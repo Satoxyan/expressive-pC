@@ -91,7 +91,9 @@ Item {
                     ? (root.material
                         ? Appearance.colors.colOnPrimary
                         : Appearance.colors.colPrimary)
-                    : Appearance.colors.colOnLayer2
+                    : (root.material
+                        ? Appearance.colors.colPrimary
+                        : Appearance.colors.colOnLayer2)
                 Behavior on color { ColorAnimation { duration: 200 } }
             }
 
