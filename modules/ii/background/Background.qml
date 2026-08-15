@@ -107,6 +107,29 @@ Variants {
         property var activeWorkspaceWithFullscreen: workspacesForMonitor.filter(workspace => ((workspace.toplevels.values.filter(window => window.wayland?.fullscreen)[0] != undefined) && workspace.active))[0]
         visible: GlobalStates.screenLocked || (!(activeWorkspaceWithFullscreen != undefined)) || !Config?.options.background.hideWhenFullscreen
 
+        readonly property bool visualizerHidden: {
+            if (GlobalStates.screenLocked) return false;
+            const viz = Config.options.background.widgets.visualizer;
+            if (!(viz.hideWhenCovered ?? true) && !(viz.hideWhenFullscreen ?? true)) return false;
+
+            const activeWs = bgRoot.monitor?.activeWorkspace?.id;
+            if (activeWs == null) return false;
+
+            let coveringCount = 0;
+            let hasFullscreen = false;
+            HyprlandData.windowList.forEach(win => {
+                const winWsId = win.workspace?.id ?? win.workspace;
+                if (win.monitor != bgRoot.monitor?.id || winWsId != activeWs) return;
+                const isMax = (win.maximized || win.wayland?.maximized);
+                const isFS = (win.fullscreen || win.wayland?.fullscreen);
+                if (win.floating === false || isMax || isFS) coveringCount++;
+                if (isFS) hasFullscreen = true;
+            });
+            if ((viz.hideWhenCovered ?? true) && coveringCount > 0) return true;
+            if ((viz.hideWhenFullscreen ?? true) && hasFullscreen) return true;
+            return false;
+        }
+
         property HyprlandMonitor monitor: Hyprland.monitorFor(modelData)
 
         property string effectiveWallpaperPath: {
@@ -475,6 +498,7 @@ Variants {
                 }
                 FadeLoader {
                     shown: Config.options.background.widgets.visualizer.enable
+                        && !bgRoot.visualizerHidden
                         && (Config.options.background.screenList.length === 0
                             || Config.options.background.screenList.includes(bgRoot.screen.name))
                     sourceComponent: VisualizerWidget {

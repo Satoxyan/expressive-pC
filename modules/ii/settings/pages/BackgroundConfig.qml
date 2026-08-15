@@ -1153,5 +1153,284 @@ ContentPage {
                 }
             }
         }
+
+        ContentSection {
+            id: visualizerSection
+            icon: "graphic_eq"
+            shape: MaterialShape.Shape.Pill
+            title: Translation.tr("Visualizer")
+            visible: Config.options.background.widgets.visualizer.enable
+
+            readonly property bool isWave: Config.options.background.widgets.visualizer.mode === "wave"
+            readonly property bool isDefault: Config.options.background.widgets.visualizer.mode === "default"
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 16
+
+                ConfigRow {
+                    Layout.fillWidth: true
+
+                    GroupedList {
+                        ConfigSelectionArray {
+                            Layout.fillWidth: false
+                            currentValue: Config.options.background.widgets.visualizer.mode
+                            onSelected: newValue => {
+                                Config.options.background.widgets.visualizer.mode = newValue;
+                            }
+                            options: [
+                                { displayName: Translation.tr("Default"), icon: "equalizer", value: "default" },
+                                { displayName: Translation.tr("Bars"), icon: "equalizer", value: "bars" },
+                                { displayName: Translation.tr("Wave"), icon: "airwave", value: "wave" }
+                            ]
+                        }
+                    }
+                }
+
+                ContentSubsection {
+                    title: Translation.tr("Visibility")
+
+                    GroupedList {
+                        ConfigSwitch {
+                            buttonIcon: "crop_free"
+                            text: Translation.tr("Hide when fullscreen/maximized")
+                            checked: Config.options.background.widgets.visualizer.hideWhenFullscreen
+                            onCheckedChanged: {
+                                Config.options.background.widgets.visualizer.hideWhenFullscreen = checked
+                                if (!checked) {
+                                    Config.options.background.widgets.visualizer.hideWhenCovered = false
+                                }
+                            }
+                        }
+                        ConfigSwitch {
+                            id: hideWhenCoveredSwitch
+                            buttonIcon: "lock"
+                            visible: Config.options.background.widgets.visualizer.hideWhenFullscreen
+                            text: Translation.tr("Also hide when covered")
+                            checked: Config.options.background.widgets.visualizer.hideWhenCovered
+                            onCheckedChanged: {
+                                Config.options.background.widgets.visualizer.hideWhenCovered = checked
+                            }
+                        }
+                    }
+
+                    // Ensure that "hide when covered" is visibly off when hide when fullscreen is turned off
+                    Binding {
+                        target: hideWhenCoveredSwitch
+                        property: "checked"
+                        value: Config.options.background.widgets.visualizer.hideWhenCovered
+                        when: !hideWhenCoveredSwitch.pressed
+                    }
+                }
+
+                ContentSubsection {
+                    visible: visualizerSection.isWave
+                    title: Translation.tr("Performance mode")
+                    tooltip: Translation.tr("Note: Auto mode requires 'power-profiles-daemon' (Arch) package")
+
+                    GroupedList {
+                        ConfigSelectionArray {
+                            currentValue: Config.options.background.widgets.visualizer.renderEveryXFrames
+                            onSelected: newValue => {
+                                Config.options.background.widgets.visualizer.renderEveryXFrames = newValue;
+                            }
+                            options: [
+                                {
+                                    displayName: Translation.tr("Auto"),
+                                    icon: "auto_fix_high",
+                                    value: -1,
+                                },
+                                {
+                                    displayName: Translation.tr("Smooth mode"),
+                                    icon: "speed",
+                                    value: 1
+                                },
+                                {
+                                    displayName: Translation.tr("Balanced mode"),
+                                    icon: "balance",
+                                    value: 2
+                                },
+                                {
+                                    displayName: Translation.tr("Efficiency mode"),
+                                    icon: "energy_savings_leaf",
+                                    value: 4
+                                }
+                            ]
+                        }
+                    }
+                }
+
+                ContentSubsection {
+                    title: Translation.tr("Behavior & Processing")
+
+                    ConfigRow {
+                        uniform: true
+                        GroupedList {
+                            ConfigSwitch {
+                                buttonIcon: "lock"
+                                text: Translation.tr("Show when locked")
+                                checked: Config.options.background.widgets.visualizer.showWhenLocked
+                                onCheckedChanged: {
+                                    Config.options.background.widgets.visualizer.showWhenLocked = checked
+                                }
+                            }
+                        }
+                        GroupedList {
+                            ConfigSwitch {
+                                buttonIcon: "flip"
+                                text: Translation.tr("Mono / Mirrored")
+                                checked: Config.options.background.widgets.visualizer.mono
+                                onCheckedChanged: {
+                                    Config.options.background.widgets.visualizer.mono = checked
+                                }
+                            }
+                        }
+                    }
+
+                    GroupedList {
+                        ConfigSlider {
+                            buttonIcon: "waves"
+                            text: Translation.tr("Data Averaging")
+                            value: (Config.options.background.widgets.visualizer.dataSmoothing ?? 0.5) * 100
+                            from: 0; to: 100
+                            stopIndicatorValues: [50]
+                            onValueChanged: {
+                                Config.options.background.widgets.visualizer.dataSmoothing = value / 100
+                            }
+                        }
+                    }
+                }
+
+                ContentSubsection {
+                    title: Translation.tr("Sizing & Resolution")
+
+                    ConfigRow {
+                        uniform: true
+                        GroupedList {
+                            ConfigSpinBox {
+                                icon: "height"
+                                text: Translation.tr("Max Height")
+                                value: Config.options.background.widgets.visualizer.height
+                                from: 60; to: 1080; stepSize: 10
+                                onValueChanged: {
+                                    Config.options.background.widgets.visualizer.height = value
+                                }
+                            }
+                        }
+                        GroupedList {
+                            visible: !visualizerSection.isDefault
+                            ConfigSpinBox {
+                                icon: "view_column"
+                                text: visualizerSection.isWave ? Translation.tr("Point Width") : Translation.tr("Bar Width")
+                                value: Config.options.background.widgets.visualizer.targetBarWidth
+                                from: 1; to: 200
+                                onValueChanged: {
+                                    Config.options.background.widgets.visualizer.targetBarWidth = value
+                                }
+                            }
+                        }
+                    }
+
+                    ConfigRow {
+                        uniform: true
+                        GroupedList {
+                            visible: !visualizerSection.isDefault
+                            ConfigSpinBox {
+                                icon: "space_bar"
+                                text: visualizerSection.isWave ? Translation.tr("Point Gap") : Translation.tr("Bar Gap")
+                                value: Config.options.background.widgets.visualizer.barSpacing
+                                from: 0; to: 100
+                                onValueChanged: {
+                                    Config.options.background.widgets.visualizer.barSpacing = value
+                                }
+                            }
+                        }
+                        GroupedList {
+                            visible: !visualizerSection.isDefault
+                            ConfigSpinBox {
+                                icon: "line_weight"
+                                text: visualizerSection.isWave ? Translation.tr("Line Thickness") : Translation.tr("Border Width")
+                                value: Config.options.background.widgets.visualizer.waveBorderWidth
+                                from: 0; to: 20
+                                onValueChanged: {
+                                    Config.options.background.widgets.visualizer.waveBorderWidth = value
+                                }
+                            }
+                        }
+                    }
+                }
+
+                ContentSubsection {
+                    title: Translation.tr("Appearance")
+
+                    ConfigRow {
+                        uniform: true
+                        GroupedList {
+                            ConfigSlider {
+                                buttonIcon: "opacity"
+                                text: Translation.tr("Master Opacity")
+                                value: Config.options.background.widgets.visualizer.opacity * 100
+                                from: 0; to: 100
+                                stopIndicatorValues: [50]
+                                onValueChanged: {
+                                    Config.options.background.widgets.visualizer.opacity = value / 100
+                                }
+                            }
+                        }
+                        GroupedList {
+                            ConfigSlider {
+                                buttonIcon: "speed"
+                                text: Translation.tr("Smoothing")
+                                value: Config.options.background.widgets.visualizer.smoothing * 100
+                                from: 0; to: 20
+                                stopIndicatorValues: [5]
+                                onValueChanged: {
+                                    Config.options.background.widgets.visualizer.smoothing = value / 100
+                                }
+                            }
+                        }
+                    }
+                    GroupedList {
+                        visible: visualizerSection.isWave
+                        ConfigSlider {
+                            buttonIcon: "format_color_fill"
+                            text: Translation.tr("Fill Opacity")
+                            value: Config.options.background.widgets.visualizer.waveFillOpacity * 100
+                            from: 0; to: 100
+                            stopIndicatorValues: [50]
+                            onValueChanged: {
+                                Config.options.background.widgets.visualizer.waveFillOpacity = value / 100
+                            }
+                        }
+                    }
+                    GroupedList {
+                        visible: !visualizerSection.isWave && !visualizerSection.isDefault
+                        ConfigSlider {
+                            buttonIcon: "format_color_reset"
+                            text: Translation.tr("Border Opacity")
+                            value: Config.options.background.widgets.visualizer.waveFillOpacity * 100
+                            from: 0; to: 100
+                            stopIndicatorValues: [50]
+                            onValueChanged: {
+                                Config.options.background.widgets.visualizer.waveFillOpacity = value / 100
+                            }
+                        }
+                    }
+                    GroupedList {
+                        visible: !visualizerSection.isWave && !visualizerSection.isDefault
+                        ConfigSlider {
+                            buttonIcon: "rounded_corner"
+                            text: Translation.tr("Bar Roundness")
+                            value: Config.options.background.widgets.visualizer.barRounding * 100
+                            from: 0; to: 50
+                            stopIndicatorValues: [25]
+                            onValueChanged: {
+                                Config.options.background.widgets.visualizer.barRounding = value / 100
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
