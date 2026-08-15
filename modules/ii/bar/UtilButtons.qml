@@ -51,31 +51,6 @@ Item {
         }
 
         Loader {
-            active: Config.options.bar.utilButtons.showColorPicker
-            visible: active
-            sourceComponent: isMaterial ? colorPickerM3 : legacyColorPicker
-        }
-        Component {
-            id: colorPickerM3
-            UtilButton {
-                iconText: "colorize"
-                onClicked: Quickshell.execDetached(["hyprpicker", "-a"])
-            }
-        }
-        Component {
-            id: legacyColorPicker
-            CircleUtilButton {
-                onClicked: Quickshell.execDetached(["hyprpicker", "-a"])
-                MaterialSymbol {
-                    horizontalAlignment: Qt.AlignHCenter
-                    fill: 1; text: "colorize"
-                    iconSize: Appearance.font.pixelSize.large
-                    color: Appearance.colors.colOnLayer2
-                }
-            }
-        }
-
-        Loader {
             active: Config.options.bar.utilButtons.showScreenRecord
             visible: active
             sourceComponent: isMaterial ? screenRecordM3 : legacyScreenRecord
@@ -112,7 +87,14 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     colBackground: recordingItem.isRecording ? Appearance.colors.colPrimaryContainer : "transparent"
                     buttonRadius: recordingItem.isRecording ? Appearance.rounding.normal : implicitHeight / 2
-                    onClicked: Quickshell.execDetached([Directories.recordScriptPath])
+                    onClicked: {
+                        if (recordingItem.isRecording) {
+                            Quickshell.execDetached([Directories.recordScriptPath]);
+                        } else {
+                            GlobalStates.overlayOpen = false;
+                            Quickshell.execDetached(["qs", "-p", Quickshell.shellPath(""), "ipc", "call", "region", "recordWithSound"]);
+                        }
+                    }
 
                     Behavior on colBackground { ColorAnimation { duration: 200 } }
                     Behavior on buttonRadius { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
@@ -153,7 +135,39 @@ Item {
             UtilButton {
                 iconText: Persistent.states.record.enable ? "stop_circle" : "screen_record"
                 forceHovered: Persistent.states.record.enable
-                onClicked: Quickshell.execDetached([Directories.recordScriptPath])
+                onClicked: {
+                    if (Persistent.states.record.enable) {
+                        Quickshell.execDetached([Directories.recordScriptPath]);
+                    } else {
+                        GlobalStates.overlayOpen = false;
+                        Quickshell.execDetached(["qs", "-p", Quickshell.shellPath(""), "ipc", "call", "region", "recordWithSound"]);
+                    }
+                }
+            }
+        }
+
+        Loader {
+            active: Config.options.bar.utilButtons.showColorPicker
+            visible: active
+            sourceComponent: isMaterial ? colorPickerM3 : legacyColorPicker
+        }
+        Component {
+            id: colorPickerM3
+            UtilButton {
+                iconText: "colorize"
+                onClicked: Quickshell.execDetached(["hyprpicker", "-a"])
+            }
+        }
+        Component {
+            id: legacyColorPicker
+            CircleUtilButton {
+                onClicked: Quickshell.execDetached(["hyprpicker", "-a"])
+                MaterialSymbol {
+                    horizontalAlignment: Qt.AlignHCenter
+                    fill: 1; text: "colorize"
+                    iconSize: Appearance.font.pixelSize.large
+                    color: Appearance.colors.colOnLayer2
+                }
             }
         }
 
