@@ -687,6 +687,18 @@ Singleton {
                     property JsonObject zerochan: JsonObject {
                         property string username: "[unset]"
                     }
+                    property JsonObject gelbooru: JsonObject {
+                        property string userId: ""
+                        property string apiKey: ""
+                    }
+                    property JsonObject rule34: JsonObject {
+                        property string userId: ""
+                        property string apiKey: ""
+                    }
+                    property JsonObject danbooru: JsonObject {
+                        property string login: ""
+                        property string apiKey: ""
+                    }
                 }
                 property JsonObject cornerOpen: JsonObject {
                     property bool enable: true
