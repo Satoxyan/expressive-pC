@@ -262,9 +262,7 @@ AbstractBackgroundWidget {
                 id: avatarImage
                 anchors.fill: parent
                 anchors.margins: 3
-                source: Config.options.profile.avatarPath !== ""
-                    ? "file://" + Config.options.profile.avatarPicture
-                    : "file:///home/" + (Quickshell.env("USER") ?? "user") + "/.face"
+                source: Avatar.effectiveAvatarSource
                 sourceSize.width: avatarImage.width * 2
                 sourceSize.height: avatarImage.height * 2
                 fillMode: Image.PreserveAspectCrop

@@ -21,8 +21,9 @@ ContentPage {
 
     FolderListModel {
         id: avatarFolderModel
-        folder: Config.options.profile.avatarPath !== "" ? Qt.resolvedUrl(Config.options.profile.avatarPath) : ""
+        folder: Qt.resolvedUrl(Avatar.folder)
         showDirs: false
+        showHidden: true
         nameFilters: ["*.png", "*.svg", "*.jpg", "*.jpeg", "*.webp"]
     }
 
@@ -93,7 +94,7 @@ ContentPage {
 
                 Item {
                     Layout.fillWidth: true
-                    implicitHeight: Config.options.profile.avatarPath === "" ? placeholderCol.implicitHeight : avatarFlow.implicitHeight
+                    implicitHeight: avatarFolderModel.count === 0 ? placeholderCol.implicitHeight : avatarFlow.implicitHeight
 
                     Flow {
                         id: avatarFlow
@@ -160,7 +161,7 @@ ContentPage {
 
                     ColumnLayout {
                         id: placeholderCol
-                        visible: Config.options.profile.avatarPath === ""
+                        visible: avatarFolderModel.count === 0
                         anchors.centerIn: parent
                         z: 1
                         spacing: 4
