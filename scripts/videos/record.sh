@@ -11,9 +11,10 @@ fi
 
 set_recording_state() {
     local state=$1
+    local start=${2:-0}
     local STATE_FILE="$HOME/.local/state/quickshell/states.json"
     local tmp=$(mktemp)
-    jq ".record.enable = $state" "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
+    jq ".record.enable = $state | .record.start = $start" "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
 }
 
 getdate() {
@@ -72,7 +73,7 @@ if pgrep wf-recorder > /dev/null; then
 else
     if [[ $FULLSCREEN_FLAG -eq 1 ]]; then
         notify-send "Starting recording" 'recording_'"$(getdate)"'.mp4' -a 'Recorder' & disown
-        set_recording_state true
+        set_recording_state true "$(date +%s%3N)"
         if [[ $SOUND_FLAG -eq 1 ]]; then
             wf-recorder -o "$(getactivemonitor)" --pixel-format yuv420p -f './recording_'"$(getdate)"'.mp4' -t --audio="$(getaudiooutput)"
         else
@@ -88,7 +89,7 @@ else
             fi
         fi
         notify-send "Starting recording" 'recording_'"$(getdate)"'.mp4' -a 'Recorder' & disown
-        set_recording_state true
+        set_recording_state true "$(date +%s%3N)"
         if [[ $SOUND_FLAG -eq 1 ]]; then
             wf-recorder --pixel-format yuv420p -f './recording_'"$(getdate)"'.mp4' -t --geometry "$region" --audio="$(getaudiooutput)"
         else
