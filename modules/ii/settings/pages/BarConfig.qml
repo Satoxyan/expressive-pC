@@ -243,6 +243,15 @@ ContentPage {
                         { displayName: Translation.tr("Segmented"), icon: "tablet",           value: "segmented" },
                     ]
                 }
+                ColorSelectionArray {
+                    icon: "brush"
+                    text: Translation.tr("Group Color")
+                    options: ["primaryContainer", "secondaryContainer", "tertiaryContainer", "layer1", "layer0"]
+                    currentValue: Config.options.bar.groupColor
+                    onSelected: newValue => {
+                        Config.options.bar.groupColor = newValue
+                    }
+                }
                 ConfigRow{
                     uniform: true
                     ConfigSwitch {
@@ -261,6 +270,50 @@ ContentPage {
                             { displayName: Translation.tr("No"),  icon: "close", value: false },
                             { displayName: Translation.tr("Yes"), icon: "check", value: true }
                         ]
+                    }
+                }
+                ConfigRow {
+                    ConfigSwitch {
+                        buttonIcon: "panorama_wide_angle"
+                        text: Translation.tr("Show Frame")
+                        checked: Config.options.bar.showFrame
+
+                        property bool switchReady: false
+                        Component.onCompleted: Qt.callLater(() => switchReady = true)
+
+                        onCheckedChanged: {
+                            if (switchReady && checked) {
+                                GlobalStates.refreshBar();
+                            }
+                            Config.options.bar.showFrame = checked;
+                        }
+                    }
+                    ConfigSwitch {
+                        buttonIcon: "colors"
+                        enabled: Config.options.bar.showFrame
+                        text: Translation.tr("Follow Frame Color")
+                        checked: Config.options.bar.followFrameColor
+                        onCheckedChanged: { Config.options.bar.followFrameColor = checked; }
+                    }
+                }
+                ConfigSpinBox {
+                    icon: "eraser_size_1"
+                    text: Translation.tr("Frame thickness")
+                    value: Config.options.bar.frameThickness
+                    from: 1
+                    to: 10
+                    stepSize: 1
+                    onValueChanged: {
+                        Config.options.bar.frameThickness = value;
+                    }
+                }
+                ColorSelectionArray {
+                    icon: "imagesearch_roller"
+                    text: Translation.tr("Frame Color")
+                    options: ["primaryContainer", "secondaryContainer", "tertiaryContainer", "layer0", "black"] // sorry only solid colors transparency looks bad
+                    currentValue: Config.options.bar.frameColor
+                    onSelected: newValue => {
+                        Config.options.bar.frameColor = newValue
                     }
                 }
             }

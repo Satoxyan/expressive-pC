@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import qs
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
@@ -354,9 +355,15 @@ ContentPage {
                     }
                 }
             }
+        }
+
+        ContentSection {
+            icon: "screenshot_frame_2"
+            shape: MaterialShape.Shape.Gem
+            title: Translation.tr("Hot Corners")
 
             ContentSubsection {
-                title: Translation.tr("Corner open")
+                title: Translation.tr("Top")
 
                 GroupedList {
                     ConfigSwitch {
@@ -417,6 +424,31 @@ ContentPage {
                         value: Config.options.sidebar.cornerOpen.cornerRegionHeight
                         from: 1; to: 300; stepSize: 1
                         onValueChanged: { Config.options.sidebar.cornerOpen.cornerRegionHeight = value }
+                    }
+                }
+            }
+            ContentSubsection {
+                title: Translation.tr("Bottom")
+                GroupedList {
+                    ConfigComboBox {
+                        Layout.fillWidth: true
+                        buttonIcon: "position_bottom_left"
+                        text: Translation.tr("Bottom-left")
+                        textRole: "displayName"
+                        fieldWidth: 50
+                        model: GlobalStates.hotCornerOptions
+                        currentValue: Config.options.sidebar.cornerOpen.bottomLeftAction
+                        onSelected: newValue => { Config.options.sidebar.cornerOpen.bottomLeftAction = newValue }
+                    }
+                    ConfigComboBox {
+                        Layout.fillWidth: true
+                        buttonIcon: "position_bottom_right"
+                        text: Translation.tr("Bottom-right")
+                        textRole: "displayName"
+                        fieldWidth: 55
+                        model: GlobalStates.hotCornerOptions
+                        currentValue: Config.options.sidebar.cornerOpen.bottomRightAction
+                        onSelected: newValue => { Config.options.sidebar.cornerOpen.bottomRightAction = newValue }
                     }
                 }
             }

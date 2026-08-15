@@ -12,6 +12,12 @@ Item {
     property real padding: (root.isMaterial && !root.paintMaterialPill) ? 0 : 5
     property color bgColor: Appearance.colors.colPrimaryContainer
 
+    readonly property color resolvedGroupColor: {
+        const name = Config.options.bar.groupColor
+        const key = `col${name.charAt(0).toUpperCase()}${name.slice(1)}`
+        return Appearance.colors[key] ?? Appearance.colors.colLayer1
+    }
+
     readonly property bool isSegmented: Config.options?.bar.borderless === "segmented"
 
     readonly property real fullRadius: height / 2
@@ -49,7 +55,7 @@ Item {
                     ? "transparent"
                     : Config.options.bar.cornerStyle === 2 || (Config.options?.bar.borderless === "segmented" && !Config.options.bar.showBackground)
                         ? Appearance.colors.colLayer0
-                        : Appearance.colors.colLayer1)
+                        : root.resolvedGroupColor)
 
         border.width: root.isSegmented ? 1 : 0
         border.color: Appearance.colors.colLayer0Border

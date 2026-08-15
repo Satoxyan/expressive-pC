@@ -253,6 +253,11 @@ ContentPage {
                         { displayName: Translation.tr("Fade"), icon: "gradient", value: "transition" },
                         { displayName: Translation.tr("Pixelate"), icon: "grain", value: "pixelate" },
                         { displayName: Translation.tr("Stripes"), icon: "texture_minus", value: "stripes" },
+                        { displayName: Translation.tr("CRT"), icon: "tv", value: "crt" },
+                        { displayName: Translation.tr("Dissolve"), icon: "blur_on", value: "dissolve" },
+                        { displayName: Translation.tr("Glitch"), icon: "bug_report", value: "glitch" },
+                        { displayName: Translation.tr("Ripple"), icon: "water", value: "ripple" },
+                        { displayName: Translation.tr("Shatter"), icon: "broken_image", value: "shatter" },
                         { displayName: Translation.tr("Random"), icon: "shuffle", value: "random" },
                     ]
                     currentValue: Config.options.background.wallpaperAnimation

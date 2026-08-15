@@ -367,6 +367,7 @@ Singleton {
                         property string placementStrategy: "free" // "free", "leastBusy", "mostBusy"
                         property real x: 800
                         property real y: 500
+                        property string sizeMode: "1x3" 
                     }
                 }
                 property list<string> screenList: [] 
@@ -400,8 +401,13 @@ Singleton {
                         property int delay: 140
                     }
                 }
+                property bool showFrame: false
+                property real frameThickness: 4
+                property string frameColor: "black"
+                property bool followFrameColor: false
                 property bool bottom: false // Instead of top
                 property int cornerStyle: 0 // 0: Hug | 1: Float | 2: Plain rectangle
+                property string groupColor: "layer1"
                 property bool floatStyleShadow: true // Show shadow behind bar when cornerStyle == 1 (Float)
                 property string borderless: "pills"
                 property string topLeftIcon: "spark" // Options: "distro" or any icon name in ~/.config/quickshell/ii/assets/icons
@@ -724,6 +730,8 @@ Singleton {
                     property bool clickless: false
                     property int cornerRegionWidth: 250
                     property int cornerRegionHeight: 5
+                    property string bottomLeftAction: "sidebarLeftOpen"
+                    property string bottomRightAction: "sidebarRightOpen"
                     property bool visualize: false
                     property bool clicklessCornerEnd: true
                     property int clicklessCornerVerticalOffset: 1
@@ -753,7 +761,7 @@ Singleton {
             }
 
             property JsonObject custom: JsonObject {
-                property string distroIcon: ""
+                property string distroIcon: "spark"
                 property bool colorizeIcon: true
             }
 

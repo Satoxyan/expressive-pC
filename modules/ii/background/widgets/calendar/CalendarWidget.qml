@@ -4,6 +4,7 @@ import qs
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
+;import qs.modules.common.functions
 import qs.modules.common.widgets.widgetCanvas
 import qs.modules.ii.background.widgets
 
@@ -34,6 +35,23 @@ AbstractBackgroundWidget {
         var mid1 = (snapWidth1 + snapWidth2) / 2
         if (value < mid1) return "1x1"
         return root.sizeMode === "1x2" ? "1x2" : "2x2"
+    }
+
+    readonly property real heightToggleFraction: 0.3
+    readonly property real heightToggleDelta: (root.cardHeight * 2 + root.cardSpacing - root.cardHeight) * root.heightToggleFraction
+
+    function modeForDrag(dx, dy, startWidth) {
+        var mid = (root.snapWidth1 + root.snapWidth2) / 2
+        var newWidth = startWidth + dx
+
+        if (newWidth < mid) return "1x1"
+
+        if (root.sizeMode === "1x1") {
+            return dy > root.heightToggleDelta ? "2x2" : "1x2"
+        }
+        if (dy > root.heightToggleDelta) return "2x2"
+        if (dy < -root.heightToggleDelta) return "1x2"
+        return root.sizeMode 
     }
 
     property int monthShift: 0
@@ -349,7 +367,7 @@ AbstractBackgroundWidget {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    color: Appearance.colors.colLayer1
+                    color: ColorUtils.transparentize(Appearance.colors.colLayer0, 0.8)
                     radius: (Appearance.rounding?.verylarge ?? 30) - 8
 
                     ColumnLayout {
@@ -377,44 +395,13 @@ AbstractBackgroundWidget {
             }
         }
 
-        Rectangle {
-            id: toggleHandle
-            width: 16; height: 16; radius: 4
-            color: Appearance.colors.colOnPrimaryContainer
-            anchors { left: card.left; bottom: card.bottom; margins: 4 }
-            opacity: (root.containsMouse || toggleArea.containsMouse) && root.sizeMode !== "1x1" ? 0.5 : 0
-            visible: opacity > 0 && !Config.options.background.widgetsLocked
-            Behavior on opacity { NumberAnimation { duration: 150 } }
-
-            MaterialSymbol {
-                anchors.centerIn: parent
-                text: root.sizeMode === "1x2" ? "calendar_view_month" : "calendar_view_week"
-                iconSize: 11
-                color: Appearance.colors.colPrimaryContainer
-            }
-
-            MouseArea {
-                id: toggleArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    root.sizeMode = root.sizeMode === "2x2" ? "1x2" : "2x2"
-                    root.configEntry.sizeMode = root.sizeMode
-                }
-            }
-        }
-
         ResizeHandler {
             anchorItem: card
             hoverActive: root.containsMouse
             locked: Config.options.background.widgetsLocked
             currentWidth: root.widgetWidth
-            onResized: (newWidth) => {
-                var mid = (root.snapWidth1 + root.snapWidth2) / 2
-                if (newWidth < mid) root.sizeMode = "1x1"
-                else if (root.sizeMode === "1x1") root.sizeMode = "2x2"
-            }
+            resizeMode: "diagonal"
+            onResizedXY: (dx, dy, startWidth) => { root.sizeMode = root.modeForDrag(dx, dy, startWidth) }
             onResizeFinished: {
                 root.configEntry.sizeMode = root.sizeMode
             }
