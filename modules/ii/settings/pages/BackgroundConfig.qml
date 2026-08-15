@@ -471,6 +471,12 @@ ContentPage {
                             onCheckedChanged: { Config.options.background.widgets.clock.digital.vertical = checked }
                         }
                         ConfigSwitch {
+                            buttonIcon: "vertical_distribute"
+                            text: Translation.tr("Vertical (lock)")
+                            checked: Config.options.background.widgets.clock.digital.verticalLocked
+                            onCheckedChanged: { Config.options.background.widgets.clock.digital.verticalLocked = checked }
+                        }
+                        ConfigSwitch {
                             buttonIcon: "date_range"
                             text: Translation.tr("Show date")
                             checked: Config.options.background.widgets.clock.digital.showDate
@@ -515,6 +521,60 @@ ContentPage {
                             Config.options.background.widgets.clock.color = newValue
                             autoColorSwitch.checked = false
                         }
+                    }
+                }
+
+                GroupedList {
+                    ConfigSelectionArray {
+                        text: Translation.tr("Clock color")
+                        icon: "light_mode"
+                        currentValue: Config.options.background.widgets.clock.digital.colorMode
+                        onSelected: newValue => {
+                            Config.options.background.widgets.clock.digital.colorMode = newValue;
+                        }
+                        options: [
+                            {
+                                displayName: Translation.tr("Auto"),
+                                icon: "auto_fix_high",
+                                value: "auto"
+                            },
+                            {
+                                displayName: Translation.tr("Light"),
+                                icon: "light_mode",
+                                value: "light"
+                            },
+                            {
+                                displayName: Translation.tr("Dark"),
+                                icon: "dark_mode",
+                                value: "dark"
+                            }
+                        ]
+                    }
+
+                    ConfigSelectionArray {
+                        text: Translation.tr("Clock color (locked)")
+                        icon: "dark_mode"
+                        currentValue: Config.options.background.widgets.clock.digital.colorModeLocked
+                        onSelected: newValue => {
+                            Config.options.background.widgets.clock.digital.colorModeLocked = newValue;
+                        }
+                        options: [
+                            {
+                                displayName: Translation.tr("Auto"),
+                                icon: "auto_fix_high",
+                                value: "auto"
+                            },
+                            {
+                                displayName: Translation.tr("Light"),
+                                icon: "light_mode",
+                                value: "light"
+                            },
+                            {
+                                displayName: Translation.tr("Dark"),
+                                icon: "dark_mode",
+                                value: "dark"
+                            }
+                        ]
                     }
                 }
 
