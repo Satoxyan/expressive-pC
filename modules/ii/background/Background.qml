@@ -289,6 +289,8 @@ Variants {
                 active: Config.options.lock.blur.enable && (GlobalStates.screenLocked || scaleAnim.running)
                 anchors.fill: parent
                 scale: GlobalStates.screenLocked ? Config.options.lock.blur.extraZoom : 1
+                layer.enabled: active
+                layer.textureMirroring: ShaderEffect.NoMirroring
                 Behavior on scale {
                     NumberAnimation {
                         id: scaleAnim
@@ -300,7 +302,8 @@ Variants {
                 sourceComponent: GaussianBlur {
                     source: bgRoot.wallpaperAnimation === "" ? wallpaper : transitionEffect
                     radius: GlobalStates.screenLocked ? Config.options.lock.blur.radius : 0
-                    samples: Config.options.lock.blur.size 
+                    samples: radius * 2 + 1
+                    cached: true
                     Rectangle {
                         opacity: GlobalStates.screenLocked ? 1 : 0
                         anchors.fill: parent
