@@ -267,6 +267,8 @@ Item {
                             root.draggingFromWorkspace = -1
                             if (targetWorkspace !== -1 && targetWorkspace !== windowData?.workspace.id) {
                                 Hyprland.dispatch(`hl.dsp.window.move({ workspace = ${targetWorkspace}, follow = false, window = "address:${window.windowData?.address}" })`)
+                                window.x = Qt.binding(() => window.initX)
+                                window.y = Qt.binding(() => window.initY)
                             }
                             else {
                                 if (!window.windowData.floating) {
