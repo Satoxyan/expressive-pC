@@ -13,6 +13,8 @@ AbstractBackgroundWidget {
     configEntryName: "weather"
     hoverEnabled: true
 
+    readonly property string style: root.configEntry.style ?? "card"
+
     readonly property real cardSpacing: 12
     readonly property real singleWidth: 132
     readonly property real cardHeight: 120
@@ -40,8 +42,8 @@ AbstractBackgroundWidget {
         return "1x3"
     }
 
-    implicitHeight: card.implicitHeight
-    implicitWidth: card.implicitWidth
+    implicitHeight: root.style === "pill" ? backgroundShape.implicitHeight : card.implicitHeight
+    implicitWidth: root.style === "pill" ? backgroundShape.implicitWidth : card.implicitWidth
 
     Behavior on widgetWidth {
         animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
@@ -49,6 +51,7 @@ AbstractBackgroundWidget {
 
     Rectangle {
         id: card
+        visible: root.style === "card"
         implicitWidth: root.widgetWidth
         implicitHeight: root.cardHeight
         radius: Appearance.rounding?.verylarge ?? 30
@@ -398,6 +401,48 @@ AbstractBackgroundWidget {
             currentWidth: root.widgetWidth
             onResized: (newWidth) => { root.sizeMode = root.modeForWidth(newWidth) }
             onResizeFinished: { root.configEntry.sizeMode = root.sizeMode }
+        }
+    }
+
+    StyledDropShadow {
+        target: backgroundShape
+        visible: root.style === "pill"
+    }
+
+    MaterialShape {
+        id: backgroundShape
+        visible: root.style === "pill"
+        anchors.fill: parent
+        shape: MaterialShape.Shape.Pill
+        color: Appearance.colors.colPrimaryContainer
+        implicitSize: 200
+
+        StyledText {
+            font {
+                pixelSize: 80
+                family: Appearance.font.family.expressive
+                weight: Font.Medium
+            }
+            color: Appearance.colors.colPrimary
+            text: Weather.data?.temp?.slice(0, -1) ?? "--°"
+            anchors {
+                right: parent.right
+                top: parent.top
+                rightMargin: 16
+                topMargin: 20
+            }
+        }
+
+        MaterialSymbol {
+            iconSize: 80
+            color: Appearance.colors.colOnPrimaryContainer
+            text: Icons.getWeatherIcon(Weather.data.wCode) ?? "cloud"
+            anchors {
+                left: parent.left
+                bottom: parent.bottom
+                leftMargin: 16
+                bottomMargin: 20
+            }
         }
     }
 }
