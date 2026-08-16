@@ -133,24 +133,14 @@ Item {
                                 radius: sysRect.radius
                                 color: "transparent"
 
-                                StyledImage {
+                                LiveWallpaperPreview {
                                     anchors.fill: parent
-                                    fillMode: Image.PreserveAspectCrop
                                     source: Config.options.sidebar.bannerImage !== "" 
                                         ? Config.options.sidebar.bannerImage 
                                         : Config.options.background.wallpaperPath
-                                    cache: false
-                                    antialiasing: true
-                                    sourceSize.width: wallpaperRect.width * 2
-                                    sourceSize.height: wallpaperRect.height * 2
-                                    layer.enabled: true
-                                    layer.effect: OpacityMask {
-                                        maskSource: Rectangle {
-                                            width: wallpaperRect.width
-                                            height: wallpaperRect.height
-                                            radius: wallpaperRect.radius
-                                        }
-                                    }
+                                    thumbnail: Config.options.background.thumbnailPath
+                                    radius: wallpaperRect.radius
+                                    active: GlobalStates.sidebarRightOpen
                                 }
                                 MouseArea {
                                     anchors.fill: parent

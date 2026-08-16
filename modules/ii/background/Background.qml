@@ -350,6 +350,20 @@ Variants {
                 }
             }
 
+            // Dim overlay - only dims wallpaper, not widgets
+            Rectangle {
+                anchors.fill: parent
+                color: "black"
+                opacity: (GlobalStates.screenLocked && Config.options.lock.dim.enable) ? (Config.options.lock.dim.strength / 100) : 0
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: 400
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial
+                    }
+                }
+            }
+
             Rectangle {
                 id: centeredWallpaperBg
                 anchors.fill: parent

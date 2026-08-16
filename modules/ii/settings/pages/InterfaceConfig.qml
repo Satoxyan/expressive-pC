@@ -73,7 +73,7 @@ ContentPage {
                         Config.options.settings.borderColor = newValue
                     }
                 }
-            } 
+            }
         }
 
         ContentSection {
@@ -759,6 +759,31 @@ ContentPage {
                         value: Config.options.lock.blur.extraZoom * 100
                         from: 1; to: 150; stepSize: 2
                         onValueChanged: { Config.options.lock.blur.extraZoom = value / 100 }
+                    }
+                }
+            }
+
+            ContentSubsection {
+                title: Translation.tr("Dim")
+                GroupedList {
+                    ConfigSwitch {
+                        buttonIcon: "brightness_6"
+                        text: Translation.tr("Dim lockscreen")
+                        checked: Config.options.lock.dim.enable
+                        onCheckedChanged: { Config.options.lock.dim.enable = checked }
+                        StyledToolTip {
+                            text: Translation.tr("Darkens the lockscreen background for better visibility")
+                        }
+                    }
+                    ConfigSlider {
+                        text: Translation.tr("Dim strength")
+                        usePercentTooltip: true
+                        value: Config.options.lock.dim.strength
+                        from: 0
+                        to: 100
+                        buttonIcon: "contrast"
+                        stopIndicatorValues: [10]
+                        onValueChanged: { Config.options.lock.dim.strength = value }
                     }
                 }
             }
