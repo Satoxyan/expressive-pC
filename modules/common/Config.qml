@@ -812,6 +812,14 @@ Singleton {
                 property int columns: 4
                 property bool closeAfterSelection: true
                 property int changeInterval: 0 
+                property string wallhavenApiKey: "" // fallback; keyring ("/wallhaven <key>") takes precedence
+                property string wallhavenCategories: "111"
+                property string wallhavenPurity: "100"
+                property string wallhavenSorting: "relevance"
+                property string wallhavenOrder: "desc"
+                property string wallhavenRatios: ""
+                property string wallhavenColors: ""
+                property string wallhavenQuery: ""
             }
 
             property JsonObject windows: JsonObject {
