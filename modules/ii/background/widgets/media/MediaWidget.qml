@@ -207,6 +207,7 @@ AbstractBackgroundWidget {
                         bottomMargin: 10
                     }
                     spacing: 4
+                    visible: MprisController.activePlayer !== null
 
                     RippleButton {
                         implicitWidth: 26
