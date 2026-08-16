@@ -90,6 +90,22 @@ AbstractBackgroundWidget {
         }
 
         FadeLoader {
+            id: pixelDateLoader
+            anchors.horizontalCenter: parent.horizontalCenter
+            shown: root.clockStyle === "pixel" && Config.options.background.widgets.clock.pixel.showDate && GlobalStates.screenLocked && root.shouldShow
+            fade: false
+            sourceComponent: ClockText {
+                horizontalAlignment: Text.AlignHCenter
+                font {
+                    family: Config.options.background.widgets.clock.digital.font.family
+                    weight: Config.options.background.widgets.clock.pixel.weight
+                    pixelSize: Appearance.font.pixelSize.huge * Config.options.background.widgets.clock.pixel.size
+                }
+                text: DateTime.longDate
+            }
+        }
+
+        FadeLoader {
             id: quoteLoader
             anchors.horizontalCenter: parent.horizontalCenter
             shown: Config.options.background.widgets.clock.quote.enable && (root.clockStyle === "pixel" || root.clockStyle === "cookie") && Config.options.background.widgets.clock.quote.text !== "" && root.shouldShow

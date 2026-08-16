@@ -13,9 +13,10 @@ Item {
     id: root
 
     readonly property bool isVertical: Config.options.background.widgets.clock.pixel.orientation === "vertical"
+    readonly property real size: Config.options.background.widgets.clock.pixel.size
 
-    implicitWidth: isVertical ? 276 : 420
-    implicitHeight: isVertical ? 252 : 150
+    implicitWidth: (isVertical ? 276 : 420) * root.size
+    implicitHeight: (isVertical ? 252 : 140) * root.size
 
     readonly property string glyphTopLeft: DateTime.digitH0
     readonly property string glyphTopRight: DateTime.digitH1
@@ -25,19 +26,26 @@ Item {
     readonly property color tintBold: Appearance.colors.colPrimary
 
     readonly property real fringeSize: isVertical ? root.width * 0.026 : root.height * 0.03
-    readonly property real tileW: isVertical ? root.width * 0.66 : root.width * 0.30
+    readonly property real tileWF: isVertical ? 0.66 : 0.30
     readonly property real tileH: isVertical ? root.height * 0.66 : root.height * 0.9
-    readonly property real glyphSize: isVertical ? root.height * 0.66 : root.height * 0.85
+    readonly property real glyphSize: isVertical ? root.height * 0.66 : root.height * 0.9
+    readonly property real tileW: root.tileWF * root.width
 
-    readonly property real pos0X: isVertical ? root.width * 0.00 : root.width * 0.00
-    readonly property real pos1X: isVertical ? root.width * 0.30 : root.width * 0.15
-    readonly property real pos2X: isVertical ? root.width * 0.00 : root.width * 0.46
-    readonly property real pos3X: isVertical ? root.width * 0.30 : root.width * 0.60
+    readonly property real pos0XF: isVertical ? 0.00 : 0.00
+    readonly property real pos1XF: isVertical ? 0.30 : 0.12
+    readonly property real pos2XF: isVertical ? 0.00 : 0.40
+    readonly property real pos3XF: isVertical ? 0.30 : 0.52
+    readonly property real contentOffsetF: (1 - (root.pos3XF + root.tileWF)) / 2
+
+    readonly property real pos0X: (root.pos0XF + root.contentOffsetF) * root.width
+    readonly property real pos1X: (root.pos1XF + root.contentOffsetF) * root.width
+    readonly property real pos2X: (root.pos2XF + root.contentOffsetF) * root.width
+    readonly property real pos3X: (root.pos3XF + root.contentOffsetF) * root.width
 
     readonly property real pos0Y: isVertical ? root.height * -0.04 : root.height * 0.05
     readonly property real pos1Y: isVertical ? root.height * -0.04 : root.height * 0.05
     readonly property real pos2Y: isVertical ? root.height * 0.42 : root.height * 0.05
-    readonly property real pos3Y: isVertical ? root.height * 0.42  : root.height * 0.05
+    readonly property real pos3Y: isVertical ? root.height * 0.42 : root.height * 0.05
 
     readonly property real colonX: root.pos1X + root.tileW + (root.pos2X - (root.pos1X + root.tileW)) / 2 - root.width * 0.03
     readonly property real colonDotSize: root.height * 0.2
@@ -67,11 +75,10 @@ Item {
             width: root.tileW
             height: root.tileH
             font {
-                family: "Google Sans Flex"
-                weight: 1000
-                bold: true
+                family: Config.options.background.widgets.clock.digital.font.family
+                weight: Config.options.background.widgets.clock.pixel.weight
                 pixelSize: root.glyphSize
-                variableAxes: ({ "wght": 1000 })
+                variableAxes: ({ "wght": Config.options.background.widgets.clock.pixel.weight })
             }
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter

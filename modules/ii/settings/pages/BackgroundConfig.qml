@@ -362,6 +362,7 @@ ContentPage {
 
             readonly property bool digitalPresent: stylePresent("digital")
             readonly property bool cookiePresent: stylePresent("cookie")
+            readonly property bool pixelPresent: stylePresent("pixel")
 
             GroupedList {
                 ConfigSwitch {
@@ -657,6 +658,76 @@ ContentPage {
             }
 
             ContentSubsection {
+                visible: settingsClock.pixelPresent
+                title: Translation.tr("Pixel clock settings")
+
+                GroupedList {
+                    ConfigSelectionArray {
+                        text: Translation.tr("Orientation")
+                        icon: "swap_vert"
+                        currentValue: Config.options.background.widgets.clock.pixel.orientation
+                        onSelected: newValue => {
+                            Config.options.background.widgets.clock.pixel.orientation = newValue;
+                        }
+                        options: [
+                            {
+                                displayName: Translation.tr("Vertical"),
+                                icon: "swap_vert",
+                                value: "vertical"
+                            },
+                            {
+                                displayName: Translation.tr("Horizontal"),
+                                icon: "swap_horiz",
+                                value: "horizontal"
+                            }
+                        ]
+                    }
+                }
+
+                ConfigRow {
+                    uniform: true
+
+                    GroupedList {
+                        ConfigSwitch {
+                            buttonIcon: "date_range"
+                            text: Translation.tr("Show date (lock screen)")
+                            checked: Config.options.background.widgets.clock.pixel.showDate
+                            onCheckedChanged: {
+                                Config.options.background.widgets.clock.pixel.showDate = checked;
+                            }
+                        }
+                    }
+
+                    GroupedList {
+                        ConfigSlider {
+                            text: Translation.tr("Size")
+                            value: Config.options.background.widgets.clock.pixel.size
+                            usePercentTooltip: true
+                            buttonIcon: "format_size"
+                            from: 0.5
+                            to: 2
+                            stopIndicatorValues: [1]
+                            onValueChanged: {
+                                Config.options.background.widgets.clock.pixel.size = value;
+                            }
+                        }
+                        ConfigSlider {
+                            text: Translation.tr("Weight")
+                            value: Config.options.background.widgets.clock.pixel.weight
+                            usePercentTooltip: false
+                            buttonIcon: "format_bold"
+                            from: 100
+                            to: 1000
+                            stopIndicatorValues: [350]
+                            onValueChanged: {
+                                Config.options.background.widgets.clock.pixel.weight = value;
+                            }
+                        }
+                    }
+                }
+            }
+
+            ContentSubsection {
                 visible: settingsClock.cookiePresent
                 title: Translation.tr("Cookie clock settings")
                 GroupedList {   
@@ -896,35 +967,6 @@ ContentPage {
                 }
             }
             
-            ContentSubsection {
-                visible: Config.options.background.widgets.clock.style === "pixel"
-                title: Translation.tr("Pixel Clock Settings")
-                GroupedList {
-                    visible: Config.options.background.widgets.clock.style === "pixel"
-                    ConfigSelectionArray {
-                        text: Translation.tr("Pixel clock orientation")
-                        visible: Config.options.background.widgets.clock.style === "pixel"
-                        icon: "screen_rotation"
-                        currentValue: Config.options.background.widgets.clock.pixel.orientation
-                        onSelected: newValue => {
-                            Config.options.background.widgets.clock.pixel.orientation = newValue;
-                        }
-                        options: [
-                            {
-                                displayName: Translation.tr("Horizontal"),
-                                icon: "swap_horiz",
-                                value: "horizontal"
-                            },
-                            {
-                                displayName: Translation.tr("Vertical"),
-                                icon: "swap_vert",
-                                value: "vertical"
-                            }
-                        ]
-                    }
-                }
-            }
-
             ContentSubsection {
                 title: Translation.tr("Quote")
                 GroupedList {
