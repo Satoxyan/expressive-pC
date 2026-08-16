@@ -10,6 +10,7 @@ import qs.modules.common.widgets
 import qs.modules.common.functions
 import qs.modules.common.panels.lock
 import qs.modules.ii.bar as Bar
+import qs.modules.ii.mediaControls
 import Quickshell
 import Quickshell.Services.SystemTray
 
@@ -36,6 +37,49 @@ MouseArea {
     }
 
     property var    artUrl:      activePlayer?.trackArtUrl ?? ""
+
+    // Media controller state. Hidden by default; shown on demand when the
+    // media info component in the left toolbar is pressed.
+    readonly property bool mediaPlayerAvailable: MprisController.activePlayer !== null && MprisController.activePlayer.trackTitle
+    property bool mediaLoaderActive: false
+
+    Connections {
+        target: GlobalStates
+        function onLockMediaOpenChanged() {
+            if (GlobalStates.lockMediaOpen) {
+                if (root.mediaPlayerAvailable) {
+                    root.mediaLoaderActive = true
+                    if (lockscreenMediaController.item) {
+                        mediaExitAnim.stop()
+                        lockscreenMediaController.mediaScale = 0.85
+                        lockscreenMediaController.mediaOpacity = 0.0
+                        entryAnim.restart()
+                    }
+                } else {
+                    GlobalStates.lockMediaOpen = false
+                }
+            } else {
+                if (lockscreenMediaController.item) {
+                    entryAnim.stop()
+                    mediaExitAnim.restart()
+                } else {
+                    root.mediaLoaderActive = false
+                }
+            }
+        }
+    }
+
+    onMediaPlayerAvailableChanged: {
+        if (!root.mediaPlayerAvailable && GlobalStates.lockMediaOpen) {
+            if (lockscreenMediaController.item) {
+                entryAnim.stop()
+                mediaExitAnim.restart()
+            } else {
+                root.mediaLoaderActive = false
+                GlobalStates.lockMediaOpen = false
+            }
+        }
+    }
 
     // Force focus on entry
     function forceFieldFocus() {
@@ -93,6 +137,7 @@ MouseArea {
         forceFieldFocus();
         toolbarScale = 1;
         toolbarOpacity = 1;
+        GlobalStates.lockMediaOpen = false;
     }
 
     // Key presses
@@ -154,6 +199,82 @@ MouseArea {
                 source: lockBgSource
                 radius: 0 // fixme
             }
+        }
+    }
+
+    // Media controller (LockMediaWidget), shown on demand above the main toolbar
+    Loader {
+        id: lockscreenMediaController
+        active: root.mediaLoaderActive
+
+        anchors {
+            horizontalCenter: parent.horizontalCenter
+            bottom: mainIsland.top
+            bottomMargin: 15
+        }
+
+        property real mediaScale: 0.85
+        property real mediaOpacity: 0.0
+
+        scale: mediaScale * root.toolbarScale
+        opacity: mediaOpacity * root.toolbarOpacity
+
+        onLoaded: {
+            mediaScale = 0.85
+            mediaOpacity = 0.0
+            entryAnim.restart()
+        }
+
+        ParallelAnimation {
+            id: entryAnim
+            NumberAnimation {
+                target: lockscreenMediaController
+                property: "mediaScale"
+                to: 1.0
+                duration: Appearance.animation.elementMove.duration
+                easing.type: Easing.OutBack
+                easing.overshoot: 1.5
+            }
+            NumberAnimation {
+                target: lockscreenMediaController
+                property: "mediaOpacity"
+                to: 1.0
+                duration: Appearance.animation.elementMoveFast.duration
+                easing.type: Easing.InCubic
+            }
+        }
+
+        SequentialAnimation {
+            id: mediaExitAnim
+            ParallelAnimation {
+                NumberAnimation {
+                    target: lockscreenMediaController
+                    property: "mediaScale"
+                    to: 0.85
+                    duration: Appearance.animation.elementMoveFast.duration
+                    easing.type: Easing.InBack
+                    easing.overshoot: 1.2
+                }
+                NumberAnimation {
+                    target: lockscreenMediaController
+                    property: "mediaOpacity"
+                    to: 0.0
+                    duration: Appearance.animation.elementMoveFast.duration
+                    easing.type: Easing.InCubic
+                }
+            }
+            ScriptAction {
+                script: {
+                    root.mediaLoaderActive = false
+                    GlobalStates.lockMediaOpen = false
+                }
+            }
+        }
+
+        sourceComponent: LockMediaWidget {
+            player: MprisController.activePlayer
+            visualizerPoints: GlobalStates.visualizerPoints
+            radius: Appearance.rounding.screenRounding - Appearance.sizes.hyprlandGapsOut + 1
         }
     }
 
@@ -422,6 +543,15 @@ MouseArea {
                                 color: Appearance.colors.colOnSurfaceVariant
                             }
                         }
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        root.forceFieldFocus()
+                        GlobalStates.lockMediaOpen = !GlobalStates.lockMediaOpen
                     }
                 }
             }
