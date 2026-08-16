@@ -32,10 +32,15 @@ AbstractWidget {
         animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
     }
 
-    draggable: placementStrategy === "free" && !Config.options.background.widgetsLocked
+    draggable: !Config.options.background.widgetsLocked
     function restoreXYBinding() {
         root.x = Qt.binding(() => root.targetX);
         root.y = Qt.binding(() => root.targetY);
+    }
+
+    onDragFinished: {
+        if (root.configEntry.placementStrategy !== "free")
+            root.configEntry.placementStrategy = "free"
     }
 
     onReleased: {

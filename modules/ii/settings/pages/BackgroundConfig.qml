@@ -1058,7 +1058,39 @@ ContentPage {
                     configEntry: Config.options.background
                 }
             }
-            
+
+            ContentSubsection {
+                title: Translation.tr("Weather")
+                Layout.bottomMargin: 10
+
+                ConfigSelectionArray {
+                    text: Translation.tr("Placement strategy")
+                    icon: "move"
+                    Layout.fillWidth: false
+                    currentValue: Config.options.background.widgets.weather.placementStrategy
+                    onSelected: newValue => {
+                        Config.options.background.widgets.weather.placementStrategy = newValue;
+                    }
+                    options: [
+                        {
+                            displayName: Translation.tr("Draggable"),
+                            icon: "drag_pan",
+                            value: "free"
+                        },
+                        {
+                            displayName: Translation.tr("Least busy"),
+                            icon: "category",
+                            value: "leastBusy"
+                        },
+                        {
+                            displayName: Translation.tr("Most busy"),
+                            icon: "shapes",
+                            value: "mostBusy"
+                        },
+                    ]
+                }
+            }
+
             GridLayout {
                 Layout.fillWidth: true
                 columns: 3

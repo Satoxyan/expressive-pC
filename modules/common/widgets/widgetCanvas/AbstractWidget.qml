@@ -14,6 +14,8 @@ MouseArea {
     property bool snapEnabled: true
     readonly property bool dragging: drag.active
 
+    signal dragFinished()
+
     acceptedButtons: Qt.LeftButton | Qt.RightButton
     drag.target: draggable ? dragProxy : undefined
     cursorShape: (draggable && containsPress) ? Qt.ClosedHandCursor : draggable ? Qt.OpenHandCursor : Qt.ArrowCursor
@@ -103,6 +105,9 @@ MouseArea {
 
         dragProxy.x = root.x
         dragProxy.y = root.y
+
+        if (!root.dragging)
+            root.dragFinished()
     }
 
     Behavior on x {
