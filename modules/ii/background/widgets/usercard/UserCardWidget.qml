@@ -290,17 +290,21 @@ AbstractBackgroundWidget {
         }
 
         ColumnLayout {
+            id: infoColumn
             x: avatarRect.x + avatarRect.width + 13
             y: avatarRect.y + (avatarRect.height - implicitHeight) / 2 + 20
+            width: (contentBox.x + contentBox.width) - infoColumn.x - 8
             spacing: 0
             z: 2
             
 
             StyledText {
+                Layout.fillWidth: true
                 text: root.userDisplay
                 font.pixelSize: Appearance.font.pixelSize.small
                 font.weight: Font.DemiBold
                 color: Appearance.colors.colOnLayer1
+                elide: Text.ElideRight
             }
             StyledText {
                 text: "Up • " + DateTime.uptime
