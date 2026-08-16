@@ -156,7 +156,7 @@ Item {
                 onClicked: {
                     const entry = slotItem.appEntry
                     if (!entry || entry.toplevels.length === 0) {
-                        slotItem.deskEntry?.execute()
+                        if (slotItem.deskEntry) Quickshell.execDetached(["gtk-launch", slotItem.deskEntry.id]);
                         return
                     }
                     const next = (slotItem._lastFocused + 1) % entry.toplevels.length
@@ -164,7 +164,7 @@ Item {
                     entry.toplevels[next].activate()
                 }
 
-                middleClickAction: () => { slotItem.deskEntry?.execute() }
+                middleClickAction: () => { if (slotItem.deskEntry) Quickshell.execDetached(["gtk-launch", slotItem.deskEntry.id]) }
                 altAction:         () => { TaskbarApps.togglePin(slotItem.appId) }
 
                 contentItem: Item {

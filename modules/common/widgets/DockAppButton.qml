@@ -64,7 +64,7 @@ DockButton {
 
     onClicked: {
         if (appToplevel.toplevels.length === 0) {
-            root.desktopEntry?.execute();
+            if (root.desktopEntry) Quickshell.execDetached(["gtk-launch", root.desktopEntry.id]);
             return;
         }
         lastFocused = (lastFocused + 1) % appToplevel.toplevels.length
@@ -72,7 +72,7 @@ DockButton {
     }
 
     middleClickAction: () => {
-        root.desktopEntry?.execute();
+        if (root.desktopEntry) Quickshell.execDetached(["gtk-launch", root.desktopEntry.id]);
     }
 
     altAction: () => {

@@ -316,14 +316,14 @@ Item {
                             if (root.dragging) return
                             const entry = slotItem.appEntry
                             if (!entry || entry.toplevels.length === 0) {
-                                slotItem.deskEntry?.execute()
+                                if (slotItem.deskEntry) Quickshell.execDetached(["gtk-launch", slotItem.deskEntry.id]);
                                 return
                             }
                             const next = (slotItem._lastFocused + 1) % entry.toplevels.length
                             slotItem._lastFocused = next
                             entry.toplevels[next].activate()
                         }
-                        middleClickAction: () => { slotItem.deskEntry?.execute() }
+                        middleClickAction: () => { if (slotItem.deskEntry) Quickshell.execDetached(["gtk-launch", slotItem.deskEntry.id]) }
                         altAction:         () => { TaskbarApps.togglePin(slotItem.appId) }
 
                         contentItem: Item {
@@ -425,7 +425,8 @@ Item {
                             activeSlot.modelData.toplevels[next].activate()
                         }
                         middleClickAction: () => {
-                            DesktopEntries.heuristicLookup(activeSlot.modelData.appId)?.execute()
+                            const entry = DesktopEntries.heuristicLookup(activeSlot.modelData.appId)
+                            if (entry) Quickshell.execDetached(["gtk-launch", entry.id]);
                         }
                         altAction: () => {
                             TaskbarApps.togglePin(activeSlot.modelData.appId)
