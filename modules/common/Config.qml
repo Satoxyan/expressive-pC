@@ -592,6 +592,10 @@ Singleton {
                 property bool filterDuplicatePlayers: true
             }
 
+            property JsonObject lyrics: JsonObject {
+                property string providers: "musixmatch,youlyplus,paxsenix,betterlyric,simpmusic,lrclib,kugou" // Comma-separated priority order
+            }
+
             property JsonObject networking: JsonObject {
                 property string userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
             }

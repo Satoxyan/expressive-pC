@@ -16,6 +16,7 @@ Singleton {
     property var lyricsLines: []
     property int activeIndex: -1
     property string status: "loading"
+    property string providedBy: ""
     property var slots: ["", "", "", "", "", "", ""]
 
     readonly property int before: 3
@@ -63,11 +64,13 @@ Singleton {
                 if (trimmed === "no_info")   { root.status = "no_info";   return }
 
                 const parts = trimmed.split("§")
-                if (parts.length < 3) return
-                if (parts[parts.length - 1].trim() !== "ok") return
+                if (parts.length < 4) return
+                if (parts[parts.length - 2].trim() !== "ok") return
+
+                root.providedBy = parts[parts.length - 1]
 
                 let lines = []
-                for (let i = 0; i < parts.length - 1; i += 2) {
+                for (let i = 0; i < parts.length - 2; i += 2) {
                     const t = parseFloat(parts[i])
                     const txt = parts[i + 1] || ""
                     if (!isNaN(t)) lines.push({ time: t, text: txt })
@@ -83,10 +86,29 @@ Singleton {
         }
     }
 
+    Timer {
+        id: retryTimer
+        interval: 200
+        repeat: true
+        running: false
+        property int attempts: 0
+        onTriggered: {
+            const ap = root.activePlayer
+            if (ap?.trackTitle && ap?.trackArtist) {
+                retryTimer.running = false
+                root.restartLyrics()
+            } else if (++retryTimer.attempts > 15) {
+                retryTimer.running = false
+                root.status = "no_info"
+            }
+        }
+    }
+
     function restartLyrics() {
         lyricsProc.running = false
         root.lyricsLines = []
         root.activeIndex = -1
+        root.providedBy = ""
         root.slots = ["", "", "", "", "", "", ""]
         root.status = "loading"
 
@@ -94,19 +116,30 @@ Singleton {
         const artist   = root.activePlayer?.trackArtist ?? ""
         const duration = root.activePlayer?.length       ?? 0
 
-        if (!title || !artist) { root.status = "no_info"; return }
+        if (!title || !artist) {
+            // Metadata may arrive in pieces (title first, artist later) or the
+            // player may not be the active one yet. Wait briefly and retry.
+            retryTimer.attempts = 0
+            retryTimer.running = true
+            return
+        }
 
+        retryTimer.running = false
         lyricsProc.command = [
             "python3",
             `${Directories.scriptPath}/lyrics/lyrics.py`,
-            title, artist, String(Math.floor(duration))
+            title, artist, String(Math.floor(duration)),
+            "--providers", Config.options.lyrics.providers
         ]
         lyricsProc.running = true
     }
 
+    onActivePlayerChanged: root.restartLyrics()
+
     Connections {
         target: root.activePlayer
         function onTrackTitleChanged() { root.restartLyrics() }
+        function onTrackArtistChanged() { root.restartLyrics() }
     }
 
     Component.onCompleted: root.restartLyrics()

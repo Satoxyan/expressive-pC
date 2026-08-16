@@ -23,14 +23,14 @@ Item {
     property list<real> visualizerPoints: []
 
     // Exposed so LockSurface can still read dominant color for bg tinting, etc.
-    readonly property color artDominantColor: playerControl.artDominantColor
-    readonly property string displayedArtFilePath: playerControl.displayedArtFilePath
+    readonly property color artDominantColor: mediaPlayer.artDominantColor
+    readonly property string displayedArtFilePath: mediaPlayer.displayedArtFilePath
 
     readonly property bool compactMode: GlobalStates.lockMediaCompact
 
     // Sizes — must match what LockSurface passes in
     readonly property real fullWidth:    Appearance.sizes.mediaControlsWidth
-    readonly property real fullHeight:   Appearance.sizes.mediaControlsHeight
+    readonly property real fullHeight:   mediaPlayer.showLyrics ? 290 : Appearance.sizes.mediaControlsHeight
     readonly property real compactHeight: 81
     readonly property real compactWidth:  fullWidth * 0.8
 
@@ -44,8 +44,8 @@ Item {
     Component.onCompleted: {
         committedCompact = compactMode
         if (compactMode) {
-            playerControl.animScale   = 1.0
-            playerControl.animOpacity = 0.0
+            mediaPlayer.animScale   = 1.0
+            mediaPlayer.animOpacity = 0.0
             compactView.animScale     = 1.0
             compactView.animOpacity   = 1.0
         }
@@ -71,8 +71,8 @@ Item {
     }
 
     // ── Transition animations ────────────────────────────────────────────────
-    // full → compact: playerControl bounces out THEN size shrinks THEN compactView bounces in
-    // compact → full: compactView bounces out THEN size grows THEN playerControl bounces in
+    // full → compact: mediaPlayer bounces out THEN size shrinks THEN compactView bounces in
+    // compact → full: compactView bounces out THEN size grows THEN mediaPlayer bounces in
 
     onCompactModeChanged: {
         if (!initialised) return
@@ -85,18 +85,18 @@ Item {
         }
     }
 
-    // full → compact step 1: playerControl exits, then commits size, then brings in compact
+    // full → compact step 1: mediaPlayer exits, then commits size, then brings in compact
     SequentialAnimation {
         id: toCompactOutAnim
         ParallelAnimation {
             NumberAnimation {
-                target: playerControl; property: "animScale"
+                target: mediaPlayer; property: "animScale"
                 to: 0.85
                 duration: Appearance.animation.elementMoveFast.duration
                 easing.type: Easing.InBack; easing.overshoot: 1.2
             }
             NumberAnimation {
-                target: playerControl; property: "animOpacity"
+                target: mediaPlayer; property: "animOpacity"
                 to: 0.0
                 duration: Appearance.animation.elementMoveFast.duration
                 easing.type: Easing.InCubic
@@ -152,8 +152,8 @@ Item {
         PauseAnimation { duration: 16 }
         ScriptAction {
             script: {
-                playerControl.animScale   = 0.85
-                playerControl.animOpacity = 0.0
+                mediaPlayer.animScale   = 0.85
+                mediaPlayer.animOpacity = 0.0
                 toFullInAnim.restart()
             }
         }
@@ -162,28 +162,26 @@ Item {
     ParallelAnimation {
         id: toFullInAnim
         NumberAnimation {
-            target: playerControl; property: "animScale"
+            target: mediaPlayer; property: "animScale"
             to: 1.0
             duration: Appearance.animation.elementMove.duration * 1.1
             easing.type: Easing.OutBack; easing.overshoot: 1.2
         }
         NumberAnimation {
-            target: playerControl; property: "animOpacity"
+            target: mediaPlayer; property: "animOpacity"
             to: 1.0
             duration: Appearance.animation.elementMoveFast.duration
             easing.type: Easing.OutCubic
         }
     }
 
-    // ── Full PlayerControl ────────────────────────────────────────────────────
-    PlayerControl {
-        id: playerControl
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
+    // ── Full media player (repo's Player widget, includes lyrics) ─────────────
+    Player {
+        id: mediaPlayer
+        width: root.fullWidth
+        height: root.fullHeight
         player: root.player
         visualizerPoints: root.visualizerPoints
-        implicitWidth: root.fullWidth
-        implicitHeight: root.fullHeight
         radius: root.radius
 
         property real animScale:   1.0
@@ -203,12 +201,13 @@ Item {
 
         Rectangle {
             id: coverHoverOverlay
+            visible: !mediaPlayer.showLyrics
 
             // Match art area: left offset = elevationMargin + 13 (RowLayout margin)
             x: Appearance.sizes.elevationMargin + 13
             y: Appearance.sizes.elevationMargin + 13
-            width:  playerControl.artSize
-            height: playerControl.artSize
+            width:  mediaPlayer.artSize
+            height: mediaPlayer.artSize
             radius: Appearance.rounding.verysmall
 
             color: "transparent"
@@ -267,7 +266,7 @@ Item {
         width: root.compactWidth
         height: root.compactHeight
         radius: root.compactHeight / 2
-        color: playerControl.blendedColors?.colLayer0 ?? Appearance.colors.colLayer0
+        color: mediaPlayer.blendedColors?.colLayer0 ?? Appearance.colors.colLayer0
 
         property real animScale:   0.85
         property real animOpacity: 0.0
@@ -306,7 +305,7 @@ Item {
             Rectangle {
                 anchors.fill: parent
                 color: ColorUtils.transparentize(
-                    playerControl.blendedColors?.colLayer0 ?? Appearance.colors.colLayer0,
+                    mediaPlayer.blendedColors?.colLayer0 ?? Appearance.colors.colLayer0,
                     0.35
                 )
                 radius: compactView.radius
@@ -334,7 +333,7 @@ Item {
                 Layout.alignment: Qt.AlignVCenter
                 radius: height / 2
                 color: ColorUtils.transparentize(
-                    playerControl.blendedColors?.colLayer1 ?? Appearance.colors.colLayer1,
+                    mediaPlayer.blendedColors?.colLayer1 ?? Appearance.colors.colLayer1,
                     0.5
                 )
 
@@ -397,7 +396,7 @@ Item {
                 StyledText {
                     Layout.fillWidth: true
                     font.pixelSize: Appearance.font.pixelSize.small
-                    color: playerControl.blendedColors?.colOnLayer0 ?? Appearance.colors.colOnLayer0
+                    color: mediaPlayer.blendedColors?.colOnLayer0 ?? Appearance.colors.colOnLayer0
                     elide: Text.ElideRight
                     text: StringUtils.cleanMusicTitle(root.player?.trackTitle) || "Untitled"
                     animateChange: true
@@ -405,7 +404,7 @@ Item {
                 StyledText {
                     Layout.fillWidth: true
                     font.pixelSize: Appearance.font.pixelSize.smaller
-                    color: playerControl.blendedColors?.colSubtext ?? Appearance.colors.colSubtext
+                    color: mediaPlayer.blendedColors?.colSubtext ?? Appearance.colors.colSubtext
                     elide: Text.ElideRight
                     text: root.player?.trackArtist ?? ""
                     animateChange: true
@@ -414,7 +413,7 @@ Item {
                     Layout.fillWidth: true
                     Layout.topMargin: 3
                     font.pixelSize: Appearance.font.pixelSize.smaller
-                    color: playerControl.blendedColors?.colSubtext ?? Appearance.colors.colSubtext
+                    color: mediaPlayer.blendedColors?.colSubtext ?? Appearance.colors.colSubtext
                     text: `${StringUtils.friendlyTimeForSeconds(root.player?.position)} / ${StringUtils.friendlyTimeForSeconds(root.player?.length)}`
                 }
             }
@@ -430,9 +429,9 @@ Item {
                     implicitHeight: 36
                     buttonRadius: height / 2
                     colBackground: ColorUtils.transparentize(
-                        playerControl.blendedColors?.colSecondaryContainer ?? Appearance.colors.colSecondaryContainer, 1)
-                    colBackgroundHover: playerControl.blendedColors?.colSecondaryContainerHover ?? Appearance.colors.colSecondaryContainerHover
-                    colRipple: playerControl.blendedColors?.colSecondaryContainerActive ?? Appearance.colors.colSecondaryContainerActive
+                        mediaPlayer.blendedColors?.colSecondaryContainer ?? Appearance.colors.colSecondaryContainer, 1)
+                    colBackgroundHover: mediaPlayer.blendedColors?.colSecondaryContainerHover ?? Appearance.colors.colSecondaryContainerHover
+                    colRipple: mediaPlayer.blendedColors?.colSecondaryContainerActive ?? Appearance.colors.colSecondaryContainerActive
                     onClicked: root.player?.previous()
                     contentItem: MaterialSymbol {
                         horizontalAlignment: Text.AlignHCenter
@@ -440,7 +439,7 @@ Item {
                         iconSize: 20
                         fill: 1
                         text: "skip_previous"
-                        color: playerControl.blendedColors?.colOnSecondaryContainer ?? Appearance.colors.colOnSecondaryContainer
+                        color: mediaPlayer.blendedColors?.colOnSecondaryContainer ?? Appearance.colors.colOnSecondaryContainer
                     }
                 }
 
@@ -449,9 +448,9 @@ Item {
                     implicitWidth: 48
                     implicitHeight: 48
                     buttonRadius: height / 2
-                    colBackground: playerControl.blendedColors?.colSecondaryContainer ?? Appearance.colors.colSecondaryContainer
-                    colBackgroundHover: playerControl.blendedColors?.colSecondaryContainerHover ?? Appearance.colors.colSecondaryContainerHover
-                    colRipple: playerControl.blendedColors?.colSecondaryContainerActive ?? Appearance.colors.colSecondaryContainerActive
+                    colBackground: mediaPlayer.blendedColors?.colSecondaryContainer ?? Appearance.colors.colSecondaryContainer
+                    colBackgroundHover: mediaPlayer.blendedColors?.colSecondaryContainerHover ?? Appearance.colors.colSecondaryContainerHover
+                    colRipple: mediaPlayer.blendedColors?.colSecondaryContainerActive ?? Appearance.colors.colSecondaryContainerActive
                     onClicked: root.player?.togglePlaying()
                     contentItem: MaterialSymbol {
                         horizontalAlignment: Text.AlignHCenter
@@ -459,7 +458,7 @@ Item {
                         iconSize: 24
                         fill: 1
                         text: (root.player?.playbackState === MprisPlaybackState.Playing) ? "pause" : "play_arrow"
-                        color: playerControl.blendedColors?.colOnSecondaryContainer ?? Appearance.colors.colOnSecondaryContainer
+                        color: mediaPlayer.blendedColors?.colOnSecondaryContainer ?? Appearance.colors.colOnSecondaryContainer
                         Behavior on text {
                             enabled: false  // icon swap is instant
                         }
@@ -472,9 +471,9 @@ Item {
                     implicitHeight: 36
                     buttonRadius: height / 2
                     colBackground: ColorUtils.transparentize(
-                        playerControl.blendedColors?.colSecondaryContainer ?? Appearance.colors.colSecondaryContainer, 1)
-                    colBackgroundHover: playerControl.blendedColors?.colSecondaryContainerHover ?? Appearance.colors.colSecondaryContainerHover
-                    colRipple: playerControl.blendedColors?.colSecondaryContainerActive ?? Appearance.colors.colSecondaryContainerActive
+                        mediaPlayer.blendedColors?.colSecondaryContainer ?? Appearance.colors.colSecondaryContainer, 1)
+                    colBackgroundHover: mediaPlayer.blendedColors?.colSecondaryContainerHover ?? Appearance.colors.colSecondaryContainerHover
+                    colRipple: mediaPlayer.blendedColors?.colSecondaryContainerActive ?? Appearance.colors.colSecondaryContainerActive
                     onClicked: root.player?.next()
                     contentItem: MaterialSymbol {
                         horizontalAlignment: Text.AlignHCenter
@@ -482,7 +481,7 @@ Item {
                         iconSize: 20
                         fill: 1
                         text: "skip_next"
-                        color: playerControl.blendedColors?.colOnSecondaryContainer ?? Appearance.colors.colOnSecondaryContainer
+                        color: mediaPlayer.blendedColors?.colOnSecondaryContainer ?? Appearance.colors.colOnSecondaryContainer
                     }
                 }
             }
