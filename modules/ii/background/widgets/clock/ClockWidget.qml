@@ -29,8 +29,20 @@ AbstractBackgroundWidget {
     readonly property string effectiveColorMode: GlobalStates.screenLocked ? Config.options.background.widgets.clock.digital.colorModeLocked : Config.options.background.widgets.clock.digital.colorMode
     property bool wallpaperSafetyTriggered: false
     needsColText: clockStyle === "digital"
-    x: forceCenter ? ((root.screenWidth - root.width) / 2) : targetX
-    y: forceCenter ? ((root.screenHeight - root.height) / 2) : targetY
+
+    property real refWidth: 0
+    property real refHeight: 0
+    readonly property real centerX: root.refWidth > 0 ? (root.targetX + root.refWidth / 2) : (root.targetX + root.width / 2)
+    readonly property real centerY: root.refHeight > 0 ? (root.targetY + root.refHeight / 2) : (root.targetY + root.height / 2)
+    onTargetXChanged: root.refWidth = root.width
+    onTargetYChanged: root.refHeight = root.height
+    Component.onCompleted: {
+        root.refWidth = root.width;
+        root.refHeight = root.height;
+    }
+
+    x: forceCenter ? ((root.screenWidth - root.width) / 2) : (root.centerX - root.width / 2)
+    y: forceCenter ? ((root.screenHeight - root.height) / 2) : (root.centerY - root.height / 2)
     visibleWhenLocked: true
 
     readonly property color effectiveColText: {
@@ -40,8 +52,8 @@ AbstractBackgroundWidget {
     }
 
     function restoreXYBinding() {
-        root.x = Qt.binding(() => root.forceCenter ? ((root.screenWidth - root.width) / 2) : root.targetX);
-        root.y = Qt.binding(() => root.forceCenter ? ((root.screenHeight - root.height) / 2) : root.targetY);
+        root.x = Qt.binding(() => root.forceCenter ? ((root.screenWidth - root.width) / 2) : (root.centerX - root.width / 2));
+        root.y = Qt.binding(() => root.forceCenter ? ((root.screenHeight - root.height) / 2) : (root.centerY - root.height / 2));
     }
 
     property var textHorizontalAlignment: {
