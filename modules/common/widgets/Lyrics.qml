@@ -193,7 +193,7 @@ Item {
                     clip: true
 
                     Repeater {
-                        model: slotItem.karaokeRows
+                        model: slotItem.useKaraoke ? slotItem.karaokeRows : []
                         delegate: Row {
                             required property var modelData
                             spacing: karaokeColumn.spacing

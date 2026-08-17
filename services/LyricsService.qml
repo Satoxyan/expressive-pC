@@ -27,6 +27,11 @@ Singleton {
     // positive = later. Hardcoded so it can't disturb the lyric logic.
     readonly property int lyricOffsetMs: -200
 
+    // Longest a word may take to fill (s). Provider word timings can place a
+    // big pause after a short word (e.g. musixmatch richsync "The" → 1.5s);
+    // capping the fill span stops the highlight from crawling through pauses.
+    readonly property real maxWordSpan: 1.2
+
     // Player position shifted by the offset, used for both the active line
     // and the word sweep so they stay in sync with each other.
     //
@@ -74,10 +79,33 @@ Singleton {
         root.activeLineWords = words
         root.activeWordIndex = idx
         if (idx >= 0 && idx + 1 < words.length) {
-            const span = Math.max(0.001, words[idx + 1].time - words[idx].time)
+            // Fill the word from its start toward the next word's start, but
+            // cap the span so a long gap (some providers put a big pause after
+            // a short word) never makes the highlight crawl. Reaching 100%
+            // early keeps the sweep stuck on the last word actually sung
+            // instead of stretching it out across the pause.
+            const span = Math.min(
+                Math.max(0.001, words[idx + 1].time - words[idx].time),
+                root.maxWordSpan
+            )
             root.activeWordProgress = Math.min(1, Math.max(0, (pos - words[idx].time) / span))
+        } else if (idx >= 0) {
+            // Last word of the line: there is no next word, so it used to
+            // snap to 100% and only glow. Sweep it across the rest of the
+            // line up to the next line's start instead, still capped so a
+            // long pause before the next line can't make it crawl.
+            const lineEnd = root.lyricsLines[root.activeIndex + 1]?.time
+            if (lineEnd !== undefined) {
+                const span = Math.min(
+                    Math.max(0.001, lineEnd - words[idx].time),
+                    root.maxWordSpan
+                )
+                root.activeWordProgress = Math.min(1, Math.max(0, (pos - words[idx].time) / span))
+            } else {
+                root.activeWordProgress = 1
+            }
         } else {
-            root.activeWordProgress = idx >= 0 ? 1 : 0
+            root.activeWordProgress = 0
         }
     }
 

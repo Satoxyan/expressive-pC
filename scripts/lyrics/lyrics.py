@@ -574,20 +574,109 @@ def _score_apple_results(results, title, artist, duration):
     return scored[:10]
 
 
+def _parse_elrc(raw):
+    """Parse enhanced-LRC lines -> [{time, text, words: [{t, w}]}].
+
+    Each word carries an absolute <mm:ss.xx> timestamp. A trailing tag with no
+    text (the line's end time) and any lead text such as "v1:" are ignored.
+    """
+    lines = []
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        m = re.match(r"\[([\d:.]+)\](.*)", line)
+        if not m:
+            continue
+        t = _ttml_time(m.group(1))
+        words = []
+        for wm in re.finditer(r"<([^>]+)>\s*([^<]*)", m.group(2)):
+            w = wm.group(2).strip()
+            if w:
+                words.append({"t": _ttml_time(wm.group(1)), "w": w})
+        if words:
+            text = " ".join(x["w"] for x in words)
+            lines.append({"time": t, "text": text, "words": words})
+    return sorted(lines, key=lambda x: x["time"])
+
+
+def _merge_split_words(lines, text_map):
+    """Re-segment over-split timed words to match the full word text.
+
+    Apple/paxsenix word timings sometimes split a sung word into fragments
+    ("conver" + "sation") even though it is one word ("conversation"), while
+    the plain/lrc text keeps the real segmentation. Align the timed tokens
+    against that text and merge fragments that together spell one word.
+    Falls back to the input line when a line can't be aligned.
+    """
+    times = sorted(text_map)
+    merged = []
+    for ln in lines:
+        tokens = ln["words"]
+        if not tokens:
+            merged.append(ln)
+            continue
+        target = None
+        best = 0.05
+        for t in times:
+            d = abs(t - ln["time"])
+            if d < best:
+                best = d
+                target = text_map[t]
+        if target is None:
+            merged.append(ln)
+            continue
+        twords = target.split()
+        concat = "".join(x["w"] for x in tokens)
+        if concat != re.sub(r"\s+", "", target):
+            merged.append(ln)
+            continue
+        out = []
+        ti = 0
+        ok = True
+        for tw in twords:
+            acc = ""
+            acc_t = None
+            while ti < len(tokens) and len(acc) < len(tw):
+                tok = tokens[ti]
+                if acc_t is None:
+                    acc_t = tok["t"]
+                acc += tok["w"]
+                ti += 1
+            if acc == tw:
+                out.append({"t": acc_t, "w": acc})
+            else:
+                ok = False
+                break
+        if ok and ti == len(tokens) and len(out) == len(twords):
+            merged.append({"time": ln["time"], "text": target, "words": out})
+        else:
+            merged.append(ln)
+    return merged
+
+
 def _paxsenix_lyrics(track_id):
     data = _http_json(f"https://lyrics.paxsenix.org/apple-music/lyrics?id={track_id}",
                       headers={"User-Agent": "ViviMusic/1.0"})
+    # Ground-truth per-line text: keeps the real word segmentation that the
+    # timed spans below split into fragments.
+    text_map = {}
+    for field in ("lrc", "elrc", "elrcMultiPerson"):
+        raw = data.get(field) or ""
+        if raw.strip():
+            for ln in _parse_lrc(raw):
+                text_map.setdefault(ln["time"], ln["text"])
     ttml = data.get("ttmlContent") or ""
     if ttml.strip():
         lines = ttml_to_lrc(ttml)
         if lines:
-            return lines, 3
+            return _merge_split_words(lines, text_map), 3
     for field in ("elrcMultiPerson", "elrc"):
         raw = data.get(field) or ""
         if raw.strip():
-            lines = _parse_lrc(raw)
+            lines = _parse_elrc(raw)
             if lines:
-                return lines, 2
+                return _merge_split_words(lines, text_map), 3
     content = data.get("content") or []
     if content:
         lines = []
