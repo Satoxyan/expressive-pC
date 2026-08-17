@@ -6,9 +6,15 @@ import qs.services
 import Qt5Compat.GraphicalEffects
 import QtQuick
 import QtQuick.Layouts
+import Quickshell.Io
 
 Item {
     id: root
+
+    // Never paint beyond the widget: when the active line grows to many
+    // rows, the overflow is cut at the edge instead of overlapping the
+    // info column.
+    clip: true
 
     property color textColor: "white"
     property color activeColor: "white"
@@ -53,6 +59,11 @@ Item {
 
         readonly property bool current: wordItem.progress > 0 && wordItem.progress < 1
 
+        // The sung color from the theme is a mid-tone that barely reads on
+        // the artwork-blurred background, so brighten it toward white for
+        // the swept fill and the glow.
+        readonly property color brightSung: Qt.lighter(wordItem.sungColor, 1.6)
+
         // Glow fades in on the active word and stays on after the word is
         // passed (slightly dimmed) so sung words keep glowing.
         property real glowStrength: wordItem.progress > 0
@@ -96,7 +107,7 @@ Item {
                     pixelSize: dimText.font.pixelSize
                     variableAxes: dimText.font.variableAxes
                 }
-                color: wordItem.sungColor
+                color: wordItem.brightSung
                 text: wordItem.word
                 horizontalAlignment: Text.AlignLeft
                 verticalAlignment: Text.AlignVCenter
@@ -114,7 +125,7 @@ Item {
             radius: 10
             samples: 21
             spread: 0.25
-            color: wordItem.sungColor
+            color: wordItem.brightSung
             opacity: 0.8 * wordItem.glowStrength
         }
     }
@@ -133,11 +144,16 @@ Item {
                 id: slotItem
                 required property int index
                 Layout.fillWidth: true
-                // The active karaoke slot sizes to its (possibly wrapped)
-                // line via preferredHeight; the others share the rest.
-                Layout.fillHeight: !slotItem.useKaraoke
-                Layout.preferredHeight: slotItem.useKaraoke
-                    ? Math.min(karaokeColumn.implicitHeight, root.activeFontSize * 3)
+                // The active slot sizes to its wrapped line (karaoke rows,
+                // or the fallback text broken onto two rows) via preferred
+                // height instead of sharing the fill space, so over-long
+                // lyrics are not clipped at the widget edge; the others
+                // fill and share the remaining height equally.
+                Layout.fillHeight: !slotItem.isActiveSlot
+                Layout.preferredHeight: slotItem.isActiveSlot
+                    ? slotItem.useKaraoke
+                        ? Math.min(slotItem.karaokeContentHeight, Math.max(root.activeFontSize * 5, root.height - root.activeFontSize * 3))
+                        : slotItem.fallbackContentHeight
                     : undefined
 
                 readonly property int dist: Math.abs(index - LyricsService.before)
@@ -152,22 +168,70 @@ Item {
                 // narrow widget. Each row below is a centered Row instead.
                 readonly property var karaokeRows: slotItem.buildKaraokeRows()
 
+                // Full height the wrapped karaoke line needs: every row plus
+                // the spacing between them, so the active slot can grow to
+                // fit instead of clipping the extra rows. The column's
+                // implicit height is the real rendered height (font metrics
+                // underestimate the line height slightly).
+                readonly property real karaokeContentHeight: karaokeColumn.implicitHeight
+
+                // Wrapped height of the active fallback text (songs without
+                // per-word timestamps): one line if it fits the slot width,
+                // otherwise two (the Text caps at two lines and elides the
+                // rest). Measured with a real text instead of font metrics
+                // because the rendered line height differs slightly from
+                // QFontMetrics, which would clip the second line.
+                readonly property real fallbackContentHeight:
+                    fallbackMeter.height > 0 ? fallbackMeter.height : fallbackMetrics.height
+
+                // Invisible meter: same width/font/wrapping as the active
+                // line, so its height is exactly what the slot must reserve.
+                StyledText {
+                    id: fallbackMeter
+                    opacity: 0
+                    width: slotItem.width
+                    font.pixelSize: root.fontSizeFor(0)
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                    text: LyricsService.slots[slotItem.index] ?? ""
+                }
+
+                FontMetrics {
+                    id: fallbackMetrics
+                    font {
+                        family: Appearance.font.family.main
+                        pixelSize: root.fontSizeFor(0)
+                        variableAxes: Appearance.font.variableAxes.main
+                    }
+                }
+
                 function buildKaraokeRows() {
                     const words = LyricsService.activeLineWords ?? []
                     if (words.length === 0) return []
                     const spacing = karaokeColumn.spacing
                     const maxWidth = Math.max(1, slotItem.width)
+                    // Some providers return the whole line as a single "word"
+                    // (text with spaces). Split those into display words so the
+                    // line can wrap instead of overflowing the slot; every piece
+                    // keeps the original word index for the highlight sweep.
+                    const pieces = []
+                    for (let i = 0; i < words.length; i++) {
+                        const parts = String(words[i].text ?? "").split(/\s+/).filter(s => s.length > 0)
+                        for (const part of parts) pieces.push({ index: i, text: part })
+                    }
+                    if (pieces.length === 0) return []
                     const rows = []
                     let cur = [], curWidth = 0
-                    for (let i = 0; i < words.length; i++) {
-                        const w = karaokeMetrics.advanceWidth(words[i].text)
+                    for (let i = 0; i < pieces.length; i++) {
+                        const w = karaokeMetrics.advanceWidth(pieces[i].text)
                         const need = cur.length === 0 ? w : curWidth + spacing + w
                         if (cur.length > 0 && need > maxWidth) {
                             rows.push(cur)
                             cur = []
                             curWidth = 0
                         }
-                        cur.push({ index: i, text: words[i].text })
+                        cur.push(pieces[i])
                         curWidth = cur.length === 1 ? w : curWidth + spacing + w
                     }
                     if (cur.length > 0) rows.push(cur)
@@ -232,14 +296,15 @@ Item {
                 }
 
                 // Fallback single-line (no karaoke, or non-active slots).
-                // One row per slot, elided if too long, so lines never
-                // wrap over or crowd each other.
+                // The active line wraps onto a second row when too long;
+                // the others stay one row and are elided if needed.
                 StyledText {
                     id: lyricSlot
                     anchors.fill: parent
                     horizontalAlignment: root.textAlignment
                     verticalAlignment: Text.AlignVCenter
-                    wrapMode: Text.NoWrap
+                    wrapMode: slotItem.isActiveSlot ? Text.WordWrap : Text.NoWrap
+                    maximumLineCount: slotItem.isActiveSlot ? 2 : 1
                     elide: Text.ElideRight
                     text: LyricsService.slots[index] ?? ""
                     font.pixelSize: root.fontSizeFor(slotItem.dist)
