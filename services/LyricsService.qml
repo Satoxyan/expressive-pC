@@ -17,7 +17,7 @@ Singleton {
     property int activeIndex: -1
     property string status: "loading"
     property string providedBy: ""
-    property var slots: ["", "", "", "", "", "", ""]
+    property var slots: ["", "", "", "", ""]
 
     // Slot index (0..total-1) where the "Lyrics provided by …" note sits,
     // right after the last lyric line once it scrolls into the window.
@@ -25,8 +25,8 @@ Singleton {
     property int noteSlot: -1
 
     readonly property int before: 2
-    readonly property int after:  3
-    readonly property int total:  6
+    readonly property int after:  2
+    readonly property int total:  5
 
     // Fixed lyric sync offset (ms). Negative = words/lines light up EARLIER,
     // positive = later. Hardcoded so it can't disturb the lyric logic.
@@ -204,7 +204,7 @@ Singleton {
         root.lyricsLines = []
         root.activeIndex = -1
         root.providedBy = ""
-        root.slots = ["", "", "", "", "", "", ""]
+        root.slots = ["", "", "", "", ""]
         root.noteSlot = -1
         root.activeLineWords = []
         root.activeWordIndex = -1

@@ -44,6 +44,102 @@ Item {
         return 0.15
     }
 
+    // ── Vertical budgeting ────────────────────────────────────────────────
+    // The active line may wrap to two or three rows; if it claimed its full
+    // wrapped height the five other slots would be left a few pixels each and
+    // their single lines would overlap. So the non-active slots are given a
+    // hard minimum (their own line height) and the active slot is capped to
+    // the number of full rows that fit after those minimums are reserved.
+    // The result: past/future lines always keep a comfortable height and the
+    // active line shows as many complete rows as there is room for, clipping
+    // the overflow instead of squeezing the neighbors.
+
+    FontMetrics {
+        id: activeRowMetrics
+        font {
+            family: Appearance.font.family.main
+            pixelSize: root.activeFontSize
+            variableAxes: Appearance.font.variableAxes.main
+        }
+    }
+
+    // QFontMetrics understates the rendered karaoke line height slightly
+    // (variable fonts), which would clip the last wrapped row by a few
+    // pixels. Measure a real one-line Text at the active font instead.
+    Text {
+        id: rowMeter
+        opacity: 0
+        width: 200
+        height: implicitHeight
+        font {
+            family: Appearance.font.family.main
+            pixelSize: root.activeFontSize
+            variableAxes: Appearance.font.variableAxes.main
+        }
+        text: "Ag"
+    }
+    FontMetrics {
+        id: nearLineMetrics
+        font {
+            family: Appearance.font.family.main
+            pixelSize: root.fontSizeFor(1)
+            variableAxes: Appearance.font.variableAxes.main
+        }
+    }
+    FontMetrics {
+        id: midLineMetrics
+        font {
+            family: Appearance.font.family.main
+            pixelSize: root.fontSizeFor(2)
+            variableAxes: Appearance.font.variableAxes.main
+        }
+    }
+    FontMetrics {
+        id: farLineMetrics
+        font {
+            family: Appearance.font.family.main
+            pixelSize: root.fontSizeFor(3)
+            variableAxes: Appearance.font.variableAxes.main
+        }
+    }
+
+    readonly property real lineSlack: 4
+    readonly property real rowHeight:
+        rowMeter.implicitHeight > 0 ? rowMeter.implicitHeight : activeRowMetrics.height
+    readonly property real rowSpacing: 4
+    readonly property int slotSpacing: 5
+
+    function comfortableHeightFor(dist) {
+        if (dist === 1) return Math.max(8, nearLineMetrics.height - root.lineSlack)
+        if (dist === 2) return Math.max(8, midLineMetrics.height - root.lineSlack)
+        return Math.max(8, farLineMetrics.height - root.lineSlack)
+    }
+
+    // Total height the non-active slots need to keep their lines readable.
+    // Computed over the actual slot distances so it tracks before/after.
+    readonly property real comfortableReserve: {
+        let sum = 0
+        for (let i = 0; i < LyricsService.total; i++) {
+            if (i === LyricsService.before) continue
+            sum += root.comfortableHeightFor(Math.abs(i - LyricsService.before))
+        }
+        return sum
+    }
+
+    // Room the active slot may take once every other slot keeps its minimum:
+    // the widget height minus the layout gaps and the others' reserves.
+    readonly property real activeRoom:
+        Math.max(root.rowHeight, root.height
+            - (LyricsService.total - 1) * root.slotSpacing - root.comfortableReserve)
+
+    // Largest whole number of active rows that fit in that room; the cap is
+    // that many rows (not the room itself), so the active slot never ends on
+    // a sliver of a cut row.
+    readonly property int fitRows:
+        Math.max(1, Math.floor((root.activeRoom + root.rowSpacing) / (root.rowHeight + root.rowSpacing)))
+    readonly property real activeCap:
+        root.fitRows * root.rowHeight + (root.fitRows - 1) * root.rowSpacing
+
     // ── Apple Music-style karaoke word sweep ───────────────────────────────
     // One word: dim base text + active-color copy clipped to the sung
     // fraction (clip-sweep). The currently-sung word additionally gets a glow.
@@ -136,28 +232,40 @@ Item {
     // (which piled all seven lines up at the top).
     ColumnLayout {
         anchors.fill: parent
-        spacing: 6
+        spacing: root.slotSpacing
 
         Repeater {
             model: LyricsService.total
             delegate: Item {
                 id: slotItem
                 required property int index
+                // Capped active overflow is clipped so it never touches the
+                // lines above or below (the karaoke column already clips).
+                clip: true
                 Layout.fillWidth: true
                 // The active slot sizes to its wrapped line (karaoke rows,
                 // or the fallback text broken onto two rows) via preferred
                 // height instead of sharing the fill space, so over-long
                 // lyrics are not clipped at the widget edge; the others
-                // fill and share the remaining height equally.
+                // fill and share the remaining height equally. The active
+                // slot is capped to the rows that fit after the other slots
+                // keep their line-height minimums, and the others can never
+                // shrink below that minimum, so a long active line clips its
+                // overflow instead of cramming the lines around it.
                 Layout.fillHeight: !slotItem.isActiveSlot
+                Layout.minimumHeight: slotItem.isActiveSlot
+                    ? 0
+                    : Math.ceil(slotItem.comfortableHeight)
                 Layout.preferredHeight: slotItem.isActiveSlot
                     ? slotItem.useKaraoke
-                        ? Math.min(slotItem.karaokeContentHeight, Math.max(root.activeFontSize * 5, root.height - root.activeFontSize * 3))
-                        : slotItem.fallbackContentHeight
-                    : undefined
+                        ? Math.min(slotItem.karaokeContentHeight, root.activeCap)
+                        : Math.min(slotItem.fallbackContentHeight, root.activeCap)
+                    : 0
 
                 readonly property int dist: Math.abs(index - LyricsService.before)
                 readonly property bool isActiveSlot: index === LyricsService.before
+                readonly property real comfortableHeight:
+                    slotItem.isActiveSlot ? 0 : root.comfortableHeightFor(slotItem.dist)
                 readonly property bool isNoteSlot: index === LyricsService.noteSlot
                     && LyricsService.noteSlot >= 0
                     && LyricsService.providedBy.length > 0
@@ -195,7 +303,7 @@ Item {
                     width: slotItem.width
                     font.pixelSize: root.fontSizeFor(0)
                     wrapMode: Text.WordWrap
-                    maximumLineCount: 2
+                    maximumLineCount: Math.max(2, root.fitRows)
                     elide: Text.ElideRight
                     text: LyricsService.slots[slotItem.index] ?? ""
                 }
@@ -253,7 +361,7 @@ Item {
                 Column {
                     id: karaokeColumn
                     anchors.fill: parent
-                    spacing: 6
+                    spacing: root.rowSpacing
                     visible: slotItem.useKaraoke
                     // Anything that overflows the slot is clipped so it never
                     // touches the line above or below.
@@ -307,7 +415,7 @@ Item {
                     horizontalAlignment: root.textAlignment
                     verticalAlignment: Text.AlignVCenter
                     wrapMode: slotItem.isActiveSlot ? Text.WordWrap : Text.NoWrap
-                    maximumLineCount: slotItem.isActiveSlot ? 2 : 1
+                    maximumLineCount: slotItem.isActiveSlot ? Math.max(2, root.fitRows) : 1
                     elide: Text.ElideRight
                     text: LyricsService.slots[index] ?? ""
                     font.pixelSize: root.fontSizeFor(slotItem.dist)
