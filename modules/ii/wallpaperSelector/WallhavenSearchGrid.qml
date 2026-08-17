@@ -211,7 +211,6 @@ Item {
             interactive: true
             clip: true
             boundsBehavior: Flickable.StopAtBounds
-            bottomMargin: 64
             ScrollBar.vertical: StyledScrollBar {}
 
             function moveSelection(delta) {
