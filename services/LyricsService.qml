@@ -19,9 +19,30 @@ Singleton {
     property string providedBy: ""
     property var slots: ["", "", "", "", "", "", ""]
 
-    readonly property int before: 3
+    readonly property int before: 2
     readonly property int after:  3
-    readonly property int total:  7
+    readonly property int total:  6
+
+    // Fixed lyric sync offset (ms). Negative = words/lines light up EARLIER,
+    // positive = later. Hardcoded so it can't disturb the lyric logic.
+    readonly property int lyricOffsetMs: -200
+
+    // Player position shifted by the offset, used for both the active line
+    // and the word sweep so they stay in sync with each other.
+    //
+    // This is a FUNCTION on purpose: Quickshell's MprisPlayer.position() is
+    // computed continuously (last DBus position + real elapsed time), but a
+    // QML binding on it would only re-evaluate when positionChanged fires
+    // (player DBus updates, often ~1/s). Reading a cached binding makes the
+    // word sweep jump in steps instead of gliding.
+    function shiftedPos() {
+        return Math.max(0, (root.activePlayer?.position ?? 0) - root.lyricOffsetMs / 1000.0)
+    }
+
+    // Word-level karaoke state for the active line
+    property var activeLineWords: []
+    property int activeWordIndex: -1
+    property real activeWordProgress: 0
 
     function buildSlots(idx) {
         let result = []
@@ -35,13 +56,41 @@ Singleton {
         return result
     }
 
+    function updateActiveWords() {
+        const line = root.lyricsLines[root.activeIndex]
+        const words = line?.words ?? []
+        if (!words || words.length === 0) {
+            root.activeLineWords = []
+            root.activeWordIndex = -1
+            root.activeWordProgress = 0
+            return
+        }
+        const pos = root.shiftedPos()
+        let idx = -1
+        for (let i = 0; i < words.length; i++) {
+            if (words[i].time <= pos) idx = i
+            else break
+        }
+        root.activeLineWords = words
+        root.activeWordIndex = idx
+        if (idx >= 0 && idx + 1 < words.length) {
+            const span = Math.max(0.001, words[idx + 1].time - words[idx].time)
+            root.activeWordProgress = Math.min(1, Math.max(0, (pos - words[idx].time) / span))
+        } else {
+            root.activeWordProgress = idx >= 0 ? 1 : 0
+        }
+    }
+
     Timer {
         id: syncTimer
-        interval: 300
+        // 50ms so the word sweep tracks the audio smoothly even for fast
+        // real word timings; at 200ms a newly active word jumps straight to
+        // a large progress and the glow looks choppy.
+        interval: 50
         repeat: true
         running: root.status === "ok" && root.lyricsLines.length > 0
         onTriggered: {
-            const pos = root.activePlayer?.position ?? 0
+            const pos = root.shiftedPos()
             let idx = -1
             for (let i = 0; i < root.lyricsLines.length; i++) {
                 if (root.lyricsLines[i].time <= pos) idx = i
@@ -51,6 +100,7 @@ Singleton {
                 root.activeIndex = idx
                 root.slots = root.buildSlots(idx)
             }
+            root.updateActiveWords()
         }
     }
 
@@ -63,17 +113,24 @@ Singleton {
                 if (trimmed === "not_found") { root.status = "not_found"; return }
                 if (trimmed === "no_info")   { root.status = "no_info";   return }
 
-                const parts = trimmed.split("§")
-                if (parts.length < 4) return
-                if (parts[parts.length - 2].trim() !== "ok") return
+                let payload = null
+                try {
+                    payload = JSON.parse(trimmed)
+                } catch (e) {}
+                if (!payload || payload.ok !== true || !Array.isArray(payload.lines)) return
 
-                root.providedBy = parts[parts.length - 1]
+                root.providedBy = payload.provider || ""
 
                 let lines = []
-                for (let i = 0; i < parts.length - 2; i += 2) {
-                    const t = parseFloat(parts[i])
-                    const txt = parts[i + 1] || ""
-                    if (!isNaN(t)) lines.push({ time: t, text: txt })
+                for (const line of payload.lines) {
+                    const t = parseFloat(line.t)
+                    const txt = line.x || ""
+                    if (isNaN(t) || !txt) continue
+                    const words = (line.w || []).map(w => ({
+                        time: parseFloat(w[0]),
+                        text: String(w[1] ?? "")
+                    })).filter(w => !isNaN(w.time))
+                    lines.push({ time: t, text: txt, words })
                 }
 
                 if (lines.length === 0) { root.status = "not_found"; return }
@@ -110,6 +167,9 @@ Singleton {
         root.activeIndex = -1
         root.providedBy = ""
         root.slots = ["", "", "", "", "", "", ""]
+        root.activeLineWords = []
+        root.activeWordIndex = -1
+        root.activeWordProgress = 0
         root.status = "loading"
 
         const title    = root.activePlayer?.trackTitle  ?? ""

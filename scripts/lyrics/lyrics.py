@@ -115,6 +115,9 @@ def _kugou_normalize_artist(a):
 # LRC parsing
 # ---------------------------------------------------------------------------
 
+_INLINE_TAG = re.compile(r"<(\d{1,2}):(\d{2}(?:\.\d{1,3})?)>\s*([^<]*)")
+
+
 def _parse_lrc(lrc_text):
     lines = []
     for raw in lrc_text.splitlines():
@@ -129,12 +132,26 @@ def _parse_lrc(lrc_text):
             timestamp = int(mins) * 60 + float(secs)
         except Exception:
             continue
-        text = re.sub(r"<[^>]+>", "", text)   # strip inline word timings
-        text = re.sub(r"\{[^}]*\}", "", text)  # strip {bg} / {agent:...} markers
-        text = text.strip()
-        if not text:
+        # Enhanced LRC: inline <mm:ss.xx> word tags are relative to the line start
+        inline = _INLINE_TAG.findall(text)
+        words = []
+        if inline:
+            for m, s, wtxt in inline:
+                wtxt = wtxt.strip()
+                if wtxt:
+                    words.append({"t": timestamp + int(m) * 60 + float(s), "w": wtxt})
+            lead = text[:text.find("<")].strip()
+            if lead:
+                words.insert(0, {"t": timestamp, "w": lead})
+            clean = _INLINE_TAG.sub("", text)
+        else:
+            clean = text
+        clean = re.sub(r"<[^>]+>", "", clean)   # strip other inline word tags
+        clean = re.sub(r"\{[^}]*\}", "", clean)  # strip {bg} / {agent:...} markers
+        clean = clean.strip()
+        if not clean:
             continue
-        lines.append({"time": timestamp, "text": text})
+        lines.append({"time": timestamp, "text": clean, "words": words})
     return sorted(lines, key=lambda x: x["time"])
 
 
@@ -179,6 +196,34 @@ def _ttml_line_text(p):
     return " ".join("".join(p.itertext()).split())
 
 
+def _ttml_line_words(p):
+    """Extract per-word timings from a TTML <p> element (Apple Music style).
+
+    Each <span> typically carries its own begin time. Words without a span
+    begin fall back to the line's begin time.
+    """
+    words = []
+    for span in p.iter():
+        tag = span.tag.rsplit("}", 1)[-1]
+        if tag != "span":
+            continue
+        role = _ttml_role(span)
+        if role in ("x-translation", "x-roman", "x-bg"):
+            continue
+        begin = span.get("begin")
+        if begin:
+            text = "".join(span.itertext()).strip()
+            if text:
+                words.append({"t": _ttml_time(begin), "w": text})
+    if words:
+        return words
+    # No per-span timings: treat whole line as a single "word"
+    text = _ttml_line_text(p)
+    if text:
+        return [{"t": _ttml_time(p.get("begin")), "w": text}]
+    return []
+
+
 def ttml_to_lrc(ttml):
     try:
         import xml.etree.ElementTree as ET
@@ -195,7 +240,11 @@ def ttml_to_lrc(ttml):
         text = _ttml_line_text(p)
         if not text:
             continue
-        lines.append({"time": _ttml_time(begin), "text": text})
+        lines.append({
+            "time": _ttml_time(begin),
+            "text": text,
+            "words": _ttml_line_words(p),
+        })
     return sorted(lines, key=lambda x: x["time"])
 
 
@@ -281,10 +330,40 @@ def _ms_richsync_to_lines(body):
         return []
     lines = []
     for e in entries:
+        ts = float(e.get("ts") or 0)
         text = (e.get("x") or "").strip()
         if not text:
             continue
-        lines.append({"time": float(e.get("ts") or 0), "text": text})
+        words = []
+        rows = e.get("l")
+        if rows:
+            # Current richsync shape: "l" is a list of {"c": word,
+            # "o": seconds from line start}; spaces are {"c": " "}.
+            for row in rows:
+                c = (row.get("c") or "").strip()
+                if not c:
+                    continue
+                words.append({"t": ts + (row.get("o") or 0), "w": c})
+        else:
+            # Older shape: "c" was a list of per-char {"t", "o"};
+            # group consecutive chars into words.
+            cur = ""
+            cur_offset = None
+            for ch in e.get("c") or []:
+                c = ch.get("t") or ""
+                o = ch.get("o")
+                if c == " ":
+                    if cur:
+                        words.append({"t": ts + (cur_offset or 0) / 1000.0, "w": cur})
+                        cur = ""
+                        cur_offset = None
+                else:
+                    if cur_offset is None:
+                        cur_offset = o
+                    cur += c
+            if cur:
+                words.append({"t": ts + (cur_offset or 0) / 1000.0, "w": cur})
+        lines.append({"time": ts, "text": text, "words": words})
     return sorted(lines, key=lambda x: x["time"])
 
 
@@ -299,7 +378,7 @@ def _ms_subtitle_to_lines(body):
         total = (e.get("time") or {}).get("total")
         if total is None or not text:
             continue
-        lines.append({"time": float(total), "text": text})
+        lines.append({"time": float(total), "text": text, "words": []})
     return sorted(lines, key=lambda x: x["time"])
 
 
@@ -392,7 +471,7 @@ def fetch_youlyplus(title, artist, duration):
                     txt = (it.get("text") or "").strip()
                     if t is None or not txt:
                         continue
-                    lrc.append({"time": t / 1000.0, "text": txt})
+                    lrc.append({"time": t / 1000.0, "text": txt, "words": []})
                 if lrc:
                     return sorted(lrc, key=lambda x: x["time"])
         except Exception:
@@ -516,7 +595,7 @@ def _paxsenix_lyrics(track_id):
             t = line.get("timestamp")
             txt = " ".join((w.get("text") or "") for w in line.get("text") or []).strip()
             if t is not None and txt:
-                lines.append({"time": t / 1000.0, "text": txt})
+                lines.append({"time": t / 1000.0, "text": txt, "words": []})
         if lines:
             return sorted(lines, key=lambda x: x["time"]), 3
     return [], 0
@@ -781,6 +860,44 @@ def _provider_names(arg):
     return [p.strip() for p in arg.split(",") if p.strip()]
 
 
+_PAUSE_PUNCT = frozenset(",.;:!?—–…-()[]\"")
+
+
+def _synthesize_words(lines):
+    """Assign per-word timings to lines that lack them.
+
+    Distributes each line's time span (line start -> next line start) across
+    its words so the karaoke effect still works for plain LRC sources without
+    word-level timestamps. A word's share is proportional to its length, and
+    words ending in punctuation get extra time so phrasing/pauses feel natural
+    instead of a uniform sweep.
+    """
+    out = []
+    n = len(lines)
+    for i, line in enumerate(lines):
+        if line.get("words"):
+            out.append(line)
+            continue
+        text = line.get("text") or ""
+        words = text.split()
+        if not words:
+            out.append(line)
+            continue
+        start = line["time"]
+        end = lines[i + 1]["time"] if i + 1 < n else start + 5.0
+        span = max(0.25, end - start)
+        weights = [len(w) + (3 if w[-1] in _PAUSE_PUNCT else 0) for w in words]
+        total = sum(weights)
+        ws = []
+        t = start
+        for w, wt in zip(words, weights):
+            ws.append({"t": t, "w": w})
+            t += span * (wt / total)
+        line["words"] = ws
+        out.append(line)
+    return out
+
+
 def main():
     if len(sys.argv) < 4:
         print("no_info", flush=True)
@@ -829,13 +946,20 @@ def main():
             continue
         lines = run_with_timeout(fn)
         if lines:
-            parts = []
-            for line in lines:
-                parts.append(str(line["time"]))
-                parts.append(line["text"].replace("§", ""))
-            parts.append("ok")
-            parts.append(name)
-            print("§".join(parts), flush=True)
+            lines = _synthesize_words(lines)
+            payload = {
+                "ok": True,
+                "provider": name,
+                "lines": [
+                    {
+                        "t": line["time"],
+                        "x": line["text"].replace("§", ""),
+                        "w": [[w["t"], w["w"]] for w in line.get("words") or []],
+                    }
+                    for line in lines
+                ],
+            }
+            print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), flush=True)
             return
 
     print("not_found", flush=True)
