@@ -30,10 +30,17 @@ render_node_driver() {
     readlink "/sys/class/drm/$(basename "$node")/device/driver" 2>/dev/null | sed 's#.*/##'
 }
 
-# Best available hardware encoder: prefer an Intel/AMD iGPU via VA-API,
-# then an NVIDIA GPU via NVENC. Empty when none exists (software encode).
+# Best available hardware encoder by priority: NVIDIA via NVENC, then an
+# Intel/AMD iGPU via VA-API. Empty when none exists (software encode).
 pick_encoder_args() {
     local node driver
+    for node in /dev/dri/renderD128 /dev/dri/renderD129; do
+        [[ -e "$node" ]] || continue
+        if [[ "$(render_node_driver "$node")" == "nvidia" ]]; then
+            echo "-c h264_nvenc"
+            return
+        fi
+    done
     for node in /dev/dri/renderD128 /dev/dri/renderD129; do
         [[ -e "$node" ]] || continue
         driver="$(render_node_driver "$node")"
@@ -43,13 +50,6 @@ pick_encoder_args() {
                 return
                 ;;
         esac
-    done
-    for node in /dev/dri/renderD128 /dev/dri/renderD129; do
-        [[ -e "$node" ]] || continue
-        if [[ "$(render_node_driver "$node")" == "nvidia" ]]; then
-            echo "-c h264_nvenc"
-            return
-        fi
     done
 }
 
@@ -127,9 +127,9 @@ else
         notify-send "Starting recording" 'recording_'"$(getdate)"'.mp4' -a 'Recorder' & disown
         set_recording_state true "$(date +%s%3N)"
         if [[ $SOUND_FLAG -eq 1 ]]; then
-            run_recorder -o "$(getactivemonitor)" --pixel-format yuv420p -f './recording_'"$(getdate)"'.mp4' -t --audio="$(getaudiooutput)"
+            run_recorder -o "$(getactivemonitor)" --pixel-format yuv420p -f './recording_'"$(getdate)"'.mp4' -t -r 60 --audio="$(getaudiooutput)"
         else
-            run_recorder -o "$(getactivemonitor)" --pixel-format yuv420p -f './recording_'"$(getdate)"'.mp4' -t
+            run_recorder -o "$(getactivemonitor)" --pixel-format yuv420p -f './recording_'"$(getdate)"'.mp4' -t -r 60
         fi
     else
         if [[ -n "$MANUAL_REGION" ]]; then
@@ -143,9 +143,9 @@ else
         notify-send "Starting recording" 'recording_'"$(getdate)"'.mp4' -a 'Recorder' & disown
         set_recording_state true "$(date +%s%3N)"
         if [[ $SOUND_FLAG -eq 1 ]]; then
-            run_recorder --pixel-format yuv420p -f './recording_'"$(getdate)"'.mp4' -t --geometry "$region" --audio="$(getaudiooutput)"
+            run_recorder --pixel-format yuv420p -f './recording_'"$(getdate)"'.mp4' -t -r 60 --geometry "$region" --audio="$(getaudiooutput)"
         else
-            run_recorder --pixel-format yuv420p -f './recording_'"$(getdate)"'.mp4' -t --geometry "$region"
+            run_recorder --pixel-format yuv420p -f './recording_'"$(getdate)"'.mp4' -t -r 60 --geometry "$region"
         fi
     fi
     set_recording_state false
