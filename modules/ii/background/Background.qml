@@ -94,10 +94,145 @@ Variants {
         property bool videoRevealed: false
 
         //centered Wallpaper
-        property bool centeredWallpaperEnabled: Config.options.background.centeredWallpaper && (!Config.options.background.centeredWallpaperOnlyWhenLocked || GlobalStates.screenLocked)
+        property bool centeredWallpaperEnabled: Config.options.background.centeredWallpaper
+        property bool centeredOnlyWhenLocked: Config.options.background.centeredWallpaperOnlyWhenLocked
         property int centeredWallpaperShape: getShapeFromName(Config.options.background.centeredWallpaperShape)
         property int centeredWallpaperSize: Config.options.background.centeredWallpaperSize
         property color centeredWallpaperColor: root.getColorFromName(Config.options.background.centeredWallpaperColor)
+        onCenteredOnlyWhenLockedChanged: {
+            if (bgRoot.centeredAnimationReady && Config.ready)
+                bgRoot.centeredProgress = GlobalStates.screenLocked ? 0 : (bgRoot.centeredOnlyWhenLocked ? 1 : 0)
+        }
+
+        // Size the shape (with the wallpaper inside) must reach so its masked
+        // area fully covers the screen; the shape then leaves the screen.
+        // The shape item is rendered at this fixed size and only transformed
+        // (scaled) during the transition, so the 2D canvas + mask are painted
+        // once instead of re-rasterized every frame at a changing size.
+        property real centeredShapeMax: Math.max(1, Math.ceil(
+            Math.hypot(bgRoot.screen.width / 2, bgRoot.screen.height / 2)
+            / bgRoot.centeredShapeMinBoundaryRadius(bgRoot.centeredWallpaperShape) * 1.02))
+
+        // Smallest normalized distance from the polygon's center to its boundary
+        // for each supported shape, precomputed by sampling the geometry.
+        // Used to derive the size at which the shape covers the whole screen
+        // (every screen point is within the cover radius of the center, and the
+        // shape contains that disk). A static table keeps the result exact and
+        // independent of when the shape item has finished resolving.
+        function centeredShapeMinBoundaryRadius(shape) {
+            switch (shape) {
+                case MaterialShape.Shape.Circle:        return 0.4898
+                case MaterialShape.Shape.Square:        return 0.5000
+                case MaterialShape.Shape.Slanted:       return 0.4610
+                case MaterialShape.Shape.Arch:          return 0.5000
+                case MaterialShape.Shape.Fan:           return 0.3710
+                case MaterialShape.Shape.Arrow:         return 0.2992
+                case MaterialShape.Shape.SemiCircle:    return 0.3125
+                case MaterialShape.Shape.Oval:          return 0.3697
+                case MaterialShape.Shape.Pill:          return 0.4157
+                case MaterialShape.Shape.Triangle:      return 0.2665
+                case MaterialShape.Shape.Diamond:       return 0.3593
+                case MaterialShape.Shape.ClamShell:     return 0.3373
+                case MaterialShape.Shape.Pentagon:      return 0.3999
+                case MaterialShape.Shape.Gem:           return 0.4498
+                case MaterialShape.Shape.Sunny:         return 0.4185
+                case MaterialShape.Shape.VerySunny:     return 0.3818
+                case MaterialShape.Shape.Cookie4Sided:  return 0.3841
+                case MaterialShape.Shape.Cookie6Sided:  return 0.4312
+                case MaterialShape.Shape.Cookie7Sided:  return 0.4202
+                case MaterialShape.Shape.Cookie9Sided:  return 0.4370
+                case MaterialShape.Shape.Cookie12Sided: return 0.4463
+                case MaterialShape.Shape.Ghostish:      return 0.3637
+                case MaterialShape.Shape.Clover4Leaf:   return 0.4019
+                case MaterialShape.Shape.Clover8Leaf:   return 0.4287
+                case MaterialShape.Shape.Burst:         return 0.3562
+                case MaterialShape.Shape.SoftBurst:     return 0.3873
+                case MaterialShape.Shape.Boom:          return 0.2175
+                case MaterialShape.Shape.SoftBoom:      return 0.2385
+                case MaterialShape.Shape.Flower:        return 0.3396
+                case MaterialShape.Shape.Puffy:         return 0.3297
+                case MaterialShape.Shape.PuffyDiamond:  return 0.3487
+                case MaterialShape.Shape.PixelCircle:   return 0.4723
+                case MaterialShape.Shape.PixelTriangle: return 0.2352
+                case MaterialShape.Shape.Bun:           return 0.2960
+                case MaterialShape.Shape.Heart:         return 0.2141
+                default:                                return 0.4202
+            }
+        }
+
+        // 0 = locked (wallpaper rests centered inside the shape), 1 = unlocked
+        // (wallpaper fills the screen). This is the only animated driver: the
+        // mappings below derive every size/opacity from it, so no secondary
+        // animations fight and the transition cannot blink.
+        // Driven by explicit assignment (onCompleted + lock-state handler)
+        // rather than a binding, so the Behavior never animates the initial
+        // set (which would play a grow-in effect on every startup while the
+        // config asynchronously loads). The Behavior stays off until both the
+        // config is loaded and the initial value has been synced.
+        property bool centeredAnimationReady: false
+        property bool centeredAnimating: false
+        property real centeredProgress: 0
+        Behavior on centeredProgress {
+            enabled: bgRoot.centeredWallpaperEnabled && bgRoot.centeredAnimationReady && Config.ready
+            NumberAnimation {
+                duration: 650
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial
+                onRunningChanged: bgRoot.centeredAnimating = running
+            }
+        }
+
+        // The centered shape is actually shown on screen only while the
+        // progress has not reached the desktop end (locked state + transitions).
+        // The wallpaper-change shader transition is hidden only then, so it
+        // keeps working normally on the desktop.
+        // Note: "animating" must be part of the condition because the easing
+        // overshoots above 1 mid-animation; gating on progress alone would
+        // hide/show/hide the shape during the overshoot tail (layer rebuild
+        // stutter at the end of the unlock).
+        readonly property bool centeredShapeActive: bgRoot.centeredWallpaperEnabled
+            && (bgRoot.centeredProgress < 1 || bgRoot.centeredAnimating)
+
+        // The full-screen wallpaper must stay rendered while it is visible
+        // (fading in/out, desktop); only turn it off once fully transparent.
+        readonly property bool centeredHidesFullWallpaper: bgRoot.centeredWallpaperEnabled
+            && bgRoot.centeredFullWallpaperOpacity() <= 0
+
+        // Fraction of the transition used for the tiny handover at the desktop
+        // end: the shape (covering the whole screen) hands off to the full
+        // wallpaper image while the solid background fades away underneath.
+        // Both are hidden behind the opaque shape for almost the whole
+        // transition, so the handover only ever shows if a shape silhouette
+        // does not yet cover a screen corner — the fade keeps that smooth too.
+        property real centeredFade: 0.05
+
+        // Size of the centered shape: grows from centeredWallpaperSize to
+        // centeredShapeMax as the progress goes 0 (locked) -> 1 (unlocked).
+        function centeredShapeSize() {
+            if (!bgRoot.centeredWallpaperEnabled) return 1
+            return bgRoot.centeredWallpaperSize
+                + bgRoot.centeredProgress * (bgRoot.centeredShapeMax - bgRoot.centeredWallpaperSize)
+        }
+        // Zoom level of the wallpaper inside the shape. The shape item is fixed
+        // at centeredShapeMax and scaled down, so the picture inside must apply
+        // the inverse zoom to stay exactly as before on screen: it fills the
+        // shape (height == shape size) while the shape is smaller than the
+        // screen, then stops growing once it would cover the whole screen.
+        function centeredImageScale() {
+            if (!bgRoot.centeredWallpaperEnabled) return 1
+            return bgRoot.centeredShapeMax
+                / Math.max(bgRoot.centeredShapeSize(),
+                    Math.min(bgRoot.screen.width, bgRoot.screen.height))
+        }
+        function centeredFullWallpaperOpacity() {
+            if (!bgRoot.centeredWallpaperEnabled) return 1
+            return Math.max(0, Math.min(1,
+                (bgRoot.centeredProgress - (1 - bgRoot.centeredFade)) / bgRoot.centeredFade))
+        }
+        function centeredBgOpacity() {
+            if (!bgRoot.centeredWallpaperEnabled) return 0
+            return Math.max(0, Math.min(1, (1 - bgRoot.centeredProgress) / bgRoot.centeredFade))
+        }
 
         property var shaderList: ["circlePit", "circleSelect", "magic", "Doom", "Peel", "transition", "pixelate", "stripes", "crt", "dissolve", "glitch", "ripple", "shatter"]
         property string currentShader: "pixelate"
@@ -184,6 +319,9 @@ Variants {
         }
 
         Component.onCompleted: {
+            bgRoot.centeredProgress = GlobalStates.screenLocked ? 0 : (bgRoot.centeredOnlyWhenLocked ? 1 : 0)
+            if (Config.ready)
+                bgRoot.centeredAnimationReady = true
             previousWallpaper.source = ""
             wallpaper.source = bgRoot.wallpaperSafetyTriggered ? "" : bgRoot.wallpaperPath
             bgRoot.currentWallpaperSource = bgRoot.wallpaperPath
@@ -253,8 +391,18 @@ Variants {
         }
 
         Connections {
+            target: Config
+            function onReadyChanged() {
+                if (!Config.ready) return
+                bgRoot.centeredProgress = GlobalStates.screenLocked ? 0 : (bgRoot.centeredOnlyWhenLocked ? 1 : 0)
+                bgRoot.centeredAnimationReady = true
+            }
+        }
+
+        Connections {
             target: GlobalStates
             function onScreenLockedChanged() {
+                bgRoot.centeredProgress = GlobalStates.screenLocked ? 0 : (bgRoot.centeredOnlyWhenLocked ? 1 : 0)
                 if (!GlobalStates.screenLocked) {
                     bgRoot.videoRevealed = bgRoot.wallpaperIsVideo
                 }
@@ -283,8 +431,10 @@ Variants {
                 smooth: true
                 asynchronous: true
                 layer.enabled: true
-                visible: !blurLoader.active && !bgRoot.centeredWallpaperEnabled && !bgRoot.videoRevealed
+                visible: !blurLoader.active && !bgRoot.videoRevealed
                     && (bgRoot.wallpaperAnimation === "" || bgRoot.transitionProgress >= 1.0)
+                    && !bgRoot.centeredHidesFullWallpaper
+                opacity: bgRoot.centeredFullWallpaperOpacity()
                 onStatusChanged: {
                     if (status === Image.Ready && bgRoot.transitionProgress === 0.0) {
                         transitionAnim.restart()
@@ -295,7 +445,7 @@ Variants {
             ShaderEffect {
                 id: transitionEffect
                 anchors.fill: parent
-                visible: !blurLoader.active && bgRoot.wallpaperAnimation !== "" && !bgRoot.centeredWallpaperEnabled && !bgRoot.videoRevealed
+                visible: !blurLoader.active && bgRoot.wallpaperAnimation !== "" && !bgRoot.centeredShapeActive && !bgRoot.videoRevealed
                     && bgRoot.transitionProgress < 1.0
 
                 property var fromImage: previousWallpaper
@@ -324,7 +474,11 @@ Variants {
 
             Loader {
                 id: blurLoader
-                active: Config.options.lock.blur.enable && (GlobalStates.screenLocked || scaleAnim.running)
+                // The blur is invisible while the centered wallpaper is active
+                // (opaque shape + solid background cover it), so skip it to
+                // save the expensive multi-sample blur pass on lock/unlock.
+                active: Config.options.lock.blur.enable && !bgRoot.centeredWallpaperEnabled
+                    && (GlobalStates.screenLocked || scaleAnim.running)
                 anchors.fill: parent
                 scale: GlobalStates.screenLocked ? Config.options.lock.blur.extraZoom : 1
                 layer.enabled: active
@@ -368,53 +522,21 @@ Variants {
                 id: centeredWallpaperBg
                 anchors.fill: parent
                 color: bgRoot.centeredWallpaperColor
-                opacity: bgRoot.centeredWallpaperEnabled ? 1 : 0
+                opacity: bgRoot.centeredBgOpacity()
                 visible: opacity > 0
-
-                Behavior on opacity {
-                    animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
-                }
             }
 
             MaterialShape {
                 id: centeredWallpaperShapeItem
                 anchors.centerIn: parent
-                width: bgRoot.centeredWallpaperSize
-                height: bgRoot.centeredWallpaperSize
+                width: bgRoot.centeredShapeMax
+                height: bgRoot.centeredShapeMax
                 color: bgRoot.centeredWallpaperColor
                 shape: bgRoot.centeredWallpaperShape
                 transformOrigin: Item.Center
-                visible: opacity > 0
-
-                state: bgRoot.centeredWallpaperEnabled ? "shown" : "hidden"
-
-                states: [
-                    State {
-                        name: "shown"
-                        PropertyChanges { target: centeredWallpaperShapeItem; scale: 1; opacity: 1 }
-                    },
-                    State {
-                        name: "hidden"
-                        PropertyChanges { target: centeredWallpaperShapeItem; scale: 1.4; opacity: 0 }
-                    }
-                ]
-
-                transitions: [
-                    Transition {
-                        to: "shown"
-                        ParallelAnimation {
-                            NumberAnimation { target: centeredWallpaperShapeItem; property: "scale"; from: 0; duration: Appearance.animation.elementMove.duration; easing.type: Easing.InOutCubic }
-                            NumberAnimation { target: centeredWallpaperShapeItem; property: "opacity"; duration: Appearance.animation.elementMove.duration; easing.type: Easing.InOutCubic }
-                        }
-                    },
-                    Transition {
-                        to: "hidden"
-                        ParallelAnimation {
-                            NumberAnimation { target: centeredWallpaperShapeItem; property: "scale"; duration: Appearance.animation.elementMove.duration; easing.type: Easing.InOutCubic }
-                            NumberAnimation { target: centeredWallpaperShapeItem; property: "opacity"; duration: Appearance.animation.elementMove.duration; easing.type: Easing.InOutCubic }
-                        }
-                    }
-                ]
+                scale: bgRoot.centeredShapeSize() / bgRoot.centeredShapeMax
+                visible: bgRoot.centeredWallpaperEnabled
+                    && (bgRoot.centeredProgress < 1 || bgRoot.centeredAnimating)
 
                 layer.enabled: true
                 layer.effect: OpacityMask {
@@ -426,13 +548,16 @@ Variants {
                 }
 
                 StyledImage {
-                    anchors.fill: parent
+                    width: bgRoot.width
+                    height: bgRoot.height
+                    anchors.centerIn: parent
                     source: bgRoot.wallpaperPath
                     fillMode: Image.PreserveAspectCrop
                     cache: false
                     antialiasing: true
-                    sourceSize.width: parent.width
-                    sourceSize.height: parent.height
+                    sourceSize.width: bgRoot.width
+                    sourceSize.height: bgRoot.height
+                    scale: bgRoot.centeredImageScale()
                 }
             }
 
