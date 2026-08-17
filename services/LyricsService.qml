@@ -19,6 +19,11 @@ Singleton {
     property string providedBy: ""
     property var slots: ["", "", "", "", "", "", ""]
 
+    // Slot index (0..total-1) where the "Lyrics provided by …" note sits,
+    // right after the last lyric line once it scrolls into the window.
+    // -1 = not visible yet.
+    property int noteSlot: -1
+
     readonly property int before: 2
     readonly property int after:  3
     readonly property int total:  6
@@ -58,6 +63,11 @@ Singleton {
             else
                 result.push("")
         }
+        // Note sits one slot after the last lyric line once that line is
+        // inside the window, and scrolls up with it toward the end.
+        const lastSlot = root.lyricsLines.length - 1 - idx + root.before
+        root.noteSlot = (root.lyricsLines.length > 0 && lastSlot >= 0 && lastSlot <= root.total - 2)
+            ? lastSlot + 1 : -1
         return result
     }
 
@@ -195,6 +205,7 @@ Singleton {
         root.activeIndex = -1
         root.providedBy = ""
         root.slots = ["", "", "", "", "", "", ""]
+        root.noteSlot = -1
         root.activeLineWords = []
         root.activeWordIndex = -1
         root.activeWordProgress = 0

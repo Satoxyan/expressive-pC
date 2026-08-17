@@ -158,6 +158,9 @@ Item {
 
                 readonly property int dist: Math.abs(index - LyricsService.before)
                 readonly property bool isActiveSlot: index === LyricsService.before
+                readonly property bool isNoteSlot: index === LyricsService.noteSlot
+                    && LyricsService.noteSlot >= 0
+                    && LyricsService.providedBy.length > 0
                 readonly property bool useKaraoke: root.karaoke
                     && slotItem.isActiveSlot
                     && (LyricsService.activeLineWords?.length ?? 0) > 0
@@ -310,8 +313,23 @@ Item {
                     font.pixelSize: root.fontSizeFor(slotItem.dist)
                     opacity: root.opacityFor(slotItem.dist)
                     color: slotItem.dist === 0 ? root.activeColor : root.textColor
-                    visible: !slotItem.useKaraoke
+                    visible: !slotItem.useKaraoke && !slotItem.isNoteSlot
                     Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
+                }
+
+                // Provider attribution: scrolls in as its own slot right
+                // after the last lyric line, but stays small, dim and
+                // centered — never part of the highlight.
+                StyledText {
+                    id: noteSlot
+                    anchors.fill: parent
+                    visible: slotItem.isNoteSlot
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    font.pixelSize: Appearance.font.pixelSize.smallest
+                    color: root.textColor
+                    opacity: 0.4
+                    text: "Lyrics provided by " + LyricsService.providedBy
                 }
             }
         }
