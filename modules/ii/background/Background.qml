@@ -111,6 +111,13 @@ Variants {
         property real centeredShapeMax: Math.max(1, Math.ceil(
             Math.hypot(bgRoot.screen.width / 2, bgRoot.screen.height / 2)
             / bgRoot.centeredShapeMinBoundaryRadius(bgRoot.centeredWallpaperShape) * 1.02))
+        // Pixel size the shape item/layer is rendered at. Kept at roughly the
+        // screen diagonal instead of centeredShapeMax (which can be 2.5x that)
+        // so the layer + OpacityMask + 2D canvases are ~6x cheaper per frame;
+        // the scale below compensates, so the silhouette and the picture inside
+        // stay identical (edges soften only while the shape outgrows the layer).
+        property real centeredShapeRenderSize: Math.max(1, Math.ceil(
+            Math.hypot(bgRoot.screen.width, bgRoot.screen.height)))
 
         // Smallest normalized distance from the polygon's center to its boundary
         // for each supported shape, precomputed by sampling the geometry.
@@ -235,11 +242,13 @@ Variants {
             return bgRoot.centeredWallpaperSize
                 + bgRoot.centeredProgress * (bgRoot.centeredShapeMax - bgRoot.centeredWallpaperSize)
         }
-        // Zoom level of the wallpaper inside the shape. The shape item is fixed
-        // at centeredShapeMax and scaled down, so the picture inside must apply
-        // the inverse zoom to stay exactly as before on screen: it fills the
-        // shape (height == shape size) while the shape is smaller than the
+        // Zoom level of the wallpaper inside the shape. The shape item is
+        // rendered at a fixed size (centeredShapeRenderSize) and scaled, so the
+        // picture inside must apply the inverse zoom to stay exactly as before
+        // on screen: it fills the shape while the shape is smaller than the
         // screen, then stops growing once it would cover the whole screen.
+        // Scaling relative to the actual item size keeps the visible wallpaper
+        // framing identical regardless of the render size.
         // A small overscan (1.08) keeps the wallpaper's own edge behind the
         // shape tips during the click pulse (which grows the shape to 1.06x);
         // it eases out as the shape approaches full screen so the lock/unlock
@@ -250,7 +259,7 @@ Variants {
             const size = bgRoot.centeredShapeSize()
             const overscan = size >= minDim ? 1
                 : 1.08 - 0.08 * (size - bgRoot.centeredWallpaperSize) / (minDim - bgRoot.centeredWallpaperSize)
-            return overscan * bgRoot.centeredShapeMax
+            return overscan * bgRoot.centeredShapeRenderSize
                 / Math.max(size, minDim)
         }
         function centeredFullWallpaperOpacity() {
@@ -558,14 +567,14 @@ Variants {
             MaterialShape {
                 id: centeredWallpaperShapeItem
                 anchors.centerIn: parent
-                width: bgRoot.centeredShapeMax
-                height: bgRoot.centeredShapeMax
+                width: bgRoot.centeredShapeRenderSize
+                height: bgRoot.centeredShapeRenderSize
                 color: bgRoot.centeredWallpaperColor
                 shape: bgRoot.centeredWallpaperShape
                 transformOrigin: Item.Center
                 // Base scale (lock/unlock) multiplied by the click pulse.
                 property real shapeZoom: 1
-                scale: (bgRoot.centeredShapeSize() / bgRoot.centeredShapeMax) * shapeZoom
+                scale: (bgRoot.centeredShapeSize() / bgRoot.centeredShapeRenderSize) * shapeZoom
                 visible: bgRoot.centeredWallpaperEnabled
                     && (bgRoot.centeredProgress < 1 || bgRoot.centeredAnimating)
 
