@@ -628,8 +628,7 @@ Variants {
                     anchors.fill: parent
                     z: 1
                     acceptedButtons: Qt.LeftButton
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: centeredWallpaperShapeItem.thump()
+                        onClicked: centeredWallpaperShapeItem.thump()
                 }
             }
 
@@ -867,6 +866,19 @@ Variants {
                         wallpaperScale: 1
                     }
                 }
+            }
+
+            MouseArea {
+                id: centeredDesktopThumpArea
+                z: 2
+                width: Math.max(1, bgRoot.centeredShapeSize())
+                height: width
+                anchors.centerIn: parent
+                visible: bgRoot.centeredWallpaperEnabled
+                    && !GlobalStates.screenLocked
+                    && (bgRoot.centeredProgress < 1 || bgRoot.centeredAnimating)
+                acceptedButtons: Qt.LeftButton
+                onClicked: GlobalStates.centeredWallpaperThumpRequested()
             }
 
             MouseArea {
