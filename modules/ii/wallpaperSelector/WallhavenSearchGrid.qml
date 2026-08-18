@@ -83,7 +83,15 @@ Item {
             item.forceActiveFocus()
         }
         sourceComponent: WallhavenSettingsPopup {
-            onDismiss: root.showSettings = false
+            id: settingsPopup
+            onDismiss: {
+                root.showSettings = false
+                // Only re-search when a filter actually changed while the menu was open
+                if (settingsPopup.dirty) {
+                    WallhavenSearch.saveToConfig()
+                    WallhavenSearch.search(WallhavenSearch.currentQuery, 1)
+                }
+            }
         }
     }
 
