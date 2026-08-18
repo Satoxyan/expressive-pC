@@ -255,6 +255,7 @@ MouseArea {
 
                     Toolbar {
                         anchors.centerIn: parent
+                        visible: root.source !== "wallhaven"
 
                         Loader {
                             active: root.source === "local"
