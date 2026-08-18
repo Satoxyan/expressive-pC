@@ -282,4 +282,11 @@ Singleton {
             search(currentQuery, currentPage - 1)
         }
     }
+
+    function goToPage(page) {
+        page = parseInt(page, 10)
+        if (isNaN(page) || page < 1) page = 1
+        if (page > lastPage) page = lastPage
+        if (page !== currentPage && !fetching) search(currentQuery, page)
+    }
 }
