@@ -627,8 +627,25 @@ MouseArea {
                                         onClicked: WallhavenSearch.previousPage()
                                     }
 
+                                    ToolbarTextField {
+                                        id: pageField
+                                        implicitWidth: 44
+                                        Layout.preferredWidth: 44
+                                        Layout.fillWidth: false
+                                        horizontalAlignment: Text.AlignHCenter
+                                        text: WallhavenSearch.currentPage
+                                        inputMethodHints: Qt.ImhDigitsOnly
+                                        onAccepted: WallhavenSearch.goToPage(text)
+                                        Connections {
+                                            target: WallhavenSearch
+                                            function onCurrentPageChanged() {
+                                                pageField.text = WallhavenSearch.currentPage
+                                            }
+                                        }
+                                    }
+
                                     StyledText {
-                                        text: WallhavenSearch.currentPage + " / " + WallhavenSearch.lastPage
+                                        text: " / " + WallhavenSearch.lastPage
                                         font.pixelSize: Appearance.font.pixelSize.small
                                         color: Appearance.colors.colOnLayer1
                                     }
