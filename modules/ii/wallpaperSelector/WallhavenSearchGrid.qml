@@ -69,6 +69,16 @@ Item {
 
     property bool showSettings: false
 
+    // Opens the filter dialog, or closes it through dismiss() so the
+    // dirty-apply logic in onDismiss still runs (toolbar tune button).
+    function toggleSettings() {
+        if (root.showSettings) {
+            if (settingsPopupLoader.item) settingsPopupLoader.item.dismiss()
+        } else {
+            root.showSettings = true
+        }
+    }
+
     // Settings dialog (filters + API key). Created on demand: WindowDialog collapses
     // via onShowChanged, so a persistent instance would start open. Loader builds it
     // fresh each time; onLoaded opens it. (The old reopen bug was WallhavenSettingsPopup's

@@ -731,7 +731,8 @@ MouseArea {
                                 IconToolbarButton {
                                     implicitWidth: height
                                     text: "tune"
-                                    onClicked: { if (gridLoader.item) gridLoader.item.showSettings = true }
+                                    toggled: gridLoader.item?.showSettings
+                                    onClicked: { if (gridLoader.item) gridLoader.item.toggleSettings() }
                                     StyledToolTip {
                                         text: Translation.tr("Wallhaven search settings")
                                     }
