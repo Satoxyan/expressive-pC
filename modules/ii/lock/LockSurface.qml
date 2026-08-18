@@ -202,6 +202,22 @@ MouseArea {
         }
     }
 
+    // Clicking the centered wallpaper (a square around the screen center
+    // matching its locked size) plays the heartbeat thump on the background.
+    // Keeps the password field focused like any other lock-screen press.
+    MouseArea {
+        id: centeredWallpaperThumpArea
+        z: 1
+        width: Math.max(1, Config.options.background.centeredWallpaperSize)
+        height: width
+        anchors.centerIn: parent
+        visible: Config.options.background.centeredWallpaper
+        onClicked: {
+            root.forceFieldFocus()
+            GlobalStates.centeredWallpaperThumpRequested()
+        }
+    }
+
     // Media controller (LockMediaWidget), shown on demand above the main toolbar
     Loader {
         id: lockscreenMediaController

@@ -100,8 +100,7 @@ Variants {
         property int centeredWallpaperSize: Config.options.background.centeredWallpaperSize
         property color centeredWallpaperColor: root.getColorFromName(Config.options.background.centeredWallpaperColor)
         onCenteredOnlyWhenLockedChanged: {
-            if (bgRoot.centeredAnimationReady && Config.ready)
-                bgRoot.centeredProgress = GlobalStates.screenLocked ? 0 : (bgRoot.centeredOnlyWhenLocked ? 1 : 0)
+            bgRoot.setCenteredProgress(GlobalStates.screenLocked ? 0 : (bgRoot.centeredOnlyWhenLocked ? 1 : 0))
         }
 
         // Size the shape (with the wallpaper inside) must reach so its masked
@@ -172,14 +171,37 @@ Variants {
         property bool centeredAnimationReady: false
         property bool centeredAnimating: false
         property real centeredProgress: 0
-        Behavior on centeredProgress {
-            enabled: bgRoot.centeredWallpaperEnabled && bgRoot.centeredAnimationReady && Config.ready
-            NumberAnimation {
-                duration: 650
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial
-                onRunningChanged: bgRoot.centeredAnimating = running
+
+        // Unlock is slower (0.8s) than lock (0.65s); the helper picks the
+        // animation by direction. It also skips the animation while the config
+        // is still loading, so the initial set never plays a grow-in on startup.
+        function setCenteredProgress(value) {
+            if (!bgRoot.centeredWallpaperEnabled || !bgRoot.centeredAnimationReady || !Config.ready) {
+                bgRoot.centeredProgress = value
+                return
             }
+            if (value === bgRoot.centeredProgress) return
+            const anim = value > bgRoot.centeredProgress ? centeredUnlockAnim : centeredLockAnim
+            anim.to = value
+            anim.restart()
+        }
+        NumberAnimation {
+            id: centeredLockAnim
+            target: bgRoot
+            property: "centeredProgress"
+            duration: 650
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial
+            onRunningChanged: bgRoot.centeredAnimating = running
+        }
+        NumberAnimation {
+            id: centeredUnlockAnim
+            target: bgRoot
+            property: "centeredProgress"
+            duration: 800
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial
+            onRunningChanged: bgRoot.centeredAnimating = running
         }
 
         // The centered shape is actually shown on screen only while the
@@ -218,11 +240,18 @@ Variants {
         // the inverse zoom to stay exactly as before on screen: it fills the
         // shape (height == shape size) while the shape is smaller than the
         // screen, then stops growing once it would cover the whole screen.
+        // A small overscan (1.08) keeps the wallpaper's own edge behind the
+        // shape tips during the click pulse (which grows the shape to 1.06x);
+        // it eases out as the shape approaches full screen so the lock/unlock
+        // handover to the full wallpaper stays unzoomed.
         function centeredImageScale() {
             if (!bgRoot.centeredWallpaperEnabled) return 1
-            return bgRoot.centeredShapeMax
-                / Math.max(bgRoot.centeredShapeSize(),
-                    Math.min(bgRoot.screen.width, bgRoot.screen.height))
+            const minDim = Math.min(bgRoot.screen.width, bgRoot.screen.height)
+            const size = bgRoot.centeredShapeSize()
+            const overscan = size >= minDim ? 1
+                : 1.08 - 0.08 * (size - bgRoot.centeredWallpaperSize) / (minDim - bgRoot.centeredWallpaperSize)
+            return overscan * bgRoot.centeredShapeMax
+                / Math.max(size, minDim)
         }
         function centeredFullWallpaperOpacity() {
             if (!bgRoot.centeredWallpaperEnabled) return 1
@@ -319,7 +348,7 @@ Variants {
         }
 
         Component.onCompleted: {
-            bgRoot.centeredProgress = GlobalStates.screenLocked ? 0 : (bgRoot.centeredOnlyWhenLocked ? 1 : 0)
+            bgRoot.setCenteredProgress(GlobalStates.screenLocked ? 0 : (bgRoot.centeredOnlyWhenLocked ? 1 : 0))
             if (Config.ready)
                 bgRoot.centeredAnimationReady = true
             previousWallpaper.source = ""
@@ -394,7 +423,7 @@ Variants {
             target: Config
             function onReadyChanged() {
                 if (!Config.ready) return
-                bgRoot.centeredProgress = GlobalStates.screenLocked ? 0 : (bgRoot.centeredOnlyWhenLocked ? 1 : 0)
+                bgRoot.setCenteredProgress(GlobalStates.screenLocked ? 0 : (bgRoot.centeredOnlyWhenLocked ? 1 : 0))
                 bgRoot.centeredAnimationReady = true
             }
         }
@@ -402,7 +431,7 @@ Variants {
         Connections {
             target: GlobalStates
             function onScreenLockedChanged() {
-                bgRoot.centeredProgress = GlobalStates.screenLocked ? 0 : (bgRoot.centeredOnlyWhenLocked ? 1 : 0)
+                bgRoot.setCenteredProgress(GlobalStates.screenLocked ? 0 : (bgRoot.centeredOnlyWhenLocked ? 1 : 0))
                 if (!GlobalStates.screenLocked) {
                     bgRoot.videoRevealed = bgRoot.wallpaperIsVideo
                 }
@@ -534,9 +563,39 @@ Variants {
                 color: bgRoot.centeredWallpaperColor
                 shape: bgRoot.centeredWallpaperShape
                 transformOrigin: Item.Center
-                scale: bgRoot.centeredShapeSize() / bgRoot.centeredShapeMax
+                // Base scale (lock/unlock) multiplied by the click pulse.
+                property real shapeZoom: 1
+                scale: (bgRoot.centeredShapeSize() / bgRoot.centeredShapeMax) * shapeZoom
                 visible: bgRoot.centeredWallpaperEnabled
                     && (bgRoot.centeredProgress < 1 || bgRoot.centeredAnimating)
+
+                // Slow single zoom-in/out on click (0.8s total). The wallpaper inside stays
+                // put during the shape pulse (compensated by 1/shapeZoom) and only
+                // starts its own zoom 200ms later for a follow-up effect.
+                // Guarded by "running" so a rapid click never restarts mid-way.
+                SequentialAnimation {
+                    id: shapeZoomAnim
+                    NumberAnimation { target: centeredWallpaperShapeItem; property: "shapeZoom"; to: 1.06; duration: 300; easing.type: Easing.OutQuad }
+                    NumberAnimation { target: centeredWallpaperShapeItem; property: "shapeZoom"; to: 1.0;  duration: 500; easing.type: Easing.InOutQuad }
+                }
+                SequentialAnimation {
+                    id: imageFollowAnim
+                    PauseAnimation { duration: 200 }
+                    NumberAnimation { target: centeredWallpaperImage; property: "imageZoom"; to: 1.08; duration: 250; easing.type: Easing.OutQuad }
+                    NumberAnimation { target: centeredWallpaperImage; property: "imageZoom"; to: 1.0;  duration: 350; easing.type: Easing.InOutQuad }
+                }
+                function thump() {
+                    if (shapeZoomAnim.running || imageFollowAnim.running) return
+                    shapeZoomAnim.restart()
+                    imageFollowAnim.restart()
+                }
+
+                Connections {
+                    target: GlobalStates
+                    function onCenteredWallpaperThumpRequested() {
+                        centeredWallpaperShapeItem.thump()
+                    }
+                }
 
                 layer.enabled: true
                 layer.effect: OpacityMask {
@@ -548,6 +607,7 @@ Variants {
                 }
 
                 StyledImage {
+                    id: centeredWallpaperImage
                     width: bgRoot.width
                     height: bgRoot.height
                     anchors.centerIn: parent
@@ -557,7 +617,19 @@ Variants {
                     antialiasing: true
                     sourceSize.width: bgRoot.width
                     sourceSize.height: bgRoot.height
-                    scale: bgRoot.centeredImageScale()
+                    // Inverse lock/unlock zoom, multiplied by the delayed pulse.
+                    // Dividing by shapeZoom keeps the picture visually still while
+                    // the shape zooms, until imageZoom's follow-up kicks in.
+                    property real imageZoom: 1
+                    scale: bgRoot.centeredImageScale() * (1 / centeredWallpaperShapeItem.shapeZoom) * imageZoom
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    z: 1
+                    acceptedButtons: Qt.LeftButton
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: centeredWallpaperShapeItem.thump()
                 }
             }
 

@@ -46,6 +46,8 @@ Singleton {
     property real dropShelfX: 0
     property real dropShelfY: 0
 
+    signal centeredWallpaperThumpRequested()
+
     readonly property var hotCornerOptions: [
         { displayName: Translation.tr("None"),                  value: "none" },
         { displayName: Translation.tr("Left Sidebar"),           value: "sidebarLeftOpen" },
