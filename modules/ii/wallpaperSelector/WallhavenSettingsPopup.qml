@@ -14,10 +14,14 @@ WindowDialog {
     id: root
     backgroundWidth: 460
 
-    function triggerSearch() {
-        WallhavenSearch.saveToConfig()
-        WallhavenSearch.search(WallhavenSearch.currentQuery, 1)
-    }
+    // Becomes true when a filter is changed while the menu is open.
+    // The actual search is deferred until the menu closes (see WallhavenSearchGrid's onDismiss).
+    property bool dirty: false
+
+    // Combos fire a spurious currentIndexChanged during construction (before bindings settle);
+    // ignore it so opening the menu alone doesn't mark the filters as changed.
+    property bool ready: false
+    Component.onCompleted: Qt.callLater(() => root.ready = true)
 
     WindowDialogTitle {
         text: Translation.tr("Wallhaven Settings")
@@ -90,10 +94,10 @@ WindowDialog {
             property var sortKeys: ["date_added", "relevance", "random", "views", "favorites", "toplist"]
             currentIndex: sortKeys.indexOf(WallhavenSearch.sorting)
             onCurrentIndexChanged: {
-                if (currentIndex >= 0) {
-                    WallhavenSearch.sorting = sortKeys[currentIndex]
-                    root.triggerSearch()
-                }
+                if (!root.ready || currentIndex < 0) return
+                if (sortKeys[currentIndex] === WallhavenSearch.sorting) return
+                WallhavenSearch.sorting = sortKeys[currentIndex]
+                root.dirty = true
             }
         }
     }
@@ -116,10 +120,10 @@ WindowDialog {
             property var orderKeys: ["desc", "asc"]
             currentIndex: orderKeys.indexOf(WallhavenSearch.order)
             onCurrentIndexChanged: {
-                if (currentIndex >= 0) {
-                    WallhavenSearch.order = orderKeys[currentIndex]
-                    root.triggerSearch()
-                }
+                if (!root.ready || currentIndex < 0) return
+                if (orderKeys[currentIndex] === WallhavenSearch.order) return
+                WallhavenSearch.order = orderKeys[currentIndex]
+                root.dirty = true
             }
         }
     }
@@ -149,7 +153,7 @@ WindowDialog {
                 onClicked: {
                     var cats = WallhavenSearch.categories
                     WallhavenSearch.categories = (cats.charAt(0) === "1" ? "0" : "1") + cats.charAt(1) + cats.charAt(2)
-                    root.triggerSearch()
+                    root.dirty = true
                 }
                 contentItem: StyledText {
                     text: Translation.tr("General")
@@ -168,7 +172,7 @@ WindowDialog {
                 onClicked: {
                     var cats = WallhavenSearch.categories
                     WallhavenSearch.categories = cats.charAt(0) + (cats.charAt(1) === "1" ? "0" : "1") + cats.charAt(2)
-                    root.triggerSearch()
+                    root.dirty = true
                 }
                 contentItem: StyledText {
                     text: Translation.tr("Anime")
@@ -187,7 +191,7 @@ WindowDialog {
                 onClicked: {
                     var cats = WallhavenSearch.categories
                     WallhavenSearch.categories = cats.charAt(0) + cats.charAt(1) + (cats.charAt(2) === "1" ? "0" : "1")
-                    root.triggerSearch()
+                    root.dirty = true
                 }
                 contentItem: StyledText {
                     text: Translation.tr("People")
@@ -222,7 +226,7 @@ WindowDialog {
                 onClicked: {
                     var p = WallhavenSearch.purity
                     WallhavenSearch.purity = (p.charAt(0) === "1" ? "0" : "1") + p.charAt(1) + p.charAt(2)
-                    root.triggerSearch()
+                    root.dirty = true
                 }
                 contentItem: StyledText {
                     text: "SFW"
@@ -241,7 +245,7 @@ WindowDialog {
                 onClicked: {
                     var p = WallhavenSearch.purity
                     WallhavenSearch.purity = p.charAt(0) + (p.charAt(1) === "1" ? "0" : "1") + p.charAt(2)
-                    root.triggerSearch()
+                    root.dirty = true
                 }
                 contentItem: StyledText {
                     text: Translation.tr("Sketchy")
@@ -261,7 +265,7 @@ WindowDialog {
                 onClicked: {
                     var p = WallhavenSearch.purity
                     WallhavenSearch.purity = p.charAt(0) + p.charAt(1) + (p.charAt(2) === "1" ? "0" : "1")
-                    root.triggerSearch()
+                    root.dirty = true
                 }
                 contentItem: StyledText {
                     text: "NSFW"
@@ -297,10 +301,10 @@ WindowDialog {
             property var ratioKeys: ["", "16x9", "16x10", "21x9", "32x9", "9x16", "10x16", "1x1", "3x2", "4x3", "5x4"]
             currentIndex: Math.max(0, ratioKeys.indexOf(WallhavenSearch.ratios))
             onCurrentIndexChanged: {
-                if (currentIndex >= 0) {
-                    WallhavenSearch.ratios = ratioKeys[currentIndex]
-                    root.triggerSearch()
-                }
+                if (!root.ready || currentIndex < 0) return
+                if (ratioKeys[currentIndex] === WallhavenSearch.ratios) return
+                WallhavenSearch.ratios = ratioKeys[currentIndex]
+                root.dirty = true
             }
         }
     }
