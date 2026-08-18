@@ -507,30 +507,6 @@ ContentPage {
                 }
 
                 GroupedList {
-                    ConfigSwitch {
-                        id: autoColorSwitch
-                        buttonIcon: "auto_awesome"
-                        text: Translation.tr("Automatic colors")
-                        checked: Config.options.background.widgets.clock.color === ""
-                        onCheckedChanged: {
-                            if (checked) {
-                                Config.options.background.widgets.clock.color = ""
-                            }
-                        }
-                    }
-
-                    ColorSelectionArray {
-                        icon: "palette"
-                        text: Translation.tr("Color")
-                        currentValue: Config.options.background.widgets.clock.color
-                        onSelected: newValue => {
-                            Config.options.background.widgets.clock.color = newValue
-                            autoColorSwitch.checked = false
-                        }
-                    }
-                }
-
-                GroupedList {
                     ConfigSelectionArray {
                         text: Translation.tr("Clock color")
                         icon: "light_mode"
@@ -581,6 +557,26 @@ ContentPage {
                                 value: "dark"
                             }
                         ]
+                    }
+
+                    ColorSelectionArray {
+                        icon: "light_mode"
+                        text: Translation.tr("Light color")
+                        options: ["primary", "secondary", "tertiary", "primaryContainer", "secondaryContainer", "tertiaryContainer", "layer0Border"]
+                        currentValue: Config.options.background.widgets.clock.digital.colorLight
+                        onSelected: newValue => {
+                            Config.options.background.widgets.clock.digital.colorLight = newValue;
+                        }
+                    }
+
+                    ColorSelectionArray {
+                        icon: "dark_mode"
+                        text: Translation.tr("Dark color")
+                        options: ["primary", "secondary", "tertiary", "primaryContainer", "secondaryContainer", "tertiaryContainer", "layer0Border"]
+                        currentValue: Config.options.background.widgets.clock.digital.colorDark
+                        onSelected: newValue => {
+                            Config.options.background.widgets.clock.digital.colorDark = newValue;
+                        }
                     }
                 }
 

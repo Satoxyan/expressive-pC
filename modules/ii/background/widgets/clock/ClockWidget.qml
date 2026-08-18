@@ -20,11 +20,12 @@ AbstractBackgroundWidget {
     readonly property bool forceCenter: (GlobalStates.screenLocked && Config.options.lock.centerClock)
     readonly property bool shouldShow: (!Config.options.background.widgets.clock.showOnlyWhenLocked || GlobalStates.screenLocked)
     readonly property string customClockColorKey: Config.options.background.widgets.clock.color ?? ""
-    readonly property color resolvedClockColor: {
-        if (customClockColorKey === "") return root.colText;
-        const propName = "col" + customClockColorKey.charAt(0).toUpperCase() + customClockColorKey.slice(1);
+    function paletteColor(key) {
+        if (key === "") return root.colText;
+        const propName = "col" + key.charAt(0).toUpperCase() + key.slice(1);
         return Appearance.colors[propName] ?? root.colText;
     }
+    readonly property color resolvedClockColor: paletteColor(customClockColorKey)
     readonly property bool effectiveVertical: GlobalStates.screenLocked ? Config.options.background.widgets.clock.digital.verticalLocked : Config.options.background.widgets.clock.digital.vertical
     readonly property string effectiveColorMode: GlobalStates.screenLocked ? Config.options.background.widgets.clock.digital.colorModeLocked : Config.options.background.widgets.clock.digital.colorMode
     property bool wallpaperSafetyTriggered: false
@@ -46,8 +47,10 @@ AbstractBackgroundWidget {
     visibleWhenLocked: true
 
     readonly property color effectiveColText: {
-        if (effectiveColorMode === "light") return Appearance.colors.colPrimary;
-        if (effectiveColorMode === "dark") return Appearance.colors.colBackground;
+        if (effectiveColorMode === "light")
+            return paletteColor(Config.options.background.widgets.clock.digital.colorLight);
+        if (effectiveColorMode === "dark")
+            return paletteColor(Config.options.background.widgets.clock.digital.colorDark);
         return root.resolvedClockColor;
     }
 

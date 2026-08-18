@@ -751,5 +751,7 @@
   "Left Sidebar": "Left Sidebar",
   "Write something here...\nUse '-' to create copyable bullet points, like this:\n\nSheep fricker\n- 4x Slab\n- 1x Boat\n- 4x Redstone Dust\n- 1x Sticky Piston\n- 1x End Rod\n- 4x Redstone Repeater\n- 1x Redstone Torch\n- 1x Sheep": "Write something here...\nUse '-' to create copyable bullet points, like this:\n\nSheep fricker\n- 4x Slab\n- 1x Boat\n- 4x Redstone Dust\n- 1x Sticky Piston\n- 1x End Rod\n- 4x Redstone Repeater\n- 1x Redstone Torch\n- 1x Sheep",
   "Keyboard": "Keyboard",
-  "Gaps In": "Gaps In"
+  "Gaps In": "Gaps In",
+  "Light color": "Light color",
+  "Dark color": "Dark color"
 }
