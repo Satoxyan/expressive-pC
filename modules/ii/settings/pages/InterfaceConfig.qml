@@ -653,6 +653,23 @@ ContentPage {
                     }
                 }
             }
+
+            ContentSubsection {
+                title: Translation.tr("Launch animation")
+                ConfigSelectionArray {
+                    Layout.fillWidth: false
+                    Layout.alignment: Qt.AlignRight
+                    currentValue: Config.options.dock.launchAnimation
+                    onSelected: newValue => { Config.options.dock.launchAnimation = newValue }
+                    options: [
+                        { displayName: Translation.tr("None"), icon: "block", value: DockLaunchAnims.AnimType.None },
+                        { displayName: Translation.tr("Bounce"), icon: "swap_vert", value: DockLaunchAnims.AnimType.Bounce },
+                        { displayName: Translation.tr("Pulse"), icon: "open_in_new", value: DockLaunchAnims.AnimType.Pulse },
+                        { displayName: Translation.tr("Pop"), icon: "adjust", value: DockLaunchAnims.AnimType.Pop },
+                        { displayName: Translation.tr("Wobble"), icon: "360", value: DockLaunchAnims.AnimType.Wobble }
+                    ]
+                }
+            }
         }
 
         ContentSection {
