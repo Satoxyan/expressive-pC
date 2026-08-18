@@ -304,12 +304,4 @@ WindowDialog {
             }
         }
     }
-
-    // Close button
-    WindowDialogButtonRow {
-        DialogButton {
-            buttonText: Translation.tr("Close")
-            onClicked: root.dismiss()
-        }
-    }
 }

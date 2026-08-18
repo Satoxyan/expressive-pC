@@ -258,7 +258,7 @@ MouseArea {
 
                     Toolbar {
                         anchors.centerIn: parent
-                        visible: root.source !== "blapples" && root.source !== "naive"
+                        visible: root.source !== "wallhaven" && root.source !== "blapples" && root.source !== "naive"
 
                         Loader {
                             active: root.source === "local"
