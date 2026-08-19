@@ -149,16 +149,15 @@ Item {
         required property string word
         required property int wordIndex
         required property real progress
-        required property color sungColor
         required property color dimColor
         required property int fontSize
 
         readonly property bool current: wordItem.progress > 0 && wordItem.progress < 1
 
-        // The sung color from the theme is a mid-tone that barely reads on
-        // the artwork-blurred background, so brighten it toward white for
-        // the swept fill and the glow.
-        readonly property color brightSung: Qt.lighter(wordItem.sungColor, 1.6)
+        // Words that have been sung (or are being sung) are pure white, the
+        // maximum brightness. Future words stay dim so the karaoke progress
+        // is clearly visible.
+        readonly property color litColor: "#ffffff"
 
         // Glow fades in on the active word and stays on after the word is
         // passed (slightly dimmed) so sung words keep glowing. The value is
@@ -181,7 +180,7 @@ Item {
         implicitWidth: dimText.implicitWidth
         implicitHeight: dimText.implicitHeight
 
-        // Dim base (future word)
+        // Dim base: future words, not yet reached by the karaoke glow.
         Text {
             id: dimText
             anchors.fill: parent
@@ -196,7 +195,8 @@ Item {
             verticalAlignment: Text.AlignVCenter
         }
 
-        // Active-color copy, clipped to the sung fraction
+        // Pure-white copy, clipped to the sung fraction. Every part of a
+        // word the karaoke has passed turns white; the rest stays dim.
         Item {
             id: fillClip
             anchors {
@@ -214,7 +214,7 @@ Item {
                     pixelSize: dimText.font.pixelSize
                     variableAxes: dimText.font.variableAxes
                 }
-                color: wordItem.brightSung
+                color: wordItem.litColor
                 text: wordItem.word
                 horizontalAlignment: Text.AlignLeft
                 verticalAlignment: Text.AlignVCenter
@@ -223,17 +223,17 @@ Item {
             visible: wordItem.progress > 0
         }
 
-        // Glow behind the currently-sung word. The layer turns on once the
-        // word starts being sung and stays on for the rest of the line
-        // (progress stays 1 after completion), so the fade-out never
-        // toggles the layer and blinks.
+        // Glow behind the words that have been sung. The layer turns on once
+        // a word starts being sung and stays on for the rest of the line
+        // (progress stays 1 after completion), so the fade-out never toggles
+        // the layer and blinks.
         layer.enabled: wordItem.progress > 0
         layer.effect: Glow {
             radius: 7
             samples: 15
             spread: 0.15
-            color: wordItem.brightSung
-            opacity: 0.35 * wordItem.glowStrength
+            color: wordItem.litColor
+            opacity: wordItem.glowStrength
         }
     }
 
@@ -397,7 +397,6 @@ Item {
                                     word: modelData.text
                                     wordIndex: modelData.index
                                     fontSize: root.fontSizeFor(0)
-                                    sungColor: root.activeColor
                                     dimColor: root.dimColor
                                     progress: {
                                         const cur = LyricsService.activeWordIndex
