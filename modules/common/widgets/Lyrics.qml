@@ -161,10 +161,21 @@ Item {
         readonly property color brightSung: Qt.lighter(wordItem.sungColor, 1.6)
 
         // Glow fades in on the active word and stays on after the word is
-        // passed (slightly dimmed) so sung words keep glowing.
-        property real glowStrength: wordItem.progress > 0
-            ? (wordItem.current ? 1 : 0.6)
-            : 0
+        // passed (slightly dimmed) so sung words keep glowing. The value is
+        // driven from onProgressChanged instead of a binding so it can start
+        // at 0 and animate up: every new line recreates the word items, and
+        // a bound property would take its full value immediately, making the
+        // glow pop in bright on the first word of each line.
+        property real glowStrength: 0
+        property bool glowReady: false
+        Component.onCompleted: wordItem.glowReady = true
+        onProgressChanged: {
+            if (!wordItem.glowReady) return
+            const target = wordItem.progress > 0
+                ? (wordItem.current ? 1 : 0.6)
+                : 0
+            if (target !== wordItem.glowStrength) wordItem.glowStrength = target
+        }
         Behavior on glowStrength { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
 
         implicitWidth: dimText.implicitWidth
@@ -218,11 +229,11 @@ Item {
         // toggles the layer and blinks.
         layer.enabled: wordItem.progress > 0
         layer.effect: Glow {
-            radius: 10
-            samples: 21
-            spread: 0.25
+            radius: 7
+            samples: 15
+            spread: 0.15
             color: wordItem.brightSung
-            opacity: 0.8 * wordItem.glowStrength
+            opacity: 0.35 * wordItem.glowStrength
         }
     }
 
@@ -395,11 +406,12 @@ Item {
                                             return LyricsService.activeWordProgress
                                         return 0
                                     }
-                                    Behavior on progress {
-                                        // Short chase so the fill tracks the audio
-                                        // closely instead of lagging/jumping per word.
-                                        NumberAnimation { duration: 60; easing.type: Easing.Linear }
-                                    }
+                                    // No Behavior on progress: delegates are
+                                    // recycled across line changes, and an
+                                    // animation would play the old word's
+                                    // bright fill down over the new word
+                                    // (a bright blink at every line change).
+                                    // The 50ms service timer is already smooth.
                                 }
                             }
                         }
