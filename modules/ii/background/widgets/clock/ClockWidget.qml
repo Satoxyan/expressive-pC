@@ -47,11 +47,11 @@ AbstractBackgroundWidget {
     visibleWhenLocked: true
 
     readonly property color effectiveColText: {
+        if (effectiveColorMode === "auto")
+            return paletteColor(Appearance.wallpaperIsDark ? Config.options.background.widgets.clock.digital.colorLight : Config.options.background.widgets.clock.digital.colorDark);
         if (effectiveColorMode === "light")
             return paletteColor(Config.options.background.widgets.clock.digital.colorLight);
-        if (effectiveColorMode === "dark")
-            return paletteColor(Config.options.background.widgets.clock.digital.colorDark);
-        return root.resolvedClockColor;
+        return paletteColor(Config.options.background.widgets.clock.digital.colorDark);
     }
 
     function restoreXYBinding() {

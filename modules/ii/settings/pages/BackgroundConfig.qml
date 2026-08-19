@@ -562,7 +562,7 @@ ContentPage {
                     ColorSelectionArray {
                         icon: "light_mode"
                         text: Translation.tr("Light color")
-                        options: ["primary", "secondary", "tertiary", "primaryContainer", "secondaryContainer", "tertiaryContainer", "layer0Border"]
+                        options: ["primary", "secondary", "tertiary", "primaryContainer", "secondaryContainer", "tertiaryContainer", "layer0Border", "adaptive"]
                         currentValue: Config.options.background.widgets.clock.digital.colorLight
                         onSelected: newValue => {
                             Config.options.background.widgets.clock.digital.colorLight = newValue;
@@ -572,7 +572,7 @@ ContentPage {
                     ColorSelectionArray {
                         icon: "dark_mode"
                         text: Translation.tr("Dark color")
-                        options: ["primary", "secondary", "tertiary", "primaryContainer", "secondaryContainer", "tertiaryContainer", "layer0Border"]
+                        options: ["primary", "secondary", "tertiary", "primaryContainer", "secondaryContainer", "tertiaryContainer", "layer0Border", "adaptive"]
                         currentValue: Config.options.background.widgets.clock.digital.colorDark
                         onSelected: newValue => {
                             Config.options.background.widgets.clock.digital.colorDark = newValue;
