@@ -181,13 +181,13 @@ AbstractBackgroundWidget {
                             anchors.centerIn: parent
                             spacing: 4
                             StyledText {
-                                text: root.today.toLocaleDateString(Qt.locale(), "MMM").toUpperCase()
+                                text: root.today.toLocaleDateString(DateTime.locale, "MMM").toUpperCase()
                                 font.pixelSize: Appearance.font.pixelSize.normal
                                 font.weight: Font.Bold
                                 color: Appearance.colors.colOnPrimary
                             }
                             StyledText {
-                                text: root.today.toLocaleDateString(Qt.locale(), "ddd").toUpperCase()
+                                text: root.today.toLocaleDateString(DateTime.locale, "ddd").toUpperCase()
                                 font.pixelSize: Appearance.font.pixelSize.normal
                                 font.weight: Font.Bold
                                 color: Appearance.colors.colOnPrimary
@@ -229,7 +229,7 @@ AbstractBackgroundWidget {
                     StyledText {
                         id: monthText
                         anchors.centerIn: parent
-                        text: root.today.toLocaleDateString(Qt.locale(), "MMMM yyyy")
+                        text: root.today.toLocaleDateString(DateTime.locale, "MMMM yyyy")
                         font.pixelSize: Appearance.font.pixelSize.small
                         font.weight: Font.Bold
                         color: Appearance.colors.colOnPrimary
@@ -307,7 +307,7 @@ AbstractBackgroundWidget {
                         font.pixelSize: Appearance.font.pixelSize.normal
                         font.weight: Font.Medium
                         color: Appearance.colors.colOnPrimaryContainer
-                        text: root.viewingDate.toLocaleDateString(Qt.locale(), "MMMM yyyy")
+                        text: root.viewingDate.toLocaleDateString(DateTime.locale, "MMMM yyyy")
                     }
 
                     Rectangle {
