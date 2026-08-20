@@ -21,7 +21,7 @@ Scope {
         return parts.length > 0 ? parts[parts.length - 1] : ""
     }
 
-    readonly property var dotsList: ["ii", "end4-pC"]
+    readonly property var dotsList: ["ii", "expressive-pC"]
 
     property bool switcherOpen: false
 
@@ -178,7 +178,7 @@ killall ydotool qs quickshell 2>/dev/null || true
                                 dotsName: "ii"
                             }
                             DotsOptionCard {
-                                dotsName: "end4-pC"
+                                dotsName: "expressive-pC"
                             }
                         }
                     }
