@@ -257,7 +257,7 @@ Singleton {
                             property string colorMode: "auto"           // Options: "auto", "light", "dark"
                             property string colorModeLocked: "auto"     // Options: "auto", "light", "dark"
                             property string colorLight: "primary"       // Palette key used when colorMode == "light"
-                            property string colorDark: "layer0Border"   // Palette key used when colorMode == "dark"
+                            property string colorDark: "adaptive"       // Palette key used when colorMode == "dark"
                             property JsonObject font: JsonObject {
                                 property string family: "Google Sans Flex"
                                 property real weight: 350

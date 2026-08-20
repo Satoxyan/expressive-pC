@@ -22,6 +22,8 @@ AbstractBackgroundWidget {
     readonly property string customClockColorKey: Config.options.background.widgets.clock.color ?? ""
     function paletteColor(key) {
         if (key === "") return root.colText;
+        if (key === "adaptive")
+            return ColorUtils.colorWithLightness(Appearance.colors.colPrimary, (root.dominantColorIsDark ? 0.8 : 0.12));
         const propName = "col" + key.charAt(0).toUpperCase() + key.slice(1);
         return Appearance.colors[propName] ?? root.colText;
     }
