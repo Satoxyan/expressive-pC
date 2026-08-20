@@ -180,7 +180,8 @@ AbstractBackgroundWidget {
                 }
                 ClockStatusText {
                     id: lockStatusText
-                    shown: GlobalStates.screenLocked && Config.options.lock.showLockedText
+                    shown: GlobalStates.screenLockPending && Config.options.lock.showLockedText
+                    reserveSpace: true
                     statusIcon: "lock"
                     statusText: Translation.tr("Locked")
                 }
@@ -197,9 +198,10 @@ AbstractBackgroundWidget {
         property alias statusIcon: statusIconWidget.text
         property alias statusText: statusTextWidget.text
         property bool shown: true
+        property bool reserveSpace: false
         property color textColor: root.clockStyle === "cookie" ? Appearance.colors.colOnSecondaryContainer : root.effectiveColText
         opacity: shown ? 1 : 0
-        visible: opacity > 0
+        visible: reserveSpace ? true : (opacity > 0)
         Behavior on opacity {
             animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
         }

@@ -73,7 +73,8 @@ Scope {
 
             // Unlock the screen before exiting, or the compositor will display a
             // fallback lock you can't interact with.
-            GlobalStates.screenLocked = false;
+            GlobalStates.screenLockPending = false;
+            unlockPendingTimer.restart();
 
             // Reset
             lockContext.reset();
@@ -92,12 +93,28 @@ Scope {
         surface: root.sessionLockSurface
     }
 
+    // The lock badge ("Locked") fades in before the screen locks and fades out
+    // before it unlocks, so the clock's size is already settled when its
+    // centering animation runs. Lead it by a short delay.
+    Timer {
+        id: lockPendingTimer
+        interval: 100
+        onTriggered: GlobalStates.screenLocked = true
+    }
+    Timer {
+        id: unlockPendingTimer
+        interval: 100
+        onTriggered: GlobalStates.screenLocked = false
+    }
+
     function lock() {
         if (Config.options.lock.useHyprlock) {
             Quickshell.execDetached(["bash", "-c", "pidof hyprlock || hyprlock"]);
             return;
         }
-        GlobalStates.screenLocked = true;
+        if (GlobalStates.screenLockPending || GlobalStates.screenLocked) return;
+        GlobalStates.screenLockPending = true;
+        lockPendingTimer.restart();
     }
 
     IpcHandler {
