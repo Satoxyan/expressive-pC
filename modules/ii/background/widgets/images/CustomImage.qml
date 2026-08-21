@@ -27,6 +27,20 @@ AbstractBackgroundWidget {
     property real liveSize: -1 // during resize gesture, before persisting
     readonly property real effectiveSize: liveSize > 0 ? liveSize : imageSize
 
+    readonly property var shapeList: [
+        "Circle", "Square", "Slanted", "Arch", "Arrow", "SemiCircle", "Oval", "Pill",
+        "Triangle", "Diamond", "ClamShell", "Pentagon", "Gem", "Sunny", "VerySunny",
+        "Cookie4Sided", "Cookie6Sided", "Cookie7Sided", "Cookie9Sided", "Cookie12Sided",
+        "Ghostish", "Clover4Leaf", "Clover8Leaf", "Burst", "SoftBurst", "Flower",
+        "Puffy", "PuffyDiamond", "PixelCircle", "Bun", "Heart"
+    ]
+
+    function cycleShape() {
+        const i = root.shapeList.indexOf(root.imageShape)
+        const next = root.shapeList[(i + 1) % root.shapeList.length]
+        Config.updateCustomImage(root.imageIndex, { shape: next })
+    }
+
     // Base class writes configEntry.x/y in-memory; persist without replacing
     // the array (a full array replace here would rebuild this widget mid-drop)
     Connections {
@@ -174,6 +188,50 @@ AbstractBackgroundWidget {
                     }
                     root.dropHover = false
                 }
+            }
+        }
+
+        // Remove button (top-left), visible on hover in edit mode
+        MaterialShapeWrappedMaterialSymbol {
+            anchors { top: parent.top; left: parent.left; margins: 8 }
+            visible: root.containsMouse && !Config.options.background.widgetsLocked
+            wrappedShape: MaterialShape.Shape.Circle
+            color: Appearance.colors.colError ?? Appearance.colors.colPrimary
+            colSymbol: Appearance.colors.colOnError ?? Appearance.colors.colOnPrimary
+            text: "close"
+            iconSize: 16
+            fill: 1
+            padding: 6
+            implicitWidth: 30
+            implicitHeight: 30
+            z: 2
+
+            ButtonMouseArea {
+                anchors.fill: parent
+                onClicked: Config.removeCustomImage(root.imageIndex)
+            }
+        }
+
+        // Shape cycle button (top-right), visible on hover in edit mode
+        MaterialShapeWrappedMaterialSymbol {
+            anchors { top: parent.top; right: parent.right; margins: 8 }
+            visible: root.containsMouse && !Config.options.background.widgetsLocked
+            wrappedShape: MaterialShape.Shape.Circle
+            color: Appearance.colors.colPrimary
+            colSymbol: Appearance.colors.colOnPrimary
+            text: "category"
+            iconSize: 16
+            fill: 1
+            padding: 6
+            implicitWidth: 30
+            implicitHeight: 30
+            z: 2
+
+            Behavior on opacity { animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this) }
+
+            ButtonMouseArea {
+                anchors.fill: parent
+                onClicked: root.cycleShape()
             }
         }
 
