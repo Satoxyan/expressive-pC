@@ -55,20 +55,62 @@ Item {
 
         Repeater {
             model: root.widgetList
-            delegate: ConfigSwitch {
+            delegate: Loader {
+                id: entry
+
                 required property var modelData
                 Layout.fillWidth: true
-                buttonIcon: modelData.icon
-                text: modelData.name
-                checked: modelData.key === "customImage" 
-                    ? Config.options.background.widgets.customImages.some(img => img.enable)
-                    : Config.options.background.widgets[modelData.key].enable
-                onCheckedChanged: {
-                    if (modelData.key === "customImage") {
-                        const widgets = Config.options.background.widgets
-                        widgets.customImages = widgets.customImages.map(e => Object.assign({}, e, { enable: checked }))
-                    } else {
-                        Config.options.background.widgets[modelData.key].enable = checked
+                Layout.bottomMargin: 6 // ConfigSwitch normally carries this; it's lost inside a Loader
+                sourceComponent: entry.modelData.key === "customImage" ? addRow : toggleSwitch
+
+                Component {
+                    id: toggleSwitch
+                    ConfigSwitch {
+                        buttonIcon: entry.modelData.icon
+                        text: entry.modelData.name
+                        checked: Config.options.background.widgets[entry.modelData.key].enable
+                        onCheckedChanged: Config.options.background.widgets[entry.modelData.key].enable = checked
+                    }
+                }
+
+                // Custom Image: mirrors ConfigSwitch structure exactly, "+" instead of the switch
+                Component {
+                    id: addRow
+                    RippleButton {
+                        id: addBtn
+
+                        colBackgroundHover: "transparent"
+                        implicitHeight: contentItem.implicitHeight + 8
+                        font.pixelSize: Appearance.font.pixelSize.small
+                        onClicked: Config.addCustomImage()
+
+                        contentItem: RowLayout {
+                            spacing: 10
+                            OptionalMaterialSymbol {
+                                icon: entry.modelData.icon
+                                iconSize: Appearance.font.pixelSize.larger
+                            }
+                            StyledText {
+                                Layout.fillWidth: true
+                                text: entry.modelData.name
+                                font: addBtn.font
+                                color: Appearance.colors.colOnSecondaryContainer
+                            }
+                            MaterialShapeWrappedMaterialSymbol {
+                                wrappedShape: MaterialShape.Shape.Circle
+                                color: Appearance.colors.colPrimary
+                                colSymbol: Appearance.colors.colOnPrimary
+                                text: "add"
+                                iconSize: 18
+                                fill: 1
+                                padding: 6
+
+                                ButtonMouseArea {
+                                    anchors.fill: parent
+                                    onClicked: Config.addCustomImage()
+                                }
+                            }
+                        }
                     }
                 }
             }
