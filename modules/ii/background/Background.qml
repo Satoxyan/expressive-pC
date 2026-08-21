@@ -743,16 +743,28 @@ Variants {
                         wallpaperScale: 1
                     }
                 }
-                FadeLoader {
-                    shown: Config.options.background.widgets.customImage.enable
-                        && (Config.options.background.screenList.length === 0
-                            || Config.options.background.screenList.includes(bgRoot.screen.name))
-                    sourceComponent: CustomImage {
-                        screenWidth:        bgRoot.screen.width
-                        screenHeight:       bgRoot.screen.height
-                        scaledScreenWidth:  bgRoot.screen.width
-                        scaledScreenHeight: bgRoot.screen.height
-                        wallpaperScale:     1
+                // Model is the count, not the array: config reloads reassign the
+                // array (write -> watchChanges -> reload), which would destroy and
+                // recreate every delegate if the array itself were the model.
+                Repeater {
+                    model: Config.options.background.widgets.customImages.length
+                    delegate: FadeLoader {
+                        required property int index
+                        readonly property var imgEntry: Config.options.background.widgets.customImages[index]
+                        shown: imgEntry?.enable
+                            && (Config.options.background.screenList.length === 0
+                                || Config.options.background.screenList.includes(bgRoot.screen.name))
+                        sourceComponent: CustomImage {
+                            screenWidth:        bgRoot.screen.width
+                            screenHeight:       bgRoot.screen.height
+                            scaledScreenWidth:  bgRoot.screen.width
+                            scaledScreenHeight: bgRoot.screen.height
+                            wallpaperScale:     1
+                            imageIndex:         index
+                            imagePath:          imgEntry?.path ?? ""
+                            imageShape:         imgEntry?.shape ?? "Cookie4Sided"
+                            imageSize:          imgEntry?.size ?? 200
+                        }
                     }
                 }
                 FadeLoader {

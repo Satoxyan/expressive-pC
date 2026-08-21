@@ -60,8 +60,17 @@ Item {
                 Layout.fillWidth: true
                 buttonIcon: modelData.icon
                 text: modelData.name
-                checked: Config.options.background.widgets[modelData.key].enable
-                onCheckedChanged: Config.options.background.widgets[modelData.key].enable = checked
+                checked: modelData.key === "customImage" 
+                    ? Config.options.background.widgets.customImages.some(img => img.enable)
+                    : Config.options.background.widgets[modelData.key].enable
+                onCheckedChanged: {
+                    if (modelData.key === "customImage") {
+                        const widgets = Config.options.background.widgets
+                        widgets.customImages = widgets.customImages.map(e => Object.assign({}, e, { enable: checked }))
+                    } else {
+                        Config.options.background.widgets[modelData.key].enable = checked
+                    }
+                }
             }
         }
     }

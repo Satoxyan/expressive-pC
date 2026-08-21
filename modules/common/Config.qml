@@ -13,6 +13,30 @@ Singleton {
     property int readWriteDelay: 50 // milliseconds
     property bool blockWrites: false
 
+    // customImages must be replaced wholesale on mutation: nested edits on plain
+    // objects inside list<var> don't notify or persist, so widgets would reset
+    // to default positions whenever the array gets reassigned from a file reload.
+    function updateCustomImage(index, props) {
+        const w = root.options.background.widgets;
+        w.customImages = w.customImages.map((e, i) => i === index ? Object.assign({}, e, props) : e);
+    }
+    function addCustomImage() {
+        const w = root.options.background.widgets;
+        w.customImages = [...w.customImages, { enable: true, placementStrategy: "free", x: 400, y: 100, path: "", shape: "Cookie4Sided", size: 200 }];
+    }
+    function removeCustomImage(index) {
+        const w = root.options.background.widgets;
+        w.customImages = w.customImages.filter((_, i) => i !== index);
+    }
+    // Persists without replacing the array, so Repeaters don't rebuild (blink)
+    // mid-interaction. Use only for values whose UI already reflects the change.
+    function saveCustomImageProps(index, props) {
+        const arr = root.options.background.widgets.customImages;
+        if (!arr[index]) return;
+        Object.assign(arr[index], props);
+        fileWriteTimer.restart();
+    }
+
     function setNestedValue(nestedKey, value) {
         let keys = nestedKey.split(".");
         let obj = root.options;
@@ -346,15 +370,9 @@ Singleton {
                         property int renderEveryXFrames: -1  // -1 = auto (System), 1 = every frame, 2 = every other frame, etc. Only for "wave" mode
                     }
 
-                    property JsonObject customImage: JsonObject {
-                        property bool enable: false
-                        property string placementStrategy: "free"
-                        property real x: 400
-                        property real y: 100
-                        property string path: ""
-                        property string shape: "Cookie4Sided"
-                        property real size: 200
-                    }
+                    property list<var> customImages: [
+                        { enable: false, placementStrategy: "free", x: 400, y: 100, path: "", shape: "Cookie4Sided", size: 200 }
+                    ]
 
                     property JsonObject resources: JsonObject {
                         property bool enable: false

@@ -5,6 +5,8 @@ import QtQuick.Layouts
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 import Quickshell
+import qs
+import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.ii.background.widgets
@@ -12,12 +14,35 @@ import qs.modules.ii.background.widgets
 AbstractBackgroundWidget {
     id: root
 
-    configEntryName: "customImage"
+    configEntryName: "customImages"
+    configEntry: Config.options.background.widgets.customImages[root.imageIndex]
     hoverEnabled: true
 
-    property string imagePath: Config.options.background.widgets.customImage.path ?? ""
+    required property int imageIndex
+    required property string imagePath
+    required property string imageShape
+    required property real imageSize
+
     property bool dropHover: false
-    property real widgetSize: Config.options.background.widgets.customImage.size ?? 200
+    property real liveSize: -1 // during resize gesture, before persisting
+    readonly property real effectiveSize: liveSize > 0 ? liveSize : imageSize
+
+    // Base class writes configEntry.x/y in-memory; persist without replacing
+    // the array (a full array replace here would rebuild this widget mid-drop)
+    Connections {
+        target: root
+        function onReleased() {
+            Config.saveCustomImageProps(root.imageIndex, { x: root.x, y: root.y })
+        }
+        function onDragFinished() {
+            Config.saveCustomImageProps(root.imageIndex, { placementStrategy: root.configEntry.placementStrategy })
+        }
+        function onClicked(mouse) {
+            // Only open the picker in edit mode (widgets unlocked / draggable)
+            if (mouse.button === Qt.LeftButton && !Config.options.background.widgetsLocked)
+                FilePicker.pickImage(path => Config.updateCustomImage(root.imageIndex, { path }))
+        }
+    }
 
     implicitWidth: contentItem.implicitWidth
     implicitHeight: contentItem.implicitHeight
@@ -65,8 +90,8 @@ AbstractBackgroundWidget {
 
     Item {
         id: contentItem
-        implicitWidth: root.widgetSize
-        implicitHeight: root.widgetSize
+        implicitWidth: root.effectiveSize
+        implicitHeight: root.effectiveSize
 
         Behavior on implicitWidth {
             animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
@@ -79,7 +104,7 @@ AbstractBackgroundWidget {
             id: shadowShape
             anchors.fill: parent
             color: Appearance.colors.colPrimaryContainer
-            shape: getShape(Config.options.background.widgets.customImage.shape ?? "Cookie4Sided")
+            shape: getShape(root.imageShape)
             visible: false
         }
 
@@ -93,14 +118,14 @@ AbstractBackgroundWidget {
             anchors.fill: parent
             z: 0
             color: Appearance.colors.colPrimaryContainer
-            shape: getShape(Config.options.background.widgets.customImage.shape ?? "Cookie4Sided")
+            shape: getShape(root.imageShape)
 
             layer.enabled: true
             layer.effect: OpacityMask {
                 maskSource: MaterialShape {
                     width: imageShape.width
                     height: imageShape.height
-                    shape: getShape(Config.options.background.widgets.customImage.shape ?? "Cookie4Sided")
+                    shape: getShape(root.imageShape)
                 }
             }
 
@@ -144,7 +169,7 @@ AbstractBackgroundWidget {
                         var ext = cleanPath.split(".").pop().toLowerCase()
                         var accepted = ["png","jpg","jpeg","webp","avif","bmp","gif","tiff","tif"]
                         if (accepted.indexOf(ext) !== -1) {
-                            Config.options.background.widgets.customImage.path = cleanPath
+                            Config.updateCustomImage(root.imageIndex, { path: cleanPath })
                         }
                     }
                     root.dropHover = false
@@ -156,14 +181,18 @@ AbstractBackgroundWidget {
             anchorItem: imageShape
             hoverActive: root.containsMouse
             locked: Config.options.background.widgetsLocked
-            currentWidth: root.widgetSize
+            currentWidth: root.effectiveSize
             resizeMode: "diagonal"
             z: 1
             onResized: (newValue) => {
-                root.widgetSize = Math.max(80, newValue)
+                root.liveSize = Math.max(80, newValue)
             }
             onResizeFinished: {
-                Config.options.background.widgets.customImage.size = root.widgetSize
+                // resizeFinished also fires on plain clicks (no drag) where liveSize
+                // was never set; don't persist the sentinel value
+                if (root.liveSize > 0)
+                    Config.updateCustomImage(root.imageIndex, { size: root.liveSize })
+                root.liveSize = -1
             }
         }
     }

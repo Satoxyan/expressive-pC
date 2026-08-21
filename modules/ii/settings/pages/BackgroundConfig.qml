@@ -1011,30 +1011,76 @@ ContentPage {
         ContentSection {
             icon: "panorama"
             shape: MaterialShape.Shape.SoftBoom 
-            title: Translation.tr("Custom Image")
-            GroupedList {
-                ConfigSwitch {
+            title: Translation.tr("Custom Images")
+            Repeater {
+                model: Config.options.background.widgets.customImages.length
+                delegate: GroupedList {
+                    required property int index
+                    readonly property var modelData: Config.options.background.widgets.customImages[index]
                     Layout.fillWidth: true
-                    buttonIcon: "check"
-                    text: Translation.tr("Enable")
-                    checked: Config.options.background.widgets.customImage.enable
-                    onCheckedChanged: {
-                        Config.options.background.widgets.customImage.enable = checked;
+                    
+                    RowLayout {
+                        Layout.fillWidth: true
+                        MaterialSymbol {
+                            iconSize: Appearance.font.pixelSize.large
+                            text: "image"
+                            color: Appearance.colors.colOnSurfaceVariant
+                        }
+                        StyledText {
+                            text: Translation.tr("Image %1").arg(index + 1)
+                            font.pixelSize: Appearance.font.pixelSize.large
+                            Layout.fillWidth: true
+                        }
+                        RippleButtonWithIcon {
+                            materialIcon: "delete"
+                            mainText: Translation.tr("Remove")
+                            onClicked: {
+                                Config.removeCustomImage(index)
+                            }
+                        }
+                    }
+                    
+                    ConfigSwitch {
+                        Layout.fillWidth: true
+                        buttonIcon: "check"
+                        text: Translation.tr("Enable")
+                        checked: modelData.enable
+                        onCheckedChanged: {
+                            Config.updateCustomImage(index, { enable: checked });
+                        }
+                    }
+                    RippleButtonWithIcon {
+                        Layout.fillWidth: true
+                        materialIcon: "image"
+                        mainText: Translation.tr("Choose image")
+                        onClicked: {
+                            FilePicker.pickImage(path => Config.updateCustomImage(index, { path }))
+                        }
+                    }
+                    ConfigSelectionShapeArray {
+                        currentValue: modelData.shape
+                        shapeColor: Appearance.colors.colPrimary
+                        backgroundColor: Appearance.colors.colPrimaryContainer
+                        options: [
+                            "Circle", "Square", "Slanted", "Arch", "Arrow", "SemiCircle", "Oval", "Pill",
+                            "Triangle", "Diamond", "ClamShell", "Pentagon", "Gem", "Sunny", "VerySunny",
+                            "Cookie4Sided", "Cookie6Sided", "Cookie7Sided", "Cookie9Sided", "Cookie12Sided",
+                            "Ghostish", "Clover4Leaf", "Clover8Leaf", "Burst", "SoftBurst", "Flower",
+                            "Puffy", "PuffyDiamond", "PixelCircle", "Bun", "Heart"
+                        ]
+                        onSelected: newValue => {
+                            Config.updateCustomImage(index, { shape: newValue })
+                        }
                     }
                 }
-                ConfigSelectionShapeArray {
-                    currentValue: Config.options.background.widgets.customImage.shape
-                    shapeColor: Appearance.colors.colPrimary
-                    backgroundColor: Appearance.colors.colPrimaryContainer
-                    options: [
-                        "Circle", "Square", "Slanted", "Arch", "Arrow", "SemiCircle", "Oval", "Pill",
-                        "Triangle", "Diamond", "ClamShell", "Pentagon", "Gem", "Sunny", "VerySunny",
-                        "Cookie4Sided", "Cookie6Sided", "Cookie7Sided", "Cookie9Sided", "Cookie12Sided",
-                        "Ghostish", "Clover4Leaf", "Clover8Leaf", "Burst", "SoftBurst", "Flower",
-                        "Puffy", "PuffyDiamond", "PixelCircle", "Bun", "Heart"
-                    ]
-                    onSelected: newValue => {
-                        Config.options.background.widgets.customImage.shape = newValue
+            }
+            GroupedList {
+                RippleButtonWithIcon {
+                    Layout.fillWidth: true
+                    materialIcon: "add"
+                    mainText: Translation.tr("Add Image")
+                    onClicked: {
+                        Config.addCustomImage()
                     }
                 }
             }
