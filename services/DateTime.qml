@@ -16,7 +16,7 @@ Singleton {
         id: clock
         precision: {
             if (Config.options.time.secondPrecision || GlobalStates.screenLocked)
-                return SystemClock.Seconds;
+            return SystemClock.Seconds;
             return SystemClock.Minutes;
         }
     }
@@ -29,7 +29,10 @@ Singleton {
     property string date: root.locale.toString(clock.date, Config.options?.time.dateWithYearFormat ?? "dd/MM/yyyy")
     property string longDate: root.locale.toString(clock.date, Config.options?.time.dateFormat ?? "dddd, dd/MM")
     property string collapsedCalendarFormat: root.locale.toString(clock.date, "dddd, MMMM dd")
-    readonly property string hourStr: root.locale.toString(clock.date, "HH")
+    readonly property bool use12HourFormat: (Config.options?.time.format ?? "hh:mm").toLowerCase().indexOf("ap") !== -1
+    readonly property int hour24: clock.date.getHours()
+    readonly property int hour12: (hour24 % 12 === 0) ? 12 : hour24 % 12
+    readonly property string hourStr: root.locale.toString(clock.date, use12HourFormat ? "hh" : "HH")
     readonly property string minuteStr: root.locale.toString(clock.date, "mm")
     readonly property string digitH0: hourStr.charAt(0)
     readonly property string digitH1: hourStr.charAt(1)
@@ -56,17 +59,16 @@ Singleton {
             if (days > 0)
                 formatted += `${days}d`;
             if (hours > 0)
-                formatted += `${formatted ? ", " : ""}${hours}h`;
+            formatted += `${formatted ? ", " : ""}${hours}h`;
             if (minutes > 0 || !formatted)
                 formatted += `${formatted ? ", " : ""}${minutes}m`;
-            uptime = formatted;
-            interval = Config.options?.resources?.updateInterval ?? 3000;
+                uptime = formatted;
+                interval = Config.options?.resources?.updateInterval ?? 3000;
         }
     }
 
     FileView {
         id: fileUptime
-
         path: "/proc/uptime"
     }
 }
