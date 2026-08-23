@@ -53,7 +53,8 @@ AbstractWidget {
 
     property bool needsColText: false
     property color dominantColor: Appearance.colors.colPrimary
-    property bool dominantColorIsDark: dominantColor.hslLightness < 0.5
+    // Weighted luminance (Rec. 601) — matches perceived brightness better than HSL lightness
+    property bool dominantColorIsDark: (0.299 * dominantColor.r + 0.587 * dominantColor.g + 0.114 * dominantColor.b) < 0.5
     property color colText: {
         const onNormalBackground = (GlobalStates.screenLocked && Config.options.lock.blur.enable)
         const adaptiveColor = ColorUtils.colorWithLightness(Appearance.colors.colPrimary, (dominantColorIsDark ? 0.8 : 0.12))

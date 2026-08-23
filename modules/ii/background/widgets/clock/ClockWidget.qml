@@ -50,7 +50,7 @@ AbstractBackgroundWidget {
 
     readonly property color effectiveColText: {
         if (effectiveColorMode === "auto")
-            return paletteColor(Appearance.wallpaperIsDark ? Config.options.background.widgets.clock.digital.colorLight : Config.options.background.widgets.clock.digital.colorDark);
+            return paletteColor(root.dominantColorIsDark ? Config.options.background.widgets.clock.digital.colorLight : Config.options.background.widgets.clock.digital.colorDark);
         if (effectiveColorMode === "light")
             return paletteColor(Config.options.background.widgets.clock.digital.colorLight);
         return paletteColor(Config.options.background.widgets.clock.digital.colorDark);
