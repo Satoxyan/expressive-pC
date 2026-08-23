@@ -339,7 +339,7 @@ Singleton {
                         property string placementStrategy: "free"
                         property real x: 400
                         property real y: 100
-                        property string sizeMode: "2x2" 
+                        property string sizeMode: "1x2" 
                     }
 
                     property JsonObject images: JsonObject {
