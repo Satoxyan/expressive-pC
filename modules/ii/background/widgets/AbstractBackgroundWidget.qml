@@ -52,7 +52,24 @@ AbstractWidget {
     }
 
     property bool needsColText: false
-    property color dominantColor: Appearance.colors.colPrimary
+    // Dominant colors of a grid tiling the screen (one script run per wallpaper);
+    // picking the cell under the widget is instant, so text color follows movement live.
+    property var colorGrid: null
+    property int gridCols: 0
+    property int gridRows: 0
+    property color scannedDominantColor: Appearance.colors.colPrimary
+    readonly property real widgetCenterX: root.x + root.width / 2
+    readonly property real widgetCenterY: root.y + root.height / 2
+    property color dominantColor: {
+        if (root.colorGrid && root.gridCols > 0 && root.gridRows > 0
+            && root.scaledScreenWidth > 0 && root.scaledScreenHeight > 0) {
+            const col = Math.min(root.gridCols - 1, Math.max(0, Math.floor(widgetCenterX / root.scaledScreenWidth * root.gridCols)));
+            const row = Math.min(root.gridRows - 1, Math.max(0, Math.floor(widgetCenterY / root.scaledScreenHeight * root.gridRows)));
+            const hex = root.colorGrid[row * root.gridCols + col];
+            if (hex) return hex;
+        }
+        return root.scannedDominantColor;
+    }
     // Weighted luminance (Rec. 601) — matches perceived brightness better than HSL lightness
     property bool dominantColorIsDark: (0.299 * dominantColor.r + 0.587 * dominantColor.g + 0.114 * dominantColor.b) < 0.5
     property color colText: {
@@ -73,11 +90,17 @@ AbstractWidget {
     property bool pendingPlacementRefresh: false
     property string activePlacementStrategy: ""
     function leastBusyRegionCommand() {
+        // Text widgets get a dominant-color grid over the whole screen so the color
+        // can follow widget movement instantly; placement scan only for non-free strategies.
+        const skipScan = root.placementStrategy === "free";
         return [Quickshell.shellPath("scripts/images/least-busy-region-venv.sh")
             , "--screen-width", Math.round(root.scaledScreenWidth)
             , "--screen-height", Math.round(root.scaledScreenHeight)
             , "--width", leastBusyRegionProc.contentWidth
             , "--height", leastBusyRegionProc.contentHeight
+            , ...(skipScan ? ["--skip-scan"] : [])
+            , ...(root.needsColText ? ["--color-grid-cols", leastBusyRegionProc.gridCols
+                , "--color-grid-rows", leastBusyRegionProc.gridRows] : [])
             , "--horizontal-padding", leastBusyRegionProc.horizontalPadding
             , "--vertical-padding", leastBusyRegionProc.verticalPadding
             , root.wallpaperPath
@@ -108,6 +131,8 @@ AbstractWidget {
         property int contentHeight: 300
         property int horizontalPadding: 200
         property int verticalPadding: 200
+        property int gridCols: 8
+        property int gridRows: 5
         onRunningChanged: {
             if (!leastBusyRegionProc.running && root.pendingPlacementRefresh) {
                 root.pendingPlacementRefresh = false;
@@ -122,7 +147,12 @@ AbstractWidget {
                 if (output === "") return;
                 if (root.activePlacementStrategy !== root.placementStrategy) return;
                 const parsedContent = JSON.parse(output);
-                root.dominantColor = parsedContent.dominant_color || Appearance.colors.colPrimary;
+                if (parsedContent.colors) {
+                    root.colorGrid = parsedContent.colors;
+                    root.gridCols = parsedContent.grid_cols;
+                    root.gridRows = parsedContent.grid_rows;
+                }
+                root.scannedDominantColor = parsedContent.dominant_color || Appearance.colors.colPrimary;
                 if (root.placementStrategy === "free") return;
                 root.targetX = parsedContent.center_x * root.wallpaperScale - root.width / 2;
                 root.targetY  = parsedContent.center_y * root.wallpaperScale - root.height / 2;
