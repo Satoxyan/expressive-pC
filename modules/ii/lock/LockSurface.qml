@@ -219,6 +219,7 @@ MouseArea {
         // Scroll cycles the centered wallpaper shape (up = next, down = previous),
         // same cooldown as the desktop so fast scrolling can't skip shapes.
         onWheel: (wheel) => {
+            if (!Config.options.background.centeredWallpaperShapeCycle) return
             if (shapeCycleCooldown.running) return
             root.forceFieldFocus()
             GlobalStates.cycleCenteredWallpaperShape(wheel.angleDelta.y > 0 ? 1 : -1)

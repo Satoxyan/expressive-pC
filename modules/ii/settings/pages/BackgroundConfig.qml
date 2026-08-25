@@ -298,6 +298,16 @@ ContentPage {
                         }
                         enabled: Config.options.background.centeredWallpaper && WM.compositor !== "niri"
                     }
+                    ConfigSwitch {
+                        Layout.fillWidth: true
+                        buttonIcon: "swipe_vertical"
+                        text: Translation.tr("Scroll to cycle shape")
+                        checked: Config.options.background.centeredWallpaperShapeCycle
+                        onCheckedChanged: {
+                            Config.options.background.centeredWallpaperShapeCycle = checked;
+                        }
+                        enabled: Config.options.background.centeredWallpaper && WM.compositor !== "niri"
+                    }
                 }
 
                 GroupedList {

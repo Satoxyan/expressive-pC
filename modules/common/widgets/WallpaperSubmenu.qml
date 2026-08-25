@@ -145,6 +145,15 @@ Item {
                     onCheckedChanged: Config.options.background.centeredWallpaperOnlyWhenLocked = checked
                 }
 
+                ConfigSwitch {
+                    Layout.fillWidth: true
+                    buttonIcon: "swipe_vertical"
+                    text: Translation.tr("Scroll to cycle shape")
+                    checked: Config.options.background.centeredWallpaperShapeCycle
+                    enabled: Config.options.background.centeredWallpaper
+                    onCheckedChanged: Config.options.background.centeredWallpaperShapeCycle = checked
+                }
+
                 ConfigSelectionShapeArray {
                     Layout.fillWidth: true
                     Layout.topMargin: 2

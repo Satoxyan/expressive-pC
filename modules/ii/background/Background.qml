@@ -652,6 +652,7 @@ Variants {
                     // Cooldown locks cycling until the shape change is fully done,
                     // so fast scrolling can't skip through shapes.
                     onWheel: (wheel) => {
+                        if (!Config.options.background.centeredWallpaperShapeCycle) return
                         if (shapeCycleCooldown.running) return
                         GlobalStates.cycleCenteredWallpaperShape(wheel.angleDelta.y > 0 ? 1 : -1)
                         shapeCycleCooldown.restart()

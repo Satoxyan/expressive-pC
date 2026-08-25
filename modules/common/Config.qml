@@ -402,6 +402,7 @@ Singleton {
                 property int centeredWallpaperSize: 400
                 property string centeredWallpaperColor: "primaryContainer"
                 property bool centeredWallpaperOnlyWhenLocked: false
+                property bool centeredWallpaperShapeCycle: true // scroll on centered wallpaper cycles its shape
                 property string wallpaperAnimation: "magic"
                 property bool enableWallpaperPreview: false
                 property string thumbnailPath: ""
