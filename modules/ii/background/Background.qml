@@ -648,6 +648,19 @@ Variants {
                     z: 1
                     acceptedButtons: Qt.LeftButton
                         onClicked: centeredWallpaperShapeItem.thump()
+                    // Scroll cycles the shape (up = next, down = previous), no pulse.
+                    // Cooldown locks cycling until the shape change is fully done,
+                    // so fast scrolling can't skip through shapes.
+                    onWheel: (wheel) => {
+                        if (shapeCycleCooldown.running) return
+                        GlobalStates.cycleCenteredWallpaperShape(wheel.angleDelta.y > 0 ? 1 : -1)
+                        shapeCycleCooldown.restart()
+                        wheel.accepted = true
+                    }
+                    Timer {
+                        id: shapeCycleCooldown
+                        interval: 400
+                    }
                 }
             }
 

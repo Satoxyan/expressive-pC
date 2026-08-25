@@ -49,6 +49,20 @@ Singleton {
 
     signal centeredWallpaperThumpRequested()
 
+    // Shared by desktop (Background) and lock screen (LockSurface) scroll-to-cycle
+    readonly property var centeredShapeOptions: [
+        "Circle", "Square", "Slanted", "Arch", "Arrow", "SemiCircle", "Oval", "Pill",
+        "Triangle", "Diamond", "ClamShell", "Pentagon", "Gem", "Sunny", "VerySunny",
+        "Cookie4Sided", "Cookie6Sided", "Cookie7Sided", "Cookie9Sided", "Cookie12Sided",
+        "Ghostish", "Clover4Leaf", "Clover8Leaf", "Burst", "SoftBurst", "Flower",
+        "Puffy", "PuffyDiamond", "PixelCircle", "Bun", "Heart"
+    ]
+    function cycleCenteredWallpaperShape(direction) {
+        const opts = root.centeredShapeOptions
+        const i = opts.indexOf(Config.options.background.centeredWallpaperShape)
+        Config.options.background.centeredWallpaperShape = opts[(i + direction + opts.length) % opts.length]
+    }
+
     readonly property var hotCornerOptions: [
         { displayName: Translation.tr("None"),                  value: "none" },
         { displayName: Translation.tr("Left Sidebar"),           value: "sidebarLeftOpen" },
