@@ -52,6 +52,9 @@ AbstractWidget {
     }
 
     property bool needsColText: false
+    // Text widgets (e.g. digital lock clock with cookie desktop clock) flip this
+    // when the style changes; rescan so the color grid exists for the new style.
+    onNeedsColTextChanged: refreshPlacementIfNeeded()
     // Dominant colors of a grid tiling the screen (one script run per wallpaper);
     // picking the cell under the widget is instant, so text color follows movement live.
     property var colorGrid: null
