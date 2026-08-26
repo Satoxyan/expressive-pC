@@ -32,6 +32,7 @@ Item {
     property real maxVisualizerValue: 1000
     property int visualizerSmoothing: 2
     property real radius
+    property bool showLyrics: true
 
     property string displayedArtFilePath: root.downloaded ? Qt.resolvedUrl(artFilePath) : ""
 
@@ -86,6 +87,21 @@ Item {
             anchors.fill: parent
             anchors.margins: parent.height * 0.04
             spacing: 0
+
+            component VSpace: Item {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.maximumHeight: 0
+            }
+
+            // Absorbs freed space above when lyrics are hidden (centers the stack)
+            VSpace {
+                id: topSpacer
+                Layout.maximumHeight: root.showLyrics ? 0 : root.height
+                Behavior on Layout.maximumHeight {
+                    NumberAnimation { duration: 400; easing.type: Easing.OutCubic }
+                }
+            }
 
             // ── Album art ──
             Rectangle {
@@ -186,23 +202,33 @@ Item {
             }
 
             // ── Lyrics ──
-            Lyrics {
-                id: lyricsComp
-                opacity: MprisController.activePlayer !== null ? 1 : 0 
+            Item {
+                id: lyricsWrapper
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                textAlignment: Text.AlignHCenter
-                textColor: blendedColors.colOnLayer0
-                activeColor: blendedColors.colPrimary
-                dimColor: blendedColors.colSubtext
-                indicatorColor: {
-                    let c = blendedColors.colPrimaryContainer
-                    return (c && c != "#000000" && c != "transparent") ? c : root.artDominantColor
+                Layout.maximumHeight: root.showLyrics ? root.height : 0
+                Behavior on Layout.maximumHeight {
+                    NumberAnimation { duration: 400; easing.type: Easing.OutCubic }
                 }
-                indicatorShapeColor: {
-                    let c = blendedColors.colOnPrimaryContainer
-                    if (c && c != "#000000" && c != "#ffffff" && c != "transparent") return c
-                    return blendedColors.colPrimary || Appearance.colors.colPrimary
+                clip: true
+
+                Lyrics {
+                    id: lyricsComp
+                    anchors.fill: parent
+                    opacity: MprisController.activePlayer !== null ? 1 : 0
+                    textAlignment: Text.AlignHCenter
+                    textColor: blendedColors.colOnLayer0
+                    activeColor: blendedColors.colPrimary
+                    dimColor: blendedColors.colSubtext
+                    indicatorColor: {
+                        let c = blendedColors.colPrimaryContainer
+                        return (c && c != "#000000" && c != "transparent") ? c : root.artDominantColor
+                    }
+                    indicatorShapeColor: {
+                        let c = blendedColors.colOnPrimaryContainer
+                        if (c && c != "#000000" && c != "#ffffff" && c != "transparent") return c
+                        return blendedColors.colPrimary || Appearance.colors.colPrimary
+                    }
                 }
             }
 
@@ -268,20 +294,27 @@ Item {
 
             // ── Controls ──
             RowLayout {
+                id: controlRow
                 Layout.fillWidth: true
                 Layout.topMargin: 20
                 Layout.alignment: Qt.AlignHCenter
-                spacing: 15
+                spacing: 8
 
                 RippleButton {
+                    id: prevButton
+                    // ponytail: baseWidth captured at startup; sidebar resize mid-session won't rescale it
                     property real baseSize: Math.max(42, parent.parent.height * 0.06)
-                    implicitWidth: baseSize * 1.5
-                    implicitHeight: baseSize * 1.5
-                    buttonRadius: Appearance.rounding.verylarge
+                    property real baseWidth: baseSize * 1.1
+                    implicitWidth: down ? baseWidth * 1.4 : baseWidth
+                    implicitHeight: baseSize * 1.6
+                    buttonRadius: implicitWidth / 2
                     colBackground: ColorUtils.transparentize(blendedColors.colSecondaryContainer, 0.7)
                     colBackgroundHover: blendedColors.colSecondaryContainerHover
                     colRipple: blendedColors.colSecondaryContainerActive
-                    downAction: () => root.player?.previous()
+                    Behavior on implicitWidth {
+                        NumberAnimation { duration: 250; easing.type: Easing.OutBack }
+                    }
+                    releaseAction: () => root.player?.previous()
                     contentItem: MaterialSymbol {
                         iconSize: 25
                         fill: 1
@@ -292,14 +325,18 @@ Item {
                 }
 
                 RippleButton {
+                    id: playButton
                     property real baseSize: Math.max(70, parent.parent.height * 0.1)
                     Layout.fillWidth: true
                     implicitHeight: baseSize
-                    buttonRadius: (root.player?.isPlaying ?? false) ? Appearance.rounding.verylarge : baseSize / 2  
+                    buttonRadius: (root.player?.isPlaying ?? false) ? Appearance.rounding.verylarge : baseSize / 2
+                    Behavior on buttonRadius {
+                        NumberAnimation { duration: 350; easing.type: Easing.OutBack }
+                    }
                     colBackground: (root.player?.isPlaying ?? false) ? blendedColors.colPrimary : blendedColors.colSecondaryContainer
                     colBackgroundHover: (root.player?.isPlaying ?? false) ? blendedColors.colPrimaryHover : blendedColors.colSecondaryContainerHover
                     colRipple: (root.player?.isPlaying ?? false) ? blendedColors.colPrimaryActive : blendedColors.colSecondaryContainerActive
-                    downAction: () => root.player?.togglePlaying()  
+                    downAction: () => root.player?.togglePlaying()
                     contentItem: MaterialSymbol {
                         iconSize: 50
                         fill: 1
@@ -313,14 +350,19 @@ Item {
                 }
 
                 RippleButton {
+                    id: nextButton
                     property real baseSize: Math.max(42, parent.parent.height * 0.06)
-                    implicitWidth: baseSize * 1.5
-                    implicitHeight: baseSize * 1.5
-                    buttonRadius: Appearance.rounding.verylarge
+                    property real baseWidth: baseSize * 1.1
+                    implicitWidth: down ? baseWidth * 1.4 : baseWidth
+                    implicitHeight: baseSize * 1.6
+                    buttonRadius: implicitWidth / 2
                     colBackground: ColorUtils.transparentize(blendedColors.colSecondaryContainer, 0.7)
                     colBackgroundHover: blendedColors.colSecondaryContainerHover
                     colRipple: blendedColors.colSecondaryContainerActive
-                    downAction: () => root.player?.next()
+                    Behavior on implicitWidth {
+                        NumberAnimation { duration: 250; easing.type: Easing.OutBack }
+                    }
+                    releaseAction: () => root.player?.next()
                     contentItem: MaterialSymbol {
                         iconSize: 25
                         fill: 1
@@ -336,6 +378,27 @@ Item {
                 Layout.fillWidth: true
                 Layout.topMargin: 10
                 spacing: 8
+
+                RippleButton {
+                    property real baseSize: Math.max(36, parent.parent.height * 0.05)
+                    implicitWidth: baseSize
+                    implicitHeight: baseSize
+                    buttonRadius: Appearance.rounding.large
+                    toggled: root.showLyrics
+                    colBackgroundToggled: blendedColors.colSecondaryContainer
+                    colRippleToggled: blendedColors.colSecondaryContainerActive
+                    colBackground: ColorUtils.transparentize(blendedColors.colSecondaryContainer, 0.7)
+                    colBackgroundHover: blendedColors.colSecondaryContainerHover
+                    colRipple: blendedColors.colSecondaryContainerActive
+                    downAction: () => root.showLyrics = !root.showLyrics
+                    contentItem: MaterialSymbol {
+                        iconSize: 18
+                        fill: root.showLyrics ? 1 : 0
+                        horizontalAlignment: Text.AlignHCenter
+                        color: blendedColors.colOnSecondaryContainer
+                        text: "lyrics"
+                    }
+                }
 
                 RippleButton {
                     property real baseSize: Math.max(36, parent.parent.height * 0.05)
@@ -408,6 +471,15 @@ Item {
                 Layout.topMargin: 12
                 model: Mpris.players.values.map(p => p.identity ?? p.desktopEntry ?? "Unknown")
                 currentIndex: 0
+            }
+
+            // Absorbs freed space below when lyrics are hidden (centers the stack)
+            VSpace {
+                id: bottomSpacer
+                Layout.maximumHeight: root.showLyrics ? 0 : root.height
+                Behavior on Layout.maximumHeight {
+                    NumberAnimation { duration: 400; easing.type: Easing.OutCubic }
+                }
             }
         }
     }
