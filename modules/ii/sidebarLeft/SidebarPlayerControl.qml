@@ -301,12 +301,20 @@ Item {
                 Layout.alignment: Qt.AlignHCenter
                 spacing: 8
 
+                // While play/pause is held it widens and morphs shape; the
+                // side pills get squeezed by the same amount (their widths
+                // shrink, the freed space flows into the fillWidth middle).
+                property real playGrow: playButton.down ? 1 : 0
+                Behavior on playGrow {
+                    NumberAnimation { duration: 250; easing.type: Easing.OutBack }
+                }
+
                 RippleButton {
                     id: prevButton
                     // ponytail: baseWidth captured at startup; sidebar resize mid-session won't rescale it
                     property real baseSize: Math.max(42, parent.parent.height * 0.06)
                     property real baseWidth: baseSize * 1.1
-                    implicitWidth: down ? baseWidth * 1.4 : baseWidth
+                    implicitWidth: baseWidth * (down ? 1.4 : 1) * Math.max(0.2, 1 - controlRow.playGrow * 0.6)
                     implicitHeight: baseSize * 1.6
                     buttonRadius: implicitWidth / 2
                     colBackground: ColorUtils.transparentize(blendedColors.colSecondaryContainer, 0.7)
@@ -330,7 +338,9 @@ Item {
                     property real baseSize: Math.max(70, parent.parent.height * 0.1)
                     Layout.fillWidth: true
                     implicitHeight: baseSize
-                    buttonRadius: (root.player?.isPlaying ?? false) ? Appearance.rounding.verylarge : baseSize / 2
+                    // Shape morph: pill-ish while pressed, otherwise follows state
+                    buttonRadius: down ? baseSize / 2
+                        : (root.player?.isPlaying ?? false) ? Appearance.rounding.verylarge : baseSize / 2
                     Behavior on buttonRadius {
                         NumberAnimation { duration: 350; easing.type: Easing.OutBack }
                     }
@@ -354,7 +364,7 @@ Item {
                     id: nextButton
                     property real baseSize: Math.max(42, parent.parent.height * 0.06)
                     property real baseWidth: baseSize * 1.1
-                    implicitWidth: down ? baseWidth * 1.4 : baseWidth
+                    implicitWidth: baseWidth * (down ? 1.4 : 1) * Math.max(0.2, 1 - controlRow.playGrow * 0.6)
                     implicitHeight: baseSize * 1.6
                     buttonRadius: implicitWidth / 2
                     colBackground: ColorUtils.transparentize(blendedColors.colSecondaryContainer, 0.7)
