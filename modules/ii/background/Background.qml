@@ -25,6 +25,8 @@ import qs.modules.ii.background.widgets.calendar
 import qs.modules.ii.background.widgets.worldclock
 import qs.modules.ii.background.widgets.usercard
 import qs.modules.ii.background.widgets.notes
+import qs.modules.ii.background.widgets.todo
+import qs.modules.ii.background.widgets.timers
 
 Variants {
     id: root
@@ -909,6 +911,30 @@ Variants {
                         scaledScreenWidth: bgRoot.screen.width
                         scaledScreenHeight: bgRoot.screen.height
                         wallpaperScale: 1
+                    }
+                }
+                FadeLoader {
+                    shown: Config.options.background.widgets.todo.enable
+                        && (Config.options.background.screenList.length === 0
+                            || Config.options.background.screenList.includes(bgRoot.screen.name))
+                    sourceComponent: TodoWidget {
+                        screenWidth: bgRoot.screen.width
+                        screenHeight: bgRoot.screen.height
+                        scaledScreenWidth: bgRoot.screen.width
+                        scaledScreenHeight: bgRoot.screen.height
+                        wallpaperScale: 1
+                    }
+                }
+                FadeLoader {
+                    shown: Config.options.background.widgets.timers.enable
+                        && (Config.options.background.screenList.length === 0
+                            || Config.options.background.screenList.includes(bgRoot.screen.name))
+                    sourceComponent: TimerWidget {
+                        screenWidth:        bgRoot.screen.width
+                        screenHeight:       bgRoot.screen.height
+                        scaledScreenWidth:  bgRoot.screen.width
+                        scaledScreenHeight: bgRoot.screen.height
+                        wallpaperScale:     1
                     }
                 }
             }

@@ -1219,7 +1219,18 @@ ContentPage {
                             icon: "note_stack_add",
                             name: Translation.tr("Notes"),
                             enabled: Config.options.background.widgets.notes.enable
+                        },
+                        {
+                            icon: "add_task",
+                            name: Translation.tr("To-Do"),
+                            enabled: Config.options.background.widgets.todo.enable
+                        },
+                        {
+                            icon: "timer",
+                            name: Translation.tr("Timers"),
+                            enabled: Config.options.background.widgets.timers.enable
                         }
+                        
                     ]
                     delegate: Rectangle {
                         Layout.fillWidth: true
@@ -1266,6 +1277,10 @@ ContentPage {
                                             Config.options.background.widgets.userCard.enable = checked
                                         else if (modelData.icon === "note_stack_add")
                                             Config.options.background.widgets.notes.enable = checked
+                                        else if (modelData.icon === "add_task")
+                                            Config.options.background.widgets.todo.enable = checked
+                                        else if (modelData.icon === "timer")
+                                            Config.options.background.widgets.timers.enable = checked
                                     }
                                 }
                             }
