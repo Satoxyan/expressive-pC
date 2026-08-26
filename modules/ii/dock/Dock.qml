@@ -28,7 +28,29 @@ Scope {
             property var monitor: WM.monitorFor(modelData)
             property bool fullscreenOnThisMonitor: WM.fullscreenOnMonitor(monitor?.name)
 
+            // Keep the dock revealed for a grace period after the media
+            // controls close, so it doesn't vanish instantly
+            property bool mediaControlsHeld: GlobalStates.mediaControlsOpen && GlobalStates.mediaControlsAboveDock
+            property bool mediaHoldActive: mediaControlsHeld
+            onMediaControlsHeldChanged: {
+                if (mediaControlsHeld) {
+                    mediaHoldTimer.stop()
+                    mediaHoldActive = true
+                } else {
+                    mediaHoldTimer.restart()
+                }
+            }
+            Timer {
+                id: mediaHoldTimer
+                interval: 600
+                onTriggered: dockRoot.mediaHoldActive = false
+            }
+
             property bool reveal: {
+                // Keep the dock visible while the media controls it opened
+                // are showing, even over a fullscreen window
+                if (mediaHoldActive)
+                    return true
                 if (fullscreenOnThisMonitor)
                     return Config.options?.dock.hoverToReveal && dockMouseArea.containsMouse
                 return root.pinned

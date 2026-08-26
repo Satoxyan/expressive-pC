@@ -14,6 +14,9 @@ Singleton {
     property bool sidebarLeftOpen: false
     property bool sidebarRightOpen: false
     property bool mediaControlsOpen: false
+    // When true, media controls are positioned right above the dock's media item
+    property bool mediaControlsAboveDock: false
+    property real mediaControlsAnchorX: 0
     property bool lockMediaOpen: false
     property bool lockMediaCompact: false
     property bool osdBrightnessOpen: false
