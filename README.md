@@ -45,7 +45,7 @@ Customized and maintained by **pctrade**
 ## ⚡ Installation
 
 > [!NOTE]
-> This fork manages its own configuration folder independently — it does **not** overwrite or modify any existing setup. However, it does require [illogical-impulse](https://github.com/end-4/dots-hyprland) to be installed and running.
+> This fork manages its own configuration folder independently — it does **not** overwrite or modify any existing setup. However, it does require [illogical-impulse](https://github.com/Satoxyan/dots-hyprfork/tree/main) to be installed and running.
 
 ### ⚙️ Auto Install
 
