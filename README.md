@@ -47,10 +47,27 @@ Customized and maintained by **pctrade**
 > [!NOTE]
 > This fork manages its own configuration folder independently — it does **not** overwrite or modify any existing setup. However, it does require [illogical-impulse](https://github.com/end-4/dots-hyprland) to be installed and running.
 
+### ⚙️ Auto Install
+
+To install the dot's automatically, run [dots-hyprfork](https://github.com/Satoxyan/dots-hyprfork/tree/main) install instruction, and make sure you confirm to install this dots alongside with those because it's all the base of this dot's, and you actually could change the dots in real time,
+
+here's the installation command for that dots
+
+```bash
+git clone https://github.com/Satoxyan/dots-hyprfork.git
+cd dots-hyprfork
+./setup install
+```
+Then press `Ctrl + Alt + D` to open the dots switcher and select expressive-pC
+
+
+### 📝 Manual Install
+if you already had setup from [dots-hyprfork](https://github.com/Satoxyan/dots-hyprfork/tree/main), you could do this instead
+
 ```bash
 cd ~/.config/quickshell/
-git clone https://github.com/pctrade/end4-pC.git
-killall qs 2>/dev/null; qs -c end4-pC > /dev/null 2>&1 & disown
+git clone https://github.com/Satoxyan/expressive-pC.git
+killall qs 2>/dev/null; qs -c expressive-pC > /dev/null 2>&1 & disown
 ```
 
 ### 🔧 Set as your default shell (optional)
