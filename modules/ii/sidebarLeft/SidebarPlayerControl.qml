@@ -215,6 +215,7 @@ Item {
                 Lyrics {
                     id: lyricsComp
                     anchors.fill: parent
+                    compactNeighbors: true
                     opacity: MprisController.activePlayer !== null ? 1 : 0
                     textAlignment: Text.AlignHCenter
                     textColor: blendedColors.colOnLayer0

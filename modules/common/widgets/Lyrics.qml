@@ -23,6 +23,12 @@ Item {
     property color indicatorShapeColor: Appearance.colors.colOnPrimaryContainer
     property int textAlignment: Text.AlignLeft
 
+    // When true, the past/future lines keep only their natural line height
+    // and cluster tightly around the active line (extra space becomes
+    // symmetric padding above/below the cluster) instead of spreading
+    // evenly across the whole widget.
+    property bool compactNeighbors: false
+
     property bool karaoke: true
 
     implicitWidth: 200
@@ -243,7 +249,13 @@ Item {
     // (which piled all seven lines up at the top).
     ColumnLayout {
         anchors.fill: parent
-        spacing: root.slotSpacing
+        // Compact mode keeps lines clustered, but with a bit more air
+        // between slots so it doesn't look cramped.
+        spacing: root.slotSpacing + (root.compactNeighbors ? 6 : 0)
+
+        // Compact mode: symmetric padding so the line cluster hugs the
+        // active line in the middle instead of stretching edge to edge.
+        Item { Layout.fillWidth: true; Layout.fillHeight: root.compactNeighbors }
 
         Repeater {
             model: LyricsService.total
@@ -263,7 +275,7 @@ Item {
                 // keep their line-height minimums, and the others can never
                 // shrink below that minimum, so a long active line clips its
                 // overflow instead of cramming the lines around it.
-                Layout.fillHeight: !slotItem.isActiveSlot
+                Layout.fillHeight: !slotItem.isActiveSlot && !root.compactNeighbors
                 Layout.minimumHeight: slotItem.isActiveSlot
                     ? 0
                     : Math.ceil(slotItem.comfortableHeight)
@@ -452,6 +464,8 @@ Item {
                 }
             }
         }
+
+        Item { Layout.fillWidth: true; Layout.fillHeight: root.compactNeighbors }
     }
 
     // Loading indicator overlay (stacked above the slots, not a layout child).
