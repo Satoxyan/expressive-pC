@@ -172,8 +172,8 @@ AbstractWidget {
         property int contentHeight: root.needsColText ? Math.round(root.height * 0.85) || 300 : 300
         property int horizontalPadding: root.needsColText ? Math.round(Math.min(root.width, root.height) * 0.12) || 24 : 200
         property int verticalPadding: root.needsColText ? Math.round(Math.min(root.width, root.height) * 0.12) || 24 : 200
-        property int gridCols: 16
-        property int gridRows: 10
+        property int gridCols: 36
+        property int gridRows: 18
         onRunningChanged: {
             if (!leastBusyRegionProc.running && root.pendingPlacementRefresh) {
                 root.pendingPlacementRefresh = false;
