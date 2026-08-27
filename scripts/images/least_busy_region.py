@@ -261,6 +261,10 @@ def main():
     parser.add_argument("--skip-scan", action="store_true", help="Skip placement scan (for free-placed widgets)")
     parser.add_argument("--color-grid-cols", type=int, default=0, help="Also output dominant colors of a cols-wide grid tiling the screen")
     parser.add_argument("--color-grid-rows", type=int, default=0, help="Row count of the dominant color grid")
+    parser.add_argument("--sample-x", type=int, default=0, help="X of widget bbox sample (for precise text color, with halo)")
+    parser.add_argument("--sample-y", type=int, default=0, help="Y of widget bbox sample")
+    parser.add_argument("--sample-w", type=int, default=0, help="Width of widget bbox sample")
+    parser.add_argument("--sample-h", type=int, default=0, help="Height of widget bbox sample")
     args = parser.parse_args()
 
     img = load_scaled(
@@ -337,6 +341,11 @@ def main():
                 cell = get_dominant_color(img, col * cw, row * ch, cw, ch)
                 colors.append('#{:02x}{:02x}{:02x}'.format(*cell))
         grid_extra = {"colors": colors, "grid_cols": args.color_grid_cols, "grid_rows": args.color_grid_rows}
+    # Precise sample for widget bbox + halo (pixel-perfect, not quantized to grid)
+    sampled_extra = {}
+    if args.sample_w > 0 and args.sample_h > 0:
+        sampled = get_dominant_color(img, args.sample_x, args.sample_y, args.sample_w, args.sample_h)
+        sampled_extra = {"sampled_color": '#{:02x}{:02x}{:02x}'.format(*sampled)}
     dominant_color_hex = '#{:02x}{:02x}{:02x}'.format(*dominant_color)
     print(json.dumps({
         "center_x": center_x,
@@ -345,7 +354,8 @@ def main():
         "height": args.height,
         "variance": variance,
         "dominant_color": dominant_color_hex,
-        **grid_extra
+        **grid_extra,
+        **sampled_extra
     }))
 
 if __name__ == "__main__":
