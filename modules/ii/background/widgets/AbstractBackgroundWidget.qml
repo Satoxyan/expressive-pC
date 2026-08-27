@@ -55,8 +55,6 @@ AbstractWidget {
     // Text widgets (e.g. digital lock clock with cookie desktop clock) flip this
     // when the style changes; rescan so the color grid exists for the new style.
     onNeedsColTextChanged: refreshPlacementIfNeeded()
-    onWidthChanged: if (needsColText) refreshPlacementIfNeeded()
-    onHeightChanged: if (needsColText) refreshPlacementIfNeeded()
     // Dominant colors of a grid tiling the screen (one script run per wallpaper);
     // picking the cell under the widget is instant, so text color follows movement live.
     property var colorGrid: null
@@ -123,13 +121,6 @@ AbstractWidget {
         // Text widgets get a dominant-color grid over the whole screen so the color
         // can follow widget movement instantly; placement scan only for non-free strategies.
         const skipScan = root.placementStrategy === "free";
-        const tightW = root.needsColText ? root.width * 0.85 : root.width
-        const tightH = root.needsColText ? root.height * 0.85 : root.height
-        const pad = root.needsColText ? Math.round(Math.min(tightW, tightH) * 0.12) : 0
-        const sampleX = Math.round(root.widgetCenterX - tightW / 2 - pad)
-        const sampleY = Math.round(root.widgetCenterY - tightH / 2 - pad)
-        const sampleW = Math.round(tightW + 2 * pad)
-        const sampleH = Math.round(tightH + 2 * pad)
         return [Quickshell.shellPath("scripts/images/least-busy-region-venv.sh")
             , "--screen-width", Math.round(root.scaledScreenWidth)
             , "--screen-height", Math.round(root.scaledScreenHeight)
@@ -137,8 +128,7 @@ AbstractWidget {
             , "--height", leastBusyRegionProc.contentHeight
             , ...(skipScan ? ["--skip-scan"] : [])
             , ...(root.needsColText ? ["--color-grid-cols", leastBusyRegionProc.gridCols
-                , "--color-grid-rows", leastBusyRegionProc.gridRows
-                , "--sample-x", sampleX, "--sample-y", sampleY, "--sample-w", sampleW, "--sample-h", sampleH] : [])
+                , "--color-grid-rows", leastBusyRegionProc.gridRows] : [])
             , "--horizontal-padding", leastBusyRegionProc.horizontalPadding
             , "--vertical-padding", leastBusyRegionProc.verticalPadding
             , root.wallpaperPath
@@ -167,13 +157,13 @@ AbstractWidget {
     Process {
         id: leastBusyRegionProc
         property string wallpaperPath: root.wallpaperPath
-        // ponytail: untuk digital clock, ikuti bbox ketat 0.85x + halo 12% agar pas teks tampil
-        property int contentWidth: root.needsColText ? Math.round(root.width * 0.85) || 300 : 300
-        property int contentHeight: root.needsColText ? Math.round(root.height * 0.85) || 300 : 300
-        property int horizontalPadding: root.needsColText ? Math.round(Math.min(root.width, root.height) * 0.12) || 24 : 200
-        property int verticalPadding: root.needsColText ? Math.round(Math.min(root.width, root.height) * 0.12) || 24 : 200
-        property int gridCols: 36
-        property int gridRows: 18
+        // TODO: make these less arbitrary
+        property int contentWidth: 300
+        property int contentHeight: 300
+        property int horizontalPadding: 200
+        property int verticalPadding: 200
+        property int gridCols: 16
+        property int gridRows: 10
         onRunningChanged: {
             if (!leastBusyRegionProc.running && root.pendingPlacementRefresh) {
                 root.pendingPlacementRefresh = false;
