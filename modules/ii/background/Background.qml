@@ -554,6 +554,18 @@ Variants {
                 }
             }
 
+            // ponytail: fastBlur for desktop blur / niri overview — separate loader, no wallpaper gating
+            Loader {
+                id: fastBlurLoader
+                active: (Config.options.background.showBlur && !bgRoot.wallpaperIsVideo) || (Config.options.overview.style === "niri" && GlobalStates.overviewOpen && Config.options.overview.enable)
+                anchors.fill: parent
+                sourceComponent: FastBlur {
+                    source: bgRoot.wallpaperAnimation === "" || bgRoot.transitionProgress >= 1.0 ? wallpaper : transitionEffect
+                    radius: 48
+                    transparentBorder: true
+                }
+            }
+
             // Dim overlay - only dims wallpaper, not widgets
             Rectangle {
                 anchors.fill: parent
