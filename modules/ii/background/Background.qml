@@ -480,8 +480,8 @@ Variants {
                 cache: true
                 smooth: true
                 asynchronous: true
-                layer.enabled: blurLoader.active || fastBlurLoader.active
-                visible: !blurLoader.active && !fastBlurLoader.active && !bgRoot.centeredWallpaperEnabled && !bgRoot.videoRevealed
+                layer.enabled: blurLoader.active
+                visible: !blurLoader.active && !bgRoot.videoRevealed
                     && (bgRoot.wallpaperAnimation === "" || bgRoot.transitionProgress >= 1.0)
                     && !bgRoot.centeredHidesFullWallpaper
                 opacity: bgRoot.centeredFullWallpaperOpacity()
@@ -495,9 +495,8 @@ Variants {
             ShaderEffect {
                 id: transitionEffect
                 anchors.fill: parent
-                layer.enabled: blurLoader.active || fastBlurLoader.active
-                visible: !blurLoader.active && !fastBlurLoader.active && !bgRoot.centeredWallpaperEnabled && !bgRoot.videoRevealed
-                    && bgRoot.wallpaperAnimation !== "" && bgRoot.transitionProgress < 1.0
+                visible: !blurLoader.active && bgRoot.wallpaperAnimation !== "" && !bgRoot.centeredShapeActive && !bgRoot.videoRevealed
+                    && bgRoot.transitionProgress < 1.0
 
                 property var fromImage: previousWallpaper
                 property var toImage: wallpaper
