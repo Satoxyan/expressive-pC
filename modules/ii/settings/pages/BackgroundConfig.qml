@@ -226,6 +226,15 @@ ContentPage {
                     }
                 }
 
+                ConfigSwitch {
+                    buttonIcon: "blur_on"
+                    text: Translation.tr("Blur wall")
+                    checked: Config.options.background.showBlur
+                    onCheckedChanged: {
+                        Config.options.background.showBlur = checked;
+                    }
+                }
+
                 ConfigSpinBox {
                     icon: "timer"
                     text: Translation.tr("Wallpaper change interval (min)")

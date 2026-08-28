@@ -87,8 +87,8 @@ AbstractBackgroundWidget {
     readonly property string greetingText: greetingFor(DateTime.hour24)
     readonly property string todayString: "Today • " + DateTime.clock.date.toLocaleDateString(Qt.locale(), "dddd d MMM")
 
-    implicitWidth: root.widgetWidth
-    implicitHeight: root.widgetHeight
+    implicitWidth:  card.implicitWidth
+    implicitHeight: card.implicitHeight
 
     Behavior on widgetWidth {
         animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
@@ -105,10 +105,17 @@ AbstractBackgroundWidget {
         onStatusChanged: if (status === Image.Error) visible = false
     }
 
-    Item {
-        id: sizedContainer
+    Rectangle {
+        id: card
         implicitWidth: root.widgetWidth
         implicitHeight: root.widgetHeight
+        radius: Appearance.rounding?.verylarge ?? 30
+        color: "transparent"
+
+        StyledRectangularShadow {
+            target: card
+            z: -2
+        }
 
         Loader {
             anchors.fill: parent
@@ -243,10 +250,6 @@ AbstractBackgroundWidget {
                 id: outerRect
                 implicitWidth: root.snapWidth3
                 implicitHeight: root.snapHeight3
-
-                StyledDropShadow {
-                    target: outerRect
-                }
 
                 Item {
                     id: bgImage
@@ -516,7 +519,7 @@ AbstractBackgroundWidget {
         }
 
         ResizeHandler {
-            anchorItem: sizedContainer
+            anchorItem: card
             hoverActive: root.containsMouse
             locked: Config.options.background.widgetsLocked
             currentWidth: root.widgetWidth
