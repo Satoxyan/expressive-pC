@@ -480,7 +480,7 @@ Variants {
                 cache: true
                 smooth: true
                 asynchronous: true
-                layer.enabled: blurLoader.active
+                layer.enabled: true
                 visible: !blurLoader.active && !bgRoot.videoRevealed
                     && (bgRoot.wallpaperAnimation === "" || bgRoot.transitionProgress >= 1.0)
                     && !bgRoot.centeredHidesFullWallpaper
@@ -551,16 +551,6 @@ Variants {
                         anchors.fill: parent
                         color: CF.ColorUtils.transparentize(Appearance.colors.colLayer0, 0.7)
                     }
-                }
-            }
-
-            Loader {
-                id: fastBlurLoader
-                active: Config.options.background.showBlur && !bgRoot.wallpaperIsVideo || (Config.options.overview.style === "niri" && GlobalStates.overviewOpen && Config.options.overview.enable)
-                anchors.fill: parent
-                sourceComponent: FastBlur {
-                    source: bgRoot.wallpaperAnimation === "" || bgRoot.transitionProgress >= 1.0 ? wallpaper : transitionEffect
-                    radius: 48
                 }
             }
 
