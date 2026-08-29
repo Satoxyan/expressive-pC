@@ -572,6 +572,7 @@ Item {
         DragHandler {
             id: reorderDragHandler
             target: null
+            acceptedButtons: Qt.LeftButton
             onActiveChanged: {
                 if (active) {
                     root.draggingSlot = reorderHandle.order
@@ -630,17 +631,21 @@ Item {
         ColumnLayout {
             spacing: 0
             Loader {
+                id: classicQuickLoader
                 Layout.fillWidth: true
                 active: Config.options.sidebar.quickToggles.style === "classic"
                 visible: active
                 sourceComponent: ClassicQuickPanel {}
             }
             Loader {
+                id: androidQuickLoader
                 Layout.fillWidth: true
                 active: Config.options.sidebar.quickToggles.style === "android"
                 visible: active
                 sourceComponent: AndroidQuickPanel { editMode: root.editMode }
             }
+            Connections { target: classicQuickLoader.item; function onOpenAudioOutputDialog() { root.showAudioOutputDialog = true } function onOpenAudioInputDialog() { root.showAudioInputDialog = true } function onOpenBluetoothDialog() { root.showBluetoothDialog = true } function onOpenNightLightDialog() { root.showNightLightDialog = true } function onOpenWifiDialog() { root.showWifiDialog = true } }
+            Connections { target: androidQuickLoader.item; function onOpenAudioOutputDialog() { root.showAudioOutputDialog = true } function onOpenAudioInputDialog() { root.showAudioInputDialog = true } function onOpenBluetoothDialog() { root.showBluetoothDialog = true } function onOpenNightLightDialog() { root.showNightLightDialog = true } function onOpenWifiDialog() { root.showWifiDialog = true } }
         }
     }
     Component {
