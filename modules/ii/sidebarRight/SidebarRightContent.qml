@@ -425,6 +425,7 @@ Item {
                 Layout.alignment: Qt.AlignHCenter
                 Layout.fillHeight: true
                 Layout.fillWidth: true
+                Layout.minimumHeight: 47 // ponytail: bottom bar (ring/count/clean) height, not shrink through
             }
 
             BottomWidgetGroup {
