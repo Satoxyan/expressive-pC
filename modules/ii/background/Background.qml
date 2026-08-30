@@ -185,8 +185,14 @@ Variants {
         // animation by direction. It also skips the animation while the config
         // is still loading, so the initial set never plays a grow-in on startup.
         function setCenteredProgress(value) {
-            if (!bgRoot.centeredWallpaperEnabled || !bgRoot.centeredAnimationReady || !Config.ready) {
+            if (!bgRoot.centeredWallpaperEnabled || !Config.ready) {
                 bgRoot.centeredProgress = value
+                return
+            }
+            if (!bgRoot.centeredAnimationReady) {
+                // first real set after config ready — direct, then arm animation for next lock/unlock
+                bgRoot.centeredProgress = value
+                bgRoot.centeredAnimationReady = true
                 return
             }
             if (value === bgRoot.centeredProgress) return
@@ -271,6 +277,7 @@ Variants {
         }
         function centeredBgOpacity() {
             if (!bgRoot.centeredWallpaperEnabled) return 0
+            if (bgRoot.wallpaperIsVideo) return 0
             return Math.max(0, Math.min(1, (1 - bgRoot.centeredProgress) / bgRoot.centeredFade))
         }
 
@@ -312,9 +319,11 @@ Variants {
         property HyprlandMonitor monitor: Hyprland.monitorFor(modelData)
 
         property string effectiveWallpaperPath: {
-            if (GlobalStates.screenLocked && Config.options.background.lockWall !== "")
+            const base = Wallpapers.previewPath || Wallpapers.confirmedPath || Config.options.background.wallpaperPath;
+            const isVideoBase = base.endsWith(".mp4") || base.endsWith(".webm") || base.endsWith(".mkv") || base.endsWith(".avi") || base.endsWith(".mov");
+            if (GlobalStates.screenLocked && Config.options.background.lockWall !== "" && !isVideoBase)
                 return Config.options.background.lockWall;
-            return Wallpapers.previewPath || Wallpapers.confirmedPath || Config.options.background.wallpaperPath;
+            return base;
         }
 
         property bool wallpaperIsVideo: bgRoot.effectiveWallpaperPath.endsWith(".mp4") || bgRoot.effectiveWallpaperPath.endsWith(".webm") || bgRoot.effectiveWallpaperPath.endsWith(".mkv") || bgRoot.effectiveWallpaperPath.endsWith(".avi") || bgRoot.effectiveWallpaperPath.endsWith(".mov")
@@ -342,7 +351,7 @@ Variants {
 
         screen: modelData
         exclusionMode: ExclusionMode.Ignore
-        WlrLayershell.layer: (GlobalStates.screenLocked && !scaleAnim.running) ? WlrLayer.Overlay : WlrLayer.Bottom
+        WlrLayershell.layer: WlrLayer.Bottom
         WlrLayershell.namespace: "quickshell:background"
         WlrLayershell.keyboardFocus: GlobalStates.desktopWidgetKeyboardFocus
             ? WlrKeyboardFocus.OnDemand
@@ -491,7 +500,6 @@ Variants {
                     }
                 }
             }
-
             ShaderEffect {
                 id: transitionEffect
                 anchors.fill: parent
@@ -593,7 +601,7 @@ Variants {
                 anchors.centerIn: parent
                 width: bgRoot.centeredShapeRenderSize
                 height: bgRoot.centeredShapeRenderSize
-                color: bgRoot.centeredWallpaperColor
+                color: bgRoot.wallpaperIsVideo ? "transparent" : bgRoot.centeredWallpaperColor
                 shape: bgRoot.centeredWallpaperShape
                 transformOrigin: Item.Center
                 // Base scale (lock/unlock) multiplied by the click pulse.
@@ -644,6 +652,7 @@ Variants {
                     width: bgRoot.width
                     height: bgRoot.height
                     anchors.centerIn: parent
+                    visible: !bgRoot.wallpaperIsVideo
                     source: bgRoot.wallpaperPath
                     fillMode: Image.PreserveAspectCrop
                     cache: false
@@ -653,6 +662,20 @@ Variants {
                     // Inverse lock/unlock zoom, multiplied by the delayed pulse.
                     // Dividing by shapeZoom keeps the picture visually still while
                     // the shape zooms, until imageZoom's follow-up kicks in.
+                    property real imageZoom: 1
+                    scale: bgRoot.centeredImageScale() * (1 / centeredWallpaperShapeItem.shapeZoom) * imageZoom
+                }
+
+                LiveWallpaperPreview {
+                    id: centeredLiveWallpaper
+                    width: bgRoot.width
+                    height: bgRoot.height
+                    anchors.centerIn: parent
+                    visible: bgRoot.wallpaperIsVideo
+                    source: bgRoot.effectiveWallpaperPath
+                    thumbnail: bgRoot.wallpaperPath
+                    radius: 0
+                    active: visible
                     property real imageZoom: 1
                     scale: bgRoot.centeredImageScale() * (1 / centeredWallpaperShapeItem.shapeZoom) * imageZoom
                 }

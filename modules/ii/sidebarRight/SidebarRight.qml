@@ -154,7 +154,7 @@ Scope {
 
                 Loader {
                     id: sidebarContentLoader
-                    active: panelWindow.reallyVisible || Config?.options.sidebar.keepRightSidebarLoaded
+                    active: true
                     anchors {
                         fill: parent
                         margins: Appearance.sizes.hyprlandGapsOut

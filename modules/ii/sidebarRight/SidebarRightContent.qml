@@ -149,7 +149,7 @@ Item {
                                         : Config.options.background.wallpaperPath
                                     thumbnail: Config.options.background.thumbnailPath
                                     radius: wallpaperRect.radius
-                                    active: GlobalStates.sidebarRightOpen
+                                    active: true
                                 }
                                 MouseArea {
                                     anchors.fill: parent

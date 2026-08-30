@@ -36,7 +36,7 @@ Item {
     Loader {
         id: videoLoader
         anchors.fill: parent
-        active: root.isVideo && root.active && root.visible
+        active: root.isVideo && root.active
         sourceComponent: LiveWallpaperVideo {
             anchors.fill: parent
             source: root.source
