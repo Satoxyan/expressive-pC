@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
@@ -38,12 +39,33 @@ StyledImage {
         thumbnailGeneration.running = false;
         thumbnailGeneration.running = true;
     }
+    onThumbnailPathChanged: {
+        if (!root.generateThumbnail || !root.thumbnailPath) return;
+        thumbnailGeneration.running = false;
+        thumbnailGeneration.running = true;
+    }
+    onSourcePathChanged: {
+        if (!root.generateThumbnail || !root.sourcePath) return;
+        Qt.callLater(() => { if (root.thumbnailPath) { thumbnailGeneration.running = false; thumbnailGeneration.running = true } })
+    }
+    Component.onCompleted: {
+        if (root.generateThumbnail && root.thumbnailPath) Qt.callLater(() => thumbnailGeneration.running = true)
+    }
+    // ponytail: video thumbnail via ffmpeg, image via magick
+    readonly property bool isVideo: Images.isValidVideoByName(root.sourcePath)
     Process {
         id: thumbnailGeneration
         command: {
             const maxSize = Images.thumbnailSizes[root.thumbnailSizeName];
-            return ["bash", "-c", 
-                `[ -f '${FileUtils.trimFileProtocol(root.thumbnailPath)}' ] && exit 0 || { magick '${root.sourcePath}' -resize ${maxSize}x${maxSize} '${FileUtils.trimFileProtocol(root.thumbnailPath)}' && exit 1; }`
+            const thumb = FileUtils.trimFileProtocol(root.thumbnailPath);
+            const thumbDir = thumb.substring(0, thumb.lastIndexOf("/"));
+            if (root.isVideo) {
+                return ["bash", "-c",
+                    `mkdir -p '${thumbDir}' && [ -f '${thumb}' ] && exit 0; ffmpeg -y -ss 0 -i '${root.sourcePath}' -frames:v 1 -vf scale=${maxSize}:-1 -q:v 2 -update 1 '${thumb}' 2>/dev/null && exit 1 || exit 0`
+                ]
+            }
+            return ["bash", "-c",
+                `mkdir -p '${thumbDir}' && [ -f '${thumb}' ] && exit 0 || { magick '${root.sourcePath}' -resize ${maxSize}x${maxSize} '${thumb}' && exit 1; }`
             ]
         }
         onExited: (exitCode, exitStatus) => {

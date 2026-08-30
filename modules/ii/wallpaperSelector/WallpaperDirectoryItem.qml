@@ -12,7 +12,8 @@ MouseArea {
 
     required property var fileModelData
     property bool isDirectory: fileModelData.fileIsDir
-    property bool useThumbnail: Images.isValidImageByName(fileModelData.fileName)
+    property bool isVideo: Images.isValidVideoByName(fileModelData.fileName)
+    property bool useThumbnail: Images.isValidImageByName(fileModelData.fileName) || isVideo
     property alias colBackground: background.color
     property alias colText: wallpaperItemName.color
     property alias radius: background.radius
@@ -136,6 +137,23 @@ MouseArea {
                         sourceSize.height: wallpaperItemColumnLayout.height - wallpaperItemColumnLayout.spacing - wallpaperItemName.height
                     }
 
+                }
+
+                // ponytail: video indicator badge
+                Rectangle {
+                    visible: root.isVideo
+                    anchors.top: parent.top
+                    anchors.right: parent.right
+                    anchors.margins: 6
+                    width: 28; height: 18
+                    radius: 4
+                    color: Appearance.colors.colPrimary
+                    MaterialSymbol {
+                        anchors.centerIn: parent
+                        text: "videocam"
+                        iconSize: 14
+                        color: Appearance.colors.colOnPrimary
+                    }
                 }
 
             }
