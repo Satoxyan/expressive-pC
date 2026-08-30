@@ -162,8 +162,8 @@ AbstractWidget {
         property int contentHeight: 300
         property int horizontalPadding: 200
         property int verticalPadding: 200
-        property int gridCols: 16
-        property int gridRows: 10
+        property int gridCols: 36
+        property int gridRows: 18
         onRunningChanged: {
             if (!leastBusyRegionProc.running && root.pendingPlacementRefresh) {
                 root.pendingPlacementRefresh = false;
