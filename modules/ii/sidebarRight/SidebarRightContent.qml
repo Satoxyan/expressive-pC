@@ -38,6 +38,18 @@ Item {
     readonly property bool animatedEntrance: WM.compositor !== "hyprland"
     readonly property bool sidebarOpen: GlobalStates.sidebarRightOpen
 
+    // ponytail: 3 panels + calendar expand → limit quick rows to 2
+    readonly property int activePanelCount: {
+        let c = 1
+        const sl = Config.options.sidebar.quickSliders
+        if (sl && sl.enable && (sl.showMic || sl.showVolume || sl.showBrightness)) c++
+        if (Config.options.sidebar.mediaPlayer && (root.activePlayer !== null || root.editMode)) c++
+        return c
+    }
+    readonly property bool threePanelsActive: root.activePanelCount >= 3
+    readonly property bool calendarExpanded: Config.options.sidebar.bottomGroup && !Persistent.states.sidebar.bottomGroup.collapsed
+    readonly property bool shouldLimitRows: root.threePanelsActive && root.calendarExpanded && !root.editMode
+
     readonly property MprisPlayer activePlayer: MprisController.activePlayer
     readonly property var realPlayers: MprisController.players
     readonly property var meaningfulPlayers: {
@@ -331,10 +343,10 @@ Item {
                     // Slot 0
                     Item {
                         Layout.fillWidth: true
-                        Layout.leftMargin: slot0Loader.panelType === "media" ? -8 : 0
-                        Layout.rightMargin: slot0Loader.panelType === "media" ? -8 : 0
-                        Layout.topMargin: slot0Loader.panelType === "media" ? -4 : 0
-                        Layout.bottomMargin: slot0Loader.panelType === "media" ? -4 : 0
+                        Layout.leftMargin: slot0Loader.panelType === "media" ? -10 : 0
+                        Layout.rightMargin: slot0Loader.panelType === "media" ? -10 : 0
+                        Layout.topMargin: slot0Loader.panelType === "media" ? -10 : 0
+                        Layout.bottomMargin: slot0Loader.panelType === "media" ? -10 : 0
                         implicitHeight: slot0Column.implicitHeight
                         visible: (slot0Loader.panelType === "media" || slot0Loader.panelType === "sliders") ? panelSlots.panelVisible(slot0Loader.panelType) : (root.editMode || panelSlots.panelVisible(slot0Loader.panelType))
                         opacity: dragHandler0.active ? 0 : (root.editMode && !panelSlots.panelVisible(slot0Loader.panelType) ? 0.4 : 1)
@@ -361,10 +373,10 @@ Item {
                     // Slot 1
                     Item {
                         Layout.fillWidth: true
-                        Layout.leftMargin: slot1Loader.panelType === "media" ? -8 : 0
-                        Layout.rightMargin: slot1Loader.panelType === "media" ? -8 : 0
-                        Layout.topMargin: slot1Loader.panelType === "media" ? -4 : 0
-                        Layout.bottomMargin: slot1Loader.panelType === "media" ? -4 : 0
+                        Layout.leftMargin: slot1Loader.panelType === "media" ? -10 : 0
+                        Layout.rightMargin: slot1Loader.panelType === "media" ? -10 : 0
+                        Layout.topMargin: slot1Loader.panelType === "media" ? -10 : 0
+                        Layout.bottomMargin: slot1Loader.panelType === "media" ? -10 : 0
                         implicitHeight: slot1Column.implicitHeight
                         visible: (slot1Loader.panelType === "media" || slot1Loader.panelType === "sliders") ? panelSlots.panelVisible(slot1Loader.panelType) : (root.editMode || panelSlots.panelVisible(slot1Loader.panelType))
                         opacity: dragHandler1.active ? 0 : (root.editMode && !panelSlots.panelVisible(slot1Loader.panelType) ? 0.4 : 1)
@@ -391,10 +403,10 @@ Item {
                     // Slot 2
                     Item {
                         Layout.fillWidth: true
-                        Layout.leftMargin: slot2Loader.panelType === "media" ? -8 : 0
-                        Layout.rightMargin: slot2Loader.panelType === "media" ? -8 : 0
-                        Layout.topMargin: slot2Loader.panelType === "media" ? -4 : 0
-                        Layout.bottomMargin: slot2Loader.panelType === "media" ? -4 : 0
+                        Layout.leftMargin: slot2Loader.panelType === "media" ? -10 : 0
+                        Layout.rightMargin: slot2Loader.panelType === "media" ? -10 : 0
+                        Layout.topMargin: slot2Loader.panelType === "media" ? -10 : 0
+                        Layout.bottomMargin: slot2Loader.panelType === "media" ? -10 : 0
                         implicitHeight: slot2Column.implicitHeight
                         visible: (slot2Loader.panelType === "media" || slot2Loader.panelType === "sliders") ? panelSlots.panelVisible(slot2Loader.panelType) : (root.editMode || panelSlots.panelVisible(slot2Loader.panelType))
                         opacity: dragHandler2.active ? 0 : (root.editMode && !panelSlots.panelVisible(slot2Loader.panelType) ? 0.4 : 1)
@@ -643,7 +655,7 @@ Item {
                 Layout.fillWidth: true
                 active: Config.options.sidebar.quickToggles.style === "android"
                 visible: active
-                sourceComponent: AndroidQuickPanel { editMode: root.editMode }
+                sourceComponent: AndroidQuickPanel { editMode: root.editMode; limitRows: root.shouldLimitRows }
             }
             Connections { target: classicQuickLoader.item; function onOpenAudioOutputDialog() { root.showAudioOutputDialog = true } function onOpenAudioInputDialog() { root.showAudioInputDialog = true } function onOpenBluetoothDialog() { root.showBluetoothDialog = true } function onOpenNightLightDialog() { root.showNightLightDialog = true } function onOpenWifiDialog() { root.showWifiDialog = true } }
             Connections { target: androidQuickLoader.item; function onOpenAudioOutputDialog() { root.showAudioOutputDialog = true } function onOpenAudioInputDialog() { root.showAudioInputDialog = true } function onOpenBluetoothDialog() { root.showBluetoothDialog = true } function onOpenNightLightDialog() { root.showNightLightDialog = true } function onOpenWifiDialog() { root.showWifiDialog = true } }
