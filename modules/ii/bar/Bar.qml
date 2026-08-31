@@ -50,6 +50,24 @@ Scope {
                         }
                     }
                 }
+
+                property bool showCorners: !Config.options.bar.autoHide.enable || mustShow
+
+                Timer {
+                    id: cornerRevealTimer
+                    interval: 65
+                    onTriggered: barRoot.showCorners = true
+                }
+
+                onMustShowChanged: {
+                    if (!Config.options.bar.autoHide.enable) return;
+                    if (mustShow) {
+                        cornerRevealTimer.restart()
+                    } else {
+                        cornerRevealTimer.stop()
+                        barRoot.showCorners = false
+                    }
+                }
                 property bool superShow: false
                 property bool mustShow: hoverRegion.containsMouse || superShow
                 property var thisMonitorData: HyprlandData.monitors.find(m => m.name === barRoot.screen?.name)
@@ -130,7 +148,7 @@ Scope {
 
                     RoundCorner {
                         id: leftPillCorner
-                        visible: barContent.centerOnly && showBarBackground && Config.options.bar.cornerStyle === 0 && (!Config.options.bar.autoHide.enable || barRoot.mustShow)
+                        visible: barContent.centerOnly && showBarBackground && Config.options.bar.cornerStyle === 0 && barRoot.showCorners
                         x: barContent.centerPillX - implicitSize
                         implicitSize: Appearance.rounding.screenRounding
                         color: Config.options.bar.followFrameColor
@@ -200,7 +218,7 @@ Scope {
 
                     RoundCorner {
                         id: rightPillCorner
-                        visible: barContent.centerOnly && showBarBackground && Config.options.bar.cornerStyle === 0 && (!Config.options.bar.autoHide.enable || barRoot.mustShow)
+                        visible: barContent.centerOnly && showBarBackground && Config.options.bar.cornerStyle === 0 && barRoot.showCorners
                         x: barContent.centerPillX + barContent.centerPillWidth
                         implicitSize: Appearance.rounding.screenRounding
                         color: Config.options.bar.followFrameColor

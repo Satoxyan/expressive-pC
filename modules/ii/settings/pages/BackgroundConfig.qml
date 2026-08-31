@@ -235,6 +235,33 @@ ContentPage {
                     }
                 }
 
+                ConfigSelectionArray {
+                    text: Translation.tr("Split blur amount")
+                    icon: "split_scene"
+                    currentValue: Config.options.background.splitRatio
+                    options: [
+                        { "displayName": "25%",  "icon": "thumbnail_bar",              "value": "25" },
+                        { "displayName": "50%",  "icon": "side_navigation",              "value": "50" },
+                        { "displayName": "100%", "icon": "fullscreen",    "value": "100" },
+                    ]
+                    onSelected: newValue => {
+                        Config.options.background.splitRatio = newValue
+                    }
+                }
+
+                ConfigSelectionArray {
+                    text: Translation.tr("Split blur side")
+                    icon: "align_horizontal_left"
+                    currentValue: Config.options.background.splitSide
+                    options: [
+                        { "displayName": Translation.tr("Left"),  "icon": "align_horizontal_left",  "value": "left" },
+                        { "displayName": Translation.tr("Right"), "icon": "align_horizontal_right", "value": "right" },
+                    ]
+                    onSelected: newValue => {
+                        Config.options.background.splitSide = newValue
+                    }
+                }
+
                 ConfigSpinBox {
                     icon: "timer"
                     text: Translation.tr("Wallpaper change interval (min)")

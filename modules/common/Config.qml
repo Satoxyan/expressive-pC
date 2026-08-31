@@ -248,6 +248,8 @@ Singleton {
                 property bool widgetsLocked: false
                 property bool showGrid: true
                 property bool showBlur: false
+                property string splitRatio: "100" // 25 50 100
+                property string splitSide: "left"
                 property bool showSnapLines: true
                 property JsonObject widgets: JsonObject {
                     property JsonObject clock: JsonObject {
