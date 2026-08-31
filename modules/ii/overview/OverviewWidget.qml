@@ -203,8 +203,8 @@ Item {
                     property int workspaceRowIndex: getWsRow(windowData?.workspace.id)
                     xOffset: (root.workspaceImplicitWidth + workspaceSpacing) * workspaceColIndex
                     yOffset: (root.workspaceImplicitHeight + workspaceSpacing) * workspaceRowIndex
-                    property real xWithinWorkspaceWidget: Math.max((windowData?.at[0] - (monitor?.x ?? 0) - monitorData?.reserved[0]) * root.scale, 0)
-                    property real yWithinWorkspaceWidget: Math.max((windowData?.at[1] - (monitor?.y ?? 0) - monitorData?.reserved[1]) * root.scale, 0)
+                    property real xWithinWorkspaceWidget: (windowData?.at[0] - (monitor?.x ?? 0) - monitorData?.reserved[0]) * root.scale
+                    property real yWithinWorkspaceWidget: (windowData?.at[1] - (monitor?.y ?? 0) - monitorData?.reserved[1]) * root.scale
 
                     // Radius
                     property real minRadius: Appearance.rounding.small
@@ -275,8 +275,18 @@ Item {
                                     updateWindowPosition.restart()
                                     return
                                 }
-                                const percentageX = (window.x - xOffset) / root.workspaceImplicitWidth
-                                const percentageY = (window.y - yOffset) / root.workspaceImplicitHeight
+                                // ponytail: keep at least 30px inside frame, not fully outside
+                                const visibleMin = 10
+                                const minX = xOffset - window.width + visibleMin
+                                const maxX = xOffset + root.workspaceImplicitWidth - visibleMin
+                                const minY = yOffset - window.height + visibleMin
+                                const maxY = yOffset + root.workspaceImplicitHeight - visibleMin
+                                const clampedX = Math.max(minX, Math.min(maxX, window.x))
+                                const clampedY = Math.max(minY, Math.min(maxY, window.y))
+                                window.x = clampedX
+                                window.y = clampedY
+                                const percentageX = (clampedX - xOffset) / root.workspaceImplicitWidth
+                                const percentageY = (clampedY - yOffset) / root.workspaceImplicitHeight
                                 const monitor = window.monitor
                                 const reserved = monitor?.reserved ?? [0, 0, 0, 0]
                                 const scaleF = monitor?.scale ?? 1
