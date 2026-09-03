@@ -24,10 +24,12 @@ ContentPage {
     property bool onlinePresetsLoading: false
 
     property var pendingOnlinePresets: {
+        if (!Presets || !Presets.onlineFolderModel) return []
         const downloadedNames = new Set()
         for (let i = 0; i < Presets.onlineFolderModel.count; i++) {
             downloadedNames.add(Presets.onlineFolderModel.get(i, "fileName").replace(".json", ""))
         }
+        if (!page.onlinePresets || !Array.isArray(page.onlinePresets)) return []
         return page.onlinePresets.filter(p => !downloadedNames.has(p.name))
     }
 
