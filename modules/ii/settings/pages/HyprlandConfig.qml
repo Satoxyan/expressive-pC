@@ -11,6 +11,7 @@ import qs.modules.common.models.hyprland
 ContentPage {
     id: page
     forceWidth: true
+    property bool showMonitorAdvanced: false
 
     function goTo(term) {
         const t = term.toLowerCase().trim()
@@ -82,27 +83,59 @@ ContentPage {
                 monitorConfig: monitorConfig
             }
 
-            ContentSubsection {
-                Layout.topMargin: 10
-                title: (monitorConfig.monitors[monitorCanvas.selectedIndex]?.name ?? "")
-                    + " · "
-                    + (monitorConfig.monitors[monitorCanvas.selectedIndex]?.description ?? "")
-
-                GroupedList {
-                    ConfigSwitch {
-                        buttonIcon: "tv_off"
-                        text: Translation.tr("Enabled")
-                        checked: !(monitorConfig.monitors[monitorCanvas.selectedIndex]?.disabled ?? false)
-                        enabled: monitorConfig.monitors.length > 1
-                        onCheckedChanged: {
-                            if (monitorConfig.monitors.length === 1 && !checked) return
-                            if (checked === !(monitorConfig.monitors[monitorCanvas.selectedIndex]?.disabled ?? false)) return
-                            monitorConfig.updateMonitor(monitorCanvas.selectedIndex, { disabled: !checked })
-                            monitorConfig.applyAndSave(monitorCanvas.selectedIndex)
+            // ponytail: per-monitor dropdown — Enabled row shows monitor name, advanced separate (no empty column)
+            GroupedList {
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+                        ConfigSwitch {
+                            Layout.fillWidth: true
+                            buttonIcon: "tv_off"
+                            text: (monitorConfig.monitors[monitorCanvas.selectedIndex]?.name ?? Translation.tr("Enabled"))
+                                + (monitorConfig.monitors[monitorCanvas.selectedIndex]?.description ? " · " + monitorConfig.monitors[monitorCanvas.selectedIndex]?.description : "")
+                            checked: !(monitorConfig.monitors[monitorCanvas.selectedIndex]?.disabled ?? false)
+                            enabled: monitorConfig.monitors.length > 1
+                            onCheckedChanged: {
+                                if (monitorConfig.monitors.length === 1 && !checked) return
+                                if (checked === !(monitorConfig.monitors[monitorCanvas.selectedIndex]?.disabled ?? false)) return
+                                monitorConfig.updateMonitor(monitorCanvas.selectedIndex, { disabled: !checked })
+                                monitorConfig.applyAndSave(monitorCanvas.selectedIndex)
+                            }
+                        }
+                        RippleButton {
+                            implicitWidth: 36; implicitHeight: 36
+                            buttonRadius: Appearance.rounding.full
+                            colBackground: "transparent"
+                            onClicked: page.showMonitorAdvanced = !page.showMonitorAdvanced
+                            MaterialSymbol {
+                                anchors.centerIn: parent
+                                text: page.showMonitorAdvanced ? "expand_less" : "expand_more"
+                                iconSize: 20
+                                color: Appearance.colors.colOnLayer1
+                            }
                         }
                     }
+            }
+            // Advanced options — outside GroupedList, scroll-down animation, no empty column when collapsed
+            GroupedList {
+                visible: page.showMonitorAdvanced || implicitHeight > 0
+                Layout.fillWidth: true
+                Layout.topMargin: 1
+                Layout.bottomMargin: page.showMonitorAdvanced ? 24 : 0
+                implicitHeight: page.showMonitorAdvanced ? advancedCol.implicitHeight : 0
+                opacity: page.showMonitorAdvanced ? 1 : 0
+                clip: false
+                Behavior on implicitHeight { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
+                Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                Behavior on Layout.bottomMargin { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
 
-                    ConfigComboBox {
+                ColumnLayout {
+                    id: advancedCol
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    spacing: 8
+
+                            ConfigComboBox {
                         Layout.fillWidth: true
                         buttonIcon: "aspect_ratio"
                         text: Translation.tr("Resolution & Refresh Rate")
@@ -175,7 +208,7 @@ ContentPage {
                             monitorConfig.applyAndSave(monitorCanvas.selectedIndex)
                         }
                     }
-                }        
+                }
             }
         }
 
