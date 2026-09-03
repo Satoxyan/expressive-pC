@@ -500,7 +500,7 @@ Variants {
                 cache: true
                 smooth: true
                 asynchronous: true
-                layer.enabled: blurLoader.active
+                layer.enabled: true
                 visible: !blurLoader.active && !bgRoot.videoRevealed
                     && (bgRoot.wallpaperAnimation === "" || bgRoot.transitionProgress >= 1.0)
                     && !bgRoot.centeredHidesFullWallpaper
@@ -514,7 +514,7 @@ Variants {
             ShaderEffect {
                 id: transitionEffect
                 anchors.fill: parent
-                layer.enabled: blurLoader.active
+                layer.enabled: true
                 visible: !blurLoader.active && bgRoot.wallpaperAnimation !== "" && !bgRoot.centeredShapeActive && !bgRoot.videoRevealed
                     && bgRoot.transitionProgress < 1.0
 
