@@ -63,8 +63,9 @@ DockButton {
     }
 
     onClicked: {
+        launchAnims.play(Config.options.dock.launchAnimation);
         if (appToplevel.toplevels.length === 0) {
-            root.desktopEntry?.execute();
+            if (root.desktopEntry) Quickshell.execDetached(["gtk-launch", root.desktopEntry.id]);
             return;
         }
         lastFocused = (lastFocused + 1) % appToplevel.toplevels.length
@@ -72,7 +73,7 @@ DockButton {
     }
 
     middleClickAction: () => {
-        root.desktopEntry?.execute();
+        if (root.desktopEntry) Quickshell.execDetached(["gtk-launch", root.desktopEntry.id]);
     }
 
     altAction: () => {
@@ -84,35 +85,49 @@ DockButton {
         sourceComponent: Item {
             anchors.centerIn: parent
 
-            Loader {
-                id: iconImageLoader
+            Item {
+                id: iconArea
+                implicitWidth: root.iconSize
+                implicitHeight: root.iconSize
                 anchors {
                     left: parent.left
                     right: parent.right
                     verticalCenter: parent.verticalCenter
                 }
-                active: !root.isSeparator
-                sourceComponent: IconImage {
-                    source: Quickshell.iconPath(AppSearch.guessIcon(appToplevel.appId), "image-missing")
-                    implicitSize: root.iconSize
-                }
-            }
+                scale: launchAnims.scale
+                rotation: launchAnims.rot
+                transformOrigin: Item.Center
 
-            Loader {
-                active: Config.options.dock.monochromeIcons
-                anchors.fill: iconImageLoader
-                sourceComponent: Item {
-                    Desaturate {
-                        id: desaturatedIcon
-                        visible: false // There's already color overlay
-                        anchors.fill: parent
-                        source: iconImageLoader
-                        desaturation: 0.8
+                Loader {
+                    id: iconImageLoader
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                        verticalCenter: parent.verticalCenter
                     }
-                    ColorOverlay {
-                        anchors.fill: desaturatedIcon
-                        source: desaturatedIcon
-                        color: ColorUtils.transparentize(Appearance.colors.colPrimary, 0.9)
+                    active: !root.isSeparator
+                    sourceComponent: IconImage {
+                        source: Quickshell.iconPath(AppSearch.guessIcon(appToplevel.appId), "image-missing")
+                        implicitSize: root.iconSize
+                    }
+                }
+
+                Loader {
+                    active: Config.options.dock.monochromeIcons
+                    anchors.fill: iconImageLoader
+                    sourceComponent: Item {
+                        Desaturate {
+                            id: desaturatedIcon
+                            visible: false // There's already color overlay
+                            anchors.fill: parent
+                            source: iconImageLoader
+                            desaturation: 0.8
+                        }
+                        ColorOverlay {
+                            anchors.fill: desaturatedIcon
+                            source: desaturatedIcon
+                            color: ColorUtils.transparentize(Appearance.colors.colPrimary, 0.9)
+                        }
                     }
                 }
             }
@@ -120,7 +135,7 @@ DockButton {
             RowLayout {
                 spacing: 3
                 anchors {
-                    top: iconImageLoader.bottom
+                    top: iconArea.bottom
                     topMargin: 2
                     horizontalCenter: parent.horizontalCenter
                 }
@@ -137,5 +152,9 @@ DockButton {
                 }
             }
         }
+    }
+
+    DockLaunchAnimations {
+        id: launchAnims
     }
 }

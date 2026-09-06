@@ -28,7 +28,7 @@ else
 fi
 
 if [ -z "$AUDIO_DEVICE" ] || ! pactl list short sources | grep -q "$AUDIO_DEVICE"; then
-    exit 1
+    exit 2
 fi
 
 mkfifo "$FIFO"
@@ -46,7 +46,7 @@ SONGREC_PID=$!
 ( sleep "$TOTAL_DURATION" && kill "$SONGREC_PID" 2>/dev/null ) &
 
 while IFS= read -r line; do
-    if echo "$line" | grep -q '"matches": \['; then
+    if echo "$line" | grep -q '"matches"'; then
         echo "$line"
         exit 0
     fi

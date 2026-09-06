@@ -22,14 +22,14 @@ StyledPopup {
             width: parent.width
 
             StyledText {
-                text: Qt.locale().toString(root.today, " MMMM")
+                text: DateTime.locale.toString(root.today, " MMMM")
                 font.pixelSize: Appearance.font.pixelSize.huge
                 font.weight: Font.Bold
                 color: Appearance.colors.colOnLayer1
             }
 
             StyledText {
-                text: " " + Qt.locale().toString(root.today, "yyyy")
+                text: " " + DateTime.locale.toString(root.today, "yyyy")
                 font.pixelSize: Appearance.font.pixelSize.huge
                 color: Appearance.colors.colOnSurfaceVariant
             }
@@ -71,7 +71,7 @@ StyledPopup {
 
                         StyledText {
                             Layout.alignment: Qt.AlignHCenter
-                            text: Qt.locale().toString(date, "ddd").slice(0, 2)
+                            text: DateTime.locale.toString(date, "ddd").slice(0, 2)
                             font.pixelSize: Appearance.font.pixelSize.smaller
                             color: isToday
                                 ? Appearance.colors.colPrimary

@@ -51,6 +51,43 @@ Item {
         }
 
         Loader {
+            active: Config.options.bar.utilButtons.showScreenRecord
+            visible: active
+            sourceComponent: isMaterial ? screenRecordM3 : legacyScreenRecord
+        }
+
+        Component {
+            id: legacyScreenRecord
+            RecordButton {
+                material: false
+                showTextOnHover: true
+                onClicked: {
+                    if (isRecording) {
+                        Quickshell.execDetached([Directories.recordScriptPath]);
+                    } else {
+                        GlobalStates.overlayOpen = false;
+                        Quickshell.execDetached(["qs", "-p", Quickshell.shellPath(""), "ipc", "call", "region", "recordWithSound"]);
+                    }
+                }
+            }
+        }
+
+        Component {
+            id: screenRecordM3
+            RecordButton {
+                material: true
+                onClicked: {
+                    if (isRecording) {
+                        Quickshell.execDetached([Directories.recordScriptPath]);
+                    } else {
+                        GlobalStates.overlayOpen = false;
+                        Quickshell.execDetached(["qs", "-p", Quickshell.shellPath(""), "ipc", "call", "region", "recordWithSound"]);
+                    }
+                }
+            }
+        }
+
+        Loader {
             active: Config.options.bar.utilButtons.showColorPicker
             visible: active
             sourceComponent: isMaterial ? colorPickerM3 : legacyColorPicker
@@ -72,88 +109,6 @@ Item {
                     iconSize: Appearance.font.pixelSize.large
                     color: Appearance.colors.colOnLayer2
                 }
-            }
-        }
-
-        Loader {
-            active: Config.options.bar.utilButtons.showScreenRecord
-            visible: active
-            sourceComponent: isMaterial ? screenRecordM3 : legacyScreenRecord
-        }
-
-        Component {
-            id: legacyScreenRecord
-            Item {
-                id: recordingItem
-                implicitWidth: btn.implicitWidth + timerRevealer.implicitWidth
-                implicitHeight: btn.implicitHeight
-
-                property bool isRecording: Persistent.states.record.enable
-                property int elapsedSeconds: 0
-
-                onIsRecordingChanged: {
-                    if (!isRecording) elapsedSeconds = 0
-                }
-
-                function formatTime(s) {
-                    return Math.floor(s / 60).toString().padStart(2, '0') + ":" + (s % 60).toString().padStart(2, '0')
-                }
-
-                Timer {
-                    interval: 1000
-                    repeat: true
-                    running: recordingItem.isRecording
-                    onTriggered: recordingItem.elapsedSeconds++
-                }
-
-                CircleUtilButton {
-                    id: btn
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-                    colBackground: recordingItem.isRecording ? Appearance.colors.colPrimaryContainer : "transparent"
-                    buttonRadius: recordingItem.isRecording ? Appearance.rounding.normal : implicitHeight / 2
-                    onClicked: Quickshell.execDetached([Directories.recordScriptPath])
-
-                    Behavior on colBackground { ColorAnimation { duration: 200 } }
-                    Behavior on buttonRadius { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-
-                    MaterialSymbol {
-                        horizontalAlignment: Qt.AlignHCenter
-                        fill: 1
-                        text: recordingItem.isRecording ? "stop_circle" : "screen_record"
-                        iconSize: Appearance.font.pixelSize.large
-                        color: recordingItem.isRecording ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer2
-                        Behavior on color { ColorAnimation { duration: 200 } }
-                    }
-                }
-
-                Revealer {
-                    id: timerRevealer
-                    anchors.left: btn.right
-                    anchors.leftMargin: 8
-                    anchors.verticalCenter: btn.verticalCenter
-                    reveal: recordingItem.isRecording && !root.vertical
-
-                    StyledText {
-                        width: implicitWidth
-                        text: recordingItem.formatTime(recordingItem.elapsedSeconds)
-                        font.pixelSize: Appearance.font.pixelSize.small
-                        font.features: { "tnum": 1 }
-                        font.letterSpacing: -0.3
-                        color: Appearance.colors.colOnLayer2
-                        rightPadding: 8
-                        Component.onCompleted: width = implicitWidth
-                    }
-                }
-            }
-        }
-
-        Component {
-            id: screenRecordM3
-            UtilButton {
-                iconText: Persistent.states.record.enable ? "stop_circle" : "screen_record"
-                forceHovered: Persistent.states.record.enable
-                onClicked: Quickshell.execDetached([Directories.recordScriptPath])
             }
         }
 

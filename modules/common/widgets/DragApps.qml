@@ -72,9 +72,16 @@ Item {
 
             property string appId:     root._workOrder[index] ?? ""
             property var    appEntry:  TaskbarApps.apps.find(a => a.appId === appId) ?? null
-            property var    deskEntry: appEntry ? DesktopEntries.heuristicLookup(appId) : null
+            property var    deskEntry: DesktopEntries.heuristicLookup(appId)
             property bool   appActive: appEntry?.toplevels?.find(t => t.activated) !== undefined
             property int    _lastFocused: -1
+
+            Connections {
+                target: DesktopEntries
+                function onApplicationsChanged() {
+                    slotItem.deskEntry = DesktopEntries.heuristicLookup(slotItem.appId)
+                }
+            }
 
             width:  root.btnSize
             height: root.implicitHeight
@@ -154,9 +161,10 @@ Item {
                 }
 
                 onClicked: {
+                    launchAnims.play(Config.options.dock.launchAnimation);
                     const entry = slotItem.appEntry
                     if (!entry || entry.toplevels.length === 0) {
-                        slotItem.deskEntry?.execute()
+                        if (slotItem.deskEntry) Quickshell.execDetached(["gtk-launch", slotItem.deskEntry.id]);
                         return
                     }
                     const next = (slotItem._lastFocused + 1) % entry.toplevels.length
@@ -164,36 +172,46 @@ Item {
                     entry.toplevels[next].activate()
                 }
 
-                middleClickAction: () => { slotItem.deskEntry?.execute() }
+                middleClickAction: () => { if (slotItem.deskEntry) Quickshell.execDetached(["gtk-launch", slotItem.deskEntry.id]) }
                 altAction:         () => { TaskbarApps.togglePin(slotItem.appId) }
 
                 contentItem: Item {
                     anchors.centerIn: parent
 
-                    IconImage {
-                        id: appIcon
+                    Item {
+                        id: iconArea
+                        implicitWidth: 33
+                        implicitHeight: 33
                         anchors.centerIn: parent
-                        source: Quickshell.iconPath(
-                            AppSearch.guessIcon(slotItem.appId),
-                            "image-missing")
-                        implicitSize: 33
-                    }
+                        scale: launchAnims.scale
+                        rotation: launchAnims.rot
+                        transformOrigin: Item.Center
 
-                    Loader {
-                        active: Config.options.dock.monochromeIcons
-                        anchors.fill: appIcon
-                        sourceComponent: Item {
-                            Desaturate {
-                                id: desaturatedIcon
-                                visible: false
-                                anchors.fill: parent
-                                source: appIcon
-                                desaturation: 0.8
-                            }
-                            ColorOverlay {
-                                anchors.fill: desaturatedIcon
-                                source: desaturatedIcon
-                                color: ColorUtils.transparentize(Appearance.colors.colPrimary, 0.9)
+                        IconImage {
+                            id: appIcon
+                            anchors.centerIn: parent
+                            source: Quickshell.iconPath(
+                                AppSearch.guessIcon(slotItem.appId),
+                                "image-missing")
+                            implicitSize: 33
+                        }
+
+                        Loader {
+                            active: Config.options.dock.monochromeIcons
+                            anchors.fill: appIcon
+                            sourceComponent: Item {
+                                Desaturate {
+                                    id: desaturatedIcon
+                                    visible: false
+                                    anchors.fill: parent
+                                    source: appIcon
+                                    desaturation: 0.8
+                                }
+                                ColorOverlay {
+                                    anchors.fill: desaturatedIcon
+                                    source: desaturatedIcon
+                                    color: ColorUtils.transparentize(Appearance.colors.colPrimary, 0.9)
+                                }
                             }
                         }
                     }
@@ -201,7 +219,7 @@ Item {
                     RowLayout {
                         spacing: 3
                         anchors {
-                            top: appIcon.bottom
+                            top: iconArea.bottom
                             topMargin: 2
                             horizontalCenter: parent.horizontalCenter
                         }
@@ -219,6 +237,10 @@ Item {
                             }
                         }
                     }
+                }
+
+                DockLaunchAnimations {
+                    id: launchAnims
                 }
             }
 

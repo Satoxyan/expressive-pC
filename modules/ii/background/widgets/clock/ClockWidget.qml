@@ -20,24 +20,49 @@ AbstractBackgroundWidget {
     readonly property bool forceCenter: (GlobalStates.screenLocked && Config.options.lock.centerClock)
     readonly property bool shouldShow: (!Config.options.background.widgets.clock.showOnlyWhenLocked || GlobalStates.screenLocked)
     readonly property string customClockColorKey: Config.options.background.widgets.clock.color ?? ""
-    readonly property color resolvedClockColor: {
-        if (customClockColorKey === "") return root.colText;
-        const propName = "col" + customClockColorKey.charAt(0).toUpperCase() + customClockColorKey.slice(1);
+    function paletteColor(key) {
+        if (key === "") return root.colText;
+        if (key === "adaptive")
+            return ColorUtils.colorWithLightness(Appearance.colors.colPrimary, (root.dominantColorIsDark ? 0.8 : 0.12));
+        const propName = "col" + key.charAt(0).toUpperCase() + key.slice(1);
         return Appearance.colors[propName] ?? root.colText;
     }
+    readonly property color resolvedClockColor: paletteColor(customClockColorKey)
+    readonly property bool effectiveVertical: GlobalStates.screenLocked ? Config.options.background.widgets.clock.digital.verticalLocked : Config.options.background.widgets.clock.digital.vertical
+    readonly property string effectiveColorMode: GlobalStates.screenLocked ? Config.options.background.widgets.clock.digital.colorModeLocked : Config.options.background.widgets.clock.digital.colorMode
     property bool wallpaperSafetyTriggered: false
     needsColText: clockStyle === "digital"
-    x: forceCenter ? ((root.screenWidth - root.width) / 2) : targetX
-    y: forceCenter ? ((root.screenHeight - root.height) / 2) : targetY
+
+    property real refWidth: 0
+    property real refHeight: 0
+    readonly property real centerX: root.refWidth > 0 ? (root.targetX + root.refWidth / 2) : (root.targetX + root.width / 2)
+    readonly property real centerY: root.refHeight > 0 ? (root.targetY + root.refHeight / 2) : (root.targetY + root.height / 2)
+    onTargetXChanged: root.refWidth = root.width
+    onTargetYChanged: root.refHeight = root.height
+    Component.onCompleted: {
+        root.refWidth = root.width;
+        root.refHeight = root.height;
+    }
+
+    x: forceCenter ? ((root.screenWidth - root.width) / 2) : (root.centerX - root.width / 2)
+    y: forceCenter ? ((root.screenHeight - root.height) / 2) : (root.centerY - root.height / 2)
     visibleWhenLocked: true
 
+    readonly property color effectiveColText: {
+        if (effectiveColorMode === "auto")
+            return paletteColor(root.dominantColorIsDark ? Config.options.background.widgets.clock.digital.colorLight : Config.options.background.widgets.clock.digital.colorDark);
+        if (effectiveColorMode === "light")
+            return paletteColor(Config.options.background.widgets.clock.digital.colorLight);
+        return paletteColor(Config.options.background.widgets.clock.digital.colorDark);
+    }
+
     function restoreXYBinding() {
-        root.x = Qt.binding(() => root.forceCenter ? ((root.screenWidth - root.width) / 2) : root.targetX);
-        root.y = Qt.binding(() => root.forceCenter ? ((root.screenHeight - root.height) / 2) : root.targetY);
+        root.x = Qt.binding(() => root.forceCenter ? ((root.screenWidth - root.width) / 2) : (root.centerX - root.width / 2));
+        root.y = Qt.binding(() => root.forceCenter ? ((root.screenHeight - root.height) / 2) : (root.centerY - root.height / 2));
     }
 
     property var textHorizontalAlignment: {
-        if (!Config.options.background.widgets.clock.digital.adaptiveAlignment || root.forceCenter || Config.options.background.widgets.clock.digital.vertical) 
+        if (!Config.options.background.widgets.clock.digital.adaptiveAlignment || root.forceCenter || root.effectiveVertical) 
             return Text.AlignHCenter;
         if (root.x < root.scaledScreenWidth / 3)
             return Text.AlignLeft;
@@ -67,7 +92,8 @@ AbstractBackgroundWidget {
             shown: root.clockStyle === "digital" && (root.shouldShow)
             fade: false
             sourceComponent: DigitalClock {
-                colText: root.resolvedClockColor
+                locked: GlobalStates.screenLocked
+                colText: root.effectiveColText
                 textHorizontalAlignment: root.textHorizontalAlignment
             }
         }
@@ -78,6 +104,22 @@ AbstractBackgroundWidget {
             shown: root.clockStyle === "pixel" && (root.shouldShow)
             fade: false
             sourceComponent: PixelClock {}
+        }
+
+        FadeLoader {
+            id: pixelDateLoader
+            anchors.horizontalCenter: parent.horizontalCenter
+            shown: root.clockStyle === "pixel" && Config.options.background.widgets.clock.pixel.showDate && GlobalStates.screenLocked && root.shouldShow
+            fade: false
+            sourceComponent: ClockText {
+                horizontalAlignment: Text.AlignHCenter
+                font {
+                    family: Config.options.background.widgets.clock.digital.font.family
+                    weight: Config.options.background.widgets.clock.pixel.weight
+                    pixelSize: Appearance.font.pixelSize.huge * Config.options.background.widgets.clock.pixel.size
+                }
+                text: DateTime.longDate
+            }
         }
 
         FadeLoader {
@@ -138,7 +180,8 @@ AbstractBackgroundWidget {
                 }
                 ClockStatusText {
                     id: lockStatusText
-                    shown: GlobalStates.screenLocked && Config.options.lock.showLockedText
+                    shown: GlobalStates.screenLockPending && Config.options.lock.showLockedText
+                    reserveSpace: true
                     statusIcon: "lock"
                     statusText: Translation.tr("Locked")
                 }
@@ -155,9 +198,10 @@ AbstractBackgroundWidget {
         property alias statusIcon: statusIconWidget.text
         property alias statusText: statusTextWidget.text
         property bool shown: true
-        property color textColor: root.clockStyle === "cookie" ? Appearance.colors.colOnSecondaryContainer : root.colText
+        property bool reserveSpace: false
+        property color textColor: root.clockStyle === "cookie" ? Appearance.colors.colOnSecondaryContainer : root.effectiveColText
         opacity: shown ? 1 : 0
-        visible: opacity > 0
+        visible: reserveSpace ? true : (opacity > 0)
         Behavior on opacity {
             animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
         }

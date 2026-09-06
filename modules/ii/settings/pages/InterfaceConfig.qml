@@ -73,7 +73,7 @@ ContentPage {
                         Config.options.settings.borderColor = newValue
                     }
                 }
-            } 
+            }
         }
 
         ContentSection {
@@ -662,6 +662,27 @@ ContentPage {
                     }
                 }
             }
+
+            ContentSubsection {
+                title: Translation.tr("Launch animation")
+                GroupedList {
+                    ConfigSelectionArray {
+                        icon: "animation"
+                        text: Translation.tr("Animation")
+                        Layout.fillWidth: false
+                        Layout.alignment: Qt.AlignRight
+                        currentValue: Config.options.dock.launchAnimation
+                        onSelected: newValue => { Config.options.dock.launchAnimation = newValue }
+                        options: [
+                            { displayName: Translation.tr("None"), icon: "block", value: DockLaunchAnims.AnimType.None },
+                            { displayName: Translation.tr("Bounce"), icon: "swap_vert", value: DockLaunchAnims.AnimType.Bounce },
+                            { displayName: Translation.tr("Pulse"), icon: "open_in_new", value: DockLaunchAnims.AnimType.Pulse },
+                            { displayName: Translation.tr("Pop"), icon: "adjust", value: DockLaunchAnims.AnimType.Pop },
+                            { displayName: Translation.tr("Wobble"), icon: "360", value: DockLaunchAnims.AnimType.Wobble }
+                        ]
+                    }
+                }
+            }
         }
 
         ContentSection {
@@ -756,11 +777,11 @@ ContentPage {
                         onCheckedChanged: { Config.options.lock.blur.enable = checked }
                     }
                     ConfigSpinBox {
-                        icon: "deblur"
-                        text: Translation.tr("Samples")
-                        value: Config.options.lock.blur.size
-                        from: 20; to: 200; stepSize: 10
-                        onValueChanged: { Config.options.lock.blur.size = value }
+                        icon: "blur_on"
+                        text: Translation.tr("Blur strength (radius)")
+                        value: Config.options.lock.blur.radius
+                        from: 5; to: 200; stepSize: 5
+                        onValueChanged: { Config.options.lock.blur.radius = value }
                     }
                     ConfigSpinBox {
                         icon: "loupe"
@@ -768,6 +789,31 @@ ContentPage {
                         value: Config.options.lock.blur.extraZoom * 100
                         from: 1; to: 150; stepSize: 2
                         onValueChanged: { Config.options.lock.blur.extraZoom = value / 100 }
+                    }
+                }
+            }
+
+            ContentSubsection {
+                title: Translation.tr("Dim")
+                GroupedList {
+                    ConfigSwitch {
+                        buttonIcon: "brightness_6"
+                        text: Translation.tr("Dim lockscreen")
+                        checked: Config.options.lock.dim.enable
+                        onCheckedChanged: { Config.options.lock.dim.enable = checked }
+                        StyledToolTip {
+                            text: Translation.tr("Darkens the lockscreen background for better visibility")
+                        }
+                    }
+                    ConfigSlider {
+                        text: Translation.tr("Dim strength")
+                        usePercentTooltip: true
+                        value: Config.options.lock.dim.strength
+                        from: 0
+                        to: 100
+                        buttonIcon: "contrast"
+                        stopIndicatorValues: [10]
+                        onValueChanged: { Config.options.lock.dim.strength = value }
                     }
                 }
             }

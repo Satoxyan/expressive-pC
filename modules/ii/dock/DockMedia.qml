@@ -1,4 +1,5 @@
 pragma ComponentBehavior: Bound
+import qs
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
@@ -139,6 +140,18 @@ Item {
             anchors.fill: parent
             color: ColorUtils.transparentize(root.blendedColors.colLayer0, 0.3)
             z: 2
+        }
+
+        // Click the card to show the existing media controls right above it
+        MouseArea {
+            anchors.fill: parent
+            z: 2
+            onClicked: {
+                const globalPos = root.mapToItem(null, root.width / 2, 0)
+                GlobalStates.mediaControlsAnchorX = globalPos.x
+                GlobalStates.mediaControlsAboveDock = true
+                GlobalStates.mediaControlsOpen = !GlobalStates.mediaControlsOpen
+            }
         }
 
         RowLayout {

@@ -4,6 +4,7 @@ import Qt5Compat.GraphicalEffects
 import Quickshell
 import Quickshell.Io
 import Qt.labs.folderlistmodel
+import qs
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
@@ -93,22 +94,12 @@ ContentPage {
                     color: Appearance.colors.colLayer2
                     clip: true
 
-                    StyledImage {
+                    LiveWallpaperPreview {
                         anchors.fill: parent
-                        sourceSize.width: isMinimal ? 600 : 420
-                        sourceSize.height: isMinimal ? 400 : 280
-                        fillMode: Image.PreserveAspectCrop
-                        source: /\.(mp4|webm|mkv|avi|mov)$/i.test(Config.options.background.wallpaperPath)
-                            ? Config.options.background.thumbnailPath
-                            : Config.options.background.wallpaperPath
-                        cache: false
-                        layer.enabled: true
-                        layer.effect: OpacityMask {
-                            maskSource: Rectangle {
-                                width: isMinimal ? 600 : 420; height: isMinimal ? 400 : 280
-                                radius: Appearance.rounding.large - 3
-                            }
-                        }
+                        source: Config.options.background.wallpaperPath
+                        thumbnail: Config.options.background.thumbnailPath
+                        radius: Appearance.rounding.large - 3
+                        active: GlobalStates.settingsOpen
                     }
 
                     ToolbarPairedFab {

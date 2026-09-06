@@ -11,7 +11,7 @@ Item {
     property string style: Config.options.background.widgets.clock.cookie.dateStyle
     property color color: Appearance.colors.colOnSecondaryContainer
     property real angleStep: 12 * Math.PI / 180
-    property string dateText: Qt.locale().toString(DateTime.clock.date, "ddd dd")
+    property string dateText: DateTime.locale.toString(DateTime.clock.date, "ddd dd")
     
     readonly property int clockSecond: DateTime.clock.seconds
     readonly property string dialStyle: Config.options.background.widgets.clock.cookie.dialNumberStyle

@@ -334,6 +334,16 @@ ContentPage {
                         }
                         enabled: Config.options.background.centeredWallpaper && WM.compositor !== "niri"
                     }
+                    ConfigSwitch {
+                        Layout.fillWidth: true
+                        buttonIcon: "swipe_vertical"
+                        text: Translation.tr("Scroll to cycle shape")
+                        checked: Config.options.background.centeredWallpaperShapeCycle
+                        onCheckedChanged: {
+                            Config.options.background.centeredWallpaperShapeCycle = checked;
+                        }
+                        enabled: Config.options.background.centeredWallpaper && WM.compositor !== "niri"
+                    }
                 }
 
                 GroupedList {
@@ -398,6 +408,7 @@ ContentPage {
 
             readonly property bool digitalPresent: stylePresent("digital")
             readonly property bool cookiePresent: stylePresent("cookie")
+            readonly property bool pixelPresent: stylePresent("pixel")
 
             GroupedList {
                 ConfigSwitch {
@@ -512,6 +523,12 @@ ContentPage {
                             onCheckedChanged: { Config.options.background.widgets.clock.digital.vertical = checked }
                         }
                         ConfigSwitch {
+                            buttonIcon: "vertical_distribute"
+                            text: Translation.tr("Vertical (lock)")
+                            checked: Config.options.background.widgets.clock.digital.verticalLocked
+                            onCheckedChanged: { Config.options.background.widgets.clock.digital.verticalLocked = checked }
+                        }
+                        ConfigSwitch {
                             buttonIcon: "date_range"
                             text: Translation.tr("Show date")
                             checked: Config.options.background.widgets.clock.digital.showDate
@@ -536,25 +553,75 @@ ContentPage {
                 }
 
                 GroupedList {
-                    ConfigSwitch {
-                        id: autoColorSwitch
-                        buttonIcon: "auto_awesome"
-                        text: Translation.tr("Automatic colors")
-                        checked: Config.options.background.widgets.clock.color === ""
-                        onCheckedChanged: {
-                            if (checked) {
-                                Config.options.background.widgets.clock.color = ""
+                    ConfigSelectionArray {
+                        text: Translation.tr("Clock color")
+                        icon: "light_mode"
+                        currentValue: Config.options.background.widgets.clock.digital.colorMode
+                        onSelected: newValue => {
+                            Config.options.background.widgets.clock.digital.colorMode = newValue;
+                        }
+                        options: [
+                            {
+                                displayName: Translation.tr("Auto"),
+                                icon: "auto_fix_high",
+                                value: "auto"
+                            },
+                            {
+                                displayName: Translation.tr("Light"),
+                                icon: "light_mode",
+                                value: "light"
+                            },
+                            {
+                                displayName: Translation.tr("Dark"),
+                                icon: "dark_mode",
+                                value: "dark"
                             }
+                        ]
+                    }
+
+                    ConfigSelectionArray {
+                        text: Translation.tr("Clock color (locked)")
+                        icon: "dark_mode"
+                        currentValue: Config.options.background.widgets.clock.digital.colorModeLocked
+                        onSelected: newValue => {
+                            Config.options.background.widgets.clock.digital.colorModeLocked = newValue;
+                        }
+                        options: [
+                            {
+                                displayName: Translation.tr("Auto"),
+                                icon: "auto_fix_high",
+                                value: "auto"
+                            },
+                            {
+                                displayName: Translation.tr("Light"),
+                                icon: "light_mode",
+                                value: "light"
+                            },
+                            {
+                                displayName: Translation.tr("Dark"),
+                                icon: "dark_mode",
+                                value: "dark"
+                            }
+                        ]
+                    }
+
+                    ColorSelectionArray {
+                        icon: "light_mode"
+                        text: Translation.tr("Light color")
+                        options: ["primary", "secondary", "tertiary", "primaryContainer", "secondaryContainer", "tertiaryContainer", "layer0Border", "adaptive"]
+                        currentValue: Config.options.background.widgets.clock.digital.colorLight
+                        onSelected: newValue => {
+                            Config.options.background.widgets.clock.digital.colorLight = newValue;
                         }
                     }
 
                     ColorSelectionArray {
-                        icon: "palette"
-                        text: Translation.tr("Color")
-                        currentValue: Config.options.background.widgets.clock.color
+                        icon: "dark_mode"
+                        text: Translation.tr("Dark color")
+                        options: ["primary", "secondary", "tertiary", "primaryContainer", "secondaryContainer", "tertiaryContainer", "layer0Border", "adaptive"]
+                        currentValue: Config.options.background.widgets.clock.digital.colorDark
                         onSelected: newValue => {
-                            Config.options.background.widgets.clock.color = newValue
-                            autoColorSwitch.checked = false
+                            Config.options.background.widgets.clock.digital.colorDark = newValue;
                         }
                     }
                 }
@@ -627,6 +694,76 @@ ContentPage {
                         to: 100
                         onValueChanged: {
                             Config.options.background.widgets.clock.digital.font.roundness = value;
+                        }
+                    }
+                }
+            }
+
+            ContentSubsection {
+                visible: settingsClock.pixelPresent
+                title: Translation.tr("Pixel clock settings")
+
+                GroupedList {
+                    ConfigSelectionArray {
+                        text: Translation.tr("Orientation")
+                        icon: "swap_vert"
+                        currentValue: Config.options.background.widgets.clock.pixel.orientation
+                        onSelected: newValue => {
+                            Config.options.background.widgets.clock.pixel.orientation = newValue;
+                        }
+                        options: [
+                            {
+                                displayName: Translation.tr("Vertical"),
+                                icon: "swap_vert",
+                                value: "vertical"
+                            },
+                            {
+                                displayName: Translation.tr("Horizontal"),
+                                icon: "swap_horiz",
+                                value: "horizontal"
+                            }
+                        ]
+                    }
+                }
+
+                ConfigRow {
+                    uniform: true
+
+                    GroupedList {
+                        ConfigSwitch {
+                            buttonIcon: "date_range"
+                            text: Translation.tr("Show date (lock screen)")
+                            checked: Config.options.background.widgets.clock.pixel.showDate
+                            onCheckedChanged: {
+                                Config.options.background.widgets.clock.pixel.showDate = checked;
+                            }
+                        }
+                    }
+
+                    GroupedList {
+                        ConfigSlider {
+                            text: Translation.tr("Size")
+                            value: Config.options.background.widgets.clock.pixel.size
+                            usePercentTooltip: true
+                            buttonIcon: "format_size"
+                            from: 0.5
+                            to: 2
+                            stopIndicatorValues: [1]
+                            onValueChanged: {
+                                Config.options.background.widgets.clock.pixel.size = value;
+                            }
+                        }
+                        ConfigSlider {
+                            text: Translation.tr("Weight")
+                            value: Config.options.background.widgets.clock.pixel.weight
+                            usePercentTooltip: false
+                            buttonIcon: "format_bold"
+                            from: 100
+                            to: 1000
+                            stopIndicatorValues: [350]
+                            onValueChanged: {
+                                Config.options.background.widgets.clock.pixel.weight = value;
+                            }
                         }
                     }
                 }
@@ -873,35 +1010,6 @@ ContentPage {
             }
             
             ContentSubsection {
-                visible: Config.options.background.widgets.clock.style === "pixel"
-                title: Translation.tr("Pixel Clock Settings")
-                GroupedList {
-                    visible: Config.options.background.widgets.clock.style === "pixel"
-                    ConfigSelectionArray {
-                        text: Translation.tr("Pixel clock orientation")
-                        visible: Config.options.background.widgets.clock.style === "pixel"
-                        icon: "screen_rotation"
-                        currentValue: Config.options.background.widgets.clock.pixel.orientation
-                        onSelected: newValue => {
-                            Config.options.background.widgets.clock.pixel.orientation = newValue;
-                        }
-                        options: [
-                            {
-                                displayName: Translation.tr("Horizontal"),
-                                icon: "swap_horiz",
-                                value: "horizontal"
-                            },
-                            {
-                                displayName: Translation.tr("Vertical"),
-                                icon: "swap_vert",
-                                value: "vertical"
-                            }
-                        ]
-                    }
-                }
-            }
-
-            ContentSubsection {
                 title: Translation.tr("Quote")
                 GroupedList {
                     ConfigSwitch {
@@ -949,30 +1057,76 @@ ContentPage {
         ContentSection {
             icon: "panorama"
             shape: MaterialShape.Shape.SoftBoom 
-            title: Translation.tr("Custom Image")
-            GroupedList {
-                ConfigSwitch {
+            title: Translation.tr("Custom Images")
+            Repeater {
+                model: Config.options.background.widgets.customImages.length
+                delegate: GroupedList {
+                    required property int index
+                    readonly property var modelData: Config.options.background.widgets.customImages[index]
                     Layout.fillWidth: true
-                    buttonIcon: "check"
-                    text: Translation.tr("Enable")
-                    checked: Config.options.background.widgets.customImage.enable
-                    onCheckedChanged: {
-                        Config.options.background.widgets.customImage.enable = checked;
+                    
+                    RowLayout {
+                        Layout.fillWidth: true
+                        MaterialSymbol {
+                            iconSize: Appearance.font.pixelSize.large
+                            text: "image"
+                            color: Appearance.colors.colOnSurfaceVariant
+                        }
+                        StyledText {
+                            text: Translation.tr("Image %1").arg(index + 1)
+                            font.pixelSize: Appearance.font.pixelSize.large
+                            Layout.fillWidth: true
+                        }
+                        RippleButtonWithIcon {
+                            materialIcon: "delete"
+                            mainText: Translation.tr("Remove")
+                            onClicked: {
+                                Config.removeCustomImage(index)
+                            }
+                        }
+                    }
+                    
+                    ConfigSwitch {
+                        Layout.fillWidth: true
+                        buttonIcon: "check"
+                        text: Translation.tr("Enable")
+                        checked: modelData.enable
+                        onCheckedChanged: {
+                            Config.updateCustomImage(index, { enable: checked });
+                        }
+                    }
+                    RippleButtonWithIcon {
+                        Layout.fillWidth: true
+                        materialIcon: "image"
+                        mainText: Translation.tr("Choose image")
+                        onClicked: {
+                            FilePicker.pickImage(path => Config.updateCustomImage(index, { path }))
+                        }
+                    }
+                    ConfigSelectionShapeArray {
+                        currentValue: modelData.shape
+                        shapeColor: Appearance.colors.colPrimary
+                        backgroundColor: Appearance.colors.colPrimaryContainer
+                        options: [
+                            "Circle", "Square", "Slanted", "Arch", "Arrow", "SemiCircle", "Oval", "Pill",
+                            "Triangle", "Diamond", "ClamShell", "Pentagon", "Gem", "Sunny", "VerySunny",
+                            "Cookie4Sided", "Cookie6Sided", "Cookie7Sided", "Cookie9Sided", "Cookie12Sided",
+                            "Ghostish", "Clover4Leaf", "Clover8Leaf", "Burst", "SoftBurst", "Flower",
+                            "Puffy", "PuffyDiamond", "PixelCircle", "Bun", "Heart"
+                        ]
+                        onSelected: newValue => {
+                            Config.updateCustomImage(index, { shape: newValue })
+                        }
                     }
                 }
-                ConfigSelectionShapeArray {
-                    currentValue: Config.options.background.widgets.customImage.shape
-                    shapeColor: Appearance.colors.colPrimary
-                    backgroundColor: Appearance.colors.colPrimaryContainer
-                    options: [
-                        "Circle", "Square", "Slanted", "Arch", "Arrow", "SemiCircle", "Oval", "Pill",
-                        "Triangle", "Diamond", "ClamShell", "Pentagon", "Gem", "Sunny", "VerySunny",
-                        "Cookie4Sided", "Cookie6Sided", "Cookie7Sided", "Cookie9Sided", "Cookie12Sided",
-                        "Ghostish", "Clover4Leaf", "Clover8Leaf", "Burst", "SoftBurst", "Flower",
-                        "Puffy", "PuffyDiamond", "PixelCircle", "Bun", "Heart"
-                    ]
-                    onSelected: newValue => {
-                        Config.options.background.widgets.customImage.shape = newValue
+            }
+            GroupedList {
+                RippleButtonWithIcon {
+                    Layout.fillWidth: true
+                    materialIcon: "add"
+                    mainText: Translation.tr("Add Image")
+                    onClicked: {
+                        Config.addCustomImage()
                     }
                 }
             }
@@ -992,7 +1146,64 @@ ContentPage {
                     configEntry: Config.options.background
                 }
             }
-            
+
+            ContentSubsection {
+                title: Translation.tr("Weather")
+                Layout.bottomMargin: 10
+
+                GroupedList {
+                    ConfigSelectionArray {
+                        text: Translation.tr("Placement strategy")
+                        icon: "move"
+                        Layout.fillWidth: false
+                        currentValue: Config.options.background.widgets.weather.placementStrategy
+                        onSelected: newValue => {
+                            Config.options.background.widgets.weather.placementStrategy = newValue;
+                        }
+                        options: [
+                            {
+                                displayName: Translation.tr("Draggable"),
+                                icon: "drag_pan",
+                                value: "free"
+                            },
+                            {
+                                displayName: Translation.tr("Least busy"),
+                                icon: "category",
+                                value: "leastBusy"
+                            },
+                            {
+                                displayName: Translation.tr("Most busy"),
+                                icon: "shapes",
+                                value: "mostBusy"
+                            },
+                        ]
+                    }
+                }
+                GroupedList {
+                    ConfigSelectionArray {
+                        text: Translation.tr("Weather style")
+                        icon: "shapes"
+                        Layout.fillWidth: false
+                        currentValue: Config.options.background.widgets.weather.style
+                        onSelected: newValue => {
+                            Config.options.background.widgets.weather.style = newValue;
+                        }
+                        options: [
+                            {
+                                displayName: Translation.tr("Card"),
+                                icon: "square",
+                                value: "card"
+                            },
+                            {
+                                displayName: Translation.tr("Pill"),
+                                icon: "padding",
+                                value: "pill"
+                            },
+                        ]
+                    }
+                }
+            }
+
             GridLayout {
                 Layout.fillWidth: true
                 columns: 3
@@ -1144,6 +1355,285 @@ ContentPage {
                         checked: Config.options.background.showSnapLines
                         onCheckedChanged: {
                             Config.options.background.showSnapLines = checked;
+                        }
+                    }
+                }
+            }
+        }
+
+        ContentSection {
+            id: visualizerSection
+            icon: "graphic_eq"
+            shape: MaterialShape.Shape.Pill
+            title: Translation.tr("Visualizer")
+            visible: Config.options.background.widgets.visualizer.enable
+
+            readonly property bool isWave: Config.options.background.widgets.visualizer.mode === "wave"
+            readonly property bool isDefault: Config.options.background.widgets.visualizer.mode === "default"
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 16
+
+                ConfigRow {
+                    Layout.fillWidth: true
+
+                    GroupedList {
+                        ConfigSelectionArray {
+                            Layout.fillWidth: false
+                            currentValue: Config.options.background.widgets.visualizer.mode
+                            onSelected: newValue => {
+                                Config.options.background.widgets.visualizer.mode = newValue;
+                            }
+                            options: [
+                                { displayName: Translation.tr("Default"), icon: "equalizer", value: "default" },
+                                { displayName: Translation.tr("Bars"), icon: "equalizer", value: "bars" },
+                                { displayName: Translation.tr("Wave"), icon: "airwave", value: "wave" }
+                            ]
+                        }
+                    }
+                }
+
+                ContentSubsection {
+                    title: Translation.tr("Visibility")
+
+                    GroupedList {
+                        ConfigSwitch {
+                            buttonIcon: "crop_free"
+                            text: Translation.tr("Hide when fullscreen/maximized")
+                            checked: Config.options.background.widgets.visualizer.hideWhenFullscreen
+                            onCheckedChanged: {
+                                Config.options.background.widgets.visualizer.hideWhenFullscreen = checked
+                                if (!checked) {
+                                    Config.options.background.widgets.visualizer.hideWhenCovered = false
+                                }
+                            }
+                        }
+                        ConfigSwitch {
+                            id: hideWhenCoveredSwitch
+                            buttonIcon: "lock"
+                            visible: Config.options.background.widgets.visualizer.hideWhenFullscreen
+                            text: Translation.tr("Also hide when covered")
+                            checked: Config.options.background.widgets.visualizer.hideWhenCovered
+                            onCheckedChanged: {
+                                Config.options.background.widgets.visualizer.hideWhenCovered = checked
+                            }
+                        }
+                    }
+
+                    // Ensure that "hide when covered" is visibly off when hide when fullscreen is turned off
+                    Binding {
+                        target: hideWhenCoveredSwitch
+                        property: "checked"
+                        value: Config.options.background.widgets.visualizer.hideWhenCovered
+                        when: !hideWhenCoveredSwitch.pressed
+                    }
+                }
+
+                ContentSubsection {
+                    visible: visualizerSection.isWave
+                    title: Translation.tr("Performance mode")
+                    tooltip: Translation.tr("Note: Auto mode requires 'power-profiles-daemon' (Arch) package")
+
+                    GroupedList {
+                        ConfigSelectionArray {
+                            currentValue: Config.options.background.widgets.visualizer.renderEveryXFrames
+                            onSelected: newValue => {
+                                Config.options.background.widgets.visualizer.renderEveryXFrames = newValue;
+                            }
+                            options: [
+                                {
+                                    displayName: Translation.tr("Auto"),
+                                    icon: "auto_fix_high",
+                                    value: -1,
+                                },
+                                {
+                                    displayName: Translation.tr("Smooth mode"),
+                                    icon: "speed",
+                                    value: 1
+                                },
+                                {
+                                    displayName: Translation.tr("Balanced mode"),
+                                    icon: "balance",
+                                    value: 2
+                                },
+                                {
+                                    displayName: Translation.tr("Efficiency mode"),
+                                    icon: "energy_savings_leaf",
+                                    value: 4
+                                }
+                            ]
+                        }
+                    }
+                }
+
+                ContentSubsection {
+                    title: Translation.tr("Behavior & Processing")
+
+                    ConfigRow {
+                        uniform: true
+                        GroupedList {
+                            ConfigSwitch {
+                                buttonIcon: "lock"
+                                text: Translation.tr("Show when locked")
+                                checked: Config.options.background.widgets.visualizer.showWhenLocked
+                                onCheckedChanged: {
+                                    Config.options.background.widgets.visualizer.showWhenLocked = checked
+                                }
+                            }
+                        }
+                        GroupedList {
+                            ConfigSwitch {
+                                buttonIcon: "flip"
+                                text: Translation.tr("Mono / Mirrored")
+                                checked: Config.options.background.widgets.visualizer.mono
+                                onCheckedChanged: {
+                                    Config.options.background.widgets.visualizer.mono = checked
+                                }
+                            }
+                        }
+                    }
+
+                    GroupedList {
+                        ConfigSlider {
+                            buttonIcon: "waves"
+                            text: Translation.tr("Data Averaging")
+                            value: (Config.options.background.widgets.visualizer.dataSmoothing ?? 0.5) * 100
+                            from: 0; to: 100
+                            stopIndicatorValues: [50]
+                            onValueChanged: {
+                                Config.options.background.widgets.visualizer.dataSmoothing = value / 100
+                            }
+                        }
+                    }
+                }
+
+                ContentSubsection {
+                    title: Translation.tr("Sizing & Resolution")
+
+                    ConfigRow {
+                        uniform: true
+                        GroupedList {
+                            ConfigSpinBox {
+                                icon: "height"
+                                text: Translation.tr("Max Height")
+                                value: Config.options.background.widgets.visualizer.height
+                                from: 60; to: 1080; stepSize: 10
+                                onValueChanged: {
+                                    Config.options.background.widgets.visualizer.height = value
+                                }
+                            }
+                        }
+                        GroupedList {
+                            visible: !visualizerSection.isDefault
+                            ConfigSpinBox {
+                                icon: "view_column"
+                                text: visualizerSection.isWave ? Translation.tr("Point Width") : Translation.tr("Bar Width")
+                                value: Config.options.background.widgets.visualizer.targetBarWidth
+                                from: 1; to: 200
+                                onValueChanged: {
+                                    Config.options.background.widgets.visualizer.targetBarWidth = value
+                                }
+                            }
+                        }
+                    }
+
+                    ConfigRow {
+                        uniform: true
+                        GroupedList {
+                            visible: !visualizerSection.isDefault
+                            ConfigSpinBox {
+                                icon: "space_bar"
+                                text: visualizerSection.isWave ? Translation.tr("Point Gap") : Translation.tr("Bar Gap")
+                                value: Config.options.background.widgets.visualizer.barSpacing
+                                from: 0; to: 100
+                                onValueChanged: {
+                                    Config.options.background.widgets.visualizer.barSpacing = value
+                                }
+                            }
+                        }
+                        GroupedList {
+                            visible: !visualizerSection.isDefault
+                            ConfigSpinBox {
+                                icon: "line_weight"
+                                text: visualizerSection.isWave ? Translation.tr("Line Thickness") : Translation.tr("Border Width")
+                                value: Config.options.background.widgets.visualizer.waveBorderWidth
+                                from: 0; to: 20
+                                onValueChanged: {
+                                    Config.options.background.widgets.visualizer.waveBorderWidth = value
+                                }
+                            }
+                        }
+                    }
+                }
+
+                ContentSubsection {
+                    title: Translation.tr("Appearance")
+
+                    ConfigRow {
+                        uniform: true
+                        GroupedList {
+                            ConfigSlider {
+                                buttonIcon: "opacity"
+                                text: Translation.tr("Master Opacity")
+                                value: Config.options.background.widgets.visualizer.opacity * 100
+                                from: 0; to: 100
+                                stopIndicatorValues: [50]
+                                onValueChanged: {
+                                    Config.options.background.widgets.visualizer.opacity = value / 100
+                                }
+                            }
+                        }
+                        GroupedList {
+                            ConfigSlider {
+                                buttonIcon: "speed"
+                                text: Translation.tr("Smoothing")
+                                value: Config.options.background.widgets.visualizer.smoothing * 100
+                                from: 0; to: 20
+                                stopIndicatorValues: [5]
+                                onValueChanged: {
+                                    Config.options.background.widgets.visualizer.smoothing = value / 100
+                                }
+                            }
+                        }
+                    }
+                    GroupedList {
+                        visible: visualizerSection.isWave
+                        ConfigSlider {
+                            buttonIcon: "format_color_fill"
+                            text: Translation.tr("Fill Opacity")
+                            value: Config.options.background.widgets.visualizer.waveFillOpacity * 100
+                            from: 0; to: 100
+                            stopIndicatorValues: [50]
+                            onValueChanged: {
+                                Config.options.background.widgets.visualizer.waveFillOpacity = value / 100
+                            }
+                        }
+                    }
+                    GroupedList {
+                        visible: !visualizerSection.isWave && !visualizerSection.isDefault
+                        ConfigSlider {
+                            buttonIcon: "format_color_reset"
+                            text: Translation.tr("Border Opacity")
+                            value: Config.options.background.widgets.visualizer.waveFillOpacity * 100
+                            from: 0; to: 100
+                            stopIndicatorValues: [50]
+                            onValueChanged: {
+                                Config.options.background.widgets.visualizer.waveFillOpacity = value / 100
+                            }
+                        }
+                    }
+                    GroupedList {
+                        visible: !visualizerSection.isWave && !visualizerSection.isDefault
+                        ConfigSlider {
+                            buttonIcon: "rounded_corner"
+                            text: Translation.tr("Bar Roundness")
+                            value: Config.options.background.widgets.visualizer.barRounding * 100
+                            from: 0; to: 50
+                            stopIndicatorValues: [25]
+                            onValueChanged: {
+                                Config.options.background.widgets.visualizer.barRounding = value / 100
+                            }
                         }
                     }
                 }

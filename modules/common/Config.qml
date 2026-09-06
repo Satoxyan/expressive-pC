@@ -13,6 +13,30 @@ Singleton {
     property int readWriteDelay: 50 // milliseconds
     property bool blockWrites: false
 
+    // customImages must be replaced wholesale on mutation: nested edits on plain
+    // objects inside list<var> don't notify or persist, so widgets would reset
+    // to default positions whenever the array gets reassigned from a file reload.
+    function updateCustomImage(index, props) {
+        const w = root.options.background.widgets;
+        w.customImages = w.customImages.map((e, i) => i === index ? Object.assign({}, e, props) : e);
+    }
+    function addCustomImage() {
+        const w = root.options.background.widgets;
+        w.customImages = [...w.customImages, { enable: true, placementStrategy: "free", x: 400, y: 100, path: "", shape: "Cookie4Sided", size: 200 }];
+    }
+    function removeCustomImage(index) {
+        const w = root.options.background.widgets;
+        w.customImages = w.customImages.filter((_, i) => i !== index);
+    }
+    // Persists without replacing the array, so Repeaters don't rebuild (blink)
+    // mid-interaction. Use only for values whose UI already reflects the change.
+    function saveCustomImageProps(index, props) {
+        const arr = root.options.background.widgets.customImages;
+        if (!arr[index]) return;
+        Object.assign(arr[index], props);
+        fileWriteTimer.restart();
+    }
+
     function setNestedValue(nestedKey, value) {
         let keys = nestedKey.split(".");
         let obj = root.options;
@@ -235,9 +259,9 @@ Singleton {
                         property string placementStrategy: "leastBusy" // "free", "leastBusy", "mostBusy"
                         property real x: 100
                         property real y: 100
-                        property string style: "cookie"        // Options: "cookie", "digital"
+                        property string style: "cookie"        // Options: "cookie", "digital", "pixel"
                         property string color: ""
-                        property string styleLocked: "cookie"  // Options: "cookie", "digital"
+                        property string styleLocked: "cookie"  // Options: "cookie", "digital", "pixel"
                         property JsonObject cookie: JsonObject {
                             property bool aiStyling: false
                             property int sides: 14
@@ -257,6 +281,11 @@ Singleton {
                             property bool showDate: true
                             property bool animateChange: true
                             property bool vertical: false
+                            property bool verticalLocked: false
+                            property string colorMode: "auto"           // Options: "auto", "light", "dark"
+                            property string colorModeLocked: "auto"     // Options: "auto", "light", "dark"
+                            property string colorLight: "primary"       // Palette key used when colorMode == "light"
+                            property string colorDark: "adaptive"       // Palette key used when colorMode == "dark"
                             property JsonObject font: JsonObject {
                                 property string family: "Google Sans Flex"
                                 property real weight: 350
@@ -267,6 +296,9 @@ Singleton {
                         }
                         property JsonObject pixel: JsonObject {
                             property string orientation: "vertical"
+                            property real size: 1
+                            property real weight: 350
+                            property bool showDate: true
                         }
                         property JsonObject quote: JsonObject {
                             property bool enable: false
@@ -280,6 +312,7 @@ Singleton {
                         property real x: 400
                         property real y: 100
                         property string sizeMode: "1x3"
+                        property string style: "card"  // "card", "pill"
                         property bool expanded: false
                     }
 
@@ -334,17 +367,26 @@ Singleton {
                         property string placementStrategy: "free"
                         property real x: 0
                         property real y: 0
+                        property bool showWhenLocked: false
+                        property bool hideWhenCovered: true
+                        property bool hideWhenFullscreen: true
+                        property int height: 600 // in pixels
+                        property real barRounding: 0.5
+                        property real smoothing: 0.05
+                        property real opacity: 1
+                        property real barSpacing: 10 // in pixels
+                        property int targetBarWidth: 50 // in pixels, rough target
+                        property bool mono: true
+                        property string mode: "bars" // "bars" or "wave"
+                        property real waveFillOpacity: 0.5
+                        property real dataSmoothing: 0.5
+                        property int waveBorderWidth: 3    // 0 = no border
+                        property int renderEveryXFrames: -1  // -1 = auto (System), 1 = every frame, 2 = every other frame, etc. Only for "wave" mode
                     }
 
-                    property JsonObject customImage: JsonObject {
-                        property bool enable: false
-                        property string placementStrategy: "free"
-                        property real x: 400
-                        property real y: 100
-                        property string path: ""
-                        property string shape: "Cookie4Sided"
-                        property real size: 200
-                    }
+                    property list<var> customImages: [
+                        { enable: false, placementStrategy: "free", x: 400, y: 100, path: "", shape: "Cookie4Sided", size: 200 }
+                    ]
 
                     property JsonObject resources: JsonObject {
                         property bool enable: false
@@ -381,6 +423,7 @@ Singleton {
                 property int centeredWallpaperSize: 400
                 property string centeredWallpaperColor: "primaryContainer"
                 property bool centeredWallpaperOnlyWhenLocked: false
+                property bool centeredWallpaperShapeCycle: true // scroll on centered wallpaper cycles its shape
                 property string wallpaperAnimation: "magic"
                 property bool enableWallpaperPreview: false
                 property string thumbnailPath: ""
@@ -524,6 +567,7 @@ Singleton {
                 property list<string> pinnedApps: [ // IDs of pinned entries
                     "org.kde.dolphin", "kitty",]
                 property list<string> ignoredAppRegexes: []
+                property int launchAnimation: 1 // 0=None 1=Bounce 2=Pulse 3=Pop 4=Wobble
             }
 
             property JsonObject interactions: JsonObject {
@@ -573,10 +617,13 @@ Singleton {
                     property bool enable: true
                     property real radius: 100
                     property real extraZoom: 1.1
-                    property int size: 20
                 }
                 property bool centerClock: true
                 property bool showLockedText: true
+                property JsonObject dim: JsonObject {
+                    property bool enable: false
+                    property real strength: 20
+                }
                 property JsonObject security: JsonObject {
                     property bool unlockKeyring: true
                     property bool requirePasswordToPower: false
@@ -587,6 +634,10 @@ Singleton {
             property JsonObject media: JsonObject {
                 // Attempt to remove dupes (the aggregator playerctl one and browsers' native ones when there's plasma browser integration)
                 property bool filterDuplicatePlayers: true
+            }
+
+            property JsonObject lyrics: JsonObject {
+                property string providers: "musixmatch,youlyplus,paxsenix,betterlyric,simpmusic,lrclib,kugou" // Comma-separated priority order
             }
 
             property JsonObject networking: JsonObject {
@@ -697,6 +748,7 @@ Singleton {
                 property bool mediaPlayer: false
                 property string bannerImage: ""
                 property bool keepRightSidebarLoaded: true
+                property list<string> panelOrder: ["quickToggles", "sliders", "media"]
                 property JsonObject translator: JsonObject {
                     property bool enable: false
                     property int delay: 300 // Delay before sending request. Reduces (potential) rate limits and lag.
@@ -719,6 +771,18 @@ Singleton {
                     property int limit: 20
                     property JsonObject zerochan: JsonObject {
                         property string username: "[unset]"
+                    }
+                    property JsonObject gelbooru: JsonObject {
+                        property string userId: ""
+                        property string apiKey: ""
+                    }
+                    property JsonObject rule34: JsonObject {
+                        property string userId: ""
+                        property string apiKey: ""
+                    }
+                    property JsonObject danbooru: JsonObject {
+                        property string login: ""
+                        property string apiKey: ""
                     }
                 }
                 property JsonObject cornerOpen: JsonObject {
@@ -810,6 +874,14 @@ Singleton {
                 property int columns: 4
                 property bool closeAfterSelection: true
                 property int changeInterval: 0 
+                property string wallhavenApiKey: "" // fallback; keyring ("/wallhaven <key>") takes precedence
+                property string wallhavenCategories: "111"
+                property string wallhavenPurity: "100"
+                property string wallhavenSorting: "relevance"
+                property string wallhavenOrder: "desc"
+                property string wallhavenRatios: ""
+                property string wallhavenColors: ""
+                property string wallhavenQuery: ""
             }
 
             property JsonObject windows: JsonObject {

@@ -25,6 +25,7 @@ Singleton {
         rescaleSize: 10
     }
     property real wallpaperVibrancy: (wallColorQuant.colors[0]?.hslSaturation + wallColorQuant.colors[0]?.hslLightness) / 2
+    readonly property bool wallpaperIsDark: (wallColorQuant.colors?.length ?? 0) > 0 && wallColorQuant.colors[0].hslLightness < 0.5
     property real autoBackgroundTransparency: { // y = 0.5768x^2 - 0.759x + 0.2896
         let x = wallpaperVibrancy
         let y = 0.5768 * (x * x) - 0.759 * (x) + 0.2896
@@ -126,6 +127,7 @@ Singleton {
 
     colors: QtObject {
         property color colSubtext: m3colors.m3outline
+        property color colAdaptive: ColorUtils.colorWithLightness(m3colors.m3primary, m3colors.m3primary.hslLightness < 0.5 ? 0.8 : 0.12)
         // Layer 0
         property color colLayer0Base: ColorUtils.mix(m3colors.m3background, m3colors.m3primary, Config.options.appearance.extraBackgroundTint ? 0.99 : 1)
         property color colLayer0: ColorUtils.transparentize(colLayer0Base, root.backgroundTransparency)

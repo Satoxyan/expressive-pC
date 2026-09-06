@@ -50,10 +50,12 @@ Singleton {
             root.recognizedTrack = {
                 title: obj.track.title,
                 subtitle: obj.track.subtitle,
-                url: obj.track.url
+                url: obj.track.url || obj.track?.share?.url || ""
             }
+            console.log("[SongRec] recognized:", JSON.stringify(root.recognizedTrack))
             musicReconizedProc.running = true
         } catch(e) {
+            console.log("[SongRec] parse failed:", e)
             Quickshell.execDetached(["notify-send", Translation.tr("Couldn't recognize music"), Translation.tr("Perhaps what you're listening to is too niche"), "-a", "Shell"])
         }
     }
@@ -72,8 +74,11 @@ Singleton {
             }
         }
         onExited: (exitCode, exitStatus) => {
+            console.log("[SongRec] recognize process exited:", exitCode, exitStatus)
             if (exitCode === 1) {
                 Quickshell.execDetached(["notify-send", Translation.tr("Couldn't recognize music"), Translation.tr("Make sure you have songrec installed"), "-a", "Shell"])
+            } else if (exitCode === 2) {
+                Quickshell.execDetached(["notify-send", Translation.tr("Couldn't recognize music"), Translation.tr("No matching audio device found"), "-a", "Shell"])
             }
         }
     }

@@ -98,9 +98,7 @@ AbstractBackgroundWidget {
     }
 
     component AvatarImage: Image {
-        source: Config.options.profile.avatarPath !== ""
-            ? "file://" + Config.options.profile.avatarPicture
-            : "file:///home/" + (Quickshell.env("USER") ?? "user") + "/.face"
+        source: Avatar.effectiveAvatarSource
         sourceSize.width: width * 2
         sourceSize.height: height * 2
         fillMode: Image.PreserveAspectCrop
@@ -467,9 +465,7 @@ AbstractBackgroundWidget {
                         id: avatarImage
                         anchors.fill: parent
                         anchors.margins: 3
-                        source: Config.options.profile.avatarPath !== ""
-                            ? "file://" + Config.options.profile.avatarPicture
-                            : "file:///home/" + (Quickshell.env("USER") ?? "user") + "/.face"
+                        source: Avatar.effectiveAvatarSource
                         sourceSize.width: avatarImage.width * 2
                         sourceSize.height: avatarImage.height * 2
                         fillMode: Image.PreserveAspectCrop
@@ -497,16 +493,20 @@ AbstractBackgroundWidget {
                 }
 
                 ColumnLayout {
+                    id: infoColumn
                     x: avatarRect.x + avatarRect.width + 13
                     y: avatarRect.y + (avatarRect.height - implicitHeight) / 2 + 20
+                    width: (contentBox.x + contentBox.width) - infoColumn.x - 8
                     spacing: 0
                     z: 2
 
                     StyledText {
+                        Layout.fillWidth: true
                         text: root.userDisplay
                         font.pixelSize: Appearance.font.pixelSize.small
                         font.weight: Font.DemiBold
                         color: Appearance.colors.colOnLayer1
+                        elide: Text.ElideRight
                     }
                     StyledText {
                         text: "Up • " + DateTime.uptime

@@ -20,10 +20,19 @@ Scope {
 
     property var focusedScreen: Quickshell.screens.find(s => s.name === root.focusedScreenName)
         ?? Quickshell.screens[0]
+    property bool sessionVisible: false
+
+    Connections {
+        target: GlobalStates
+        function onSessionOpenChanged() {
+            if (GlobalStates.sessionOpen)
+                root.sessionVisible = true;
+        }
+    }
 
     Loader {
         id: sessionLoader
-        active: GlobalStates.sessionOpen
+        active: root.sessionVisible
         onActiveChanged: {
             if (sessionLoader.active)
                 SessionWarnings.refresh();
@@ -52,7 +61,7 @@ Scope {
             WlrLayershell.namespace: "quickshell:session"
             WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-            color: ColorUtils.transparentize(Appearance.m3colors.m3background, Appearance.m3colors.darkmode ? 0.05 : 0.12)
+            color: "transparent"
 
             anchors {
                 top: true
@@ -62,6 +71,35 @@ Scope {
 
             implicitWidth: root.focusedScreen?.width ?? 0
             implicitHeight: root.focusedScreen?.height ?? 0
+
+            Rectangle {
+                // Backdrop: fades in (Hyprland blurs this surface via layerrule,
+                // and the blur follows the surface alpha, so it fades in too)
+                id: sessionBackdrop
+                anchors.fill: parent
+                color: ColorUtils.transparentize(Appearance.m3colors.m3background, Appearance.m3colors.darkmode ? 0.05 : 0.12)
+                opacity: 0
+                Component.onCompleted: sessionBackdrop.opacity = 1
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: Appearance.animationCurves.expressiveEffectsDuration
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: Appearance.animationCurves.expressiveEffects
+                    }
+                }
+            }
+
+            Connections {
+                target: GlobalStates
+                function onSessionOpenChanged() {
+                    if (GlobalStates.sessionOpen) {
+                        sessionBackdrop.opacity = 1;
+                        sessionOpenAnim.restart();
+                    } else {
+                        sessionCloseAnim.restart();
+                    }
+                }
+            }
 
             MouseArea {
                 id: sessionMouseArea
@@ -75,6 +113,63 @@ Scope {
                 id: contentColumn
                 anchors.centerIn: parent
                 spacing: 15
+                opacity: 0
+                scale: 0.85
+                transformOrigin: Item.Center
+
+                Component.onCompleted: sessionOpenAnim.restart()
+
+                ParallelAnimation {
+                    id: sessionOpenAnim
+                    NumberAnimation {
+                        target: contentColumn
+                        property: "opacity"
+                        to: 1
+                        duration: Appearance.animationCurves.expressiveEffectsDuration
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: Appearance.animationCurves.expressiveEffects
+                    }
+                    NumberAnimation {
+                        target: contentColumn
+                        property: "scale"
+                        to: 1
+                        duration: Appearance.animationCurves.expressiveDefaultSpatialDuration
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial
+                    }
+                }
+
+                ParallelAnimation {
+                    id: sessionCloseAnim
+                    NumberAnimation {
+                        target: contentColumn
+                        property: "opacity"
+                        to: 0
+                        duration: Appearance.animationCurves.expressiveEffectsDuration
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: Appearance.animationCurves.expressiveEffects
+                    }
+                    NumberAnimation {
+                        target: contentColumn
+                        property: "scale"
+                        to: 0.9
+                        duration: Appearance.animationCurves.expressiveEffectsDuration
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: Appearance.animationCurves.expressiveEffects
+                    }
+                    NumberAnimation {
+                        target: sessionBackdrop
+                        property: "opacity"
+                        to: 0
+                        duration: Appearance.animationCurves.expressiveEffectsDuration
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: Appearance.animationCurves.expressiveEffects
+                    }
+                    onFinished: {
+                        if (!GlobalStates.sessionOpen)
+                            root.sessionVisible = false
+                    }
+                }
 
                 Keys.onPressed: event => {
                     if (event.key === Qt.Key_Escape) {

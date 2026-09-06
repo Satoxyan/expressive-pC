@@ -156,12 +156,14 @@ GroupButton {
         id: editModeInteraction
         visible: root.editMode && !root.isUnused
         anchors.fill: parent
+        z: 1
 
         property bool isDragging: false
 
         DragHandler {
             id: dragHandler
             target: null
+            acceptedButtons: Qt.LeftButton
 
             function getAllSiblings() {
                 const siblings = [];

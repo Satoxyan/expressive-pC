@@ -22,8 +22,9 @@ Singleton {
     property url defaultFolder: Qt.resolvedUrl(`${Directories.pictures}/Wallpapers`)
     property alias folderModel: folderModel // Expose for direct binding when needed
     property string searchQuery: ""
-    readonly property list<string> extensions: [ // TODO: add videos
-        "jpg", "jpeg", "png", "webp", "avif", "bmp", "svg"
+    readonly property list<string> extensions: [
+        "jpg", "jpeg", "png", "webp", "avif", "bmp", "svg",
+        "mp4", "webm", "mkv", "avi", "mov"
     ]
     property list<string> wallpapers: [] // List of absolute file paths (without file://)
     readonly property bool thumbnailGenerationRunning: thumbgenProc.running
@@ -177,6 +178,8 @@ Singleton {
     function generateThumbnail(size: string) {
         if (!["normal", "large", "x-large", "xx-large"].includes(size)) throw new Error("Invalid thumbnail size");
         thumbgenProc.directory = root.directory
+        videoThumbGen.size = size
+        videoThumbGen.directory = root.directory
         thumbgenProc.running = false
         thumbgenProc.command = [
             "bash", "-c",
@@ -185,6 +188,21 @@ Singleton {
         // console.log("[Wallpapers] Updating thumbnails with command ", thumbgenProc.command.join(" "))
         root.thumbnailGenerationProgress = 0
         thumbgenProc.running = true
+    }
+    // ponytail: video thumbnails via ffmpeg (thumbgen.py ignores video if no thumbnailer)
+    Process {
+        id: videoThumbGen
+        property string directory
+        property string size
+        stdout: SplitParser {
+            onRead: data => {
+                let m = data.match(/FILE (.+)/)
+                if (m) root.thumbnailGeneratedFile(m[1].trim())
+                let p = data.match(/PROGRESS (\d+)\/(\d+)/)
+                if (p) root.thumbnailGenerationProgress = parseInt(p[1]) / parseInt(p[2])
+            }
+        }
+        onExited: root.thumbnailGenerated(directory)
     }
     Process {
         id: thumbgenProc
@@ -206,8 +224,21 @@ Singleton {
             }
         }
         onExited: (exitCode, exitStatus) => {
-            // print("[Wallpapers] Thumbnail generation completed with exit code", exitCode)
-            root.thumbnailGenerated(thumbgenProc.directory)
+            // after image thumbgen, also generate video thumbs for this size
+            const dir = FileUtils.trimFileProtocol(thumbgenProc.directory)
+            const sz = videoThumbGen.size || "normal"
+            // keep progress at 0.5 during video phase
+            videoThumbGen.directory = thumbgenProc.directory
+            videoThumbGen.size = sz
+            // build ffmpeg loop for videos
+            const cacheBase = FileUtils.trimFileProtocol(Directories.genericCache)
+            const maxMap = { "normal":128, "large":256, "x-large":512, "xx-large":1024 }
+            const maxSize = maxMap[sz] || 256
+            videoThumbGen.command = [
+                "bash", "-c",
+                `shopt -s nullglob; c=0; total=$(ls -1 "${dir}"/*.{mp4,webm,mkv,avi,mov,MP4,WEBM,MKV,AVI,MOV} 2>/dev/null | wc -l); [ "$total" -eq 0 ] && { echo "PROGRESS 1/1"; exit 0; }; for f in "${dir}"/*.{mp4,webm,mkv,avi,mov,MP4,WEBM,MKV,AVI,MOV}; do [ -f "$f" ] || continue; enc=$(python3 -c "import urllib.parse,sys; p=sys.argv[1]; print('/'.join(urllib.parse.quote(part,safe='') for part in p.split('/')))" "$f"); h=$(echo -n "file://$enc" | md5sum | cut -d' ' -f1); thumb="${cacheBase}/thumbnails/${sz}/$h.png"; [ -f "$thumb" ] && { c=$((c+1)); echo "PROGRESS $c/$total"; continue; }; mkdir -p "$(dirname "$thumb")"; ffmpeg -y -ss 0 -i "$f" -frames:v 1 -vf scale=${maxSize}:-1 -q:v 2 -update 1 "$thumb" 2>/dev/null && { c=$((c+1)); echo "FILE $f"; echo "PROGRESS $c/$total"; } || { c=$((c+1)); echo "PROGRESS $c/$total"; }; done`
+            ]
+            videoThumbGen.running = true
         }
     }
 
