@@ -77,9 +77,10 @@ Scope {
         return filtered;
     }
 
-    Process {
+     Process {
         id: cavaProc
         running: (GlobalStates.mediaControlsOpen ||
+            GlobalStates.lockMediaOpen ||
             GlobalStates.sidebarRightOpen ||
             (GlobalStates.sidebarLeftOpen && !GlobalStates.mediaLyricsVisible) ||
             GlobalStates.equalizerOpen ||
@@ -128,6 +129,11 @@ Scope {
             }
             margins {
                 top: {
+                    if (GlobalStates.mediaControlsAboveDock && !root.barVertical) {
+                        const dockHeight = (Config.options?.dock.height ?? 70)
+                            + Appearance.sizes.elevationMargin + Appearance.sizes.hyprlandGapsOut
+                        return panelWindow.screen.height - dockHeight - playerColumnLayout.implicitHeight
+                    }
                     if (root.barEdge === "top") return root.barThickness + (root.cornerStyleReducesGap ? -root.gap -6 : root.gap)
                     if (root.barEdge === "bottom") return panelWindow.screen.height - root.barThickness - (root.cornerStyleReducesGap ? -root.gap : root.gap) - playerColumnLayout.implicitHeight
                     if (root.mediaPosition === "left") return 0
@@ -135,6 +141,11 @@ Scope {
                     return (panelWindow.screen.height - playerColumnLayout.implicitHeight) / 2
                 }
                 left: {
+                    if (GlobalStates.mediaControlsAboveDock && !root.barVertical) {
+                        return Math.max(root.gap, Math.min(
+                            GlobalStates.mediaControlsAnchorX - root.widgetWidth / 2,
+                            panelWindow.screen.width - root.widgetWidth - root.gap))
+                    }
                     if (root.barEdge === "left") return root.barThickness + (root.cornerStyleReducesGap ? -root.gap : root.gap)
                     if (root.barEdge === "right") return panelWindow.screen.width - root.barThickness - (root.cornerStyleReducesGap ? -root.gap : root.gap) - root.widgetWidth
                     if (root.mediaPosition === "left") return 0
@@ -234,16 +245,19 @@ Scope {
         target: "mediaControls"
 
         function toggle(): void {
+            GlobalStates.mediaControlsAboveDock = false;
             mediaControlsLoader.active = !mediaControlsLoader.active;
             if (mediaControlsLoader.active)
                 Notifications.timeoutAll();
         }
 
         function close(): void {
+            GlobalStates.mediaControlsAboveDock = false;
             mediaControlsLoader.active = false;
         }
 
         function open(): void {
+            GlobalStates.mediaControlsAboveDock = false;
             mediaControlsLoader.active = true;
             Notifications.timeoutAll();
         }
@@ -254,6 +268,7 @@ Scope {
         description: "Toggles media controls on press"
 
         onPressed: {
+            GlobalStates.mediaControlsAboveDock = false;
             GlobalStates.mediaControlsOpen = !GlobalStates.mediaControlsOpen;
         }
     }
@@ -262,6 +277,7 @@ Scope {
         description: "Opens media controls on press"
 
         onPressed: {
+            GlobalStates.mediaControlsAboveDock = false;
             GlobalStates.mediaControlsOpen = true;
         }
     }
@@ -270,6 +286,7 @@ Scope {
         description: "Closes media controls on press"
 
         onPressed: {
+            GlobalStates.mediaControlsAboveDock = false;
             GlobalStates.mediaControlsOpen = false;
         }
     }

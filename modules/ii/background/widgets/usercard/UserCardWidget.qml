@@ -507,7 +507,6 @@ AbstractBackgroundWidget {
                     id: infoColumn
                     x: avatarRect.x + avatarRect.width + 13
                     y: avatarRect.y + (avatarRect.height - implicitHeight) / 2 + 20
-                    width: (contentBox.x + contentBox.width) - infoColumn.x - 8
                     spacing: 0
                     z: 2
                     width: outerRect.width - x - root.blurMargin

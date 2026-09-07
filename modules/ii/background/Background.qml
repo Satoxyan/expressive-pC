@@ -873,7 +873,6 @@ Variants {
                             imageSize:          imgEntry?.size ?? 200
                         }
                     }
-                }                    }
                 }
                 FadeLoader {
                     shown: Config.options.background.widgets.calendar.enable
