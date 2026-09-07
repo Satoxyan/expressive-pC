@@ -12,6 +12,7 @@ Singleton {
     signal requestBluetoothDialog()
     property bool barOpen: true
     property bool crosshairOpen: false
+    property bool equalizerOpen: false
     property bool sidebarLeftOpen: false
     property bool sidebarRightOpen: false
     property bool mediaControlsOpen: false

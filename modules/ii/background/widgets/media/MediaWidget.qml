@@ -148,6 +148,17 @@ AbstractBackgroundWidget {
             NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
         }
 
+        FastBlurred {
+            anchors.fill: parent
+            blurSource: root.wallpaperItem
+            cardRadius: card.radius
+            tint: Appearance.colors.colLayer1
+            tintOpacity: 0.55
+            trackX: root.x  
+            trackY: root.y
+            visible: Config.options.background.widgets.blurWidgets 
+        }
+
         Loader {
             anchors.fill: parent
             sourceComponent: {
