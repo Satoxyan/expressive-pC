@@ -410,7 +410,6 @@ MouseArea {
                         anchors.fill: parent
                         sourceComponent: root.source === "local" ? localGridComponent
                             : root.source === "wallhaven" ? wallhavenGridComponent
-                            : root.source === "wallpaperEngine" ? wallpaperEngineGridComponent
                             : onlineGridComponent
                     }
 
@@ -433,15 +432,6 @@ MouseArea {
                                 if (Config.options.wallpaperSelector.closeAfterSelection)
                                     GlobalStates.wallpaperSelectorOpen = false;
                             }
-                        }
-                    }
-
-                    Component {
-                        id: wallpaperEngineGridComponent
-                        WallpaperEngineGrid {
-                            columns: root.columns
-                            previewCellAspectRatio: root.previewCellAspectRatio
-                            onProjectSelected: project => WallpaperEngine.selectEntry(project)
                         }
                     }
 
@@ -552,7 +542,7 @@ MouseArea {
                         }
 
                         Loader {
-                            active: root.source !== "local" && root.source !== "wallhaven" && root.source !== "wallpaperEngine"
+                            active: root.source !== "local" && root.source !== "wallhaven"
                             visible: active
                             sourceComponent: Toolbar {
                                 ToolbarTextField {
