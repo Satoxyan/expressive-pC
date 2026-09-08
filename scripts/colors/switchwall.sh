@@ -106,28 +106,14 @@ CUSTOM_DIR="$XDG_CONFIG_HOME/hypr/custom"
 RESTORE_SCRIPT_DIR="$CUSTOM_DIR/scripts"
 RESTORE_SCRIPT="$RESTORE_SCRIPT_DIR/__restore_video_wallpaper.sh"
 THUMBNAIL_DIR="$RESTORE_SCRIPT_DIR/mpvpaper_thumbnails"
-# ponytail: base opts keep native fps (video-sync display-resample + interpolation=no = max video fps, no cap)
-VIDEO_OPTS_BASE="no-audio loop hwdec=auto scale=bilinear interpolation=no video-sync=display-resample panscan=1.0 video-scale-x=1.0 video-scale-y=1.0 video-align-x=0.5 video-align-y=0.5 load-scripts=no"
+# ponytail: no video-sync=display-resample (stutter on 144Hz with interpolation=no)
+# hwdec=vaapi for Intel direct decode (zero copy on Wayland), gpu-context=waylandvk for direct scanout
+VIDEO_OPTS_BASE="no-audio loop hwdec=vaapi gpu-api=vulkan gpu-context=waylandvk scale=bilinear panscan=1.0 video-scale-x=1.0 video-scale-y=1.0 video-align-x=0.5 video-align-y=0.5 load-scripts=no"
 
 get_gpu_prefix() {
-    # dedicated first: nvidia > amd discrete > intel arc > integrated fallback
-    if lspci 2>/dev/null | grep -qi "nvidia"; then
-        if lspci 2>/dev/null | grep -qi "intel.*graphics"; then
-            echo "__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia"
-            return
-        fi
-        echo ""
-        return
-    fi
-    if lspci 2>/dev/null | grep -qi "Arc"; then
-        if [ "$(ls /dev/dri/renderD* 2>/dev/null | wc -l)" -gt 1 ]; then echo "DRI_PRIME=1"; else echo ""; fi
-        return
-    fi
-    # AMD discrete Navi/RX
-    if lspci 2>/dev/null | grep -qi "AMD" && lspci 2>/dev/null | grep -qiE "Navi|RX [0-9]|Radeon.*RX"; then
-        if [ "$(ls /dev/dri/renderD* 2>/dev/null | wc -l)" -gt 1 ]; then echo "DRI_PRIME=1"; else echo ""; fi
-        return
-    fi
+    # ponytail: NO PRIME overrides — Wayland compositor runs on Intel (display GPU).
+    # NVIDIA PRIME offload causes VRAM→RAM→VRAM buffer copy = stutter.
+    # Intel VA-API decode is direct to display, zero copy.
     echo ""
 }
 
@@ -144,14 +130,9 @@ get_video_fps() {
 build_video_opts() {
     local video="$1"
     local opts="$VIDEO_OPTS_BASE"
-    # ensure max fps = native fps: keep display-resample + no interpolation (no fps cap)
-    # probe fps for logging only, mpv uses native fps automatically
+    # ponytail: hwdec=auto-safe handles nvidia/amd/intel automatically, no manual override needed
     local fps=$(get_video_fps "$video")
     if [ -n "$fps" ]; then echo "[switchwall] video fps: $fps (native max)" >&2; fi
-    # prefer dedicated hwdec if available
-    if lspci 2>/dev/null | grep -qi "nvidia"; then
-        opts="${opts/hwdec=auto/hwdec=nvdec}"
-    fi
     echo "$opts"
 }
 
