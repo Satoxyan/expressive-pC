@@ -104,7 +104,7 @@ Item {
                 Layout.fillHeight: true
                 Layout.margins: 0
                 implicitWidth: navRail.expanded ? 195 : fab.baseSize
-                color: isMinimal ? "transparent" : Appearance.m3colors.m3surfaceContainerLow
+                color: isMinimal ? "transparent" : Appearance.colors.colLayer1
                 radius: Appearance.rounding.normal
 
                 Behavior on implicitWidth {

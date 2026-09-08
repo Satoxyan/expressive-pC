@@ -10,8 +10,13 @@
 # Usage:
 #   equalizer.sh <state_dir> get
 #   equalizer.sh <state_dir> set_band <1-10> <gainDb>
+#   equalizer.sh <state_dir> set_preamp <gainDb>   (master gain, independent of the curve/preset)
 #   equalizer.sh <state_dir> apply
 #   equalizer.sh <state_dir> preset <Flat|Bass|Treble|Vocal|Pop|Rock|Jazz|Classic>
+#   equalizer.sh <state_dir> genre_tags <artist>   (cache-first Last.fm lookup, requires
+#                                                     <state_dir>/lastfm_api_key to exist)
+#   equalizer.sh <state_dir> get_lastfm_key        (prints the saved key, or nothing)
+#   equalizer.sh <state_dir> set_lastfm_key <key>  (writes it; empty arg clears it)
 #
 # <state_dir> is expected to be Directories.eqStateDir from the QML side
 # (e.g. ~/.local/state/quickshell/user/eq), passed in so this script never
@@ -24,27 +29,128 @@ cmd="${1:-}"; arg1="${2:-}"; arg2="${3:-}"
 
 mkdir -p "$STATE_DIR"
 STATE_FILE="$STATE_DIR/eq_state.json"
-PRESET_DIR="$HOME/.config/easyeffects/output"
-PRESET_NAME="live_eq"
-PRESET_FILE="$PRESET_DIR/${PRESET_NAME}.json"
+
+# EasyEffects >= 8.0 (Qt/Kirigami port) moved presets from
+# ~/.config/easyeffects/output to $XDG_DATA_HOME/easyeffects/output
+# (usually ~/.local/share/easyeffects/output), migrating existing files
+# on first launch of the new version. Blindly writing to the old
+# ~/.config path keeps recreating it, which confuses that migration
+# logic (EasyEffects finds "new" files in a directory it already
+# thinks it migrated away from) and has been observed to crash the app,
+# e.g. when creating a new preset. Detect whichever directory the
+# installed EasyEffects is actually using instead of assuming.
+EE_DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/easyeffects"
+EE_CONFIG_DIR="$HOME/.config/easyeffects"
+if [ -d "$EE_DATA_DIR/output" ]; then
+    # >= 8.0: already migrated, this is the live directory.
+    PRESET_DIR="$EE_DATA_DIR/output"
+elif [ -d "$EE_CONFIG_DIR/output" ]; then
+    # < 8.0 (GTK4), or >= 8.0 that hasn't been launched yet and hasn't
+    # migrated - either way this is the directory currently in use.
+    PRESET_DIR="$EE_CONFIG_DIR/output"
+else
+    # EasyEffects has never been launched at all yet. Default to the
+    # current (>= 8.0) location so we don't seed the legacy directory.
+    PRESET_DIR="$EE_DATA_DIR/output"
+fi
+
+CUSTOM_PRESETS_FILE="$STATE_DIR/custom_presets.json"
+AUTO_FILE="$STATE_DIR/auto_eq_enabled"
+# Genre-aware auto-EQ: neither Spotify's nor a browser's MPRIS metadata
+# expose genre, so this looks it up by artist name via Last.fm's
+# artist.gettoptags API instead, and caches the result locally so we're
+# not hitting the network on every replay of an already-seen artist.
+# LASTFM_KEY_FILE is intentionally just a path, not a value - drop your
+# own free API key (from https://www.last.fm/api/account/create) in a
+# plain text file at that path. Nothing here ever hardcodes a key, so
+# this script is safe to share/version-control as-is.
+GENRE_CACHE_FILE="$STATE_DIR/genre_cache.json"
+LASTFM_KEY_FILE="$STATE_DIR/lastfm_api_key"
+# Set to 'true' by apply_eq() when it refuses to touch a never-saved
+# preset file, so the UI can tell the user to save their current
+# EasyEffects setup first instead of the widget silently doing nothing.
+NEEDS_SAVE_FILE="$STATE_DIR/needs_manual_save"
+# Name of the EasyEffects output preset the equalizer merges into - i.e.
+# whatever preset holds the *rest* of your chain (compressor, limiter,
+# deesser, etc). Defaults to "output", EasyEffects' own default preset
+# name, so this works out of the box for anyone who hasn't set up a named
+# preset of their own. Override with `set_active_preset <name>` if your
+# main chain lives under a different preset name.
+ACTIVE_PRESET_FILE="$STATE_DIR/active_preset"
 
 mkdir -p "$PRESET_DIR"
 
-if [ ! -f "$STATE_FILE" ]; then
-    echo '{"b1": 0, "b2": 0, "b3": 0, "b4": 0, "b5": 0, "b6": 0, "b7": 0, "b8": 0, "b9": 0, "b10": 0, "preset": "Flat", "pending": false}' > "$STATE_FILE"
+if [ ! -f "$CUSTOM_PRESETS_FILE" ]; then
+    echo '{}' > "$CUSTOM_PRESETS_FILE"
 fi
+
+if [ ! -f "$GENRE_CACHE_FILE" ]; then
+    echo '{}' > "$GENRE_CACHE_FILE"
+fi
+
+if [ ! -f "$AUTO_FILE" ]; then
+    echo 'false' > "$AUTO_FILE"
+fi
+
+if [ ! -f "$NEEDS_SAVE_FILE" ]; then
+    echo 'false' > "$NEEDS_SAVE_FILE"
+fi
+
+if [ ! -f "$ACTIVE_PRESET_FILE" ]; then
+    echo 'output' > "$ACTIVE_PRESET_FILE"
+fi
+
+if [ ! -f "$STATE_FILE" ]; then
+    echo '{"b1": 0, "b2": 0, "b3": 0, "b4": 0, "b5": 0, "b6": 0, "b7": 0, "b8": 0, "b9": 0, "b10": 0, "preset": "Flat", "preamp": 0, "pending": false}' > "$STATE_FILE"
+fi
+
+apply_custom_preset() {
+    local name="$1"
+    local vals current_preamp
+    vals=$(jq -c --arg n "$name" '.[$n] // empty' "$CUSTOM_PRESETS_FILE")
+    [ -n "$vals" ] || exit 1
+    # Preamp is a master control independent of which curve is active -
+    # carry it forward instead of letting it reset to 0 just because the
+    # preset switched.
+    current_preamp=$(jq -r '.preamp // 0' "$STATE_FILE" 2>/dev/null)
+    case "$current_preamp" in ''|null) current_preamp=0 ;; esac
+    echo "$vals" | jq -c '{b1:.b1,b2:.b2,b3:.b3,b4:.b4,b5:.b5,b6:.b6,b7:.b7,b8:.b8,b9:.b9,b10:.b10,preset:$name,preamp:($preamp|tonumber),pending:false}' \
+        --arg name "$name" --arg preamp "$current_preamp" > "$STATE_FILE"
+    apply_eq
+}
 
 apply_eq() {
     vals=$(cat "$STATE_FILE")
+    active_preset=$(cat "$ACTIVE_PRESET_FILE" 2>/dev/null)
+    [ -n "$active_preset" ] || active_preset="output"
+    active_preset_path="$PRESET_DIR/${active_preset}.json"
+
+    # Merge into whatever preset is actually the active one instead of
+    # loading a scratch preset that only contains the equalizer - loading a
+    # preset in EasyEffects replaces the *entire* pipeline, so a preset with
+    # only 'equalizer' in plugins_order was silently dropping every other
+    # effect (compressor, limiter, deesser, ...) the user had running. This
+    # reads the existing preset file, leaves every other plugin's block
+    # exactly as-is, and only adds/updates the 'equalizer' entry (and makes
+    # sure 'equalizer' is present in plugins_order without disturbing the
+    # rest of that list), then writes back to the SAME file and reloads the
+    # SAME preset name - so the other effects stay loaded.
     python3 -c "
-import sys, json
+import sys, json, os
+
+state_json, preset_path = sys.argv[1], sys.argv[2]
+
 try:
-    data = json.loads(sys.argv[1])
+    data = json.loads(state_json)
     # 10 user-facing sliders -> spread across a 32-band IIR equalizer,
     # same mapping Serpantinum uses so presets/behaviour stay identical.
     slider_map = { 0:0, 1:3, 2:6, 3:9, 4:12, 5:15, 6:18, 7:21, 8:24, 9:27 }
     freqs = [32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500, 16000, 20000, 22000, 24000, 24000]
     gains = [float(data['b1']), float(data['b2']), float(data['b3']), float(data['b4']), float(data['b5']), float(data['b6']), float(data['b7']), float(data['b8']), float(data['b9']), float(data['b10'])]
+    # Master gain layered on top of the 10 bands - compensates for
+    # headroom lost when several bands are boosted, instead of just
+    # clipping. Falls back to 0 for state files saved before this existed.
+    preamp = float(data.get('preamp', 0))
     bands = {}
     for i in range(32):
         freq = freqs[i] if i < len(freqs) else 20000.0
@@ -53,20 +159,108 @@ try:
             if i == b_idx:
                 gain = gains[s_idx]
                 break
-        bands[f'band{i}'] = { 'frequency': freq, 'gain': gain, 'mode': 'Bell', 'mute': False, 'q': 1.0, 'solo': False, 'width': 1.0, 'slope': 'x1' }
-    preset = { 'output': { 'blocklist': [], 'plugins_order': [ 'equalizer' ], 'equalizer': { 'bypass': False, 'input-gain': 0.0, 'output-gain': 0.0, 'left': bands, 'right': bands, 'mode': 'IIR', 'num-bands': 32, 'split-channels': False } } }
-    print(json.dumps(preset, indent=4))
+        bands[f'band{i}'] = { 'frequency': freq, 'gain': gain, 'type': 'Bell', 'mode': 'RLC (BT)', 'mute': False, 'q': 1.0, 'solo': False, 'width': 4.0, 'slope': 'x1' }
+    eq_block = { 'balance': 0.0, 'bypass': False, 'input-gain': 0.0, 'output-gain': preamp, 'left': bands, 'right': bands, 'mode': 'IIR', 'num-bands': 32, 'split-channels': False }
+
+    try:
+        with open(preset_path) as f:
+            preset = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        preset = {}
+
+    # EasyEffects only writes your live settings to this file when you
+    # explicitly hit Save in its own UI - changing something live does
+    # NOT update the file on disk. So if this file has never been saved
+    # (doesn't exist, or has no 'output'/plugins_order yet), any other
+    # effects you've configured live (Crystalizer, compressor, whatever)
+    # only exist in the running EasyEffects session, not here. Loading a
+    # preset replaces the ENTIRE live pipeline with what's in the file -
+    # if we built and loaded an equalizer-only preset right now, it would
+    # silently erase everything else you have running. Bail out instead:
+    # leave the file untouched, and let the caller (equalizer.sh) know so
+    # it can tell you to save your current setup first.
+    existing_output = preset.get('output')
+    if not existing_output or not existing_output.get('plugins_order'):
+        sys.exit(3)
+
+    output = preset.setdefault('output', {})
+    output.setdefault('blocklist', [])
+    plugins_order = output.setdefault('plugins_order', [])
+
+    # EasyEffects always names plugin instances with a '#N' suffix, even
+    # the first/only one (e.g. 'equalizer#0') - never a bare 'equalizer'.
+    # This used to write a bare 'equalizer' key, which didn't match a
+    # real EasyEffects-created instance name. Result: if you ever added
+    # an Equalizer yourself through EasyEffects' own GUI and saved that
+    # preset, the file ended up with BOTH 'equalizer#0' (yours) and
+    # 'equalizer' (this script's) in plugins_order - two separate
+    # equalizers stacked in series, which is what caused the duplicate
+    # entry and the extreme volume.
+    eq_key = None
+    for name in plugins_order:
+        if name == 'equalizer' or name.startswith('equalizer#'):
+            eq_key = name
+            break
+
+    if eq_key == 'equalizer':
+        # Self-heal: migrate the old wrong name to a real one instead of
+        # leaving a mismatched duplicate around.
+        plugins_order[plugins_order.index('equalizer')] = 'equalizer#0'
+        eq_key = 'equalizer#0'
+    elif eq_key is None:
+        eq_key = 'equalizer#0'
+        plugins_order.append(eq_key)
+
+    # Clean up any stray bare 'equalizer' entry left over from a previous
+    # run of the old buggy version (e.g. if a real 'equalizer#0' already
+    # existed separately, the loop above would have picked that one,
+    # leaving this dangling bad entry behind).
+    if 'equalizer' in plugins_order and eq_key != 'equalizer':
+        plugins_order[:] = [p for p in plugins_order if p != 'equalizer']
+    if 'equalizer' in output and eq_key != 'equalizer':
+        del output['equalizer']
+
+    output[eq_key] = eq_block
+
+    # Write atomically: EasyEffects watches this file (and reads it as a
+    # template when creating a new preset). Writing in place truncates it
+    # first, so a watcher/reader can catch it mid-write and see corrupt or
+    # empty JSON - this has been observed to crash EasyEffects >= 8.0.
+    # Writing to a temp file in the same directory and renaming into place
+    # means EasyEffects only ever sees the old complete file or the new
+    # complete file, never a partial one.
+    tmp_path = preset_path + '.tmp'
+    with open(tmp_path, 'w') as f:
+        json.dump(preset, f, indent=4)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp_path, preset_path)
 except Exception:
     sys.exit(1)
-" "$vals" > "$PRESET_FILE"
+" "$vals" "$active_preset_path"
+    py_status=$?
 
-    easyeffects -l "$PRESET_NAME" >/dev/null 2>&1 &
+    if [ "$py_status" -eq 3 ]; then
+        # Never-saved preset detected - the file above was left untouched
+        # on purpose. Flag it so the UI can tell you to save your current
+        # EasyEffects setup first, and skip the reload: there's nothing
+        # new to load, and force-reloading here is exactly what would
+        # wipe unsaved live effects.
+        echo 'true' > "$NEEDS_SAVE_FILE"
+        return 0
+    fi
+    echo 'false' > "$NEEDS_SAVE_FILE"
+
+    easyeffects -l "$active_preset" >/dev/null 2>&1 &
 }
 
 save_preset() {
+    local current_preamp
+    current_preamp=$(jq -r '.preamp // 0' "$STATE_FILE" 2>/dev/null)
+    case "$current_preamp" in ''|null) current_preamp=0 ;; esac
     jq -n -c --arg b1 "$1" --arg b2 "$2" --arg b3 "$3" --arg b4 "$4" --arg b5 "$5" \
-          --arg b6 "$6" --arg b7 "$7" --arg b8 "$8" --arg b9 "$9" --arg b10 "${10}" --arg p "${11}" \
-       '{"b1": $b1, "b2": $b2, "b3": $b3, "b4": $b4, "b5": $b5, "b6": $b6, "b7": $b7, "b8": $b8, "b9": $b9, "b10": $b10, "preset": $p, "pending": false}' > "$STATE_FILE"
+          --arg b6 "$6" --arg b7 "$7" --arg b8 "$8" --arg b9 "$9" --arg b10 "${10}" --arg p "${11}" --arg preamp "$current_preamp" \
+       '{"b1": $b1, "b2": $b2, "b3": $b3, "b4": $b4, "b5": $b5, "b6": $b6, "b7": $b7, "b8": $b8, "b9": $b9, "b10": $b10, "preset": $p, "preamp": ($preamp|tonumber), "pending": false}' > "$STATE_FILE"
 }
 
 case "$cmd" in
@@ -74,6 +268,13 @@ case "$cmd" in
     "set_band")
         tmp=$(cat "$STATE_FILE")
         updated=$(echo "$tmp" | jq -c --arg val "$arg2" ".b$arg1 = \$val | .preset = \"Custom\" | .pending = true")
+        echo "$updated" > "$STATE_FILE"
+        ;;
+    "set_preamp")
+        # Doesn't touch .preset - preamp is a master gain layered on top
+        # of whichever curve is active, not part of the curve's identity.
+        tmp=$(cat "$STATE_FILE")
+        updated=$(echo "$tmp" | jq -c --arg val "$arg1" ".preamp = \$val | .pending = true")
         echo "$updated" > "$STATE_FILE"
         ;;
     "apply")
@@ -92,8 +293,97 @@ case "$cmd" in
             "Rock")    save_preset 5 4 2 -1 -2 -1 2 4 5 6 "Rock" ;;
             "Jazz")    save_preset 3 3 1 1 1 1 2 1 2 3 "Jazz" ;;
             "Classic") save_preset 0 1 2 2 2 2 1 2 3 4 "Classic" ;;
+            *) apply_custom_preset "$arg1"; exit $? ;;
         esac
         apply_eq
+        ;;
+    "get_auto") cat "$AUTO_FILE" ;;
+    "set_auto")
+        if [ "$arg1" = "true" ] || [ "$arg1" = "1" ]; then
+            echo 'true' > "$AUTO_FILE"
+        else
+            echo 'false' > "$AUTO_FILE"
+        fi
+        ;;
+    "get_custom") cat "$CUSTOM_PRESETS_FILE" ;;
+    "save_custom")
+        name="$arg1"
+        shift 2
+        vals=("$@")
+        [ -n "$name" ] || exit 1
+        jq -n --argjson old "$(cat "$CUSTOM_PRESETS_FILE")" \
+            --arg n "$name" \
+            --arg b1 "${vals[0]:-0}" --arg b2 "${vals[1]:-0}" --arg b3 "${vals[2]:-0}" --arg b4 "${vals[3]:-0}" --arg b5 "${vals[4]:-0}" \
+            --arg b6 "${vals[5]:-0}" --arg b7 "${vals[6]:-0}" --arg b8 "${vals[7]:-0}" --arg b9 "${vals[8]:-0}" --arg b10 "${vals[9]:-0}" \
+            '$old + {($n): {b1:($b1|tonumber),b2:($b2|tonumber),b3:($b3|tonumber),b4:($b4|tonumber),b5:($b5|tonumber),b6:($b6|tonumber),b7:($b7|tonumber),b8:($b8|tonumber),b9:($b9|tonumber),b10:($b10|tonumber)}}' > "$CUSTOM_PRESETS_FILE.tmp" && mv "$CUSTOM_PRESETS_FILE.tmp" "$CUSTOM_PRESETS_FILE"
+        save_preset "${vals[0]:-0}" "${vals[1]:-0}" "${vals[2]:-0}" "${vals[3]:-0}" "${vals[4]:-0}" "${vals[5]:-0}" "${vals[6]:-0}" "${vals[7]:-0}" "${vals[8]:-0}" "${vals[9]:-0}" "$name"
+        apply_eq
+        ;;
+    "delete_custom")
+        jq --arg n "$arg1" 'del(.[$n])' "$CUSTOM_PRESETS_FILE" > "$CUSTOM_PRESETS_FILE.tmp" && mv "$CUSTOM_PRESETS_FILE.tmp" "$CUSTOM_PRESETS_FILE"
+        ;;
+    "get_active_preset") cat "$ACTIVE_PRESET_FILE" ;;
+    "get_needs_save") cat "$NEEDS_SAVE_FILE" ;;
+    "set_active_preset")
+        [ -n "$arg1" ] || exit 1
+        echo "$arg1" > "$ACTIVE_PRESET_FILE"
+        apply_eq
+        ;;
+    "genre_tags")
+        # Returns a JSON array of Last.fm tags for arg1 (an artist name),
+        # e.g. ["thrash metal","metal","80s"]. The QML side maps those to
+        # a preset itself; this only fetches+caches the raw tags, since
+        # neither Spotify nor a browser's MPRIS metadata expose genre.
+        artist="$arg1"
+        if [ -z "$artist" ]; then
+            echo '[]'
+            exit 0
+        fi
+        cached=$(jq -c --arg a "$artist" '.[$a] // empty' "$GENRE_CACHE_FILE" 2>/dev/null)
+        if [ -n "$cached" ]; then
+            echo "$cached"
+            exit 0
+        fi
+        # No key file -> no lookup, fail quiet (no crash, no spam), rather
+        # than erroring every time someone hasn't set this up.
+        if [ ! -f "$LASTFM_KEY_FILE" ]; then
+            echo '[]'
+            exit 0
+        fi
+        api_key=$(tr -d '[:space:]' < "$LASTFM_KEY_FILE")
+        if [ -z "$api_key" ]; then
+            echo '[]'
+            exit 0
+        fi
+        encoded_artist=$(jq -rn --arg a "$artist" '$a|@uri')
+        resp=$(curl -fsS --max-time 5 "https://ws.audioscrobbler.com/2.0/?method=artist.gettoptags&artist=${encoded_artist}&api_key=${api_key}&format=json" 2>/dev/null)
+        tags=$(echo "$resp" | jq -c '[.toptags.tag[]?.name]' 2>/dev/null)
+        if [ -z "$tags" ] || [ "$tags" = "null" ]; then
+            tags='[]'
+        fi
+        # Cache even a miss/empty result, so an unrecognized or misspelled
+        # artist doesn't get re-queried on every single track change.
+        jq --arg a "$artist" --argjson t "$tags" '. + {($a): $t}' "$GENRE_CACHE_FILE" > "$GENRE_CACHE_FILE.tmp" 2>/dev/null \
+            && mv "$GENRE_CACHE_FILE.tmp" "$GENRE_CACHE_FILE"
+        echo "$tags"
+        ;;
+    "clear_genre_cache") echo '{}' > "$GENRE_CACHE_FILE" ;;
+    "get_lastfm_key")
+        # Echoes back whatever's on disk so the UI field can be
+        # pre-filled for editing. Same trust boundary as reading the
+        # file directly - it already lives in the user's own state dir.
+        if [ -f "$LASTFM_KEY_FILE" ]; then
+            tr -d '[:space:]' < "$LASTFM_KEY_FILE"
+        fi
+        ;;
+    "set_lastfm_key")
+        # Empty/missing arg1 clears it (lets the UI have a "remove key" path).
+        if [ -z "$arg1" ]; then
+            rm -f "$LASTFM_KEY_FILE"
+        else
+            printf '%s' "$arg1" > "$LASTFM_KEY_FILE"
+            chmod 600 "$LASTFM_KEY_FILE"
+        fi
         ;;
     *)
         echo "Usage: equalizer.sh <state_dir> <get|set_band|apply|preset> [args...]" >&2

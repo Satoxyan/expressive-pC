@@ -13,6 +13,7 @@ MouseArea {
     property int gridSize: 12
     property bool snapEnabled: true
     readonly property bool dragging: drag.active
+    property bool showSelectionBorder: true
 
     signal dragFinished()
     property bool selected: false
@@ -147,7 +148,7 @@ MouseArea {
 
     Rectangle {
         anchors.fill: parent
-        visible: root.selected
+        visible: root.selected && root.showSelectionBorder
         color: "transparent"
         border.width: 2
         border.color: Appearance.colors.colPrimary

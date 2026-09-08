@@ -33,8 +33,8 @@ import Quickshell.Services.Mpris
 Scope {
     id: root
 
-    readonly property real popupWidth: 760
-    readonly property real popupHeight: 640
+    readonly property real popupWidth: 820
+    readonly property real popupHeight: 600
     readonly property real popupRounding: Appearance.rounding.screenRounding - Appearance.sizes.hyprlandGapsOut + 1
 
     // No standalone "equalizer" bar entry anymore - it only opens via the
@@ -62,12 +62,48 @@ Scope {
     readonly property MprisPlayer activePlayer: MprisController.activePlayer
     readonly property var artUrl: activePlayer?.trackArtUrl ?? ""
     readonly property string artFilePath: `${Directories.coverArt}/${Qt.md5(root.artUrl)}`
-    property bool artDownloaded: false
-    readonly property string displayedArtFilePath: {
-        if (!root.artUrl || root.artUrl.length === 0) return ""
-        if (!root.artDownloaded) return ""
-        if (root.artUrl.startsWith("file://")) return root.artUrl
-        return Qt.resolvedUrl(root.artFilePath)
+
+    // Only updated once the *new* track's art has actually finished
+    // downloading - never blanked out in between. Blanking it the instant
+    // the track changed (before the new file existed) meant blurredArt AND
+    // colorQuantizer.source both went empty for a moment, which reset the
+    // quantized color to the plain matugen fallback (colPrimary) - a visible
+    // flash to the wrong color on every track change instead of a clean
+    // swap once the new art was ready. Keeping the old one showing the
+    // whole time avoids that flash entirely.
+    property string displayedArtFilePath: ""
+
+    // ColorQuantizer needs an actual local file it can decode - it can't read
+    // a remote https:// MPRIS art URL, which most players hand back. Pointing
+    // it at root.displayedArtFilePath (the *visible* art, shown immediately
+    // for the no-flash behavior above) meant it sat on an unreadable remote
+    // URL forever, since coverArtDownloader.onExited never told it a local
+    // copy was ready - colors[0] silently stayed empty and artDominantColor
+    // permanently fell back to plain matugen colPrimary. This tracks the
+    // last known-local file separately: swaps immediately for file:// art,
+    // otherwise keeps the previous track's local copy showing until the new
+    // one finishes downloading, so the quantizer is never pointed at
+    // something it can't read.
+    property string colorSourceFilePath: ""
+
+    function syncArt() {
+        if (!root.artUrl || root.artUrl.length === 0) {
+            root.displayedArtFilePath = ""
+            root.colorSourceFilePath = ""
+            return
+        }
+        // Show the new art immediately. StyledImage/Image and ColorQuantizer
+        // can consume the MPRIS art URL directly, so there is no blank/fallback
+        // frame while the cache copy is being downloaded. The downloader then
+        // stores the same art locally for subsequent use.
+        root.displayedArtFilePath = root.artUrl
+        if (root.artUrl.startsWith("file://")) {
+            root.colorSourceFilePath = root.artUrl
+            return
+        }
+        coverArtDownloader.targetFile = root.artUrl
+        coverArtDownloader.targetPath = root.artFilePath
+        coverArtDownloader.running = true
     }
     readonly property color artDominantColor: ColorUtils.mix(
         (colorQuantizer?.colors[0] ?? Appearance.colors.colPrimary),
@@ -77,30 +113,32 @@ Scope {
         color: root.artDominantColor
     }
 
-    onArtUrlChanged: {
-        if (!root.artUrl || root.artUrl.length === 0) {
-            root.artDownloaded = false
-            return
-        }
-        if (root.artUrl.startsWith("file://")) {
-            root.artDownloaded = true
-            return
-        }
-        root.artDownloaded = false
-        coverArtDownloader.running = true
-    }
+    // Component.onCompleted covers the track that's already playing when this
+    // Scope is first created - onArtFilePathChanged alone misses it, since
+    // QML doesn't fire onXChanged for a property's initial value, only for
+    // later changes.
+    Component.onCompleted: root.syncArt()
+    onArtFilePathChanged: root.syncArt()
 
     Process {
         id: coverArtDownloader
         property string targetFile: root.artUrl
         property string targetPath: root.artFilePath
         command: ["bash", "-c", `[ -f ${targetPath} ] || curl -4 -sSL '${targetFile}' -o '${targetPath}'`]
-        onExited: root.artDownloaded = true
+        // Keep the visible art on the live MPRIS URL for the current frame -
+        // do not replace it on download completion, since that can make the
+        // background briefly wait on a local-file reload and can race when
+        // tracks change quickly. The color source is different: it only ever
+        // points at local files, so swapping it here is safe and is what
+        // actually lets ColorQuantizer read the art at all.
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode === 0) root.colorSourceFilePath = Qt.resolvedUrl(root.artFilePath)
+        }
     }
 
     ColorQuantizer {
         id: colorQuantizer
-        source: root.displayedArtFilePath
+        source: root.colorSourceFilePath
         depth: 0
         rescaleSize: 1
     }
@@ -119,6 +157,14 @@ Scope {
             implicitHeight: root.popupHeight
             color: "transparent"
             WlrLayershell.namespace: "quickshell:equalizer"
+            // Layer-shell surfaces don't get keyboard input by default (they're
+            // built for click-through overlays). This popup now has a text
+            // field (custom preset naming), which needs the surface to
+            // actually be grantable keyboard focus - OnDemand means it only
+            // takes focus when something inside (like that TextInput) asks
+            // for it, so it doesn't steal focus from the rest of the desktop
+            // the rest of the time.
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
             anchors {
                 top: true
@@ -162,8 +208,8 @@ Scope {
                 anchors.margins: Appearance.sizes.elevationMargin
                 radius: root.popupRounding
                 color: ColorUtils.applyAlpha(root.blendedColors.colLayer0, 1)
-                border.width: 1
-                border.color: ColorUtils.transparentize(root.blendedColors.colOnLayer0, 0.85)
+                border.width: 2
+                border.color: Qt.rgba(0, 0, 0, 0.55)
 
                 layer.enabled: true
                 layer.effect: OpacityMask {
@@ -192,8 +238,12 @@ Scope {
                     }
 
                     Rectangle {
+                        // Neutral dark scrim, no color tint - keeps the blurred
+                        // art readable without recoloring it pink/whatever from
+                        // matugen's blend. Buttons/sliders elsewhere still use
+                        // root.blendedColors (album-tinted) as before.
                         anchors.fill: parent
-                        color: ColorUtils.transparentize(root.blendedColors.colLayer0, 0.25)
+                        color: ColorUtils.transparentize(Appearance.colors.colScrim, 0.3)
                     }
                 }
 
@@ -209,6 +259,8 @@ Scope {
                 EqualizerView {
                     anchors.fill: parent
                     blendedColors: root.blendedColors
+                    player: root.activePlayer
+                    displayedArtFilePath: root.displayedArtFilePath
                     onCloseRequested: GlobalStates.equalizerOpen = false
                 }
             }
