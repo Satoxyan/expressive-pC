@@ -761,8 +761,8 @@ MouseArea {
 
                                     IconToolbarButton {
                                         implicitWidth: height
-                                        text: "navigate_before"
                                         enabled: !WallhavenSearch.fetching && WallhavenSearch.currentPage > 1
+                                        text: "chevron_left"
                                         onClicked: WallhavenSearch.previousPage()
                                     }
 
@@ -786,13 +786,34 @@ MouseArea {
                                     StyledText {
                                         text: " / " + WallhavenSearch.lastPage
                                         font.pixelSize: Appearance.font.pixelSize.small
-                                        color: Appearance.colors.colOnLayer1
+                                        inputMethodHints: Qt.ImhDigitsOnly
+                                        validator: IntValidator { bottom: 1; top: WallhavenSearch.lastPage }
+                                        onAccepted: {
+                                            const p = parseInt(text);
+                                            if (p > 0 && p <= WallhavenSearch.lastPage) {
+                                                WallhavenSearch.search(WallhavenSearch.currentQuery, p);
+                                            } else {
+                                                text = WallhavenSearch.currentPage.toString();
+                                            }
+                                        }
+                                        Connections {
+                                            target: WallhavenSearch
+                                            function onSearchCompleted() {
+                                                wallhavenPageField.text = WallhavenSearch.currentPage.toString();
+                                            }
+                                        }
+                                    }
+
+                                    StyledText {
+                                        text: "/ " + WallhavenSearch.lastPage
+                                        font.pixelSize: Appearance.font.pixelSize.small
+                                        color: Appearance.colors.colSubtext
                                     }
 
                                     IconToolbarButton {
                                         implicitWidth: height
-                                        text: "navigate_next"
                                         enabled: !WallhavenSearch.fetching && WallhavenSearch.currentPage < WallhavenSearch.lastPage
+                                        text: "chevron_right"
                                         onClicked: WallhavenSearch.nextPage()
                                     }
                                 }

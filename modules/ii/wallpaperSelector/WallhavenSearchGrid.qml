@@ -365,12 +365,17 @@ Item {
                 }
 
                 MouseArea {
+                    id: thumbMouse
                     anchors.fill: parent
                     hoverEnabled: true
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
                     onEntered: {
                         wallhavenGrid.currentSelection = delegateItem.index
                         wallhavenGrid.forceActiveFocus()
+                    }
+                    onExited: {
+                        if (wallhavenGrid.currentSelection === delegateItem.index)
+                            wallhavenGrid.currentSelection = -1
                     }
                     onClicked: event => {
                         wallhavenGrid.currentSelection = delegateItem.index
@@ -388,7 +393,7 @@ Item {
                     }
                     z: 10
                     spacing: 4
-                    opacity: delegateItem.index === wallhavenGrid.currentSelection ? 1 : 0
+                    opacity: delegateItem.index === wallhavenGrid.currentSelection && thumbMouse.containsMouse ? 1 : 0
                     Behavior on opacity { NumberAnimation { duration: 100 } }
 
                     Rectangle {
