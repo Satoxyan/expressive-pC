@@ -8,13 +8,6 @@ import QtQuick.Layouts
 import Qt5Compat.GraphicalEffects
 import Quickshell.Io
 
-/**
- * Wallhaven search grid: results, states, and integrated settings popup.
- * All search controls (search field, pagination, palette, dark mode toggle)
- * live in the bottom toolbar of WallpaperSelectorContent so the grid area
- * stays clean. Drop-in replacement for the local wallpaper grid when
- * Wallhaven mode is active.
- */
 Item {
     id: root
 
@@ -27,15 +20,12 @@ Item {
 
     signal wallpaperApplied()
 
-    // Auto-browse on open so the grid is never empty (relevance needs a query, so
-    // fall back to toplist). Lets users land on curated results without typing.
     onVisibleChanged: {
         if (visible && !WallhavenSearch.fetching && WallhavenSearch.currentResults.length === 0) {
             WallhavenSearch.browse(WallhavenSearch.sorting === "relevance" ? "toplist" : WallhavenSearch.sorting)
         }
     }
 
-    // Quick predefined browse modes (all return results without a query)
     readonly property var browseModes: [
         { label: Translation.tr("Top"), sort: "toplist" },
         { label: Translation.tr("Latest"), sort: "date_added" },
@@ -43,16 +33,11 @@ Item {
         { label: Translation.tr("Views"), sort: "views" }
     ]
 
-    // Public API for parent key forwarding
     function moveGridSelection(delta) { wallhavenGrid.moveSelection(delta) }
     function activateGridCurrent() { wallhavenGrid.activateCurrent() }
-
-    // Aliases matching the shared gridLoader.item?.moveSelection / activateCurrent
-    // protocol used by WallpaperSelectorContent for local and online grids.
     function moveSelection(delta) { moveGridSelection(delta) }
     function activateCurrent() { activateGridCurrent() }
 
-    // Download and apply a wallhaven wallpaper
     function downloadAndApply(wallpaper) {
         if (downloading) return
         downloading = true
@@ -67,10 +52,18 @@ Item {
         })
     }
 
+    function downloadOnly(wallpaper) {
+        if (downloading) return
+        downloading = true
+        downloadingId = wallpaper.id || ""
+        WallhavenSearch.downloadWallpaper(wallpaper, function(success, localPath) {
+            downloading = false
+            downloadingId = ""
+        })
+    }
+
     property bool showSettings: false
 
-    // Opens the filter dialog, or closes it through dismiss() so the
-    // dirty-apply logic in onDismiss still runs (toolbar tune button).
     function toggleSettings() {
         if (root.showSettings) {
             if (settingsPopupLoader.item) settingsPopupLoader.item.dismiss()
@@ -79,10 +72,6 @@ Item {
         }
     }
 
-    // Settings dialog (filters + API key). Created on demand: WindowDialog collapses
-    // via onShowChanged, so a persistent instance would start open. Loader builds it
-    // fresh each time; onLoaded opens it. (The old reopen bug was WallhavenSettingsPopup's
-    // Component.onCompleted{show=false} racing this open — removed there.)
     Loader {
         id: settingsPopupLoader
         anchors.fill: parent
@@ -96,7 +85,6 @@ Item {
             id: settingsPopup
             onDismiss: {
                 root.showSettings = false
-                // Only re-search when a filter actually changed while the menu was open
                 if (settingsPopup.dirty) {
                     WallhavenSearch.saveToConfig()
                     WallhavenSearch.search(WallhavenSearch.currentQuery, 1)
@@ -149,7 +137,7 @@ Item {
             }
         }
 
-        // Empty state
+        // Empty state (search returned nothing)
         ColumnLayout {
             anchors.centerIn: parent
             visible: !root.loading && WallhavenSearch.lastError.length === 0 && WallhavenSearch.currentResults.length === 0 && WallhavenSearch.currentQuery.length > 0
@@ -187,7 +175,6 @@ Item {
                 font.pixelSize: Appearance.font.pixelSize.small
                 Layout.alignment: Qt.AlignHCenter
             }
-            // Quick predefined browse — no typing required
             Row {
                 Layout.alignment: Qt.AlignHCenter
                 spacing: 8
@@ -221,7 +208,6 @@ Item {
 
             property int columns: root.columns
             property int currentSelection: -1
-            // "first" = select first item, "last" = select last item, "" = none
             property string pendingSelectionAfterPageChange: ""
 
             cellWidth: width / root.columns
@@ -235,7 +221,6 @@ Item {
                 if (wallhavenGrid.count === 0) return
                 var newIndex = currentSelection + delta
 
-                // Auto-paginate: went past the last item → next page
                 if (newIndex >= wallhavenGrid.count) {
                     if (!root.loading && WallhavenSearch.currentPage < WallhavenSearch.lastPage) {
                         pendingSelectionAfterPageChange = "first"
@@ -243,7 +228,6 @@ Item {
                     }
                     return
                 }
-                // Auto-paginate: went before the first item → previous page
                 if (newIndex < 0) {
                     if (!root.loading && WallhavenSearch.currentPage > 1) {
                         pendingSelectionAfterPageChange = "last"
@@ -259,13 +243,10 @@ Item {
             function activateCurrent() {
                 if (currentSelection >= 0 && currentSelection < wallhavenGrid.count) {
                     var wallpaper = WallhavenSearch.currentResults[currentSelection]
-                    if (wallpaper) {
-                        root.downloadAndApply(wallpaper)
-                    }
+                    if (wallpaper) root.downloadAndApply(wallpaper)
                 }
             }
 
-            // After page change, select first or last item as appropriate
             Connections {
                 target: WallhavenSearch
                 function onSearchCompleted() {
@@ -281,158 +262,186 @@ Item {
             }
 
             Keys.onPressed: event => {
-                if (event.key === Qt.Key_Left) {
-                    moveSelection(-1)
-                    event.accepted = true
-                } else if (event.key === Qt.Key_Right) {
-                    moveSelection(1)
-                    event.accepted = true
-                } else if (event.key === Qt.Key_Up) {
-                    moveSelection(-columns)
-                    event.accepted = true
-                } else if (event.key === Qt.Key_Down) {
-                    moveSelection(columns)
-                    event.accepted = true
-                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                    activateCurrent()
-                    event.accepted = true
-                }
+                if (event.key === Qt.Key_Left) { moveSelection(-1); event.accepted = true }
+                else if (event.key === Qt.Key_Right) { moveSelection(1); event.accepted = true }
+                else if (event.key === Qt.Key_Up) { moveSelection(-columns); event.accepted = true }
+                else if (event.key === Qt.Key_Down) { moveSelection(columns); event.accepted = true }
+                else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { activateCurrent(); event.accepted = true }
             }
 
             model: WallhavenSearch.currentResults
 
-            delegate: MouseArea {
-                id: wallhavenItemRoot
+            delegate: Item {
+                id: delegateItem
                 required property var modelData
                 required property int index
 
                 width: wallhavenGrid.cellWidth
                 height: wallhavenGrid.cellHeight
-                hoverEnabled: true
 
                 property string thumbnailUrl: modelData ? WallhavenSearch.getThumbnailUrl(modelData, "large") : ""
                 property string wallpaperId: modelData?.id ?? ""
                 property bool isDownloading: root.downloading && root.downloadingId === wallpaperId
 
-                onClicked: {
-                    wallhavenGrid.currentSelection = index
-                    root.downloadAndApply(modelData)
+                Image {
+                    id: thumb
+                    anchors.fill: parent
+                    anchors.margins: Appearance.sizes.wallpaperSelectorItemMargins
+                    source: delegateItem.thumbnailUrl
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    cache: true
+                    sourceSize.width: wallhavenGrid.cellWidth
+                    sourceSize.height: wallhavenGrid.cellHeight
+
+                    layer.enabled: true
+                    layer.effect: OpacityMask {
+                        maskSource: Rectangle {
+                            width: thumb.width
+                            height: thumb.height
+                            radius: Appearance.rounding.normal
+                        }
+                    }
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: Appearance.rounding.normal
+                        color: delegateItem.index === wallhavenGrid.currentSelection
+                            ? Qt.rgba(
+                                Appearance.colors.colPrimary.r,
+                                Appearance.colors.colPrimary.g,
+                                Appearance.colors.colPrimary.b, 0.15)
+                            : "transparent"
+                        border.width: delegateItem.index === wallhavenGrid.currentSelection ? 2 : 0
+                        border.color: Appearance.colors.colPrimary
+                    }
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: Appearance.rounding.normal
+                        color: Appearance.colors.colLayer2
+                        visible: thumb.status !== Image.Ready
+                        MaterialSymbol {
+                            anchors.centerIn: parent
+                            text: thumb.status === Image.Error ? "broken_image" : "image"
+                            iconSize: 32
+                            color: Appearance.colors.colSubtext
+                        }
+                    }
                 }
 
                 Rectangle {
-                    id: itemBackground
-                    anchors {
-                        fill: parent
-                        margins: Appearance.sizes.wallpaperSelectorItemMargins
-                    }
+                    anchors.fill: parent
+                    anchors.margins: Appearance.sizes.wallpaperSelectorItemMargins
                     radius: Appearance.rounding.normal
-                    color: (index === wallhavenGrid.currentSelection || wallhavenItemRoot.containsMouse)
-                        ? Appearance.colors.colPrimary
-                        : Appearance.colors.colLayer1
+                    color: Appearance.colors.colScrim
+                    visible: delegateItem.isDownloading
 
-                    Behavior on color {
-                        animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+                    MaterialLoadingIndicator {
+                        anchors.centerIn: parent
+                        colBg: Appearance.colors.colOnPrimary
+                    }
+                }
+
+                Rectangle {
+                    anchors {
+                        bottom: parent.bottom
+                        left: parent.left
+                        margins: Appearance.sizes.wallpaperSelectorItemMargins + 4
+                    }
+                    visible: delegateItem.modelData?.resolution ? true : false
+                    color: Appearance.colors.colScrim
+                    radius: Appearance.rounding.small
+                    implicitWidth: resolutionText.implicitWidth + 8
+                    implicitHeight: resolutionText.implicitHeight + 4
+
+                    StyledText {
+                        id: resolutionText
+                        anchors.centerIn: parent
+                        text: delegateItem.modelData?.resolution ?? ""
+                        font.pixelSize: Appearance.font.pixelSize.smaller * 0.85
+                        color: "white"
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    onEntered: {
+                        wallhavenGrid.currentSelection = delegateItem.index
+                        wallhavenGrid.forceActiveFocus()
+                    }
+                    onClicked: event => {
+                        wallhavenGrid.currentSelection = delegateItem.index
+                        if (event.button === Qt.LeftButton)
+                            root.downloadAndApply(delegateItem.modelData)
+                    }
+                }
+
+                RowLayout {
+                    id: hoverActions
+                    anchors {
+                        bottom: thumb.bottom
+                        right: thumb.right
+                        margins: 6
+                    }
+                    z: 10
+                    spacing: 4
+                    opacity: delegateItem.index === wallhavenGrid.currentSelection ? 1 : 0
+                    Behavior on opacity { NumberAnimation { duration: 100 } }
+
+                    Rectangle {
+                        width: 26
+                        height: 26
+                        radius: 13
+                        color: "transparent"
+
+                        MaterialSymbol {
+                            anchors.centerIn: parent
+                            text: "download"
+                            iconSize: 15
+                            color: Appearance.colors.colOnLayer0
+                        }
+
+                        MouseArea {
+                            id: downloadMouseArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.downloadOnly(delegateItem.modelData)
+
+                            StyledToolTip {
+                                visible: downloadMouseArea.containsMouse
+                                text: Translation.tr("Download")
+                            }
+                        }
                     }
 
-                    ColumnLayout {
-                        anchors {
-                            fill: parent
-                            margins: Appearance.sizes.wallpaperSelectorItemPadding
-                        }
-                        spacing: 4
+                    Rectangle {
+                        width: 26
+                        height: 26
+                        radius: 13
+                        color: "transparent"
 
-                        // Thumbnail
-                        Item {
-                            id: thumbnailContainer
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-
-                            Image {
-                                id: thumbnailImage
-                                anchors.fill: parent
-                                source: wallhavenItemRoot.thumbnailUrl
-                                fillMode: Image.PreserveAspectCrop
-                                asynchronous: true
-                                cache: true
-                                sourceSize.width: wallhavenGrid.cellWidth
-                                sourceSize.height: wallhavenGrid.cellHeight
-
-                                layer.enabled: true
-                                layer.effect: OpacityMask {
-                                    maskSource: Rectangle {
-                                        width: thumbnailContainer.width
-                                        height: thumbnailContainer.height
-                                        radius: Appearance.rounding.small
-                                    }
-                                }
-                            }
-
-                            // Loading state for individual thumbnails
-                            Rectangle {
-                                anchors.fill: parent
-                                radius: Appearance.rounding.small
-                                color: Appearance.colors.colLayer1
-                                visible: thumbnailImage.status === Image.Loading || thumbnailImage.status === Image.Error
-
-                                MaterialSymbol {
-                                    anchors.centerIn: parent
-                                    text: thumbnailImage.status === Image.Error ? "broken_image" : "image"
-                                    iconSize: Appearance.font.pixelSize.hugeass
-                                    color: Appearance.colors.colSubtext
-                                }
-                            }
-
-                            // Download overlay
-                            Rectangle {
-                                anchors.fill: parent
-                                radius: Appearance.rounding.small
-                                color: Appearance.colors.colScrim
-                                visible: wallhavenItemRoot.isDownloading
-
-                                MaterialLoadingIndicator {
-                                    anchors.centerIn: parent
-                                    colBg: Appearance.colors.colOnPrimary
-                                }
-                            }
-
-                            // Resolution badge
-                            Rectangle {
-                                anchors {
-                                    bottom: parent.bottom
-                                    right: parent.right
-                                    margins: 4
-                                }
-                                visible: modelData?.resolution ? true : false
-                                color: Appearance.colors.colScrim
-                                radius: Appearance.rounding.small
-                                implicitWidth: resolutionText.implicitWidth + 8
-                                implicitHeight: resolutionText.implicitHeight + 4
-
-                                StyledText {
-                                    id: resolutionText
-                                    anchors.centerIn: parent
-                                    text: modelData?.resolution ?? ""
-                                    font.pixelSize: Appearance.font.pixelSize.smaller * 0.85
-                                    color: "white"
-                                }
-                            }
+                        MaterialSymbol {
+                            anchors.centerIn: parent
+                            text: "wallpaper"
+                            iconSize: 15
+                            color: Appearance.colors.colOnLayer0
                         }
 
-                        // Wallpaper ID label
-                        StyledText {
-                            Layout.fillWidth: true
-                            Layout.leftMargin: 10
-                            Layout.rightMargin: 10
-                            horizontalAlignment: Text.AlignHCenter
-                            elide: Text.ElideRight
-                            font.pixelSize: Appearance.font.pixelSize.smaller
-                            color: (index === wallhavenGrid.currentSelection || wallhavenItemRoot.containsMouse)
-                                ? Appearance.colors.colOnPrimary
-                                : Appearance.colors.colOnLayer1
-                            Behavior on color {
-                                animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+                        MouseArea {
+                            id: applyMouseArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.downloadAndApply(delegateItem.modelData)
+
+                            StyledToolTip {
+                                visible: applyMouseArea.containsMouse
+                                text: Translation.tr("Download and Set as Wallpaper")
                             }
-                            text: wallpaperId
                         }
                     }
                 }
@@ -448,7 +457,6 @@ Item {
             }
         }
 
-        // Loading overlay when re-searching (has results but fetching new page)
         Rectangle {
             anchors.fill: parent
             color: Appearance.colors.colScrim

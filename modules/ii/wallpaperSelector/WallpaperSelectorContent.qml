@@ -300,7 +300,7 @@ MouseArea {
                         }
 
                         Loader {
-                            active: root.source !== "local" && root.source !== "blapples" && root.source !== "naive"
+                            active: root.source !== "local" && root.source !== "blapples" && root.source !== "naive" && root.source !== "wallhaven"
                             visible: active
                             sourceComponent: RowLayout {
                                 spacing: 4
