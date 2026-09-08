@@ -44,13 +44,15 @@ AbstractWidget {
             root.configEntry.placementStrategy = "free"
     }
 
-    onReleased: {
+    function commitPosition() {
         configEntry.x = root.x;
         configEntry.y = root.y;
         root.targetX = Qt.binding(() => Math.max(0, Math.min(configEntry.x, scaledScreenWidth - width)));
         root.targetY = Qt.binding(() => Math.max(0, Math.min(configEntry.y, scaledScreenHeight - height)));
         root.restoreXYBinding();
     }
+
+    onReleased: root.commitPosition()
 
     property bool needsColText: false
     // Text widgets (e.g. digital lock clock with cookie desktop clock) flip this

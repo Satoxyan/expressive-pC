@@ -15,6 +15,8 @@ MouseArea {
     readonly property bool dragging: drag.active
 
     signal dragFinished()
+    property bool selected: false
+    property bool groupDragActive: false
 
     acceptedButtons: Qt.LeftButton | Qt.RightButton
     drag.target: draggable ? dragProxy : undefined
@@ -23,6 +25,12 @@ MouseArea {
     onClicked: (mouse) => {
         if (mouse.button === Qt.RightButton) {
             Config.options.background.widgetsLocked = !Config.options.background.widgetsLocked
+        } else if (mouse.modifiers & Qt.ControlModifier) {
+            root.selected = !root.selected
+        } else {
+            var canvas = findCanvas(root.parent)
+            if (canvas) canvas.clearSelection()
+            root.selected = true
         }
     }
 
@@ -55,6 +63,18 @@ MouseArea {
         canvas.setCenterActive(nearX, nearY)
     }
 
+    function commitPosition() {}
+
+    Component.onCompleted: {
+        var canvas = findCanvas(root.parent)
+        if (canvas) canvas.registerWidget(root)
+    }
+
+    Component.onDestruction: {
+        var canvas = findCanvas(root.parent)
+        if (canvas) canvas.unregisterWidget(root)
+    }
+
     Item {
         id: dragProxy
         parent: root.parent
@@ -80,11 +100,26 @@ MouseArea {
         restoreMode: Binding.RestoreNone
     }
 
+    onXChanged: {
+        if (!root.dragging) return
+        var canvas = findCanvas(root.parent)
+        if (canvas) canvas.updateGroupDrag(root)
+    }
+    onYChanged: {
+        if (!root.dragging) return
+        var canvas = findCanvas(root.parent)
+        if (canvas) canvas.updateGroupDrag(root)
+    }
+
     onDraggingChanged: {
         var canvas = findCanvas(root.parent)
         if (canvas) canvas.setDragging(dragging)
 
-        if (!dragging && canvas) {
+        if (dragging) {
+            if (canvas) canvas.beginGroupDrag(root)
+        } else {
+            if (canvas) canvas.endGroupDrag()
+
             var left = root.x
             var right = root.x + root.width
             var top = root.y
@@ -94,12 +129,12 @@ MouseArea {
 
             var widgetCenterX = root.x + root.width / 2
             var widgetCenterY = root.y + root.height / 2
-            if (Math.abs(widgetCenterX - canvas.width / 2) < root.gridSize / 2)
+            if (canvas && Math.abs(widgetCenterX - canvas.width / 2) < root.gridSize / 2)
                 verticalLines.push(canvas.width / 2)
-            if (Math.abs(widgetCenterY - canvas.height / 2) < root.gridSize / 2)
+            if (canvas && Math.abs(widgetCenterY - canvas.height / 2) < root.gridSize / 2)
                 horizontalLines.push(canvas.height / 2)
 
-            if (Config.options.background.showSnapLines)
+            if (canvas && Config.options.background.showSnapLines)
                 canvas.flashLines(verticalLines, horizontalLines)
         }
 
@@ -110,14 +145,24 @@ MouseArea {
             root.dragFinished()
     }
 
+    Rectangle {
+        anchors.fill: parent
+        visible: root.selected
+        color: "transparent"
+        border.width: 2
+        border.color: Appearance.colors.colPrimary
+        radius: Appearance.rounding?.verylarge ?? 30
+        z: 9999
+    }
+
     Behavior on x {
         id: xBehavior
-        enabled: !root.dragging
+        enabled: !root.dragging && !root.groupDragActive
         animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
     }
     Behavior on y {
         id: yBehavior
-        enabled: !root.dragging
+        enabled: !root.dragging && !root.groupDragActive
         animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
     }
 }

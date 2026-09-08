@@ -18,7 +18,7 @@ Item {
     property real originY: 0
 
     implicitWidth: isVertical ? 276 : 420
-    implicitHeight: isVertical ? 252 : 150
+    implicitHeight: isVertical ? 252 + 12 : 150
 
     readonly property string glyphTopLeft: DateTime.digitH0
     readonly property string glyphTopRight: DateTime.digitH1
@@ -311,6 +311,16 @@ Item {
                 radius: width / 2
                 color: root.tintBold
                 anchors.horizontalCenter: parent.horizontalCenter
+                FastBlurred {
+                    anchors.fill: parent
+                    cardRadius: width / 2
+                    blurSource: root.wallpaperItem
+                    tint: root.tintBold
+                    tintOpacity: 0.55
+                    trackX: root.originX + root.colonX
+                    trackY: root.originY + root.pos0Y + root.tileH / 2 - height / 2
+                    visible: root.blurWidgets
+                }
             }
             Rectangle {
                 width: root.colonDotSize
@@ -318,6 +328,16 @@ Item {
                 radius: width / 2
                 color: root.tintBold
                 anchors.horizontalCenter: parent.horizontalCenter
+                FastBlurred {
+                    anchors.fill: parent
+                    cardRadius: width / 2
+                    blurSource: root.wallpaperItem
+                    tint: root.tintBold
+                    tintOpacity: 0.55
+                    trackX: root.originX + root.colonX
+                    trackY: root.originY + root.pos0Y + root.tileH / 2 - height / 2 + root.colonGap + root.colonDotSize
+                    visible: root.blurWidgets
+                }
             }
         }
     }
