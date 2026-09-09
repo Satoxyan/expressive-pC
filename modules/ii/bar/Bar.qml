@@ -146,36 +146,6 @@ Scope {
                         }
                     }
 
-                    RoundCorner {
-                        id: leftPillCorner
-                        visible: barContent.centerOnly && showBarBackground && Config.options.bar.cornerStyle === 0 && barRoot.showCorners
-                        x: barContent.centerPillX - implicitSize
-                        implicitSize: Appearance.rounding.screenRounding
-                        color: Config.options.bar.followFrameColor
-                            ? Appearance.getColorFromName(Config.options.bar.frameColor)
-                            : Appearance.colors.colLayer0
-                        corner: RoundCorner.CornerEnum.TopRight
-
-                        states: State {
-                            name: "bottom"
-                            when: Config.options.bar.bottom
-                            AnchorChanges {
-                                target: leftPillCorner
-                                anchors.top: undefined
-                                anchors.bottom: barContent.bottom
-                            }
-                            PropertyChanges {
-                                target: leftPillCorner
-                                corner: RoundCorner.CornerEnum.BottomRight
-                            }
-                        }
-                        AnchorChanges {
-                            target: leftPillCorner
-                            anchors.top: barContent.top
-                            anchors.bottom: undefined
-                        }
-                    }
-
                     BarContent {
                         id: barContent
                         
@@ -213,36 +183,6 @@ Scope {
                                 anchors.topMargin: 0
                                 anchors.bottomMargin: (Config?.options.bar.autoHide.enable && !mustShow) ? -Appearance.sizes.barHeight : 0
                             }
-                        }
-                    }
-
-                    RoundCorner {
-                        id: rightPillCorner
-                        visible: barContent.centerOnly && showBarBackground && Config.options.bar.cornerStyle === 0 && barRoot.showCorners
-                        x: barContent.centerPillX + barContent.centerPillWidth
-                        implicitSize: Appearance.rounding.screenRounding
-                        color: Config.options.bar.followFrameColor
-                            ? Appearance.getColorFromName(Config.options.bar.frameColor)
-                            : Appearance.colors.colLayer0
-                        corner: RoundCorner.CornerEnum.TopLeft
-
-                        states: State {
-                            name: "bottom"
-                            when: Config.options.bar.bottom
-                            AnchorChanges {
-                                target: rightPillCorner
-                                anchors.top: undefined
-                                anchors.bottom: barContent.bottom
-                            }
-                            PropertyChanges {
-                                target: rightPillCorner
-                                corner: RoundCorner.CornerEnum.BottomLeft
-                            }
-                        }
-                        AnchorChanges {
-                            target: rightPillCorner
-                            anchors.top: barContent.top
-                            anchors.bottom: undefined
                         }
                     }
                     

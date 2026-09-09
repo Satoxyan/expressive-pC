@@ -87,6 +87,36 @@ Item {
         && root.effectiveLeftLayout.length === 0
         && root.effectiveRightLayout.length === 0
 
+    RoundCorner {
+        id: leftPillCorner
+        visible: root.centerOnly && showBarBackground && Config.options.bar.cornerStyle === 0 
+        x: barContent.centerPillX - implicitSize
+        implicitSize: Appearance.rounding.screenRounding
+        color: Config.options.bar.followFrameColor
+            ? Appearance.getColorFromName(Config.options.bar.frameColor)
+            : Appearance.colors.colLayer0
+        corner: RoundCorner.CornerEnum.TopRight
+
+        states: State {
+            name: "bottom"
+            when: Config.options.bar.bottom
+            AnchorChanges {
+                target: leftPillCorner
+                anchors.top: undefined
+                anchors.bottom: barContent.bottom
+            }
+            PropertyChanges {
+                target: leftPillCorner
+                corner: RoundCorner.CornerEnum.BottomRight
+            }
+        }
+        AnchorChanges {
+            target: leftPillCorner
+            anchors.top: barContent.top
+            anchors.bottom: undefined
+        }
+    }
+
     Rectangle {
         id: centerPill
         visible: centerOnly && Config.options.bar.showBackground && Config.options.bar.cornerStyle !== 2
@@ -105,6 +135,36 @@ Item {
         bottomRightRadius: Config.options.bar.cornerStyle === 0 && !Config.options.bar.bottom ? Appearance.rounding.screenRounding : radius
         topLeftRadius:     Config.options.bar.cornerStyle === 0 && Config.options.bar.bottom  ? Appearance.rounding.screenRounding : radius
         topRightRadius:    Config.options.bar.cornerStyle === 0 && Config.options.bar.bottom  ? Appearance.rounding.screenRounding : radius
+    }
+
+    RoundCorner {
+        id: rightPillCorner
+        visible: root.centerOnly && showBarBackground && Config.options.bar.cornerStyle === 0
+        x: barContent.centerPillX + barContent.centerPillWidth
+        implicitSize: Appearance.rounding.screenRounding
+        color: Config.options.bar.followFrameColor
+            ? Appearance.getColorFromName(Config.options.bar.frameColor)
+            : Appearance.colors.colLayer0
+        corner: RoundCorner.CornerEnum.TopLeft
+
+        states: State {
+            name: "bottom"
+            when: Config.options.bar.bottom
+            AnchorChanges {
+                target: rightPillCorner
+                anchors.top: undefined
+                anchors.bottom: barContent.bottom
+            }
+            PropertyChanges {
+                target: rightPillCorner
+                corner: RoundCorner.CornerEnum.BottomLeft
+            }
+        }
+        AnchorChanges {
+            target: rightPillCorner
+            anchors.top: barContent.top
+            anchors.bottom: undefined
+        }
     }
 
     Item {

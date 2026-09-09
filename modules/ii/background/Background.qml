@@ -409,6 +409,7 @@ Variants {
             }
             if (bgRoot.wallpaperAnimation === "") {
                 wallpaper.source = wallpaperPath
+                previousWallpaper.source = wallpaperPath
                 bgRoot.currentWallpaperSource = wallpaperPath
                 if (!bgRoot.wallpaperIsVideo) return
                 bgRoot.videoRevealed = true
@@ -424,6 +425,9 @@ Variants {
                 bgRoot.currentShader = bgRoot.wallpaperAnimation
             }
             bgRoot.transitionProgress = 0.0
+            if (wallpaper.status === Image.Ready) {
+                transitionAnim.restart()
+            }
         }
 
         NumberAnimation {
@@ -435,7 +439,7 @@ Variants {
             duration: 1200
             easing.type: Easing.InOutCubic
             onFinished: {
-                previousWallpaper.source = ""
+                previousWallpaper.source = bgRoot.currentWallpaperSource
                 bgRoot.previousWallpaperSource = ""
                 bgRoot.transitionProgress = 1.0
                 bgRoot.videoRevealed = bgRoot.wallpaperIsVideo
@@ -489,9 +493,9 @@ Variants {
                 cache: true
                 mipmap: true
                 smooth: true
-                asynchronous: true
                 layer.enabled: true
-                visible: false
+                visible: true
+                opacity: 0
             }
 
             StyledImage {
