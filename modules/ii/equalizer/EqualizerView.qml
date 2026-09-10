@@ -11,7 +11,7 @@ import Quickshell.Services.Mpris
 import Qt5Compat.GraphicalEffects
 
 // A 10-band live equalizer. Talks to EasyEffects through scripts/eq/equalizer.sh
-// (all of that plumbing - refresh/setBand/applyPending/applyPreset/eqGetProc -
+// (all of that plumbing - refresh/setBand/saveChanges/applyPreset/eqGetProc -
 // is unchanged from before, only the UI built on top of it is new).
 //
 // The layout is split the way a lot of Material 3 Expressive surfaces are:
@@ -45,6 +45,16 @@ Item {
     // b1..b10 gains in dB, mirrors eq_state.json written by equalizer.sh
     property var bands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     property string presetName: "Flat"
+    // Which named custom preset (if any) the CURRENT editing session
+    // started from - separate from presetName, which flips to generic
+    // "Custom" the instant you touch a slider (see setBand()). Lets the
+    // Save rail offer a one-tap "Update '<name>'" that writes back into
+    // that same custom-preset entry, instead of only ever being able to
+    // commit into whichever EasyEffects preset happens to be active. Set
+    // in applyCustomPreset(), cleared in applyPreset() (switching to a
+    // built-in curve), and naturally resets to "" on next popup open
+    // either way since this whole Item gets recreated then.
+    property string editingCustomPresetName: ""
     property bool pending: false
     readonly property var bandLabels: ["32", "63", "125", "250", "500", "1k", "2k", "4k", "8k", "16k"]
     readonly property real bandRange: 12 // -12dB .. +12dB, matches equalizer.sh clamp expectations
@@ -53,6 +63,18 @@ Item {
     // switching presets rather than resetting with them.
     property real preamp: 0
     readonly property real preampRange: 12
+
+    // Dims the blurred album-art background behind the popup (see the
+    // scrim Rectangle in EqualizerPopup.qml) - bright/high-contrast covers
+    // can otherwise flash-bang the user when the popup opens. Persisted to
+    // eq_state.json via set_dim, same as preamp, but never sets
+    // root.pending - it's a UI/background setting, not something
+    // EasyEffects needs to apply.
+    property real dimAmount: 0.3
+    readonly property real dimAmountMax: 0.85
+    // Collapsed to just the icon until tapped, so it doesn't permanently
+    // eat header space for a control most sessions won't touch.
+    property bool dimExpanded: false
 
     // Three-tier spacing system shared across the whole popup, so every
     // panel reads as one consistent layout instead of each picking its own
@@ -163,6 +185,18 @@ Item {
     // unsaved, so that needs an explicit confirm rather than happening
     // the moment you finish typing.
     property string pendingNewPresetName: ""
+    // Toggles the existing-presets list below between "tap to switch" and
+    // "tap to delete" - same pattern as customEditMode above, just scoped
+    // to real EasyEffects preset files instead of this script's own
+    // custom-preset store.
+    property bool activePresetEditMode: false
+    // Set instead of deleting immediately when a chip is tapped in edit
+    // mode - unlike the custom-preset rail (a curve you typed numbers
+    // into, trivial to redo), this deletes a real EasyEffects preset file
+    // that may hold hand-tuned effects with no equalizer.sh backup, so it
+    // gets the same explicit-confirm treatment as pendingNewPresetName
+    // above rather than deleting on the first tap.
+    property string pendingDeletePresetName: ""
     onShowActivePresetDialogChanged: {
         if (root.showActivePresetDialog) {
             activePresetField.text = root.activePreset
@@ -171,6 +205,8 @@ Item {
         } else {
             activePresetField.focus = false
             root.pendingNewPresetName = ""
+            root.activePresetEditMode = false
+            root.pendingDeletePresetName = ""
         }
     }
 
@@ -197,6 +233,7 @@ Item {
         EqualizerAutoService.currentPresetName = "Custom"
         root.pending = true
         Quickshell.execDetached(["bash", Directories.eqScriptPath, Directories.eqStateDir, "set_band", String(index + 1), String(Math.round(value))])
+        liveApplyTimer.restart()
     }
 
     // Doesn't touch presetName - preamp is a master gain layered on top
@@ -206,12 +243,49 @@ Item {
         root.preamp = value
         root.pending = true
         Quickshell.execDetached(["bash", Directories.eqScriptPath, Directories.eqStateDir, "set_preamp", String(Math.round(value))])
+        liveApplyTimer.restart()
     }
 
-    function applyPending() {
-        Quickshell.execDetached(["bash", Directories.eqScriptPath, Directories.eqStateDir, "apply"])
+    // Unlike setPreamp/setBand, doesn't touch root.pending - dim is a
+    // display-only setting with nothing for EasyEffects to apply, so
+    // there's no "Apply" prompt to trigger here.
+    function setDim(value) {
+        root.dimAmount = value
+        Quickshell.execDetached(["bash", Directories.eqScriptPath, Directories.eqStateDir, "set_dim", String(value)])
+    }
+
+    // The real commit - writes into the actual active preset's own file
+    // and clears the unsaved indicator. Only ever called by the user
+    // explicitly hitting Save now (see the pill below) - dragging a
+    // slider no longer reaches this function at all.
+    function saveChanges() {
+        Quickshell.execDetached(["bash", Directories.eqScriptPath, Directories.eqStateDir, "save"])
         root.pending = false
         needsSaveRecheckTimer.restart()
+    }
+
+    // Debounced live-audio preview while dragging - merges the current
+    // slider state into a scratch preset and reloads THAT, so you hear
+    // the change immediately without touching the real active preset's
+    // file. root.pending deliberately stays true after this: it's audible
+    // now, but still unsaved, and the Save pill should keep reflecting that
+    // until you actually hit it.
+    function previewChanges() {
+        Quickshell.execDetached(["bash", Directories.eqScriptPath, Directories.eqStateDir, "preview"])
+    }
+
+    // Fires shortly after band/preamp sliders go quiet, so you hear the
+    // result without needing to hit Save yourself. Restarted (not just
+    // started) on every onMoved, so continuous dragging doesn't spam
+    // reloads - it only actually previews once you settle on a value.
+    // Deliberately not fired on every single onMoved tick: apply_eq()
+    // reloads the whole EasyEffects pipeline each time, which can pop/glitch
+    // audio if done many times a second while actively dragging.
+    Timer {
+        id: liveApplyTimer
+        interval: 120
+        repeat: false
+        onTriggered: root.previewChanges()
     }
 
     function applyPreset(name) {
@@ -219,6 +293,9 @@ Item {
         const vals = root.presetValues[name]
         if (vals) root.bands = vals.slice()
         root.presetName = name
+        // A built-in curve, not a named custom preset - nothing for the
+        // "Update" shortcut to write back into.
+        root.editingCustomPresetName = ""
         // See setBand() above - keeps Auto's stale-preset check honest.
         EqualizerAutoService.currentPresetName = name
         root.pending = false
@@ -269,6 +346,9 @@ Item {
         const vals = root.customPresets[name]
         if (vals) root.bands = vals.slice()
         root.presetName = name
+        // This IS a named custom preset - remember it so the Save rail can
+        // offer "Update '<name>'" if you go on to edit it.
+        root.editingCustomPresetName = name
         // See setBand() above - keeps Auto's stale-preset check honest.
         EqualizerAutoService.currentPresetName = name
         root.pending = false
@@ -286,6 +366,13 @@ Item {
         updated[trimmed] = root.bands.slice()
         root.customPresets = updated
         root.presetName = trimmed
+        // Whether this came from the "Update '<name>'" shortcut or typing
+        // a fresh name into "save as", that name is now what you're
+        // editing - and save_custom already committed everything (state
+        // file + the real active EasyEffects preset) via apply_eq on the
+        // backend side, so there's nothing left unsaved.
+        root.editingCustomPresetName = trimmed
+        root.pending = false
         // See setBand() above - keeps Auto's stale-preset check honest.
         EqualizerAutoService.currentPresetName = trimmed
         root.showSaveDialog = false
@@ -299,6 +386,7 @@ Item {
         root.customPresets = updated
         if (root.presetName === name) {
             root.presetName = "Custom"
+            root.editingCustomPresetName = ""
             // See setBand() above - keeps Auto's stale-preset check honest.
             EqualizerAutoService.currentPresetName = "Custom"
         }
@@ -346,6 +434,25 @@ Item {
         root.refreshAvailablePresets()
     }
 
+    // First tap on a chip in edit mode - arms the confirm banner below
+    // instead of deleting right away. See pendingDeletePresetName above
+    // for why this needs an explicit second step.
+    function requestDeleteEasyEffectsPreset(name) {
+        if (name === root.activePreset) return
+        root.pendingDeletePresetName = name
+    }
+
+    // The actual delete, only ever reached via the confirm banner's own
+    // "Delete" button. Distinct from deleteCustomPreset above, which only
+    // ever touches this script's own saved-curve store, never a real
+    // EasyEffects preset file on disk.
+    function deleteEasyEffectsPreset(name) {
+        if (name === root.activePreset) return
+        Quickshell.execDetached(["bash", Directories.eqScriptPath, Directories.eqStateDir, "delete_preset", name])
+        root.availablePresets = root.availablePresets.filter(p => p !== name)
+        root.pendingDeletePresetName = ""
+    }
+
     // A short one-shot delay before polling get_needs_save after any
     // action that runs apply_eq() on the backend (execDetached is
     // fire-and-forget, so there's no direct completion signal to hook -
@@ -387,6 +494,10 @@ Item {
         root.refreshCustomPresets()
         root.refreshNeedsSave()
         root.refreshActivePreset()
+        // Needed up front (not just when the picker's opened) so the
+        // needsManualSave banner below can tell "you have presets, just
+        // pick one" apart from "you don't have any yet, make one."
+        root.refreshAvailablePresets()
     }
 
     // MPRIS doesn't push continuous position updates on its own - most
@@ -401,6 +512,32 @@ Item {
         onTriggered: root.player.positionChanged()
     }
 
+    // Collapses the dim slider back to its icon whenever the popup closes -
+    // whether via the header close button or the click-outside/Escape
+    // dismiss path in EqualizerPopup.qml, which only ever flips
+    // GlobalStates.equalizerOpen and never calls closeRequested. Watching
+    // the shared state here is what catches that second path too.
+    Connections {
+        target: GlobalStates
+        function onEqualizerOpenChanged() {
+            if (!GlobalStates.equalizerOpen) {
+                root.dimExpanded = false
+                // Closing without an explicit Save should discard whatever's
+                // been previewing, not commit it - that's the whole point of
+                // splitting preview from Save (see setBand/setPreamp above).
+                // Stop any debounce still waiting to fire (no point previewing
+                // a value we're about to throw away) and tell the backend to
+                // revert: pulls the sliders' next-open values back out of the
+                // real saved preset and reloads that live, discarding the
+                // scratch preview - see revert_preview() in equalizer.sh.
+                if (root.pending) {
+                    liveApplyTimer.stop()
+                    Quickshell.execDetached(["bash", Directories.eqScriptPath, Directories.eqStateDir, "revert_preview"])
+                }
+            }
+        }
+    }
+
     Process {
         id: eqGetProc
         command: ["bash", Directories.eqScriptPath, Directories.eqStateDir, "get"]
@@ -413,12 +550,29 @@ Item {
                     Number(data.b6), Number(data.b7), Number(data.b8), Number(data.b9), Number(data.b10)
                     ]
                     root.presetName = data.preset ?? "Custom"
+                    // Reopening the popup recreates this whole Item, so
+                    // editingCustomPresetName always starts blank - if the
+                    // preset that was active when you last closed happens
+                    // to be one of your named custom presets, restore the
+                    // tracking so "Update '<name>'" can show without you
+                    // having to re-click it in the list first. customPresets
+                    // may not have loaded yet (separate async request) -
+                    // the matching check in eqGetCustomProc below covers
+                    // that ordering too.
+                    if (Object.prototype.hasOwnProperty.call(root.customPresets, root.presetName))
+                        root.editingCustomPresetName = root.presetName
                     // Safety net alongside the explicit syncs in setBand()/
                     // applyPreset()/etc. - if anything else ever writes the
                     // state file, Auto's mirror still gets corrected here.
                     EqualizerAutoService.currentPresetName = root.presetName
                     root.pending = !!data.pending
                     root.preamp = Number(data.preamp) || 0
+                    // Only pick up a value once it's actually a number - an
+                    // absent/null .dim (e.g. an eq_state.json from before
+                    // this feature existed) should keep whatever's already
+                    // showing rather than snapping to a false "0" dim.
+                    if (data.dim !== undefined && data.dim !== null && !isNaN(Number(data.dim)))
+                        root.dimAmount = Number(data.dim)
                 } catch (e) {
                     // Leave previous values if the state file isn't ready yet
                 }
@@ -460,6 +614,11 @@ Item {
                         parsed[name] = [b.b1, b.b2, b.b3, b.b4, b.b5, b.b6, b.b7, b.b8, b.b9, b.b10].map(Number)
                     }
                     root.customPresets = parsed
+                    // See the matching comment in eqGetProc above - covers
+                    // the case where this request finishes AFTER the state
+                    // load already set presetName.
+                    if (Object.prototype.hasOwnProperty.call(parsed, root.presetName))
+                        root.editingCustomPresetName = root.presetName
                 } catch (e) {
                     // Leave previous values if custom_presets.json isn't ready yet
                 }
@@ -597,6 +756,18 @@ Item {
             highlightColor: cell.accent
             trackColor: ColorUtils.transparentize(cell.accent, 0.85)
             handleColor: cell.accent
+            // The built-in stop-indicator dot (see StyledSlider's TrackDot)
+            // defaults to marking value=1 - meaningful on a normal 0..1
+            // slider, but this one's range is -bandRange..+bandRange, so
+            // that default landed at a near-but-not-quite-center spot with
+            // no relation to 0dB, and never moved when you dragged (it's a
+            // fixed reference mark, not the handle). 0 is the actual center
+            // of this range, i.e. true 0dB - and default dotColor/
+            // dotColorHighlighted are also bumped for contrast, since the
+            // 3px dot was easy to lose against these tinted fills.
+            stopIndicatorValues: [0]
+            dotColor: root.blendedColors.colOnLayer1
+            dotColorHighlighted: root.blendedColors.colOnPrimary
             usePercentTooltip: false
             tooltipContent: `${Math.round(value) > 0 ? "+" : ""}${Math.round(value)} dB`
             onMoved: root.setBand(cell.index, value)
@@ -663,6 +834,73 @@ Item {
                     color: root.blendedColors.colSubtext
                     elide: Text.ElideRight
                     text: `${Translation.tr("Preset")}: ${root.presetName}`
+                }
+            }
+
+            // Dims the blurred-art background behind the popup - bright
+            // covers can otherwise flash-bang the user. Collapsed to a
+            // single icon by default; tapping it expands a slider inline
+            // (see dimSliderWrap below) rather than permanently taking up
+            // header space.
+            PillChip {
+                id: dimChip
+                implicitWidth: 34
+                implicitHeight: 34
+                chipToggled: root.dimExpanded
+                downAction: () => root.dimExpanded = !root.dimExpanded
+                contentItem: Item {
+                    anchors.fill: parent
+                    MaterialSymbol {
+                        anchors.centerIn: parent
+                        iconSize: Appearance.font.pixelSize.large
+                        fill: root.dimExpanded ? 1 : 0
+                        horizontalAlignment: Text.AlignHCenter
+                        color: root.dimExpanded ? root.blendedColors.colOnPrimary : root.blendedColors.colOnLayer1
+                        text: "contrast"
+                    }
+                }
+            }
+
+            // Expands/retracts alongside dimChip above instead of always
+            // reserving space - width and opacity both animate so it reads
+            // as sliding out from under the icon, not popping in.
+            Item {
+                id: dimSliderWrap
+                Layout.preferredWidth: root.dimExpanded ? 110 : 0
+                Layout.preferredHeight: 34
+                clip: true
+                opacity: root.dimExpanded ? 1 : 0
+
+                Behavior on Layout.preferredWidth {
+                    NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
+                }
+                Behavior on opacity {
+                    NumberAnimation { duration: root.dimExpanded ? 220 : 120; easing.type: Easing.OutCubic }
+                }
+
+                StyledSlider {
+                    id: dimSlider
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 110
+                    configuration: StyledSlider.Configuration.M
+                    from: 0
+                    to: root.dimAmountMax
+                    value: root.dimAmount
+                    highlightColor: root.blendedColors.colPrimary
+                    trackColor: ColorUtils.transparentize(root.blendedColors.colPrimary, 0.85)
+                    // Default stop-indicator value 1 is outside this
+                    // slider's 0..dimAmountMax range entirely (harmless,
+                    // just pointless) - clearing it rather than leaving an
+                    // unused Repeater iteration around.
+                    stopIndicatorValues: []
+                    handleColor: root.blendedColors.colPrimary
+                    usePercentTooltip: true
+                    onMoved: root.setDim(value)
+
+                    Behavior on value {
+                        enabled: !dimSlider.pressed
+                        NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
+                    }
                 }
             }
 
@@ -1123,7 +1361,29 @@ Item {
                                             wrapMode: Text.WordWrap
                                             font.pixelSize: Appearance.font.pixelSize.smaller
                                             color: root.blendedColors.colOnLayer1
-                                            text: Translation.tr("Save your current EasyEffects setup first (Presets tab \u2192 Save), or other effects won't be kept when you use this equalizer.")
+                                            // Two different situations share this banner:
+                                            // someone with zero EasyEffects presets at all
+                                            // (a genuine first run) needs to be told to make
+                                            // one, not to go "save their setup" when there's
+                                            // nothing there to save yet. Someone who already
+                                            // has presets just needs to pick the right one.
+                                            text: root.availablePresets.length === 0
+                                                ? Translation.tr("You don't have an EasyEffects preset yet. Make one below to start using this equalizer.")
+                                                : Translation.tr("Pick one of your existing EasyEffects presets below, or save your current setup first (Presets tab \u2192 Save).")
+                                        }
+                                        PillChip {
+                                            Layout.alignment: Qt.AlignVCenter
+                                            implicitHeight: 26
+                                            implicitWidth: choosePresetLabel.implicitWidth + 20
+                                            chipToggled: true
+                                            downAction: () => root.showActivePresetDialog = true
+                                            contentItem: StyledText {
+                                                id: choosePresetLabel
+                                                horizontalAlignment: Text.AlignHCenter
+                                                font.pixelSize: Appearance.font.pixelSize.smallest
+                                                color: root.blendedColors.colOnPrimary
+                                                text: root.availablePresets.length === 0 ? Translation.tr("Create") : Translation.tr("Choose")
+                                            }
                                         }
                                     }
                                 }
@@ -1446,11 +1706,52 @@ Item {
                         }
                     }
 
-                    // Apply - the rail's primary action, not a full-width bar
+                    // Update '<name>' - only shown when the edit in progress
+                    // started from an existing named custom preset (see
+                    // editingCustomPresetName). The main Save pill below
+                    // only ever commits into whichever EasyEffects preset
+                    // is currently active - it never touches your saved
+                    // custom-preset shapes, so without this, editing
+                    // "MyBassBoost" and hitting Save would leave
+                    // "MyBassBoost" itself unchanged (next time you picked
+                    // it, you'd get the old values back). This writes the
+                    // current bands into that same custom-preset entry
+                    // directly, same as retyping its name into "save as"
+                    // would - just without having to retype it.
+                    PillChip {
+                        Layout.fillWidth: true
+                        Layout.minimumHeight: implicitHeight
+                        implicitHeight: 36
+                        visible: root.pending && root.editingCustomPresetName.length > 0
+                        chipToggled: false
+                        downAction: () => root.saveCustomPreset(root.editingCustomPresetName)
+                        contentItem: RowLayout {
+                            spacing: 6
+                            Item { Layout.fillWidth: true }
+                            MaterialSymbol {
+                                iconSize: Appearance.font.pixelSize.normal
+                                fill: 0
+                                text: "sync"
+                                color: root.blendedColors.colOnLayer1
+                            }
+                            StyledText {
+                                font.pixelSize: Appearance.font.pixelSize.small
+                                text: Translation.tr("Update \"%1\"").arg(root.editingCustomPresetName)
+                                color: root.blendedColors.colOnLayer1
+                                elide: Text.ElideRight
+                            }
+                            Item { Layout.fillWidth: true }
+                        }
+                    }
+
+                    // Save - the rail's primary action, not a full-width bar
                     // spanning the whole popup. Placed after railFlick rather
                     // than inside it, so it stays visible and full size no
                     // matter how far the custom-preset list has scrolled -
                     // railFlick above is what absorbs overflow now, never this.
+                    // Dragging a slider previews live audio on its own (see
+                    // liveApplyTimer above) but never touches the real saved
+                    // preset - this pill is now the ONLY thing that commits.
                     PillChip {
                         Layout.fillWidth: true
                         Layout.minimumHeight: implicitHeight
@@ -1459,14 +1760,14 @@ Item {
                         chipToggled: true
                         colBackgroundToggled: root.pending ? root.blendedColors.colPrimary : ColorUtils.transparentize(root.blendedColors.colLayer1, 0.35)
                         colBackgroundToggledHover: root.pending ? root.blendedColors.colPrimaryHover : ColorUtils.mix(root.blendedColors.colLayer1, root.blendedColors.colOnLayer1, 0.92)
-                        downAction: () => root.applyPending()
+                        downAction: () => root.saveChanges()
                         contentItem: RowLayout {
                             spacing: 6
                             Item { Layout.fillWidth: true }
                             MaterialSymbol {
                                 iconSize: Appearance.font.pixelSize.large
                                 fill: 1
-                                text: root.pending ? "check" : "check_circle"
+                                text: root.pending ? "save" : "check_circle"
                                 color: root.pending ? root.blendedColors.colOnPrimary : root.blendedColors.colSubtext
                                 Behavior on color {
                                     ColorAnimation { duration: 180; easing.type: Easing.OutCubic }
@@ -1474,7 +1775,7 @@ Item {
                             }
                             StyledText {
                                 font.bold: true
-                                text: root.pending ? Translation.tr("Apply") : Translation.tr("Applied")
+                                text: root.pending ? Translation.tr("Save") : Translation.tr("Saved")
                                 color: root.pending ? root.blendedColors.colOnPrimary : root.blendedColors.colSubtext
                                 Behavior on color {
                                     ColorAnimation { duration: 180; easing.type: Easing.OutCubic }
@@ -1800,22 +2101,56 @@ Item {
                                         }
                                         StyledText {
                                             Layout.fillWidth: true
+                                            horizontalAlignment: Text.AlignHCenter
                                             elide: Text.ElideRight
                                             font.pixelSize: Appearance.font.pixelSize.smaller
                                             color: root.blendedColors.colOnLayer1
                                             text: root.activePreset
                                         }
+                                        // Opens the dialog only - no longer toggles it shut
+                                        // too. The name field's own "check" chip below already
+                                        // closes the dialog when tapped (it's prefilled with
+                                        // the current preset, so tapping it unchanged is a
+                                        // no-op reselect that closes cleanly), and Escape on
+                                        // that field closes it too - so a dedicated X here was
+                                        // redundant with those, on top of visually colliding
+                                        // with the trash toggle's own icon once that existed.
                                         PillChip {
                                             implicitWidth: 26
                                             implicitHeight: 26
                                             chipToggled: root.showActivePresetDialog
-                                            downAction: () => root.showActivePresetDialog = !root.showActivePresetDialog
+                                            downAction: () => root.showActivePresetDialog = true
                                             contentItem: MaterialSymbol {
                                                 iconSize: Appearance.font.pixelSize.normal
                                                 fill: 0
                                                 horizontalAlignment: Text.AlignHCenter
-                                                text: root.showActivePresetDialog ? "close" : "edit"
+                                                text: "edit"
                                                 color: root.showActivePresetDialog ? root.blendedColors.colOnPrimary : root.blendedColors.colOnLayer1
+                                            }
+                                        }
+                                        // Tap-to-delete toggle for the existing-presets list
+                                        // below - kept on this same header row (rather than a
+                                        // row of its own) so opening it doesn't cost an extra
+                                        // line of otherwise-empty space. Only makes sense once
+                                        // the dialog is open and there's actually something to
+                                        // delete. Stays as the trash icon in both states (just
+                                        // filled once active, plus the chip's own highlight)
+                                        // rather than swapping to "check" once active, since
+                                        // the name field's own apply chip below already uses
+                                        // "check" - two check icons on screen read as
+                                        // duplicates of each other.
+                                        PillChip {
+                                            implicitWidth: 26
+                                            implicitHeight: 26
+                                            visible: root.showActivePresetDialog && root.availablePresets.length > 0
+                                            chipToggled: root.activePresetEditMode
+                                            downAction: () => root.activePresetEditMode = !root.activePresetEditMode
+                                            contentItem: MaterialSymbol {
+                                                iconSize: Appearance.font.pixelSize.normal
+                                                fill: root.activePresetEditMode ? 1 : 0
+                                                horizontalAlignment: Text.AlignHCenter
+                                                text: "delete"
+                                                color: root.activePresetEditMode ? root.blendedColors.colOnPrimary : root.blendedColors.colOnLayer1
                                             }
                                         }
                                     }
@@ -1955,11 +2290,93 @@ Item {
                                         }
                                     }
 
+                                    // Shown after tapping a preset chip in delete mode -
+                                    // this removes a real EasyEffects preset file, which
+                                    // (unlike a custom EQ-curve entry) may hold hand-tuned
+                                    // effects with no backup anywhere else, so it gets an
+                                    // explicit confirm instead of deleting on first tap.
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        visible: root.pendingDeletePresetName.length > 0
+                                        Layout.minimumHeight: implicitHeight
+                                        radius: Appearance.rounding.normal
+                                        color: ColorUtils.transparentize(root.blendedColors.colPrimary, 0.85)
+                                        implicitHeight: deleteConfirmColumn.implicitHeight + 16
+
+                                        opacity: root.pendingDeletePresetName.length > 0 ? 1 : 0
+                                        scale: root.pendingDeletePresetName.length > 0 ? 1 : 0.94
+                                        transformOrigin: Item.Top
+                                        Behavior on opacity {
+                                            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                                        }
+                                        Behavior on scale {
+                                            NumberAnimation { duration: 200; easing.type: Easing.OutBack }
+                                        }
+
+                                        ColumnLayout {
+                                            id: deleteConfirmColumn
+                                            anchors.fill: parent
+                                            anchors.margins: 8
+                                            spacing: 6
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 6
+
+                                                MaterialSymbol {
+                                                    Layout.alignment: Qt.AlignTop
+                                                    iconSize: Appearance.font.pixelSize.normal
+                                                    fill: 0
+                                                    text: "warning"
+                                                    color: root.blendedColors.colPrimary
+                                                }
+                                                StyledText {
+                                                    Layout.fillWidth: true
+                                                    wrapMode: Text.WordWrap
+                                                    font.pixelSize: Appearance.font.pixelSize.smaller
+                                                    color: root.blendedColors.colOnLayer1
+                                                    text: Translation.tr("Delete the EasyEffects preset \"%1\"? This removes its file from disk, including any other effects (compressor, limiter, etc) saved in it - not just the equalizer. This can't be undone.").arg(root.pendingDeletePresetName)
+                                                }
+                                            }
+
+                                            RowLayout {
+                                                Layout.alignment: Qt.AlignRight
+                                                spacing: 6
+
+                                                PillChip {
+                                                    implicitWidth: 90
+                                                    implicitHeight: 30
+                                                    downAction: () => root.pendingDeletePresetName = ""
+                                                    contentItem: StyledText {
+                                                        horizontalAlignment: Text.AlignHCenter
+                                                        font.pixelSize: Appearance.font.pixelSize.smaller
+                                                        text: Translation.tr("Cancel")
+                                                        color: root.blendedColors.colOnLayer1
+                                                    }
+                                                }
+                                                PillChip {
+                                                    implicitWidth: 90
+                                                    implicitHeight: 30
+                                                    chipToggled: true
+                                                    downAction: () => root.deleteEasyEffectsPreset(root.pendingDeletePresetName)
+                                                    contentItem: StyledText {
+                                                        horizontalAlignment: Text.AlignHCenter
+                                                        font.pixelSize: Appearance.font.pixelSize.smaller
+                                                        text: Translation.tr("Delete")
+                                                        color: root.blendedColors.colOnPrimary
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
                                     // Existing EasyEffects presets to pick from instead of
                                     // typing blind - whichever one actually holds your
                                     // other effects. Wraps rather than a fixed 2-column
                                     // grid since preset names vary a lot more in length
-                                    // than the built-in EQ curve names do.
+                                    // than the built-in EQ curve names do. The tap-to-delete
+                                    // toggle for this list lives up in the header row above
+                                    // (next to the edit pencil) rather than its own row here.
                                     Flow {
                                         Layout.fillWidth: true
                                         visible: root.showActivePresetDialog && root.availablePresets.length > 0
@@ -1971,16 +2388,40 @@ Item {
                                             delegate: PillChip {
                                                 id: presetPickChip
                                                 required property string modelData
+                                                // Can't delete whatever's currently active - see
+                                                // deleteEasyEffectsPreset()/the backend's own
+                                                // refusal for why. Dimmed rather than hidden in
+                                                // edit mode so it's clear this one's excluded on
+                                                // purpose, not missing.
+                                                readonly property bool isActive: root.activePreset === presetPickChip.modelData
                                                 implicitHeight: 28
-                                                implicitWidth: pickLabel.implicitWidth + 20
-                                                chipToggled: root.activePreset === modelData
-                                                downAction: () => root.setActivePreset(modelData)
-                                                contentItem: StyledText {
-                                                    id: pickLabel
-                                                    horizontalAlignment: Text.AlignHCenter
-                                                    font.pixelSize: Appearance.font.pixelSize.smaller
-                                                    text: presetPickChip.modelData
-                                                    color: presetPickChip.chipToggled ? root.blendedColors.colOnPrimary : root.blendedColors.colOnLayer1
+                                                implicitWidth: pickRow.implicitWidth + 20
+                                                chipToggled: presetPickChip.isActive
+                                                opacity: root.activePresetEditMode && presetPickChip.isActive ? 0.45 : 1
+                                                downAction: () => {
+                                                    if (root.activePresetEditMode) {
+                                                        if (!presetPickChip.isActive)
+                                                            root.requestDeleteEasyEffectsPreset(presetPickChip.modelData)
+                                                    } else {
+                                                        root.setActivePreset(presetPickChip.modelData)
+                                                    }
+                                                }
+                                                contentItem: RowLayout {
+                                                    id: pickRow
+                                                    spacing: 4
+                                                    MaterialSymbol {
+                                                        visible: root.activePresetEditMode
+                                                        iconSize: Appearance.font.pixelSize.normal
+                                                        fill: 0
+                                                        text: "delete"
+                                                        color: presetPickChip.chipToggled ? root.blendedColors.colOnPrimary : root.blendedColors.colOnLayer1
+                                                    }
+                                                    StyledText {
+                                                        horizontalAlignment: Text.AlignHCenter
+                                                        font.pixelSize: Appearance.font.pixelSize.smaller
+                                                        text: presetPickChip.modelData
+                                                        color: presetPickChip.chipToggled ? root.blendedColors.colOnPrimary : root.blendedColors.colOnLayer1
+                                                    }
                                                 }
                                             }
                                         }
@@ -2033,6 +2474,12 @@ Item {
                                         highlightColor: root.blendedColors.colPrimary
                                         trackColor: ColorUtils.transparentize(root.blendedColors.colPrimary, 0.85)
                                         handleColor: root.blendedColors.colPrimary
+                                        // Same fix as the band sliders - default
+                                        // stop-indicator value 1 has no meaning on
+                                        // this -preampRange..+preampRange scale.
+                                        stopIndicatorValues: [0]
+                                        dotColor: root.blendedColors.colOnLayer1
+                                        dotColorHighlighted: root.blendedColors.colOnPrimary
                                         usePercentTooltip: false
                                         tooltipContent: `${Math.round(value) > 0 ? "+" : ""}${Math.round(value)} dB`
                                         onMoved: root.setPreamp(value)

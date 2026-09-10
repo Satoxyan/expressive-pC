@@ -107,13 +107,31 @@ Variants {
         readonly property bool blurFullScreen: bgRoot.overviewBlurActive || bgRoot.splitFraction >= 1.0
 
         //centered Wallpaper
-        property bool centeredWallpaperEnabled: Config.options.background.centeredWallpaper
+        readonly property bool centeredWallpaperConfigEnabled: Config.options.background.centeredWallpaper
+        property bool centeredWallpaperEnabled: false  
+        property bool centeredWallpaperPendingDisable: false
         property bool centeredOnlyWhenLocked: Config.options.background.centeredWallpaperOnlyWhenLocked
         property int centeredWallpaperShape: getShapeFromName(Config.options.background.centeredWallpaperShape)
         property int centeredWallpaperSize: Config.options.background.centeredWallpaperSize
         property color centeredWallpaperColor: root.getColorFromName(Config.options.background.centeredWallpaperColor)
         onCenteredOnlyWhenLockedChanged: {
             bgRoot.setCenteredProgress(GlobalStates.screenLocked ? 0 : (bgRoot.centeredOnlyWhenLocked ? 1 : 0))
+        }
+
+        onCenteredWallpaperConfigEnabledChanged: {
+            if (bgRoot.centeredWallpaperConfigEnabled) {
+                bgRoot.centeredWallpaperPendingDisable = false
+                bgRoot.centeredWallpaperEnabled = true
+                bgRoot.centeredProgress = 1
+                bgRoot.setCenteredProgress(GlobalStates.screenLocked ? 0 : (bgRoot.centeredOnlyWhenLocked ? 1 : 0))
+            } else {
+                if (bgRoot.centeredProgress === 1) {
+                    bgRoot.centeredWallpaperEnabled = false
+                } else {
+                    bgRoot.centeredWallpaperPendingDisable = true
+                    bgRoot.setCenteredProgress(1)
+                }
+            }
         }
 
         // Size the shape (with the wallpaper inside) must reach so its masked
@@ -227,7 +245,13 @@ Variants {
             duration: 800
             easing.type: Easing.BezierSpline
             easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial
-            onRunningChanged: bgRoot.centeredAnimating = running
+            onRunningChanged: {
+                bgRoot.centeredAnimating = running
+                if (!running && bgRoot.centeredWallpaperPendingDisable) {
+                    bgRoot.centeredWallpaperPendingDisable = false
+                    bgRoot.centeredWallpaperEnabled = false
+                }
+            }
         }
 
         // The centered shape is actually shown on screen only while the
@@ -384,6 +408,7 @@ Variants {
         }
 
         Component.onCompleted: {
+            bgRoot.centeredWallpaperEnabled = bgRoot.centeredWallpaperConfigEnabled 
             bgRoot.setCenteredProgress(GlobalStates.screenLocked ? 0 : (bgRoot.centeredOnlyWhenLocked ? 1 : 0))
             if (Config.ready)
                 bgRoot.centeredAnimationReady = true
@@ -511,7 +536,7 @@ Variants {
                 smooth: true
                 mipmap: true
                 asynchronous: true
-                layer.enabled: true
+                layer.enabled: blurLoader.active
                 visible: !blurLoader.active && !bgRoot.videoRevealed
                     && (bgRoot.wallpaperAnimation === "" || bgRoot.transitionProgress >= 1.0)
                     && !bgRoot.centeredHidesFullWallpaper
@@ -527,7 +552,7 @@ Variants {
             ShaderEffect {
                 id: transitionEffect
                 anchors.fill: parent
-                layer.enabled: true
+
                 visible: !blurLoader.active && bgRoot.wallpaperAnimation !== "" && !bgRoot.centeredShapeActive && !bgRoot.videoRevealed
                     && bgRoot.transitionProgress < 1.0
 

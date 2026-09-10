@@ -259,8 +259,15 @@ Scope {
                         // art readable without recoloring it pink/whatever from
                         // matugen's blend. Buttons/sliders elsewhere still use
                         // root.blendedColors (album-tinted) as before.
+                        //
+                        // Alpha is user-controlled via eqView.dimAmount (the
+                        // slider next to Auto in the header, persisted to
+                        // eq_state.json) instead of a fixed 0.3 -
+                        // bright/high-contrast covers could otherwise
+                        // flash-bang the user on open with no way to tone
+                        // it down.
                         anchors.fill: parent
-                        color: ColorUtils.transparentize(Appearance.colors.colScrim, 0.3)
+                        color: ColorUtils.transparentize(Appearance.colors.colScrim, eqView.dimAmount)
 
                         Behavior on color {
                             ColorAnimation { duration: 420; easing.type: Easing.OutCubic }
@@ -282,6 +289,7 @@ Scope {
                 }
 
                 EqualizerView {
+                    id: eqView
                     anchors.fill: parent
                     blendedColors: root.blendedColors
                     player: root.activePlayer

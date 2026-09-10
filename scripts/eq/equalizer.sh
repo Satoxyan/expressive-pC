@@ -11,6 +11,15 @@
 #   equalizer.sh <state_dir> get
 #   equalizer.sh <state_dir> set_band <1-10> <gainDb>
 #   equalizer.sh <state_dir> set_preamp <gainDb>   (master gain, independent of the curve/preset)
+#   equalizer.sh <state_dir> set_dim <0-0.85>      (blurred-art scrim darkness, UI-only, no apply needed)
+#   equalizer.sh <state_dir> preview                (live-audio preview only - merges current slider
+#                                                     state into a scratch preset and loads that, never
+#                                                     touching the real active preset's own file)
+#   equalizer.sh <state_dir> save                   (the real commit - writes into the actual active
+#                                                     preset's file and reloads it)
+#   equalizer.sh <state_dir> revert_preview         (discards an unsaved preview: restores STATE_FILE
+#                                                     from the real active preset's saved equalizer
+#                                                     block and reloads it live)
 #   equalizer.sh <state_dir> apply
 #   equalizer.sh <state_dir> preset <Flat|Bass|Treble|Vocal|Pop|Rock|Jazz|Classic>
 #   equalizer.sh <state_dir> genre_tags <artist>   (cache-first Last.fm artist.getTopTags
@@ -34,6 +43,9 @@
 #   equalizer.sh <state_dir> set_active_preset <n>  (switch which preset it merges into)
 #   equalizer.sh <state_dir> create_preset <n>      (make a brand-new preset from scratch and
 #                                                     switch to it - refuses if <n> already exists)
+#   equalizer.sh <state_dir> delete_preset <n>       (delete a saved EasyEffects preset file from
+#                                                     PRESET_DIR - refuses if <n> is the active preset
+#                                                     or doesn't exist on disk)
 #
 # <state_dir> is expected to be Directories.eqStateDir from the QML side
 # (e.g. ~/.local/state/quickshell/user/eq), passed in so this script never
@@ -130,21 +142,24 @@ if [ ! -f "$ACTIVE_PRESET_FILE" ]; then
 fi
 
 if [ ! -f "$STATE_FILE" ]; then
-    echo '{"b1": 0, "b2": 0, "b3": 0, "b4": 0, "b5": 0, "b6": 0, "b7": 0, "b8": 0, "b9": 0, "b10": 0, "preset": "Flat", "preamp": 0, "pending": false}' > "$STATE_FILE"
+    echo '{"b1": 0, "b2": 0, "b3": 0, "b4": 0, "b5": 0, "b6": 0, "b7": 0, "b8": 0, "b9": 0, "b10": 0, "preset": "Flat", "preamp": 0, "dim": 0.3, "pending": false}' > "$STATE_FILE"
 fi
 
 apply_custom_preset() {
     local name="$1"
-    local vals current_preamp
+    local vals current_preamp current_dim
     vals=$(jq -c --arg n "$name" '.[$n] // empty' "$CUSTOM_PRESETS_FILE")
     [ -n "$vals" ] || exit 1
     # Preamp is a master control independent of which curve is active -
     # carry it forward instead of letting it reset to 0 just because the
-    # preset switched.
+    # preset switched. Same reasoning for dim - it's a UI/background
+    # setting, not part of the curve's identity.
     current_preamp=$(jq -r '.preamp // 0' "$STATE_FILE" 2>/dev/null)
     case "$current_preamp" in ''|null) current_preamp=0 ;; esac
-    echo "$vals" | jq -c '{b1:.b1,b2:.b2,b3:.b3,b4:.b4,b5:.b5,b6:.b6,b7:.b7,b8:.b8,b9:.b9,b10:.b10,preset:$name,preamp:($preamp|tonumber),pending:false}' \
-        --arg name "$name" --arg preamp "$current_preamp" > "$STATE_FILE"
+    current_dim=$(jq -r '.dim // 0.3' "$STATE_FILE" 2>/dev/null)
+    case "$current_dim" in ''|null) current_dim=0.3 ;; esac
+    echo "$vals" | jq -c '{b1:.b1,b2:.b2,b3:.b3,b4:.b4,b5:.b5,b6:.b6,b7:.b7,b8:.b8,b9:.b9,b10:.b10,preset:$name,preamp:($preamp|tonumber),dim:($dim|tonumber),pending:false}' \
+        --arg name "$name" --arg preamp "$current_preamp" --arg dim "$current_dim" > "$STATE_FILE"
     apply_eq
 }
 
@@ -194,10 +209,19 @@ apply_eq() {
     # existence here: the real risk isn't the file, it's replacing
     # whatever's currently live in EasyEffects, which can happen either way).
     local force_create="${1:-0}"
+    # target_name lets a caller write the merged result somewhere OTHER
+    # than the real active preset and load THAT instead - used by
+    # apply_eq_preview() below so live-dragging a slider can be heard
+    # immediately without touching (and risking corrupting) a real,
+    # possibly hand-crafted preset until the user explicitly saves.
+    # Defaults to the real active preset, i.e. today's original behavior.
+    local target_name="${2:-}"
     vals=$(cat "$STATE_FILE")
     active_preset=$(cat "$ACTIVE_PRESET_FILE" 2>/dev/null)
     [ -n "$active_preset" ] || active_preset="output"
     active_preset_path="$PRESET_DIR/${active_preset}.json"
+    write_name="${target_name:-$active_preset}"
+    write_path="$PRESET_DIR/${write_name}.json"
 
     # Merge into whatever preset is actually the active one instead of
     # loading a scratch preset that only contains the equalizer - loading a
@@ -207,12 +231,13 @@ apply_eq() {
     # reads the existing preset file, leaves every other plugin's block
     # exactly as-is, and only adds/updates the 'equalizer' entry (and makes
     # sure 'equalizer' is present in plugins_order without disturbing the
-    # rest of that list), then writes back to the SAME file and reloads the
-    # SAME preset name - so the other effects stay loaded.
+    # rest of that list), then writes to write_path (the SAME file as the
+    # source unless a preview target_name was passed) and reloads write_name -
+    # so the other effects stay loaded either way.
     python3 -c "
 import sys, json, os
 
-state_json, preset_path, force_create = sys.argv[1], sys.argv[2], sys.argv[3] == '1'
+state_json, preset_path, write_path, force_create = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4] == '1'
 
 try:
     data = json.loads(state_json)
@@ -305,15 +330,15 @@ try:
     # Writing to a temp file in the same directory and renaming into place
     # means EasyEffects only ever sees the old complete file or the new
     # complete file, never a partial one.
-    tmp_path = preset_path + '.tmp'
+    tmp_path = write_path + '.tmp'
     with open(tmp_path, 'w') as f:
         json.dump(preset, f, indent=4)
         f.flush()
         os.fsync(f.fileno())
-    os.replace(tmp_path, preset_path)
+    os.replace(tmp_path, write_path)
 except Exception:
     sys.exit(1)
-" "$vals" "$active_preset_path" "$force_create"
+" "$vals" "$active_preset_path" "$write_path" "$force_create"
     py_status=$?
 
     if [ "$py_status" -eq 3 ]; then
@@ -327,16 +352,88 @@ except Exception:
     fi
     echo 'false' > "$NEEDS_SAVE_FILE"
 
+    easyeffects -l "$write_name" >/dev/null 2>&1 &
+}
+
+# Live-preview variant of apply_eq() - merges the current slider state into
+# a copy of the real active preset (so every other effect is preserved)
+# but writes that copy to a scratch preset name and loads THAT, instead of
+# touching the real preset's own file. Used by the "preview" command below,
+# which is what dragging a band/preamp slider now triggers (debounced) -
+# you hear the change immediately, but nothing about your actual saved
+# preset changes until you explicitly hit Save.
+LIVE_PREVIEW_NAME="_eq_live_preview"
+apply_eq_preview() {
+    apply_eq 0 "$LIVE_PREVIEW_NAME"
+}
+
+# Undoes whatever apply_eq_preview() above has been previewing: pulls the
+# equalizer's band gains and output-gain straight back out of the REAL
+# active preset's own saved file (which preview never touched) into
+# STATE_FILE, so the sliders next time the popup opens match what's
+# actually saved - then reloads the real preset live, discarding the
+# scratch preview. Called when the popup closes without an explicit Save,
+# so previewing a change and backing out never leaves you (a) listening to
+# an unsaved tweak with no on-screen indication, or (b) with EasyEffects'
+# own "currently loaded preset" left pointed at the scratch file.
+revert_preview() {
+    active_preset=$(cat "$ACTIVE_PRESET_FILE" 2>/dev/null)
+    [ -n "$active_preset" ] || active_preset="output"
+    active_preset_path="$PRESET_DIR/${active_preset}.json"
+
+    restored=$(python3 -c "
+import sys, json
+
+preset_path = sys.argv[1]
+slider_map = { 0:0, 1:3, 2:6, 3:9, 4:12, 5:15, 6:18, 7:21, 8:24, 9:27 }
+
+try:
+    with open(preset_path) as f:
+        preset = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError):
+    preset = {}
+
+output = preset.get('output', {})
+plugins_order = output.get('plugins_order', [])
+eq_key = None
+for name in plugins_order:
+    if name == 'equalizer' or name.startswith('equalizer#'):
+        eq_key = name
+        break
+
+# No equalizer saved in this preset yet - nothing to revert to but flat.
+if eq_key is None or eq_key not in output:
+    print(json.dumps({'bands': [0]*10, 'preamp': 0}))
+    sys.exit(0)
+
+eq_block = output[eq_key]
+bands_src = eq_block.get('left', {})
+bands = []
+for s_idx in range(10):
+    b_idx = slider_map[s_idx]
+    band = bands_src.get(f'band{b_idx}', {})
+    bands.append(band.get('gain', 0))
+preamp = eq_block.get('output-gain', 0)
+print(json.dumps({'bands': bands, 'preamp': preamp}))
+" "$active_preset_path")
+
+    tmp=$(cat "$STATE_FILE")
+    updated=$(echo "$tmp" | jq -c --argjson r "$restored" \
+        '.b1=($r.bands[0]|tostring) | .b2=($r.bands[1]|tostring) | .b3=($r.bands[2]|tostring) | .b4=($r.bands[3]|tostring) | .b5=($r.bands[4]|tostring) | .b6=($r.bands[5]|tostring) | .b7=($r.bands[6]|tostring) | .b8=($r.bands[7]|tostring) | .b9=($r.bands[8]|tostring) | .b10=($r.bands[9]|tostring) | .preamp=($r.preamp|tostring) | .preset="Custom" | .pending=false')
+    echo "$updated" > "$STATE_FILE"
+
     easyeffects -l "$active_preset" >/dev/null 2>&1 &
 }
 
 save_preset() {
-    local current_preamp
+    local current_preamp current_dim
     current_preamp=$(jq -r '.preamp // 0' "$STATE_FILE" 2>/dev/null)
     case "$current_preamp" in ''|null) current_preamp=0 ;; esac
+    current_dim=$(jq -r '.dim // 0.3' "$STATE_FILE" 2>/dev/null)
+    case "$current_dim" in ''|null) current_dim=0.3 ;; esac
     jq -n -c --arg b1 "$1" --arg b2 "$2" --arg b3 "$3" --arg b4 "$4" --arg b5 "$5" \
-          --arg b6 "$6" --arg b7 "$7" --arg b8 "$8" --arg b9 "$9" --arg b10 "${10}" --arg p "${11}" --arg preamp "$current_preamp" \
-       '{"b1": $b1, "b2": $b2, "b3": $b3, "b4": $b4, "b5": $b5, "b6": $b6, "b7": $b7, "b8": $b8, "b9": $b9, "b10": $b10, "preset": $p, "preamp": ($preamp|tonumber), "pending": false}' > "$STATE_FILE"
+          --arg b6 "$6" --arg b7 "$7" --arg b8 "$8" --arg b9 "$9" --arg b10 "${10}" --arg p "${11}" --arg preamp "$current_preamp" --arg dim "$current_dim" \
+       '{"b1": $b1, "b2": $b2, "b3": $b3, "b4": $b4, "b5": $b5, "b6": $b6, "b7": $b7, "b8": $b8, "b9": $b9, "b10": $b10, "preset": $p, "preamp": ($preamp|tonumber), "dim": ($dim|tonumber), "pending": false}' > "$STATE_FILE"
 }
 
 case "$cmd" in
@@ -353,11 +450,38 @@ case "$cmd" in
         updated=$(echo "$tmp" | jq -c --arg val "$arg1" ".preamp = \$val | .pending = true")
         echo "$updated" > "$STATE_FILE"
         ;;
-    "apply")
+    "set_dim")
+        # Purely a UI/background setting (how dark the blurred-art scrim
+        # sits behind the popup) - unlike set_preamp, this never touches
+        # .pending. There's nothing for EasyEffects to apply; writing it
+        # straight through is the whole job.
+        tmp=$(cat "$STATE_FILE")
+        updated=$(echo "$tmp" | jq -c --arg val "$arg1" ".dim = \$val")
+        echo "$updated" > "$STATE_FILE"
+        ;;
+    "save")
+        # The real commit: writes the current slider state into the
+        # actual active preset's own file and reloads it live. Only ever
+        # triggered by the user explicitly hitting Save now - dragging a
+        # slider triggers "preview" below instead, which never touches
+        # this file.
         tmp=$(cat "$STATE_FILE")
         updated=$(echo "$tmp" | jq -c ".pending = false")
         echo "$updated" > "$STATE_FILE"
         apply_eq
+        ;;
+    "preview")
+        # Debounced live-audio preview while dragging a band/preamp
+        # slider - see apply_eq_preview() above. Deliberately does NOT
+        # touch .pending: the change is audible now, but still unsaved
+        # until "save" runs, and the UI's Save pill should keep saying so.
+        apply_eq_preview
+        ;;
+    "revert_preview")
+        # Popup closed without an explicit Save - discard whatever's been
+        # previewing and go back to the real saved preset. See
+        # revert_preview() above.
+        revert_preview
         ;;
     "preset")
         case "$arg1" in
@@ -406,8 +530,11 @@ case "$cmd" in
         # the ACTIVE_PRESET_FILE comment above for why that guess so often
         # isn't. Empty/no PRESET_DIR just yields an empty list rather than
         # erroring, e.g. before EasyEffects has ever been launched.
+        # $LIVE_PREVIEW_NAME is this script's own scratch file (see
+        # apply_eq_preview() above), never a real user preset - excluded
+        # so it never shows up as something to pick or switch to.
         if [ -d "$PRESET_DIR" ]; then
-            find "$PRESET_DIR" -maxdepth 1 -type f -name '*.json' -exec basename {} .json \; \
+            find "$PRESET_DIR" -maxdepth 1 -type f -name '*.json' ! -name "${LIVE_PREVIEW_NAME}.json" -exec basename {} .json \; \
                 | jq -R . | jq -cs 'sort'
         else
             echo '[]'
@@ -454,6 +581,38 @@ case "$cmd" in
         fi
         echo "$name" > "$ACTIVE_PRESET_FILE"
         apply_eq 1
+        ;;
+    "delete_preset")
+        # Deletes a real EasyEffects preset file from PRESET_DIR - distinct
+        # from delete_custom above, which only ever removes an entry from
+        # this script's own CUSTOM_PRESETS_FILE (a saved 10-band curve),
+        # never a real EasyEffects preset on disk.
+        name="$arg1"
+        [ -n "$name" ] || exit 1
+        # Same path-escape guard as set_active_preset/create_preset above -
+        # this also flows straight into $PRESET_DIR/${name}.json.
+        case "$name" in
+            */*|*..*)
+                echo "Invalid preset name: must not contain '/' or '..'" >&2
+                exit 1
+                ;;
+        esac
+        active_preset=$(cat "$ACTIVE_PRESET_FILE" 2>/dev/null)
+        [ -n "$active_preset" ] || active_preset="output"
+        if [ "$name" = "$active_preset" ]; then
+            # Deleting the preset the equalizer currently merges into would
+            # leave ACTIVE_PRESET_FILE pointing at nothing - apply_eq would
+            # then either bail out (no plugins_order to preserve) or, worse,
+            # silently start a fresh file. Make the user switch away first.
+            echo "Cannot delete '$name' - it's the active preset. Switch to a different one first." >&2
+            exit 1
+        fi
+        target="$PRESET_DIR/${name}.json"
+        if [ ! -e "$target" ]; then
+            echo "Preset '$name' does not exist." >&2
+            exit 1
+        fi
+        rm -f "$target"
         ;;
     "genre_tags")
         # Returns a JSON array of Last.fm tags for arg1 (an artist name),
