@@ -312,7 +312,7 @@ Variants {
         }
         function centeredBgOpacity() {
             if (!bgRoot.centeredWallpaperEnabled) return 0
-            if (bgRoot.wallpaperIsVideo) return 0
+            if (bgRoot.wallpaperIsVideo && GlobalStates.screenLocked) return 1
             return Math.max(0, Math.min(1, (1 - bgRoot.centeredProgress) / bgRoot.centeredFade))
         }
 
@@ -524,7 +524,7 @@ Variants {
                 mipmap: true
                 smooth: true
                 layer.enabled: true
-                visible: !bgRoot.videoRevealed
+                visible: !bgRoot.wallpaperIsVideo
                 opacity: 1
             }
 
@@ -537,7 +537,7 @@ Variants {
                 mipmap: true
                 asynchronous: true
                 layer.enabled: blurLoader.active
-                visible: !blurLoader.active && !bgRoot.videoRevealed
+                visible: !blurLoader.active && !bgRoot.wallpaperIsVideo
                     && (bgRoot.wallpaperAnimation === "" || bgRoot.transitionProgress >= 1.0)
                     && !bgRoot.centeredHidesFullWallpaper
                 opacity: bgRoot.centeredFullWallpaperOpacity()
