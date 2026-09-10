@@ -536,7 +536,7 @@ Variants {
                 smooth: true
                 mipmap: true
                 asynchronous: true
-                layer.enabled: blurLoader.active
+                layer.enabled: true
                 visible: !blurLoader.active && !bgRoot.wallpaperIsVideo
                     && (bgRoot.wallpaperAnimation === "" || bgRoot.transitionProgress >= 1.0)
                     && !bgRoot.centeredHidesFullWallpaper
