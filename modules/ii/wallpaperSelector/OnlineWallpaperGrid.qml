@@ -17,6 +17,8 @@ Item {
     property int columns: Config.options.wallpaperSelector.columns || 4
     property real previewCellAspectRatio: 4 / 3
     property var hoveredItem: null
+    property bool downloading: false
+    property string downloadingId: ""
 
     signal wallpaperSelected(string path)
     signal updateThumbnailsRequested()
@@ -49,7 +51,9 @@ Item {
     }
 
     function downloadItem(item, apply) {
-        if (!item) return
+        if (!item || root.downloading) return
+        root.downloading = true
+        root.downloadingId = item.id || ""
         const url = item.full
         const urlLower = url.toLowerCase().split("?")[0]
         const ext = urlLower.includes(".png") ? "png"
@@ -103,6 +107,8 @@ Item {
         }
 
         onExited: (exitCode) => {
+            root.downloading = false
+            root.downloadingId = ""
             if (exitCode === 0) {
                 if (applyAfter) root.wallpaperSelected(filePath)
                 Wallpapers.setDirectory(Wallpapers.effectiveDirectory)
@@ -215,6 +221,8 @@ Item {
                 width: grid.cellWidth
                 height: grid.cellHeight
 
+                property bool isDownloading: root.downloading && root.downloadingId === delegateItem.model.id
+
                 Image {
                     id: thumb
                     anchors.fill: parent
@@ -264,6 +272,7 @@ Item {
                     anchors.fill: parent
                     hoverEnabled: true
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    enabled: !delegateItem.isDownloading
                     onEntered: {
                         grid.currentIndex = delegateItem.index
                         root.hoveredItem = delegateItem.model
@@ -275,6 +284,19 @@ Item {
                     }
                     onClicked: event => {
                         root.downloadItem(delegateItem.model, event.button === Qt.LeftButton)
+                    }
+                }
+
+                Rectangle {
+                    anchors.fill: parent
+                    anchors.margins: Appearance.sizes.wallpaperSelectorItemMargins
+                    radius: Appearance.rounding.normal
+                    color: Appearance.colors.colScrim
+                    visible: delegateItem.isDownloading
+
+                    MaterialLoadingIndicator {
+                        anchors.centerIn: parent
+                        colBg: Appearance.colors.colOnPrimary
                     }
                 }
 
