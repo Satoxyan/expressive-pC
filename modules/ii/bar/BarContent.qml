@@ -88,7 +88,7 @@ Item {
 
     RoundCorner {
         id: leftPillCorner
-        visible: root.centerOnly && showBarBackground && Config.options.bar.cornerStyle === 0 
+        visible: root.centerOnly && Config.options.bar.showBackground && Config.options.bar.cornerStyle === 0 
         x: barContent.centerPillX - implicitSize
         implicitSize: Appearance.rounding.screenRounding
         color: Config.options.bar.followFrameColor
@@ -138,7 +138,7 @@ Item {
 
     RoundCorner {
         id: rightPillCorner
-        visible: root.centerOnly && showBarBackground && Config.options.bar.cornerStyle === 0
+        visible: root.centerOnly && Config.options.bar.showBackground && Config.options.bar.cornerStyle === 0
         x: barContent.centerPillX + barContent.centerPillWidth
         implicitSize: Appearance.rounding.screenRounding
         color: Config.options.bar.followFrameColor

@@ -45,7 +45,7 @@ AbstractBackgroundWidget {
         FastBlurred {
             anchors.fill: parent
             blurSource: root.wallpaperItem
-            cardRadius: card.radius
+            cardRadius: statCard.radius
             tint: Appearance.colors.colLayer1
             tintOpacity: 0.55
             trackX: statCard.x + root.x

@@ -177,7 +177,7 @@ AbstractBackgroundWidget {
             id: oneByOneContent
             Rectangle {
                 anchors.fill: parent
-                radius: parent.radius
+                radius: Appearance.rounding?.verylarge ?? 30
                 color: "transparent"
 
                 ColumnLayout {
