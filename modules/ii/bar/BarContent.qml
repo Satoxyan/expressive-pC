@@ -83,8 +83,7 @@ Item {
     }
 
     // center-only
-    readonly property bool centerOnly: !root.isMaterial
-        && root.effectiveLeftLayout.length === 0
+    readonly property bool centerOnly: root.effectiveLeftLayout.length === 0
         && root.effectiveRightLayout.length === 0
 
     RoundCorner {
@@ -398,8 +397,11 @@ Item {
                                 Layout.fillHeight: true
                                 source: root.getWidgetUrl(modelData)
                                 onLoaded: {
-                                    if (item && item.hasOwnProperty("mirrored"))
-                                        item.mirrored = root.getMirroredForIndex(root.effectiveRightLayout, index)
+                                    if (item && item.hasOwnProperty("mirrored")) {
+                                        try {
+                                            item.mirrored = root.getMirroredForIndex(root.effectiveRightLayout, index);
+                                        } catch (e) {}
+                                    }
                                 }
                             }
                         }
@@ -429,8 +431,11 @@ Item {
                             Layout.fillHeight: true
                             source: root.getWidgetUrl(modelData)
                             onLoaded: {
-                                if (item && item.hasOwnProperty("mirrored"))
-                                    item.mirrored = root.getMirroredForIndex(root.effectiveRightLayout, index)
+                                if (item && item.hasOwnProperty("mirrored")) {
+                                    try {
+                                        item.mirrored = root.getMirroredForIndex(root.effectiveRightLayout, index);
+                                    } catch (e) {}
+                                }
                             }
                         }
                     }
@@ -443,8 +448,11 @@ Item {
                         Layout.topMargin: Config.options.bar.bottom ? -5 : 3
                         source: root.getWidgetUrl(modelData)
                         onLoaded: {
-                            if (item && item.hasOwnProperty("mirrored"))
-                                item.mirrored = root.getMirroredForIndex(root.effectiveRightLayout, index)
+                            if (item && item.hasOwnProperty("mirrored")) {
+                                try {
+                                    item.mirrored = root.getMirroredForIndex(root.effectiveRightLayout, index);
+                                } catch (e) {}
+                            }
                         }
                     }
                 }

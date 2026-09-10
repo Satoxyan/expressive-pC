@@ -559,8 +559,10 @@ Item {
                         closePolicy: Popup.CloseOnPressOutside | Popup.CloseOnEscape
 
                         background: Rectangle {
-                            color: Appearance.colors.colLayer0
+                            color: Appearance.m3colors.m3surfaceContainer
                             radius: Appearance.rounding.verylarge
+                            border.width: 2
+                            border.color: Appearance.colors.colLayer0Border
                         }
 
                         contentItem: ColumnLayout {

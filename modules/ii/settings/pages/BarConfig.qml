@@ -273,6 +273,13 @@ ContentPage {
                         ]
                     }
                 }
+                ConfigSwitch {
+                    buttonIcon: "expand"
+                    enabled: Config.options.bar.showFrame
+                    text: Translation.tr("Overlap windows when center-only")
+                    checked: Config.options.bar.centerOnlyReserveFrame
+                    onCheckedChanged: { Config.options.bar.centerOnlyReserveFrame = checked; }
+                }
                 ConfigRow {
                     ConfigSwitch {
                         buttonIcon: "panorama_wide_angle"

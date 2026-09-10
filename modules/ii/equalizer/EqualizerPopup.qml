@@ -211,6 +211,15 @@ Scope {
                 border.width: 2
                 border.color: Qt.rgba(0, 0, 0, 0.55)
 
+                // root.blendedColors settles onto new album art in place (see
+                // EqualizerView's colorSignature fix for the same issue on the
+                // curve graph) - without this, the whole card would hard-snap
+                // to the new tint the instant it resolves instead of easing
+                // into it the way the rest of the popup now does.
+                Behavior on color {
+                    ColorAnimation { duration: 420; easing.type: Easing.OutCubic }
+                }
+
                 layer.enabled: true
                 layer.effect: OpacityMask {
                     maskSource: Rectangle {
@@ -231,6 +240,14 @@ Scope {
                     antialiasing: true
                     asynchronous: true
                     visible: root.displayedArtFilePath.length > 0
+                    // Fades in once the async load actually finishes, rather
+                    // than popping straight to a fully-loaded frame the
+                    // instant `visible` flips true.
+                    opacity: blurredArt.status === Image.Ready ? 1 : 0
+
+                    Behavior on opacity {
+                        NumberAnimation { duration: 320; easing.type: Easing.OutCubic }
+                    }
 
                     layer.enabled: true
                     layer.effect: StyledBlurEffect {
@@ -244,6 +261,10 @@ Scope {
                         // root.blendedColors (album-tinted) as before.
                         anchors.fill: parent
                         color: ColorUtils.transparentize(Appearance.colors.colScrim, 0.3)
+
+                        Behavior on color {
+                            ColorAnimation { duration: 420; easing.type: Easing.OutCubic }
+                        }
                     }
                 }
 
@@ -254,6 +275,10 @@ Scope {
                     maxVisualizerValue: 1000
                     smoothing: 2
                     color: root.blendedColors.colPrimary
+
+                    Behavior on color {
+                        ColorAnimation { duration: 420; easing.type: Easing.OutCubic }
+                    }
                 }
 
                 EqualizerView {

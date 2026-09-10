@@ -446,6 +446,111 @@ MouseArea {
                         }
                     }
 
+                    MouseArea {
+                        id: sortMenuDismissArea
+                        anchors.fill: parent
+                        visible: sortMenuPopup.visible
+                        z: 9
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        onClicked: sortMenuPopup.visible = false
+                    }
+
+                    Item {
+                        id: sortMenuPopup
+                        visible: false
+                        z: 10
+                        anchors.bottom: extraOptions.top
+                        anchors.horizontalCenter: extraOptions.horizontalCenter
+                        anchors.bottomMargin: 8
+                        implicitWidth: sortMenuContent.implicitWidth + 24
+                        implicitHeight: sortMenuContent.implicitHeight + 20
+
+                        StyledRectangularShadow {
+                            target: sortMenuBackground
+                        }
+
+                        Rectangle {
+                            id: sortMenuBackground
+                            anchors.fill: parent
+                            radius: Appearance.rounding.normal
+                            color: Appearance.m3colors.m3surfaceContainer
+                            border.width: 1
+                            border.color: Appearance.colors.colLayer0Border
+
+                            ColumnLayout {
+                                id: sortMenuContent
+                                anchors.centerIn: parent
+                                spacing: 3
+
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    Layout.leftMargin: 10
+                                    Layout.rightMargin: 10
+                                    Layout.topMargin: 4
+                                    Layout.bottomMargin: 2
+                                    text: Translation.tr("Sort wallpapers")
+                                    font.pixelSize: Appearance.font.pixelSize.smaller
+                                    color: Appearance.colors.colSubtext
+                                }
+
+                                Repeater {
+                                    model: [
+                                        { id: "custom",   name: Translation.tr("Custom (manual order)"), icon: "dashboard_customize" },
+                                        { id: "time",     name: Translation.tr("Date added (newest first)"), icon: "schedule" },
+                                        { id: "time_rev", name: Translation.tr("Date added (oldest first)"), icon: "history" },
+                                        { id: "name",     name: Translation.tr("Name (A to Z)"), icon: "sort_by_alpha" },
+                                        { id: "name_rev", name: Translation.tr("Name (Z to A)"), icon: "sort_by_alpha" },
+                                        { id: "size",     name: Translation.tr("Size (largest first)"), icon: "straighten" },
+                                        { id: "size_rev", name: Translation.tr("Size (smallest first)"), icon: "straighten" },
+                                    ]
+
+                                    delegate: RippleButton {
+                                        id: sortItemBtn
+                                        required property var modelData
+                                        implicitHeight: 32
+                                        implicitWidth: 230
+                                        buttonRadius: Appearance.rounding.small
+                                        toggled: Wallpapers.sortMode === modelData.id
+                                        colBackgroundToggled: Appearance.colors.colSecondaryContainer
+                                        colBackgroundToggledHover: Appearance.colors.colSecondaryContainerHover
+                                        colRippleToggled: Appearance.colors.colSecondaryContainerActive
+                                        onClicked: {
+                                            Wallpapers.setSortMode(modelData.id);
+                                            sortMenuPopup.visible = false;
+                                        }
+
+                                        contentItem: RowLayout {
+                                            anchors.fill: parent
+                                            anchors.leftMargin: 10
+                                            anchors.rightMargin: 10
+                                            spacing: 8
+
+                                            MaterialSymbol {
+                                                text: sortItemBtn.modelData.icon
+                                                iconSize: Appearance.font.pixelSize.normal
+                                                color: sortItemBtn.toggled ? Appearance.colors.colOnSecondaryContainer : Appearance.colors.colOnLayer1
+                                            }
+
+                                            StyledText {
+                                                Layout.fillWidth: true
+                                                text: sortItemBtn.modelData.name
+                                                font.pixelSize: Appearance.font.pixelSize.small
+                                                color: sortItemBtn.toggled ? Appearance.colors.colOnSecondaryContainer : Appearance.colors.colOnLayer1
+                                            }
+
+                                            MaterialSymbol {
+                                                visible: sortItemBtn.toggled
+                                                text: "check"
+                                                iconSize: Appearance.font.pixelSize.small
+                                                color: Appearance.colors.colPrimary
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     RowLayout {
                         id: extraOptions
                         anchors {
@@ -510,6 +615,15 @@ MouseArea {
                                     text: "reset_image"
                                     StyledToolTip {
                                         text: Translation.tr("Update thumbnails")
+                                    }
+                                }
+                                IconToolbarButton {
+                                    implicitWidth: height
+                                    toggled: sortMenuPopup.visible
+                                    onClicked: sortMenuPopup.visible = !sortMenuPopup.visible
+                                    text: "sort"
+                                    StyledToolTip {
+                                        text: Translation.tr("Sort wallpapers")
                                     }
                                 }
                                 ToolbarTextField {
@@ -817,6 +931,7 @@ MouseArea {
                 else
                     root.forceActiveFocus()
             } else if (!GlobalStates.wallpaperSelectorOpen) {
+                sortMenuPopup.visible = false;
                 Wallpapers.stopPreview();
             }
         }

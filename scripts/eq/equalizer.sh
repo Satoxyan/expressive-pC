@@ -13,10 +13,27 @@
 #   equalizer.sh <state_dir> set_preamp <gainDb>   (master gain, independent of the curve/preset)
 #   equalizer.sh <state_dir> apply
 #   equalizer.sh <state_dir> preset <Flat|Bass|Treble|Vocal|Pop|Rock|Jazz|Classic>
-#   equalizer.sh <state_dir> genre_tags <artist>   (cache-first Last.fm lookup, requires
-#                                                     <state_dir>/lastfm_api_key to exist)
+#   equalizer.sh <state_dir> genre_tags <artist>   (cache-first Last.fm artist.getTopTags
+#                                                     lookup, requires <state_dir>/lastfm_api_key
+#                                                     to exist)
+#   equalizer.sh <state_dir> track_genre_tags <artist> <track>
+#                                                   (same, but Last.fm track.getTopTags for the
+#                                                     specific track - genre-crossing artists get
+#                                                     tags that describe their whole catalog from
+#                                                     genre_tags alone, this narrows it down to
+#                                                     the song actually playing. Often empty, since
+#                                                     far fewer tracks than artists get tagged -
+#                                                     the QML side treats that as "no opinion" and
+#                                                     falls back to genre_tags rather than erroring)
 #   equalizer.sh <state_dir> get_lastfm_key        (prints the saved key, or nothing)
 #   equalizer.sh <state_dir> set_lastfm_key <key>  (writes it; empty arg clears it)
+#   equalizer.sh <state_dir> list_presets           (JSON array of EasyEffects preset names
+#                                                     actually saved in PRESET_DIR, so the UI
+#                                                     can offer a picker instead of guessing)
+#   equalizer.sh <state_dir> get_active_preset      (name of the preset the equalizer merges into)
+#   equalizer.sh <state_dir> set_active_preset <n>  (switch which preset it merges into)
+#   equalizer.sh <state_dir> create_preset <n>      (make a brand-new preset from scratch and
+#                                                     switch to it - refuses if <n> already exists)
 #
 # <state_dir> is expected to be Directories.eqStateDir from the QML side
 # (e.g. ~/.local/state/quickshell/user/eq), passed in so this script never
@@ -65,6 +82,12 @@ AUTO_FILE="$STATE_DIR/auto_eq_enabled"
 # plain text file at that path. Nothing here ever hardcodes a key, so
 # this script is safe to share/version-control as-is.
 GENRE_CACHE_FILE="$STATE_DIR/genre_cache.json"
+# Separate from GENRE_CACHE_FILE (which is keyed by artist name alone) since
+# this is keyed by artist+track together - a flat "artist\x1ftrack" string
+# key, using \x1f (ASCII unit separator) as the join character since it's
+# vanishingly unlikely to appear in a real artist or track name, unlike "-"
+# or ":" which plenty of track titles already contain.
+TRACK_GENRE_CACHE_FILE="$STATE_DIR/track_genre_cache.json"
 LASTFM_KEY_FILE="$STATE_DIR/lastfm_api_key"
 # Set to 'true' by apply_eq() when it refuses to touch a never-saved
 # preset file, so the UI can tell the user to save their current
@@ -72,10 +95,12 @@ LASTFM_KEY_FILE="$STATE_DIR/lastfm_api_key"
 NEEDS_SAVE_FILE="$STATE_DIR/needs_manual_save"
 # Name of the EasyEffects output preset the equalizer merges into - i.e.
 # whatever preset holds the *rest* of your chain (compressor, limiter,
-# deesser, etc). Defaults to "output", EasyEffects' own default preset
-# name, so this works out of the box for anyone who hasn't set up a named
-# preset of their own. Override with `set_active_preset <name>` if your
-# main chain lives under a different preset name.
+# deesser, etc). Defaults to "output" purely as a guess (EasyEffects does
+# NOT actually create a preset with that name on its own - presets are
+# always user-named), so this is very likely wrong until you point it at
+# whichever preset your own chain actually lives under, either via
+# `set_active_preset <name>` or the picker in the equalizer widget (see
+# list_presets below for what that picker is populated from).
 ACTIVE_PRESET_FILE="$STATE_DIR/active_preset"
 
 mkdir -p "$PRESET_DIR"
@@ -86,6 +111,10 @@ fi
 
 if [ ! -f "$GENRE_CACHE_FILE" ]; then
     echo '{}' > "$GENRE_CACHE_FILE"
+fi
+
+if [ ! -f "$TRACK_GENRE_CACHE_FILE" ]; then
+    echo '{}' > "$TRACK_GENRE_CACHE_FILE"
 fi
 
 if [ ! -f "$AUTO_FILE" ]; then
@@ -119,7 +148,52 @@ apply_custom_preset() {
     apply_eq
 }
 
+# Shared by genre_tags/track_genre_tags below. Prints a JSON array of tag
+# names (possibly "[]") for the given Last.fm method+params; never errors
+# out to stderr-visible failure - a bad/missing key, no network, or an
+# unrecognized artist/track all just come back as "[]" so the caller can
+# treat "found nothing" uniformly.
+lastfm_toptags() {
+    local method="$1" api_key="$2"; shift 2
+    local qs="method=${method}&api_key=${api_key}&format=json"
+    while [ "$#" -gt 0 ]; do
+        qs="${qs}&$1=$(jq -rn --arg v "$2" '$v|@uri')"
+        shift 2
+    done
+    local resp tags
+    resp=$(curl -fsS --max-time 5 "https://ws.audioscrobbler.com/2.0/?${qs}" 2>/dev/null)
+    tags=$(echo "$resp" | jq -c '[.toptags.tag[]?.name]' 2>/dev/null)
+    if [ -z "$tags" ] || [ "$tags" = "null" ]; then
+        tags='[]'
+    fi
+    echo "$tags"
+}
+
+# Spotify (and MPRIS more generally) often reports a collab track's artist
+# as one joined string - "Drake, 21 Savage", "Artist feat. Someone Else",
+# "A & B" - which usually isn't a real Last.fm artist page on its own, even
+# though every individual name in it is. Prints just the first-listed name,
+# unchanged if there was nothing to strip (a normal single-artist string
+# passes straight through). Used as a fallback, not the primary lookup -
+# see genre_tags below - so a genuinely separate act named e.g. "Simon &
+# Garfunkel" is tried as-is first and never needs this at all.
+strip_featured_artists() {
+    printf '%s' "$1" \
+        | sed -E 's/[[:space:]]*,.*//' \
+        | sed -E 's/[[:space:]]+&[[:space:]].*//' \
+        | sed -E 's/[[:space:]]+([fF]eat(uring)?|[fF]t)\.?[[:space:]].*//' \
+        | sed -E 's/[[:space:]]+[xX][[:space:]].*//' \
+        | sed -E 's/[[:space:]]+[vV]s\.?[[:space:]].*//'
+}
+
 apply_eq() {
+    # force_create=1 means "yes, really create this preset from scratch" -
+    # only ever passed by create_preset below, which itself only runs for
+    # a name confirmed not to exist yet (see there for why this is safe to
+    # gate behind an explicit flag rather than just checking file
+    # existence here: the real risk isn't the file, it's replacing
+    # whatever's currently live in EasyEffects, which can happen either way).
+    local force_create="${1:-0}"
     vals=$(cat "$STATE_FILE")
     active_preset=$(cat "$ACTIVE_PRESET_FILE" 2>/dev/null)
     [ -n "$active_preset" ] || active_preset="output"
@@ -138,7 +212,7 @@ apply_eq() {
     python3 -c "
 import sys, json, os
 
-state_json, preset_path = sys.argv[1], sys.argv[2]
+state_json, preset_path, force_create = sys.argv[1], sys.argv[2], sys.argv[3] == '1'
 
 try:
     data = json.loads(state_json)
@@ -178,9 +252,11 @@ try:
     # if we built and loaded an equalizer-only preset right now, it would
     # silently erase everything else you have running. Bail out instead:
     # leave the file untouched, and let the caller (equalizer.sh) know so
-    # it can tell you to save your current setup first.
+    # it can tell you to save your current setup first. force_create skips
+    # this bail-out - only create_preset sets it, and only after the UI has
+    # explicitly warned that this will replace whatever's currently live.
     existing_output = preset.get('output')
-    if not existing_output or not existing_output.get('plugins_order'):
+    if not force_create and (not existing_output or not existing_output.get('plugins_order')):
         sys.exit(3)
 
     output = preset.setdefault('output', {})
@@ -237,7 +313,7 @@ try:
     os.replace(tmp_path, preset_path)
 except Exception:
     sys.exit(1)
-" "$vals" "$active_preset_path"
+" "$vals" "$active_preset_path" "$force_create"
     py_status=$?
 
     if [ "$py_status" -eq 3 ]; then
@@ -324,10 +400,60 @@ case "$cmd" in
         ;;
     "get_active_preset") cat "$ACTIVE_PRESET_FILE" ;;
     "get_needs_save") cat "$NEEDS_SAVE_FILE" ;;
+    "list_presets")
+        # Real preset names actually saved on disk, so the UI can offer a
+        # picker instead of guessing "output" and hoping it's right - see
+        # the ACTIVE_PRESET_FILE comment above for why that guess so often
+        # isn't. Empty/no PRESET_DIR just yields an empty list rather than
+        # erroring, e.g. before EasyEffects has ever been launched.
+        if [ -d "$PRESET_DIR" ]; then
+            find "$PRESET_DIR" -maxdepth 1 -type f -name '*.json' -exec basename {} .json \; \
+                | jq -R . | jq -cs 'sort'
+        else
+            echo '[]'
+        fi
+        ;;
     "set_active_preset")
         [ -n "$arg1" ] || exit 1
+        # This name now flows straight into a filesystem path
+        # ($PRESET_DIR/${active_preset}.json) and comes from free-typed UI
+        # input rather than only ever a hardcoded/internal value, so guard
+        # against a name that could escape PRESET_DIR (e.g. "../../foo") or
+        # otherwise isn't a plain preset name.
+        case "$arg1" in
+            */*|*..*)
+                echo "Invalid preset name: must not contain '/' or '..'" >&2
+                exit 1
+                ;;
+        esac
         echo "$arg1" > "$ACTIVE_PRESET_FILE"
         apply_eq
+        ;;
+    "create_preset")
+        # Spin up a brand-new EasyEffects preset containing just the
+        # equalizer, then switch to it. Deliberately a separate command
+        # from set_active_preset (rather than just letting a nonexistent
+        # name auto-create): switching to it force-reloads EasyEffects,
+        # which replaces whatever's CURRENTLY live - discarding any
+        # unsaved changes to your other effects regardless of which
+        # preset they're nominally under. The UI should only call this
+        # after warning the user about exactly that, not the moment
+        # they type an unrecognized name.
+        name="$arg1"
+        [ -n "$name" ] || exit 1
+        case "$name" in
+            */*|*..*)
+                echo "Invalid preset name: must not contain '/' or '..'" >&2
+                exit 1
+                ;;
+        esac
+        target="$PRESET_DIR/${name}.json"
+        if [ -e "$target" ]; then
+            echo "Preset '$name' already exists - use set_active_preset instead." >&2
+            exit 1
+        fi
+        echo "$name" > "$ACTIVE_PRESET_FILE"
+        apply_eq 1
         ;;
     "genre_tags")
         # Returns a JSON array of Last.fm tags for arg1 (an artist name),
@@ -355,11 +481,12 @@ case "$cmd" in
             echo '[]'
             exit 0
         fi
-        encoded_artist=$(jq -rn --arg a "$artist" '$a|@uri')
-        resp=$(curl -fsS --max-time 5 "https://ws.audioscrobbler.com/2.0/?method=artist.gettoptags&artist=${encoded_artist}&api_key=${api_key}&format=json" 2>/dev/null)
-        tags=$(echo "$resp" | jq -c '[.toptags.tag[]?.name]' 2>/dev/null)
-        if [ -z "$tags" ] || [ "$tags" = "null" ]; then
-            tags='[]'
+        tags=$(lastfm_toptags "artist.gettoptags" "$api_key" artist "$artist")
+        if [ "$tags" = "[]" ]; then
+            primary=$(strip_featured_artists "$artist")
+            if [ "$primary" != "$artist" ] && [ -n "$primary" ]; then
+                tags=$(lastfm_toptags "artist.gettoptags" "$api_key" artist "$primary")
+            fi
         fi
         # Cache even a miss/empty result, so an unrecognized or misspelled
         # artist doesn't get re-queried on every single track change.
@@ -367,7 +494,50 @@ case "$cmd" in
             && mv "$GENRE_CACHE_FILE.tmp" "$GENRE_CACHE_FILE"
         echo "$tags"
         ;;
-    "clear_genre_cache") echo '{}' > "$GENRE_CACHE_FILE" ;;
+    "track_genre_tags")
+        # Track-scoped counterpart to genre_tags above, via Last.fm's
+        # track.getTopTags - see the usage comment at the top of this file
+        # for why this exists alongside the artist-level lookup rather than
+        # instead of it.
+        artist="$arg1"
+        track="$arg2"
+        if [ -z "$artist" ] || [ -z "$track" ]; then
+            echo '[]'
+            exit 0
+        fi
+        cache_key="${artist}"$'\x1f'"${track}"
+        cached=$(jq -c --arg k "$cache_key" '.[$k] // empty' "$TRACK_GENRE_CACHE_FILE" 2>/dev/null)
+        if [ -n "$cached" ]; then
+            echo "$cached"
+            exit 0
+        fi
+        if [ ! -f "$LASTFM_KEY_FILE" ]; then
+            echo '[]'
+            exit 0
+        fi
+        api_key=$(tr -d '[:space:]' < "$LASTFM_KEY_FILE")
+        if [ -z "$api_key" ]; then
+            echo '[]'
+            exit 0
+        fi
+        tags=$(lastfm_toptags "track.gettoptags" "$api_key" artist "$artist" track "$track")
+        if [ "$tags" = "[]" ]; then
+            primary=$(strip_featured_artists "$artist")
+            if [ "$primary" != "$artist" ] && [ -n "$primary" ]; then
+                tags=$(lastfm_toptags "track.gettoptags" "$api_key" artist "$primary" track "$track")
+            fi
+        fi
+        # Cache even an empty result - most individual tracks have no tags
+        # at all on Last.fm, and we don't want to re-hit the API for that
+        # same track every time it comes back around in a playlist.
+        jq --arg k "$cache_key" --argjson t "$tags" '. + {($k): $t}' "$TRACK_GENRE_CACHE_FILE" > "$TRACK_GENRE_CACHE_FILE.tmp" 2>/dev/null \
+            && mv "$TRACK_GENRE_CACHE_FILE.tmp" "$TRACK_GENRE_CACHE_FILE"
+        echo "$tags"
+        ;;
+    "clear_genre_cache")
+        echo '{}' > "$GENRE_CACHE_FILE"
+        echo '{}' > "$TRACK_GENRE_CACHE_FILE"
+        ;;
     "get_lastfm_key")
         # Echoes back whatever's on disk so the UI field can be
         # pre-filled for editing. Same trust boundary as reading the

@@ -201,6 +201,7 @@ Item {
             cellWidth: width / root.columns
             cellHeight: cellWidth / root.previewCellAspectRatio
             interactive: true
+            acceptedButtons: Qt.NoButton
             clip: true
             boundsBehavior: Flickable.StopAtBounds
 

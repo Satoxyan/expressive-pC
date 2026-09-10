@@ -148,7 +148,7 @@ MouseArea {
 
     Rectangle {
         anchors.fill: parent
-        visible: root.selected && root.showSelectionBorder
+        visible: root.selected && root.showSelectionBorder && !Config.options.background.widgetsLocked
         color: "transparent"
         border.width: 2
         border.color: Appearance.colors.colPrimary

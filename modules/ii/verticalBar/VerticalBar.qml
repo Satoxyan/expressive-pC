@@ -50,9 +50,15 @@ Scope {
                 property bool superShow: false
                 property bool mustShow: hoverRegion.containsMouse || superShow
                 exclusionMode: ExclusionMode.Ignore
-                exclusiveZone: (Config?.options.bar.autoHide.enable && (!mustShow || !Config?.options.bar.autoHide.pushWindows)) ? 0 :
-                    Appearance.sizes.baseVerticalBarWidth + (Config.options.bar.cornerStyle === 1 ? Appearance.sizes.hyprlandGapsOut : 0)
-                    + (Config.options.bar.cornerStyle === 3 ? (Appearance.sizes.hyprlandGapsOut || 5) : 0)
+                property int normalExclusiveZone: (Config?.options.bar.autoHide.enable && (!mustShow || !Config?.options.bar.autoHide.pushWindows))
+                    ? 0
+                    : Appearance.sizes.baseVerticalBarWidth
+                        + (Config.options.bar.cornerStyle === 1 ? Appearance.sizes.hyprlandGapsOut : 0)
+                        + (Config.options.bar.cornerStyle === 3 ? (Appearance.sizes.hyprlandGapsOut || 5) : 0)
+
+                exclusiveZone: (barContent.centerOnly && Config.options.bar.centerOnlyReserveFrame)
+                    ? Config.options.bar.frameThickness
+                    : normalExclusiveZone
                 WlrLayershell.namespace: "quickshell:verticalBar"
                 implicitWidth: Appearance.sizes.verticalBarWidth + Appearance.rounding.screenRounding
                 mask: Region { item: hoverMaskRegion }
