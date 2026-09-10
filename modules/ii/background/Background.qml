@@ -524,7 +524,7 @@ Variants {
                 mipmap: true
                 smooth: true
                 layer.enabled: true
-                visible: true
+                visible: !bgRoot.videoRevealed
                 opacity: 1
             }
 
