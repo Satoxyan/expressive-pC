@@ -120,7 +120,7 @@ Item {
                     Item {
                         id: profileRowContainer
                         visible: true
-                        Layout.fillWidth: true
+                        Layout.fillWidth: false
                         Layout.margins: isMinimal ? 0 : 5
                         Layout.topMargin: 15
                         Layout.bottomMargin: isMinimal ? -30 : 0
