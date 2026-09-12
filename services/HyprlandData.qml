@@ -47,33 +47,69 @@ Singleton {
 
     // Internals
 
-    function updateWindowList() {
+    property bool _pendingClients: false
+    property bool _pendingMonitors: false
+    property bool _pendingLayers: false
+    property bool _pendingWorkspaces: false
+
+    Timer {
+        id: eventDebounceTimer
+        interval: 60
+        repeat: false
+        onTriggered: {
+            if (WM.compositor !== "hyprland") return;
+            if (root._pendingClients) {
+                getClients.running = false;
+                getClients.running = true;
+                root._pendingClients = false;
+            }
+            if (root._pendingMonitors) {
+                getMonitors.running = false;
+                getMonitors.running = true;
+                root._pendingMonitors = false;
+            }
+            if (root._pendingLayers) {
+                getLayers.running = false;
+                getLayers.running = true;
+                root._pendingLayers = false;
+            }
+            if (root._pendingWorkspaces) {
+                getWorkspaces.running = false;
+                getWorkspaces.running = true;
+                getActiveWorkspace.running = false;
+                getActiveWorkspace.running = true;
+                root._pendingWorkspaces = false;
+            }
+        }
+    }
+
+    function queueUpdate(clients = false, workspaces = false, monitors = false, layers = false) {
         if (WM.compositor !== "hyprland") return;
-        getClients.running = true;
+        if (clients) root._pendingClients = true;
+        if (workspaces) root._pendingWorkspaces = true;
+        if (monitors) root._pendingMonitors = true;
+        if (layers) root._pendingLayers = true;
+        eventDebounceTimer.restart();
+    }
+
+    function updateWindowList() {
+        queueUpdate(true, false, false, false);
     }
 
     function updateLayers() {
-        if (WM.compositor !== "hyprland") return;
-        getLayers.running = true;
+        queueUpdate(false, false, false, true);
     }
 
     function updateMonitors() {
-        if (WM.compositor !== "hyprland") return;
-        getMonitors.running = true;
+        queueUpdate(false, false, true, false);
     }
 
     function updateWorkspaces() {
-        if (WM.compositor !== "hyprland") return;
-        getWorkspaces.running = true;
-        getActiveWorkspace.running = true;
+        queueUpdate(false, true, false, false);
     }
 
     function updateAll() {
-        if (WM.compositor !== "hyprland") return;
-        updateWindowList();
-        updateMonitors();
-        updateLayers();
-        updateWorkspaces();
+        queueUpdate(true, true, true, true);
     }
 
     function biggestWindowForWorkspace(workspaceId) {
@@ -86,7 +122,13 @@ Singleton {
     }
 
     Component.onCompleted: {
-        updateAll();
+        if (WM.compositor === "hyprland") {
+            getClients.running = true;
+            getMonitors.running = true;
+            getLayers.running = true;
+            getWorkspaces.running = true;
+            getActiveWorkspace.running = true;
+        }
     }
 
     Connections {
@@ -94,8 +136,22 @@ Singleton {
         enabled: WM.compositor === "hyprland"
 
         function onRawEvent(event) {
-            if (["openlayer", "closelayer", "screencast"].includes(event.name)) return;
-            updateAll()
+            const name = event.name;
+            if (["openlayer", "closelayer", "screencast", "submap", "activelayout"].includes(name)) return;
+
+            if (name.startsWith("workspace") || name.startsWith("createworkspace") || name.startsWith("destroyworkspace") || name.startsWith("moveworkspace") || name === "renameworkspace") {
+                root.queueUpdate(false, true, false, false);
+            } else if (name.startsWith("activespecial")) {
+                root.queueUpdate(false, true, true, false);
+            } else if (name.startsWith("openwindow") || name.startsWith("closewindow") || name.startsWith("movewindow")) {
+                root.queueUpdate(true, true, false, false);
+            } else if (name.startsWith("window") || name.startsWith("activewindow") || name === "fullscreen" || name === "changefloatingmode" || name === "pin" || name === "urgent" || name === "minimize") {
+                root.queueUpdate(true, false, false, false);
+            } else if (name.startsWith("monitor") || name === "focusedmon") {
+                root.queueUpdate(false, true, true, false);
+            } else {
+                root.queueUpdate(true, true, false, false);
+            }
         }
     }
 
