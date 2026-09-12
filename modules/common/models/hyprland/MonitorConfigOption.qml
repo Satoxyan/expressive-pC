@@ -135,7 +135,6 @@ NestableObject {
     }
 
     function applyAndSave(index) {
-        root.applyMonitor(root.monitors[index])
         root.save(index)
     }
 
