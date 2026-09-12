@@ -261,6 +261,7 @@ Singleton {
                         property string placementStrategy: "leastBusy" // "free", "leastBusy", "mostBusy"
                         property real x: 100
                         property real y: 100
+                        property real z: 0
                         property string style: "cookie"        // Options: "cookie", "digital", "pixel"
                         property string color: ""
                         property string styleLocked: "cookie"  // Options: "cookie", "digital", "pixel"
@@ -313,6 +314,7 @@ Singleton {
                         property string placementStrategy: "free" // "free", "leastBusy", "mostBusy"
                         property real x: 400
                         property real y: 100
+                        property real z: 0
                         property string sizeMode: "1x3"
                         property string style: "card"  // "card", "pill"
                         property bool expanded: false
@@ -323,6 +325,7 @@ Singleton {
                         property string placementStrategy: "free" // "free", "leastBusy", "mostBusy"
                         property real x: 400
                         property real y: 100
+                        property real z: 0
                         property string sizeMode: "2x2"
                     }
                     property JsonObject worldClock: JsonObject {
@@ -331,6 +334,7 @@ Singleton {
                         property string placementStrategy: "free"
                         property real x: 400
                         property real y: 100
+                        property real z: 0
                         property string sizeMode: "2x2"
                         property int clockCount: 4 
                     }
@@ -340,6 +344,7 @@ Singleton {
                         property string placementStrategy: "free"
                         property real x: 400
                         property real y: 100
+                        property real z: 0
                     }
 
                     property JsonObject todo: JsonObject {
@@ -347,6 +352,7 @@ Singleton {
                         property string placementStrategy: "free"
                         property real x: 400
                         property real y: 100
+                        property real z: 0
                     }
 
                     property JsonObject userCard: JsonObject {
@@ -354,6 +360,7 @@ Singleton {
                         property string placementStrategy: "free"
                         property real x: 400
                         property real y: 100
+                        property real z: 0
                         property string sizeMode: "1x2" 
                     }
 
@@ -362,6 +369,7 @@ Singleton {
                         property string placementStrategy: "free"
                         property real x: 400
                         property real y: 100
+                        property real z: 0
                     }
 
                     property JsonObject visualizer: JsonObject {
@@ -384,17 +392,26 @@ Singleton {
                         property real dataSmoothing: 0.5
                         property int waveBorderWidth: 3    // 0 = no border
                         property int renderEveryXFrames: -1  // -1 = auto (System), 1 = every frame, 2 = every other frame, etc. Only for "wave" mode
+                        property real z: -1000
                     }
 
-                    property list<var> customImages: [
-                        { enable: false, placementStrategy: "free", x: 400, y: 100, path: "", shape: "Cookie4Sided", size: 200 }
-                    ]
+                    property JsonObject customImage: JsonObject {
+                        property bool enable: false
+                        property string placementStrategy: "free"
+                        property real x: 400
+                        property real y: 100
+                        property real z: 0
+                        property string path: ""
+                        property string shape: "Cookie4Sided"
+                        property real size: 200
+                    }
 
                     property JsonObject resources: JsonObject {
                         property bool enable: false
                         property string placementStrategy: "free"
                         property real x: 400
                         property real y: 100
+                        property real z: 0
                         property bool vertical: false
                     }
 
@@ -403,6 +420,7 @@ Singleton {
                         property string placementStrategy: "free"
                         property real x: 400
                         property real y: 100
+                        property real z: 0
                         property bool vertical: false
                     }
 
@@ -415,6 +433,7 @@ Singleton {
                         property string placementStrategy: "free" // "free", "leastBusy", "mostBusy"
                         property real x: 800
                         property real y: 500
+                        property real z: 0
                         property string sizeMode: "1x3" 
                     }
                 }

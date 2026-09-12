@@ -44,4 +44,45 @@ Singleton {
             default:              return MaterialShape.Shape.Cookie4Sided
         }
     }
+
+    function centeredShapeMinBoundaryRadius(shape) {
+        switch (shape) {
+            case MaterialShape.Shape.Circle:        return 0.4898
+            case MaterialShape.Shape.Square:        return 0.5000
+            case MaterialShape.Shape.Slanted:       return 0.4610
+            case MaterialShape.Shape.Arch:          return 0.5000
+            case MaterialShape.Shape.Fan:           return 0.3710
+            case MaterialShape.Shape.Arrow:         return 0.2992
+            case MaterialShape.Shape.SemiCircle:    return 0.3125
+            case MaterialShape.Shape.Oval:          return 0.3697
+            case MaterialShape.Shape.Pill:          return 0.4157
+            case MaterialShape.Shape.Triangle:      return 0.2665
+            case MaterialShape.Shape.Diamond:       return 0.3593
+            case MaterialShape.Shape.ClamShell:     return 0.3373
+            case MaterialShape.Shape.Pentagon:      return 0.3999
+            case MaterialShape.Shape.Gem:           return 0.4498
+            case MaterialShape.Shape.Sunny:         return 0.4185
+            case MaterialShape.Shape.VerySunny:     return 0.3818
+            case MaterialShape.Shape.Cookie4Sided:  return 0.3841
+            case MaterialShape.Shape.Cookie6Sided:  return 0.4312
+            case MaterialShape.Shape.Cookie7Sided:  return 0.4202
+            case MaterialShape.Shape.Cookie9Sided:  return 0.4370
+            case MaterialShape.Shape.Cookie12Sided: return 0.4463
+            case MaterialShape.Shape.Ghostish:      return 0.3637
+            case MaterialShape.Shape.Clover4Leaf:   return 0.4019
+            case MaterialShape.Shape.Clover8Leaf:   return 0.4287
+            case MaterialShape.Shape.Burst:         return 0.3562
+            case MaterialShape.Shape.SoftBurst:     return 0.3873
+            case MaterialShape.Shape.Boom:          return 0.2175
+            case MaterialShape.Shape.SoftBoom:      return 0.2385
+            case MaterialShape.Shape.Flower:        return 0.3396
+            case MaterialShape.Shape.Puffy:         return 0.3297
+            case MaterialShape.Shape.PuffyDiamond:  return 0.3487
+            case MaterialShape.Shape.PixelCircle:   return 0.4723
+            case MaterialShape.Shape.PixelTriangle: return 0.2352
+            case MaterialShape.Shape.Bun:           return 0.2960
+            case MaterialShape.Shape.Heart:         return 0.2141
+            default:                                return 0.4202
+        }
+    }
 }

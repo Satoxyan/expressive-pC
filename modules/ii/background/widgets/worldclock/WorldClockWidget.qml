@@ -325,6 +325,11 @@ AbstractBackgroundWidget {
                         Layout.preferredWidth: 132
                         Layout.preferredHeight: 120
 
+                        StyledRectangularShadow {
+                            target: androidClock
+                            z: -2
+                        }
+
                         FastBlurred {
                             anchors.fill: parent
                             visible: Config.options.background.widgets.blurWidgets
@@ -332,13 +337,14 @@ AbstractBackgroundWidget {
                             cardRadius: Appearance.rounding?.verylarge ?? 30
                             tint: (clockWrapper.cityData?.isDay ?? true)
                                 ? Appearance.colors.colPrimary
-                                : Appearance.colors.colLayer0
+                                : Appearance.colors.colLayer1
                             tintOpacity: 0.55
                             trackX: root.x
                             trackY: root.y
                         }
 
                         AndroidClock {
+                            id: androidClock
                             anchors.fill: parent
                             radius: Appearance.rounding?.verylarge ?? 30
 

@@ -41,6 +41,15 @@ MouseArea {
         root.registeredWidgets = root.registeredWidgets.filter(w => w !== widget)
     }
 
+    function bringToFront(widget) {
+        if (widget.pinnedBottom) return
+        let maxZ = 0
+        for (const w of root.registeredWidgets) {
+            if (w !== widget && !w.pinnedBottom && w.z > maxZ) maxZ = w.z
+        }
+        widget.z = maxZ + 1
+    }
+
     function clearSelection() {
         for (const widget of root.registeredWidgets) widget.selected = false
     }
