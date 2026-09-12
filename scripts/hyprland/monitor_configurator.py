@@ -9,6 +9,8 @@ STRING_KEYS = {"output", "mode", "position", "cm", "mirror"}
 BOOL_KEYS = {"disabled"}
 FIELD_RE = re.compile(r'^(\s*)([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*,?\s*(--.*)?$')
 OUTPUT_RE = re.compile(r'output\s*=\s*"([^"]*)"')
+SINGLE_LINE_RE = re.compile(r'hl\.monitor\(\{\s*(.*?)\s*\}\)\s*$')
+FIELD_ITEM_RE = re.compile(r'([A-Za-z_][A-Za-z0-9_]*)\s*=\s*("(?:[^"\\]|\\.)*"|[^,]+)')
 
 
 def to_lua_value(key, value):
@@ -94,6 +96,20 @@ def split_blocks(lines):
     return segments
 
 
+def split_single_line_fields(line):
+    """A block written entirely on one line (header, fields, and closing
+    paren all together) has no separate header/footer lines to anchor on.
+    Pull its fields out so it can be normalized into the same multi-line
+    shape every other block uses."""
+    m = SINGLE_LINE_RE.search(line)
+    if not m:
+        return []
+    fields = []
+    for fm in FIELD_ITEM_RE.finditer(m.group(1)):
+        fields.append((fm.group(1), fm.group(2).strip()))
+    return fields
+
+
 def rebuild_field_line(m, key, value):
     indent, comment = m.group(1), m.group(4)
     line = f"{indent}{key} = {value},"
@@ -103,9 +119,15 @@ def rebuild_field_line(m, key, value):
 
 
 def edit_block_lines(block_lines, set_dict, reset_keys):
-    header = block_lines[0]
-    footer = block_lines[-1]
-    body = block_lines[1:-1]
+    if len(block_lines) == 1:
+        fields = split_single_line_fields(block_lines[0])
+        header = "hl.monitor({\n"
+        footer = "})\n"
+        body = [f'    {k} = {v},\n' for k, v in fields]
+    else:
+        header = block_lines[0]
+        footer = block_lines[-1]
+        body = block_lines[1:-1]
 
     default_indent = "    "
     for line in body:
