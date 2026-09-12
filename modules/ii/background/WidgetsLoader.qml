@@ -26,6 +26,7 @@ Item {
     required property var screen
     required property var wallpaperItem
     required property bool wallpaperSafetyTriggered
+    required property bool visualizerHidden
 
     readonly property bool onThisScreen: Config.options.background.screenList.length === 0
         || Config.options.background.screenList.includes(root.screen.name)
@@ -115,6 +116,7 @@ Item {
             scaledScreenHeight: root.screen.height
             wallpaperScale: 1
             pinnedBottom: true
+            isCovered: root.visualizerHidden
         }
     }
     Component {

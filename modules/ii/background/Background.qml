@@ -435,6 +435,7 @@ Variants {
                     screen: bgRoot.screen
                     wallpaperItem: wallpaper
                     wallpaperSafetyTriggered: bgRoot.wallpaperSafetyTriggered
+                    visualizerHidden: bgRoot.visualizerHidden
                 }
             }
 

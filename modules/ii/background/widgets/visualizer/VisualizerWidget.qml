@@ -44,6 +44,9 @@ AbstractBackgroundWidget {
 
     readonly property color waveFillColor: Qt.rgba(Appearance.colors.colPrimary.r, Appearance.colors.colPrimary.g, Appearance.colors.colPrimary.b, config.waveFillOpacity)
     property var pixelHeights: []
+    property bool isCovered: false
+    property real coverageOpacity: isCovered ? 0 : 1
+    Behavior on coverageOpacity { NumberAnimation { duration: 300; easing.type: Easing.InOutQuad } }
 
     visibleWhenLocked: configEntry?.showWhenLocked ?? false
     implicitWidth: scaledScreenWidth
@@ -249,14 +252,14 @@ AbstractBackgroundWidget {
         State {
             name: "default"
             when: root.config.mode === "default"
-            PropertyChanges { target: defaultRow; opacity: root.config.opacity * root.activityOpacity * (root.effectsEnabled ? 1 : 0) }
+            PropertyChanges { target: defaultRow; opacity: root.config.opacity * root.activityOpacity * root.coverageOpacity * (root.effectsEnabled ? 1 : 0) }
             PropertyChanges { target: visualizerRow; opacity: 0 }
             PropertyChanges { target: waveCanvas; opacity: 0 }
         },
         State {
             name: "bars"
             when: root.config.mode === "bars"
-            PropertyChanges { target: visualizerRow; opacity: root.config.opacity * root.activityOpacity * (root.effectsEnabled ? 1 : 0) }
+            PropertyChanges { target: visualizerRow; opacity: root.config.opacity * root.activityOpacity * root.coverageOpacity * (root.effectsEnabled ? 1 : 0) }
             PropertyChanges { target: waveCanvas; opacity: 0 }
             PropertyChanges { target: defaultRow; opacity: 0 }
         },
@@ -264,7 +267,7 @@ AbstractBackgroundWidget {
             name: "wave"
             when: root.config.mode === "wave"
             PropertyChanges { target: visualizerRow; opacity: 0 }
-            PropertyChanges { target: waveCanvas; opacity: root.config.opacity * root.activityOpacity * (root.effectsEnabled ? 1 : 0) }
+            PropertyChanges { target: waveCanvas; opacity: root.config.opacity * root.activityOpacity * root.coverageOpacity * (root.effectsEnabled ? 1 : 0) }
             PropertyChanges { target: defaultRow; opacity: 0 }
         }
     ]
@@ -274,7 +277,7 @@ AbstractBackgroundWidget {
     }
 
     FrameAnimation {
-        running: root.config.mode !== "default" && (root.activityOpacity > 0 || silenceTimer.running) && (visualizerRow.visible || waveCanvas.visible)
+        running: !root.isCovered && root.config.mode !== "default" && (root.activityOpacity > 0 || silenceTimer.running) && (visualizerRow.visible || waveCanvas.visible)
         onTriggered: {
             let target = root.targetPoints;
             let current = root.renderedPoints;
