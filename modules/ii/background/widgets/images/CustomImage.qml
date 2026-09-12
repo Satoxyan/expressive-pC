@@ -15,7 +15,7 @@ AbstractBackgroundWidget {
     id: root
 
     configEntryName: "customImages"
-    configEntry: Config.options.background.widgets.customImages[root.imageIndex]
+    configEntry: Config.customImages[root.imageIndex]
     hoverEnabled: true
 
     required property int imageIndex
@@ -49,7 +49,8 @@ AbstractBackgroundWidget {
             Config.saveCustomImageProps(root.imageIndex, { x: root.x, y: root.y })
         }
         function onDragFinished() {
-            Config.saveCustomImageProps(root.imageIndex, { placementStrategy: root.configEntry.placementStrategy })
+            if (root.configEntry)
+                Config.saveCustomImageProps(root.imageIndex, { placementStrategy: root.configEntry.placementStrategy })
         }
         function onClicked(mouse) {
             // Only open the picker in edit mode (widgets unlocked / draggable)

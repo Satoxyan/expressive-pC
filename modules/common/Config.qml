@@ -13,28 +13,40 @@ Singleton {
     property int readWriteDelay: 50 // milliseconds
     property bool blockWrites: false
 
-    // customImages must be replaced wholesale on mutation: nested edits on plain
-    // objects inside list<var> don't notify or persist, so widgets would reset
-    // to default positions whenever the array gets reassigned from a file reload.
+    // customImages — persisted in its own file to avoid JsonObject re-read crashes
+    property var customImages: []
+
+    function _customImagesPath() {
+        return Directories.config + "/custom-images.json"
+    }
+
+    function _saveCustomImages() {
+        _customImagesAdapter.data = JSON.parse(JSON.stringify(root.customImages))
+        _customImagesFileView.writeAdapter()
+    }
+
     function updateCustomImage(index, props) {
-        const w = root.options.background.widgets;
-        w.customImages = w.customImages.map((e, i) => i === index ? Object.assign({}, e, props) : e);
+        const current = Array.isArray(root.customImages) ? root.customImages : [];
+        root.customImages = current.map((e, i) => i === index ? Object.assign({}, e, props) : e);
+        _saveCustomImages();
     }
     function addCustomImage() {
-        const w = root.options.background.widgets;
-        w.customImages = [...w.customImages, { enable: true, placementStrategy: "free", x: 400, y: 100, path: "", shape: "Cookie4Sided", size: 200 }];
+        const current = Array.isArray(root.customImages) ? root.customImages : [];
+        root.customImages = [...current, { enable: true, placementStrategy: "free", x: 400, y: 100, path: "", shape: "Cookie4Sided", size: 200 }];
+        _saveCustomImages();
     }
     function removeCustomImage(index) {
-        const w = root.options.background.widgets;
-        w.customImages = w.customImages.filter((_, i) => i !== index);
+        const current = Array.isArray(root.customImages) ? root.customImages : [];
+        root.customImages = current.filter((_, i) => i !== index);
+        _saveCustomImages();
     }
-    // Persists without replacing the array, so Repeaters don't rebuild (blink)
-    // mid-interaction. Use only for values whose UI already reflects the change.
+    // Persists without replacing the array (no rebuild/blink). Use for
+    // values whose UI already reflects the change (e.g. drag position).
     function saveCustomImageProps(index, props) {
-        const arr = root.options.background.widgets.customImages;
-        if (!arr[index]) return;
+        const arr = root.customImages;
+        if (!Array.isArray(arr) || !arr[index]) return;
         Object.assign(arr[index], props);
-        fileWriteTimer.restart();
+        _saveCustomImages();
     }
 
     function setNestedValue(nestedKey, value) {
@@ -393,17 +405,6 @@ Singleton {
                         property int waveBorderWidth: 3    // 0 = no border
                         property int renderEveryXFrames: -1  // -1 = auto (System), 1 = every frame, 2 = every other frame, etc. Only for "wave" mode
                         property real z: -1000
-                    }
-
-                    property JsonObject customImage: JsonObject {
-                        property bool enable: false
-                        property string placementStrategy: "free"
-                        property real x: 400
-                        property real y: 100
-                        property real z: 0
-                        property string path: ""
-                        property string shape: "Cookie4Sided"
-                        property real size: 200
                     }
 
                     property JsonObject resources: JsonObject {
@@ -928,5 +929,29 @@ Singleton {
                 }
             }
         }
+    }
+
+    FileView {
+        id: _customImagesFileView
+        path: root._customImagesPath()
+        watchChanges: false
+        onLoaded: {
+            const d = _customImagesAdapter.data
+            if (Array.isArray(d))
+                root.customImages = d
+        }
+        onLoadFailed: error => {
+            if (error == FileViewError.FileNotFound) {
+                _customImagesAdapter.data = []
+                writeAdapter()
+            }
+        }
+
+        JsonAdapter {
+            id: _customImagesAdapter
+            property var data: []
+        }
+
+        Component.onCompleted: load()
     }
 }

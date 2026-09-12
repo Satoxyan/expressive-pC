@@ -18,10 +18,10 @@ AbstractWidget {
     property var wallpaperItem
     property bool visibleWhenLocked: Config.options.lock.showWidgets
     property var configEntry: Config.options.background.widgets[configEntryName]
-    property string placementStrategy: configEntry.placementStrategy
-    property real targetX: Math.max(0, Math.min(configEntry.x, scaledScreenWidth - width))
-    property real targetY : Math.max(0, Math.min(configEntry.y, scaledScreenHeight - height))
-    property real targetZ: configEntry.z
+    property string placementStrategy: configEntry?.placementStrategy ?? "free"
+    property real targetX: Math.max(0, Math.min(configEntry?.x ?? 0, scaledScreenWidth - width))
+    property real targetY : Math.max(0, Math.min(configEntry?.y ?? 0, scaledScreenHeight - height))
+    property real targetZ: configEntry?.z ?? 0
     x: targetX
     y: targetY
     z: targetZ
@@ -43,17 +43,18 @@ AbstractWidget {
     }
 
     onDragFinished: {
-        if (root.configEntry.placementStrategy !== "free")
+        if (root.configEntry && root.configEntry.placementStrategy !== "free")
             root.configEntry.placementStrategy = "free"
     }
 
     function commitPosition() {
+        if (!configEntry) return;
         configEntry.x = root.x;
         configEntry.y = root.y;
         configEntry.z = root.z;
-        root.targetX = Qt.binding(() => Math.max(0, Math.min(configEntry.x, scaledScreenWidth - width)));
-        root.targetY = Qt.binding(() => Math.max(0, Math.min(configEntry.y, scaledScreenHeight - height)));
-        root.targetZ = Qt.binding(() => configEntry.z);
+        root.targetX = Qt.binding(() => Math.max(0, Math.min(configEntry?.x ?? 0, scaledScreenWidth - width)));
+        root.targetY = Qt.binding(() => Math.max(0, Math.min(configEntry?.y ?? 0, scaledScreenHeight - height)));
+        root.targetZ = Qt.binding(() => configEntry?.z ?? 0);
         root.restoreXYBinding();
     }
 

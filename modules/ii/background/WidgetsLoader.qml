@@ -33,7 +33,7 @@ Item {
     Repeater {
         model: [
             { key: "visualizer" },
-            { key: "customImage" },
+            { key: "customImages" },
             { key: "calendar" },
             { key: "weather" },
             { key: "clock", alwaysOnLock: true },
@@ -53,16 +53,26 @@ Item {
 
             property bool enableLoading: true
 
-            shown: Config.options.background.widgets[loaderDelegate.modelData.key].enable
-                && loaderDelegate.enableLoading
-                && (loaderDelegate.modelData.alwaysOnLock
-                    ? (GlobalStates.screenLocked || root.onThisScreen)
-                    : root.onThisScreen)
+            shown: {
+                if (loaderDelegate.modelData.key === "customImages")
+                    return Array.isArray(Config.customImages) && Config.customImages.length > 0
+                        && loaderDelegate.enableLoading
+                        && (loaderDelegate.modelData.alwaysOnLock
+                            ? (GlobalStates.screenLocked || root.onThisScreen)
+                            : root.onThisScreen)
+                const cfg = Config.options.background.widgets[loaderDelegate.modelData.key]
+                const isEnabled = cfg?.enable ?? false
+                return isEnabled
+                    && loaderDelegate.enableLoading
+                    && (loaderDelegate.modelData.alwaysOnLock
+                        ? (GlobalStates.screenLocked || root.onThisScreen)
+                        : root.onThisScreen)
+            }
 
             sourceComponent: {
                 switch (loaderDelegate.modelData.key) {
                     case "visualizer":  return visualizerComp
-                    case "customImage": return customImageComp
+                    case "customImages": return customImageComp
                     case "calendar":    return calendarComp
                     case "weather":     return weatherComp
                     case "clock":       return clockComp
@@ -109,13 +119,24 @@ Item {
     }
     Component {
         id: customImageComp
-        CustomImage {
-            screenWidth: root.screen.width
-            screenHeight: root.screen.height
-            scaledScreenWidth: root.screen.width
-            scaledScreenHeight: root.screen.height
-            wallpaperScale: 1
-            wallpaperItem: root.wallpaperItem
+        Item {
+            Repeater {
+                model: Config.customImages
+                delegate: CustomImage {
+                    required property var modelData
+                    required property int index
+                    imageIndex: index
+                    imagePath: modelData.path ?? ""
+                    imageShape: modelData.shape ?? "Cookie4Sided"
+                    imageSize: modelData.size ?? 200
+                    screenWidth: root.screen.width
+                    screenHeight: root.screen.height
+                    scaledScreenWidth: root.screen.width
+                    scaledScreenHeight: root.screen.height
+                    wallpaperScale: 1
+                    wallpaperItem: root.wallpaperItem
+                }
+            }
         }
     }
     Component {

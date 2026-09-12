@@ -1059,10 +1059,10 @@ ContentPage {
             shape: MaterialShape.Shape.SoftBoom 
             title: Translation.tr("Custom Images")
             Repeater {
-                model: Config.options.background.widgets.customImages.length
+                model: Config.customImages.length
                 delegate: GroupedList {
                     required property int index
-                    readonly property var modelData: Config.options.background.widgets.customImages[index]
+                    readonly property var modelData: Config.customImages[index]
                     Layout.fillWidth: true
                     
                     RowLayout {
