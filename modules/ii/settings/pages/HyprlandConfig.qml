@@ -190,7 +190,7 @@ ContentPage {
                 NoticeBox {
                     Layout.fillWidth: true
                     visible: monitorConfig.monitors[monitorCanvas.selectedIndex]?.hdrSupported === false
-                    text: Translation.tr("This display's EDID does not report HDR support, enabling it below is unlikely to work correctly.")
+                    text: Translation.tr("This display's EDID does not report HDR support, so HDR options are disabled here. Open an issue in GitHub if you think this is a mistake.")
                 }
 
                 GroupedList {
