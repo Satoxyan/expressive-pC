@@ -54,6 +54,15 @@ Item {
             onCheckedChanged: Config.options.background.widgets.blurWidgets = checked
         }
 
+        ConfigSwitch {
+            Layout.fillWidth: true
+            buttonIcon: "palette"
+            text: Translation.tr("Tint blur")
+            visible: Config.options.background.widgets.blurWidgets
+            checked: Config.options.background.widgets.tintBlur
+            onCheckedChanged: Config.options.background.widgets.tintBlur = checked
+        }
+
         ConfigSlider {
             Layout.fillWidth: true
             showLabel: false

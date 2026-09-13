@@ -266,6 +266,7 @@ Singleton {
                 property bool showSnapLines: true
                 property JsonObject widgets: JsonObject {
                     property bool blurWidgets: false
+                    property bool tintBlur: true
                     property real blurRadius: 32
                     property JsonObject clock: JsonObject {
                         property bool enable: true

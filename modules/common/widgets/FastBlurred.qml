@@ -51,6 +51,6 @@ Item {
         anchors.fill: parent
         radius: root.cardRadius
         color: root.tint
-        opacity: root.tintOpacity
+        opacity: Config.options.background.widgets.tintBlur ? root.tintOpacity : 0
     }
 }
