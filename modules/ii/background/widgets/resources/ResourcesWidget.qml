@@ -50,7 +50,8 @@ AbstractBackgroundWidget {
             tintOpacity: 0.55
             trackX: statCard.x + root.x
             trackY: statCard.y + root.y
-            visible: Config.options.background.widgets.blurWidgets 
+            visible: Config.options.background.widgets.resources.blur
+            tintEnabled: Config.options.background.widgets.resources.tintBlur
         }
 
         ColumnLayout {

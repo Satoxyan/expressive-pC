@@ -177,7 +177,8 @@ AbstractBackgroundWidget {
                     tintOpacity: 0.55
                     trackX: root.x  
                     trackY: root.y
-                    visible: Config.options.background.widgets.blurWidgets 
+                    visible: Config.options.background.widgets.userCard.blur
+                    tintEnabled: Config.options.background.widgets.userCard.tintBlur
                 }
 
                 RowLayout {
@@ -338,7 +339,8 @@ AbstractBackgroundWidget {
                     tintOpacity: 0.55
                     trackX: root.x  
                     trackY: root.y
-                    visible: Config.options.background.widgets.blurWidgets 
+                    visible: Config.options.background.widgets.userCard.blur
+                    tintEnabled: Config.options.background.widgets.userCard.tintBlur
                 }
 
                 Rectangle {

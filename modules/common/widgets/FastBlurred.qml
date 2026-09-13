@@ -6,8 +6,9 @@ Item {
     id: root
     required property Item blurSource
     property real cardRadius: 30
-    property color tint: "white"
-    property real tintOpacity: 0.15
+    property color tint: Appearance.colors.colPrimaryContainer
+    property real tintOpacity: 0.55
+    property bool tintEnabled: true
     property real blurRadius: Config.options.background.widgets.blurRadius ?? 32
     property real trackX: 0
     property real trackY: 0
@@ -51,6 +52,6 @@ Item {
         anchors.fill: parent
         radius: root.cardRadius
         color: root.tint
-        opacity: Config.options.background.widgets.tintBlur ? root.tintOpacity : 0
+        opacity: root.tintEnabled ? root.tintOpacity : 0
     }
 }

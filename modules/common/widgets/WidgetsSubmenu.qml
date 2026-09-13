@@ -49,18 +49,26 @@ Item {
         ConfigSwitch {
             Layout.fillWidth: true
             buttonIcon: "blur_on"
-            text: Translation.tr("Blur widgets")
-            checked: Config.options.background.widgets.blurWidgets 
-            onCheckedChanged: Config.options.background.widgets.blurWidgets = checked
+            text: Translation.tr("Blur all widgets")
+            checked: Config.options.background.widgets.blurWidgets
+            onCheckedChanged: {
+                Config.options.background.widgets.blurWidgets = checked
+                const keys = ["weather","images","media","resources","calendar","worldClock","userCard","notes","todo","timers"]
+                keys.forEach(k => { Config.options.background.widgets[k].blur = checked })
+            }
         }
 
         ConfigSwitch {
             Layout.fillWidth: true
             buttonIcon: "palette"
-            text: Translation.tr("Tint blur")
+            text: Translation.tr("Tint all widgets")
             visible: Config.options.background.widgets.blurWidgets
             checked: Config.options.background.widgets.tintBlur
-            onCheckedChanged: Config.options.background.widgets.tintBlur = checked
+            onCheckedChanged: {
+                Config.options.background.widgets.tintBlur = checked
+                const keys = ["weather","images","media","resources","calendar","worldClock","userCard","notes","todo","timers"]
+                keys.forEach(k => { Config.options.background.widgets[k].tintBlur = checked })
+            }
         }
 
         ConfigSlider {

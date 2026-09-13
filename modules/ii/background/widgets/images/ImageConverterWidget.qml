@@ -156,7 +156,8 @@ AbstractBackgroundWidget {
             tintOpacity: 0.55
             trackX: root.x  
             trackY: root.y
-            visible: Config.options.background.widgets.blurWidgets 
+            visible: Config.options.background.widgets.images.blur
+            tintEnabled: Config.options.background.widgets.images.tintBlur
         }
 
         ColumnLayout {

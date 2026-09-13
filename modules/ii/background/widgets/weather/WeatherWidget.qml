@@ -79,7 +79,8 @@ AbstractBackgroundWidget {
             tintOpacity: 0.55
             trackX: root.x  
             trackY: root.y
-            visible: Config.options.background.widgets.blurWidgets 
+            visible: Config.options.background.widgets.weather.blur
+            tintEnabled: Config.options.background.widgets.weather.tintBlur
         }
 
         Loader {
@@ -798,7 +799,7 @@ AbstractBackgroundWidget {
     Item {
         anchors.fill: parent
         z: -1
-        visible: root.style === "pill" && Config.options.background.widgets.blurWidgets
+        visible: root.style === "pill" && Config.options.background.widgets.weather.blur
         layer.enabled: true
         layer.effect: OpacityMask {
             maskSource: MaterialShape {

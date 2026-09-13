@@ -81,7 +81,8 @@ AbstractBackgroundWidget {
                 tintOpacity: 0.55
                 trackX: root.x  
                 trackY: root.y
-                visible: Config.options.background.widgets.blurWidgets 
+                visible: Config.options.background.widgets.todo.blur
+            tintEnabled: Config.options.background.widgets.todo.tintBlur
             }
 
             // List

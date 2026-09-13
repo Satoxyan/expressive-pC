@@ -1147,8 +1147,233 @@ ContentPage {
                 }
             }
 
+            GridLayout {
+                Layout.fillWidth: true
+                columns: 3
+                rowSpacing: 8
+                columnSpacing: 8
+                Repeater {
+                    model: [
+                        {
+                            icon: "weather_mix",
+                            name: Translation.tr("Weather"),
+                            configKey: "weather",
+                        },
+                        {
+                            icon: "image",
+                            name: Translation.tr("Image converter"),
+                            configKey: "images",
+                        },
+                        {
+                            icon: "music_note",
+                            name: Translation.tr("Media Player"),
+                            configKey: "media",
+                        },
+                        {
+                            icon: "memory",
+                            name: Translation.tr("Resources"),
+                            configKey: "resources",
+                        },
+                        {
+                            icon: "graphic_eq",
+                            name: Translation.tr("Visualizer"),
+                            configKey: "visualizer",
+                        },
+                        {
+                            icon: "calendar_month",
+                            name: Translation.tr("Calendar"),
+                            configKey: "calendar",
+                        },
+                        {
+                            icon: "public",
+                            name: Translation.tr("World Clock"),
+                            configKey: "worldClock",
+                        },
+                        {
+                            icon: "person",
+                            name: Translation.tr("User Card"),
+                            configKey: "userCard",
+                        },
+                        {
+                            icon: "note_stack_add",
+                            name: Translation.tr("Notes"),
+                            configKey: "notes",
+                        },
+                        {
+                            icon: "add_task",
+                            name: Translation.tr("To-Do"),
+                            configKey: "todo",
+                        },
+                        {
+                            icon: "timer",
+                            name: Translation.tr("Timers"),
+                            configKey: "timers",
+                        }
+                    ]
+                    delegate: Rectangle {
+                        id: widgetTile
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 130
+                        radius: Appearance.rounding.normal
+                        color: Appearance.colors.colLayer1
+                        border.width: 1
+                        border.color: Appearance.colors.colLayer0Border
+
+                        readonly property bool isEnabled: Config.options.background.widgets[modelData.configKey].enable
+
+                        ColumnLayout {
+                            anchors {
+                                top: parent.top
+                                left: parent.left
+                                right: parent.right
+                                margins: 12
+                            }
+                            spacing: 0
+                            RowLayout {
+                                Layout.fillWidth: true
+                                MaterialSymbol {
+                                    text: modelData.icon
+                                    iconSize: Appearance.font.pixelSize.normal + 5
+                                    color: Appearance.colors.colPrimary
+                                }
+                                Item { Layout.fillWidth: true }
+                                ConfigSwitch {
+                                    Layout.fillWidth: false
+                                    checked: widgetTile.isEnabled
+                                    onCheckedChanged: {
+                                        Config.options.background.widgets[modelData.configKey].enable = checked
+                                    }
+                                }
+                            }
+                            StyledText {
+                                text: modelData.name
+                                font.pixelSize: Appearance.font.pixelSize.normal
+                                color: Appearance.colors.colOnLayer1
+                            }
+                            StyledText {
+                                text: widgetTile.isEnabled ? Translation.tr("Enabled") : Translation.tr("Disabled")
+                                font.pixelSize: Appearance.font.pixelSize.small
+                                color: Appearance.colors.colSubtext
+                            }
+                            RowLayout {
+                                spacing: 6
+                                Layout.topMargin: 4
+                                visible: widgetTile.isEnabled && modelData.configKey !== "visualizer"
+                                MaterialShape {
+                                    Layout.preferredWidth: 28
+                                    Layout.preferredHeight: 28
+                                    shape: MaterialShape.Shape.Cookie6Sided
+                                    color: Config.options.background.widgets[modelData.configKey].blur
+                                        ? Appearance.colors.colPrimary
+                                        : Appearance.colors.colLayer2
+                                    MaterialSymbol {
+                                        anchors.centerIn: parent
+                                        text: "blur_on"
+                                        iconSize: 16
+                                        color: Config.options.background.widgets[modelData.configKey].blur
+                                            ? Appearance.colors.colOnPrimary
+                                            : Appearance.colors.colOnLayer2
+                                    }
+                                    TapHandler {
+                                        cursorShape: Qt.PointingHandCursor
+                                        onTapped: {
+                                            const w = Config.options.background.widgets[modelData.configKey]
+                                            w.blur = !w.blur
+                                        }
+                                    }
+                                }
+                                MaterialShape {
+                                    Layout.preferredWidth: 28
+                                    Layout.preferredHeight: 28
+                                    shape: MaterialShape.Shape.Cookie6Sided
+                                    color: Config.options.background.widgets[modelData.configKey].tintBlur
+                                        ? Appearance.colors.colPrimary
+                                        : Appearance.colors.colLayer2
+                                    MaterialSymbol {
+                                        anchors.centerIn: parent
+                                        text: "palette"
+                                        iconSize: 16
+                                        color: Config.options.background.widgets[modelData.configKey].tintBlur
+                                            ? Appearance.colors.colOnPrimary
+                                            : Appearance.colors.colOnLayer2
+                                    }
+                                    TapHandler {
+                                        cursorShape: Qt.PointingHandCursor
+                                        onTapped: {
+                                            const w = Config.options.background.widgets[modelData.configKey]
+                                            w.tintBlur = !w.tintBlur
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             ContentSubsection {
-                title: Translation.tr("Weather")
+                title: Translation.tr("Canvas")
+                Layout.bottomMargin: 10
+
+                GroupedList {
+                    ConfigSwitch {
+                        Layout.fillWidth: true
+                        buttonIcon: "grid_4x4"
+                        text: Translation.tr("Show alignment grid while dragging")
+                        checked: Config.options.background.showGrid
+                        onCheckedChanged: {
+                            Config.options.background.showGrid = checked;
+                        }
+                    }
+                    ConfigSwitch {
+                        Layout.fillWidth: true
+                        buttonIcon: "align_horizontal_center"
+                        text: Translation.tr("Show snap lines when dropping")
+                        checked: Config.options.background.showSnapLines
+                        onCheckedChanged: {
+                            Config.options.background.showSnapLines = checked;
+                        }
+                    }
+                }
+            }
+        }
+
+        ContentSection {
+            icon: "weather_mix"
+            shape: MaterialShape.Shape.Pill
+            title: Translation.tr("Weather")
+            visible: Config.options.background.widgets.weather.enable
+
+            ContentSubsection {
+                title: Translation.tr("Style")
+                Layout.bottomMargin: 10
+
+                GroupedList {
+                    ConfigSelectionArray {
+                        text: Translation.tr("Weather style")
+                        icon: "shapes"
+                        Layout.fillWidth: false
+                        currentValue: Config.options.background.widgets.weather.style
+                        onSelected: newValue => {
+                            Config.options.background.widgets.weather.style = newValue;
+                        }
+                        options: [
+                            {
+                                displayName: Translation.tr("Card"),
+                                icon: "square",
+                                value: "card"
+                            },
+                            {
+                                displayName: Translation.tr("Pill"),
+                                icon: "padding",
+                                value: "pill"
+                            },
+                        ]
+                    }
+                }
+            }
+
+            ContentSubsection {
+                title: Translation.tr("Placement")
                 Layout.bottomMargin: 10
 
                 GroupedList {
@@ -1177,185 +1402,6 @@ ContentPage {
                                 value: "mostBusy"
                             },
                         ]
-                    }
-                }
-                GroupedList {
-                    ConfigSelectionArray {
-                        text: Translation.tr("Weather style")
-                        icon: "shapes"
-                        Layout.fillWidth: false
-                        currentValue: Config.options.background.widgets.weather.style
-                        onSelected: newValue => {
-                            Config.options.background.widgets.weather.style = newValue;
-                        }
-                        options: [
-                            {
-                                displayName: Translation.tr("Card"),
-                                icon: "square",
-                                value: "card"
-                            },
-                            {
-                                displayName: Translation.tr("Pill"),
-                                icon: "padding",
-                                value: "pill"
-                            },
-                        ]
-                    }
-                }
-            }
-
-            GridLayout {
-                Layout.fillWidth: true
-                columns: 3
-                rowSpacing: 8
-                columnSpacing: 8
-                Repeater {
-                    model: [
-                        {
-                            icon: "weather_mix",
-                            name: Translation.tr("Weather"),
-                            enabled: Config.options.background.widgets.weather.enable
-                        },
-                        {
-                            icon: "image",
-                            name: Translation.tr("Image converter"),
-                            enabled: Config.options.background.widgets.images.enable
-                        },
-                        {
-                            icon: "music_note",
-                            name: Translation.tr("Media Player"),
-                            enabled: Config.options.background.widgets.media.enable
-                        },
-                        {
-                            icon: "memory",
-                            name: Translation.tr("Resources"),
-                            enabled: Config.options.background.widgets.resources.enable
-                        },
-                        {
-                            icon: "graphic_eq",
-                            name: Translation.tr("Visualizer"),
-                            enabled: Config.options.background.widgets.visualizer.enable
-                        },
-                        {
-                            icon: "calendar_month",
-                            name: Translation.tr("Calendar"),
-                            enabled: Config.options.background.widgets.calendar.enable
-                        },
-                        {
-                            icon: "public",
-                            name: Translation.tr("World Clock"),
-                            enabled: Config.options.background.widgets.worldClock.enable
-                        },
-                        {
-                            icon: "person",
-                            name: Translation.tr("User Card"),
-                            enabled: Config.options.background.widgets.userCard.enable
-                        },
-                        {
-                            icon: "note_stack_add",
-                            name: Translation.tr("Notes"),
-                            enabled: Config.options.background.widgets.notes.enable
-                        },
-                        {
-                            icon: "add_task",
-                            name: Translation.tr("To-Do"),
-                            enabled: Config.options.background.widgets.todo.enable
-                        },
-                        {
-                            icon: "timer",
-                            name: Translation.tr("Timers"),
-                            enabled: Config.options.background.widgets.timers.enable
-                        }
-                        
-                    ]
-                    delegate: Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 105
-                        radius: Appearance.rounding.normal
-                        color: Appearance.colors.colLayer1
-                        border.width: 1
-                        border.color: Appearance.colors.colLayer0Border
-                        ColumnLayout {
-                            anchors {
-                                top: parent.top
-                                left: parent.left
-                                right: parent.right
-                                margins: 12
-                            }
-                            spacing: 0
-                            RowLayout {
-                                Layout.fillWidth: true
-                                MaterialSymbol {
-                                    text: modelData.icon
-                                    iconSize: Appearance.font.pixelSize.normal + 5
-                                    color: Appearance.colors.colPrimary
-                                }
-                                Item { Layout.fillWidth: true }
-                                ConfigSwitch {
-                                    Layout.fillWidth: false
-                                    checked: modelData.enabled
-                                    onCheckedChanged: {
-                                        if (modelData.icon === "weather_mix")
-                                            Config.options.background.widgets.weather.enable = checked
-                                        else if (modelData.icon === "image")
-                                            Config.options.background.widgets.images.enable = checked
-                                        else if (modelData.icon === "music_note")
-                                            Config.options.background.widgets.media.enable = checked
-                                        else if (modelData.icon === "memory")
-                                            Config.options.background.widgets.resources.enable = checked
-                                        else if (modelData.icon === "graphic_eq")
-                                            Config.options.background.widgets.visualizer.enable = checked
-                                        else if (modelData.icon === "calendar_month")
-                                            Config.options.background.widgets.calendar.enable = checked
-                                        else if (modelData.icon === "public")
-                                            Config.options.background.widgets.worldClock.enable = checked
-                                        else if (modelData.icon === "person")
-                                            Config.options.background.widgets.userCard.enable = checked
-                                        else if (modelData.icon === "note_stack_add")
-                                            Config.options.background.widgets.notes.enable = checked
-                                        else if (modelData.icon === "add_task")
-                                            Config.options.background.widgets.todo.enable = checked
-                                        else if (modelData.icon === "timer")
-                                            Config.options.background.widgets.timers.enable = checked
-                                    }
-                                }
-                            }
-                            StyledText {
-                                text: modelData.name
-                                font.pixelSize: Appearance.font.pixelSize.normal
-                                color: Appearance.colors.colOnLayer1
-                            }
-                            StyledText {
-                                text: modelData.enabled ? Translation.tr("Enabled") : Translation.tr("Disabled")
-                                font.pixelSize: Appearance.font.pixelSize.small
-                                color: Appearance.colors.colSubtext
-                            }
-                        }
-                    }
-                }
-            }
-            ContentSubsection {
-                title: Translation.tr("Canvas")
-                Layout.bottomMargin: 10
-
-                GroupedList {
-                    ConfigSwitch {
-                        Layout.fillWidth: true
-                        buttonIcon: "grid_4x4"
-                        text: Translation.tr("Show alignment grid while dragging")
-                        checked: Config.options.background.showGrid
-                        onCheckedChanged: {
-                            Config.options.background.showGrid = checked;
-                        }
-                    }
-                    ConfigSwitch {
-                        Layout.fillWidth: true
-                        buttonIcon: "align_horizontal_center"
-                        text: Translation.tr("Show snap lines when dropping")
-                        checked: Config.options.background.showSnapLines
-                        onCheckedChanged: {
-                            Config.options.background.showSnapLines = checked;
-                        }
                     }
                 }
             }

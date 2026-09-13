@@ -53,7 +53,8 @@ AbstractBackgroundWidget {
             tintOpacity: 0.55
             trackX: timerCard.x + root.x
             trackY: timerCard.y + root.y
-            visible: Config.options.background.widgets.blurWidgets 
+            visible: Config.options.background.widgets.timers.blur
+            tintEnabled: Config.options.background.widgets.timers.tintBlur
         }
 
         MouseArea {

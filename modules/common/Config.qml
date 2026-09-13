@@ -324,6 +324,8 @@ Singleton {
                     }
                     property JsonObject weather: JsonObject {
                         property bool enable: false
+                        property bool blur: true
+                        property bool tintBlur: true
                         property string placementStrategy: "free" // "free", "leastBusy", "mostBusy"
                         property real x: 400
                         property real y: 100
@@ -335,6 +337,8 @@ Singleton {
 
                     property JsonObject calendar: JsonObject {
                         property bool enable: false
+                        property bool blur: true
+                        property bool tintBlur: true
                         property string placementStrategy: "free" // "free", "leastBusy", "mostBusy"
                         property real x: 400
                         property real y: 100
@@ -343,6 +347,8 @@ Singleton {
                     }
                     property JsonObject worldClock: JsonObject {
                         property bool enable: false
+                        property bool blur: true
+                        property bool tintBlur: true
                         property list<string> timezones: ["Australia/Sydney", "Asia/Tokyo", "Europe/London", "America/New_York"]
                         property string placementStrategy: "free"
                         property real x: 400
@@ -354,6 +360,8 @@ Singleton {
 
                     property JsonObject notes: JsonObject {
                         property bool enable: false
+                        property bool blur: true
+                        property bool tintBlur: true
                         property string placementStrategy: "free"
                         property real x: 400
                         property real y: 100
@@ -362,6 +370,8 @@ Singleton {
 
                     property JsonObject todo: JsonObject {
                         property bool enable: false
+                        property bool blur: true
+                        property bool tintBlur: true
                         property string placementStrategy: "free"
                         property real x: 400
                         property real y: 100
@@ -370,6 +380,8 @@ Singleton {
 
                     property JsonObject userCard: JsonObject {
                         property bool enable: false
+                        property bool blur: true
+                        property bool tintBlur: true
                         property string placementStrategy: "free"
                         property real x: 400
                         property real y: 100
@@ -379,6 +391,8 @@ Singleton {
 
                     property JsonObject images: JsonObject {
                         property bool enable: false
+                        property bool blur: true
+                        property bool tintBlur: true
                         property string placementStrategy: "free"
                         property real x: 400
                         property real y: 100
@@ -387,6 +401,8 @@ Singleton {
 
                     property JsonObject visualizer: JsonObject {
                         property bool enable: false
+                        property bool blur: true
+                        property bool tintBlur: true
                         property string placementStrategy: "free"
                         property real x: 0
                         property real y: 0
@@ -410,6 +426,8 @@ Singleton {
 
                     property JsonObject resources: JsonObject {
                         property bool enable: false
+                        property bool blur: true
+                        property bool tintBlur: true
                         property string placementStrategy: "free"
                         property real x: 400
                         property real y: 100
@@ -419,6 +437,8 @@ Singleton {
 
                     property JsonObject timers: JsonObject {
                         property bool enable: false
+                        property bool blur: true
+                        property bool tintBlur: true
                         property string placementStrategy: "free"
                         property real x: 400
                         property real y: 100
@@ -428,6 +448,8 @@ Singleton {
 
                     property JsonObject media: JsonObject {
                         property bool enable: false
+                        property bool blur: true
+                        property bool tintBlur: true
                         property bool showControls: true
                         property bool showLyrics: false
                         property bool showTitles: true

@@ -91,7 +91,8 @@ AbstractBackgroundWidget {
                 tintOpacity: 0.55
                 trackX: root.x  
                 trackY: root.y
-                visible: Config.options.background.widgets.blurWidgets && sizeMode === "2x2"
+                visible: Config.options.background.widgets.worldClock.blur && sizeMode === "2x2"
+                tintEnabled: Config.options.background.widgets.worldClock.tintBlur
             }
 
             // 2x2
@@ -332,7 +333,8 @@ AbstractBackgroundWidget {
 
                         FastBlurred {
                             anchors.fill: parent
-                            visible: Config.options.background.widgets.blurWidgets
+                            visible: Config.options.background.widgets.worldClock.blur
+                            tintEnabled: Config.options.background.widgets.worldClock.tintBlur
                             blurSource: root.wallpaperItem
                             cardRadius: Appearance.rounding?.verylarge ?? 30
                             tint: (clockWrapper.cityData?.isDay ?? true)
