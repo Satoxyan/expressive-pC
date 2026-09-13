@@ -12,6 +12,7 @@ AbstractBackgroundWidget {
     id: root
 
     configEntryName: "clock"
+    placementPriority: 2
 
     implicitHeight: contentColumn.implicitHeight
     implicitWidth: contentColumn.implicitWidth

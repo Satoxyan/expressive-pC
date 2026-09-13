@@ -61,6 +61,14 @@ AbstractWidget {
     onReleased: root.commitPosition()
 
     property bool needsColText: false
+    property int placementPriority: 0 // Higher = runs first (clock=2, weather=1)
+    function _higherPriorityScanDone() {
+        if (root.placementPriority <= 0) return true;
+        var done = Config._placementScanDone;
+        if (root.placementPriority < 2 && !done["clock"]) return false;
+        if (root.placementPriority < 1 && !done["weather"]) return false;
+        return true;
+    }
     // Text widgets (e.g. digital lock clock with cookie desktop clock) flip this
     // when the style changes; rescan so the color grid exists for the new style.
     onNeedsColTextChanged: refreshPlacementIfNeeded()
@@ -118,7 +126,10 @@ AbstractWidget {
     property bool wallpaperIsVideo: Config.options.background.wallpaperPath.endsWith(".mp4") || Config.options.background.wallpaperPath.endsWith(".webm") || Config.options.background.wallpaperPath.endsWith(".mkv") || Config.options.background.wallpaperPath.endsWith(".avi") || Config.options.background.wallpaperPath.endsWith(".mov")
     property string wallpaperPath: wallpaperIsVideo ? Config.options.background.thumbnailPath : Config.options.background.wallpaperPath
     
-    onWallpaperPathChanged: refreshPlacementIfNeeded()
+    onWallpaperPathChanged: {
+        Config._placementScanDone = {};
+        refreshPlacementIfNeeded();
+    }
     onPlacementStrategyChanged: refreshPlacementIfNeeded()
     Connections {
         target: Config
@@ -130,6 +141,22 @@ AbstractWidget {
         // Text widgets get a dominant-color grid over the whole screen so the color
         // can follow widget movement instantly; placement scan only for non-free strategies.
         const skipScan = root.placementStrategy === "free";
+        var excludeArgs = [];
+        if (!skipScan) {
+            var widgetNames = ["clock", "weather", "timer", "todo", "notes", "media", "images", "worldClock", "userCard", "resources"];
+            var myW = leastBusyRegionProc.contentWidth;
+            var myH = leastBusyRegionProc.contentHeight;
+            for (var i = 0; i < widgetNames.length; i++) {
+                var name = widgetNames[i];
+                if (name === root.configEntryName) continue;
+                var entry = Config.options.background.widgets[name];
+                if (!entry || entry.placementStrategy === "free") continue;
+                if (entry.x === undefined || entry.y === undefined) continue;
+                var exCx = (entry.x + myW / 2) / root.wallpaperScale;
+                var exCy = (entry.y + myH / 2) / root.wallpaperScale;
+                excludeArgs.push("--exclude", exCx, exCy, myW, myH);
+            }
+        }
         return [Quickshell.shellPath("scripts/images/least-busy-region-venv.sh")
             , "--screen-width", Math.round(root.scaledScreenWidth)
             , "--screen-height", Math.round(root.scaledScreenHeight)
@@ -142,6 +169,7 @@ AbstractWidget {
             , "--vertical-padding", leastBusyRegionProc.verticalPadding
             , root.wallpaperPath
             , ...(root.placementStrategy === "mostBusy" ? ["--busiest"] : [])
+            , ...excludeArgs
         ];
     }
     function startLeastBusyRegionProc() {
@@ -157,7 +185,22 @@ AbstractWidget {
             root.pendingPlacementRefresh = true;
             leastBusyRegionProc.running = false;
         } else {
+            if (!root._higherPriorityScanDone()) {
+                if (!placementWaitTimer.running) placementWaitTimer.start();
+                return;
+            }
             root.startLeastBusyRegionProc();
+        }
+    }
+    Timer {
+        id: placementWaitTimer
+        interval: 50
+        repeat: true
+        onTriggered: {
+            if (root._higherPriorityScanDone()) {
+                stop();
+                root.startLeastBusyRegionProc();
+            }
         }
     }
     // ponytail: debug overlay — set true untuk lihat grid 8x5 + 3x3 aktif; matikan setelah verifikasi
@@ -197,6 +240,14 @@ AbstractWidget {
                 if (root.placementStrategy === "free") return;
                 root.targetX = parsedContent.center_x * root.wallpaperScale - root.width / 2;
                 root.targetY  = parsedContent.center_y * root.wallpaperScale - root.height / 2;
+                if (root.configEntry) {
+                    root.configEntry.x = root.targetX;
+                    root.configEntry.y = root.targetY;
+                }
+                // Mark scan done so lower-priority widgets can start
+                var done = Config._placementScanDone;
+                done[root.configEntryName] = true;
+                Config._placementScanDone = Object.assign({}, done);
             }
         }
     }

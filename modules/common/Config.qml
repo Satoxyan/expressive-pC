@@ -16,6 +16,9 @@ Singleton {
     // customImages — persisted in its own file to avoid JsonObject re-read crashes
     property var customImages: []
 
+    // Track which widgets have completed their placement scan (not persisted)
+    property var _placementScanDone: ({})
+
     function _customImagesPath() {
         return Directories.config + "/custom-images.json"
     }

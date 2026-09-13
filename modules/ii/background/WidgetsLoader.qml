@@ -31,13 +31,15 @@ Item {
     readonly property bool onThisScreen: Config.options.background.screenList.length === 0
         || Config.options.background.screenList.includes(root.screen.name)
 
+    property var placementScanDone: ({})
+
     Repeater {
         model: [
             { key: "visualizer" },
             { key: "customImages" },
             { key: "calendar" },
-            { key: "weather" },
             { key: "clock", alwaysOnLock: true },
+            { key: "weather" },
             { key: "notes" },
             { key: "media" },
             { key: "images" },

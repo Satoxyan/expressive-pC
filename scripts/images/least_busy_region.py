@@ -41,7 +41,9 @@ def load_scaled(image_path, screen_width=None, screen_height=None, verbose=False
         img = center_crop(img, screen_width, screen_height)
     return img
 
-def find_least_busy_region(img, region_width=300, region_height=200, verbose=False, stride=2, horizontal_padding=50, vertical_padding=50, busiest=False):
+def find_least_busy_region(img, region_width=300, region_height=200, verbose=False, stride=2, horizontal_padding=50, vertical_padding=50, busiest=False, exclude_regions=None):
+    if exclude_regions is None:
+        exclude_regions = []
     img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     arr = img_gray.astype(np.float64)
     h, w = arr.shape
@@ -96,6 +98,17 @@ def find_least_busy_region(img, region_width=300, region_height=200, verbose=Fal
             x2, y2 = x + region_width - 1, y + region_height - 1
             if x2 >= w or y2 >= h:
                 continue  # Skip out-of-bounds window
+            # Skip regions overlapping with excluded widgets
+            cx = x + region_width / 2
+            cy = y + region_height / 2
+            skip = False
+            for ex_cx, ex_cy, ex_w, ex_h in exclude_regions:
+                if (abs(cx - ex_cx) < (region_width + ex_w) / 2 and
+                    abs(cy - ex_cy) < (region_height + ex_h) / 2):
+                    skip = True
+                    break
+            if skip:
+                continue
             s = region_sum(integral, x1, y1, x2, y2)
             s2 = region_sum(integral_sq, x1, y1, x2, y2)
             mean = s / area
@@ -259,6 +272,7 @@ def main():
     parser.add_argument("--vertical-padding", "-vp", type=int, default=50, help="Minimum vertical distance from region to image edge")
     parser.add_argument("--busiest", action="store_true", help="Find the busiest region instead of the least busy")
     parser.add_argument("--skip-scan", action="store_true", help="Skip placement scan (for free-placed widgets)")
+    parser.add_argument("--exclude", nargs=4, type=float, action="append", default=[], metavar=("CX", "CY", "W", "H"), help="Exclude regions overlapping with given center+size (repeatable)")
     parser.add_argument("--color-grid-cols", type=int, default=0, help="Also output dominant colors of a cols-wide grid tiling the screen")
     parser.add_argument("--color-grid-rows", type=int, default=0, help="Row count of the dominant color grid")
     parser.add_argument("--sample-x", type=int, default=0, help="X of widget bbox sample (for precise text color, with halo)")
@@ -319,7 +333,8 @@ def main():
             stride=args.stride,
             horizontal_padding=args.horizontal_padding,
             vertical_padding=args.vertical_padding,
-            busiest=args.busiest
+            busiest=args.busiest,
+            exclude_regions=[(c[0], c[1], c[2], c[3]) for c in args.exclude]
         )
     if args.visual_output:
         draw_region(img, coords, region_width=args.width, region_height=args.height)

@@ -12,6 +12,7 @@ import qs.modules.ii.background.widgets
 AbstractBackgroundWidget {
     id: root
     configEntryName: "weather"
+    placementPriority: 1
     hoverEnabled: true
 
     readonly property string style: root.configEntry.style ?? "card"
