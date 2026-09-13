@@ -273,13 +273,28 @@ Item {
                             if (targetWorkspace !== -1 && targetWorkspace !== windowData?.workspace.id) {
                                 if (!window.windowData.floating) {
                                     Hyprland.dispatch(`hl.dsp.window.move({ workspace = ${targetWorkspace}, follow = false, window = "address:${window.windowData?.address}" })`)
-                                    // Animate non-float to center of target workspace cell
+                                    // Animate non-float: predict final size (will fill workspace if alone)
                                     const targetColIndex = getWsColumn(targetWorkspace)
                                     const targetRowIndex = getWsRow(targetWorkspace)
                                     const targetXOffset = (root.workspaceImplicitWidth + workspaceSpacing) * targetColIndex
                                     const targetYOffset = (root.workspaceImplicitHeight + workspaceSpacing) * targetRowIndex
-                                    window.x = targetXOffset + (root.workspaceImplicitWidth - window.width) / 2
-                                    window.y = targetYOffset + (root.workspaceImplicitHeight - window.height) / 2
+                                    // Check if target workspace will have other windows
+                                    var otherWinCount = 0
+                                    var toplevels = ToplevelManager.toplevels.values
+                                    for (var i = 0; i < toplevels.length; i++) {
+                                        var t = toplevels[i]
+                                        var h = t.HyprlandToplevel
+                                        if (!h) continue
+                                        var addr = `0x${h.address}`
+                                        if (addr === window.windowData?.address) continue
+                                        var w = windowByAddress[addr]
+                                        if (w && !w.floating && w.workspace?.id === targetWorkspace) otherWinCount++
+                                    }
+                                    // If alone, use workspace size for centering; otherwise use current window size
+                                    var finalW = otherWinCount === 0 ? root.workspaceImplicitWidth : window.width
+                                    var finalH = otherWinCount === 0 ? root.workspaceImplicitHeight : window.height
+                                    window.x = targetXOffset + (root.workspaceImplicitWidth - finalW) / 2
+                                    window.y = targetYOffset + (root.workspaceImplicitHeight - finalH) / 2
                                 } else {
                                     // Float: keep consistent screen position across workspaces
                                     Hyprland.dispatch(`hl.dsp.window.move({ workspace = ${targetWorkspace}, follow = false, window = "address:${window.windowData?.address}" })`)
