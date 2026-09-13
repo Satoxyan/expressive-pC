@@ -79,6 +79,9 @@ Scope {
         Column {
             id: columnLayout
             visible: GlobalStates.overviewOpen
+            opacity: GlobalStates.overviewOpen ? 1 : 0
+            scale: GlobalStates.overviewOpen ? 1 : 0.85
+            transformOrigin: Item.Top
             anchors {
                 horizontalCenter: parent.horizontalCenter
                 top: parent.top
@@ -87,6 +90,13 @@ Scope {
                     : 0
             }
             spacing: -8
+
+            Behavior on opacity {
+                NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+            }
+            Behavior on scale {
+                NumberAnimation { duration: 400; easing.type: Easing.BezierSpline; easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial }
+            }
 
             Keys.onPressed: event => {
                 if (event.key === Qt.Key_Escape) {
