@@ -173,7 +173,7 @@ AbstractBackgroundWidget {
                     anchors.fill: parent
                     blurSource: root.wallpaperItem
                     cardRadius: card.radius
-                    tint: Appearance.colors.colLayer1
+                    tint: Appearance.colors.colPrimaryContainer
                     tintOpacity: 0.55
                     trackX: root.x  
                     trackY: root.y
@@ -334,7 +334,7 @@ AbstractBackgroundWidget {
                     anchors.fill: parent
                     blurSource: root.wallpaperItem
                     cardRadius: Appearance.rounding?.verylarge ?? 30
-                    tint: Appearance.colors.colLayer1
+                    tint: Appearance.colors.colPrimaryContainer
                     tintOpacity: 0.55
                     trackX: root.x  
                     trackY: root.y

@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import Qt5Compat.GraphicalEffects
 import qs
 import qs.services
 import qs.modules.common
@@ -74,7 +75,7 @@ AbstractBackgroundWidget {
             anchors.fill: parent
             blurSource: root.wallpaperItem
             cardRadius: card.radius
-            tint: Appearance.colors.colLayer1
+            tint: Appearance.colors.colPrimaryContainer
             tintOpacity: 0.55
             trackX: root.x  
             trackY: root.y
@@ -762,7 +763,7 @@ AbstractBackgroundWidget {
         visible: root.style === "pill"
         anchors.fill: parent
         shape: MaterialShape.Shape.Pill
-        color: Appearance.colors.colPrimaryContainer
+        color: Config.options.background.widgets.blurWidgets ? "transparent" : Appearance.colors.colPrimaryContainer
         implicitSize: 200
 
         StyledText {
@@ -791,6 +792,32 @@ AbstractBackgroundWidget {
                 leftMargin: 16
                 bottomMargin: 20
             }
+        }
+    }
+
+    Item {
+        anchors.fill: parent
+        z: -1
+        visible: root.style === "pill" && Config.options.background.widgets.blurWidgets
+        layer.enabled: true
+        layer.effect: OpacityMask {
+            maskSource: MaterialShape {
+                width: backgroundShape.width
+                height: backgroundShape.height
+                shape: MaterialShape.Shape.Pill
+                color: "white"
+            }
+        }
+
+        FastBlurred {
+            anchors.fill: parent
+            blurSource: root.wallpaperItem
+            cardRadius: 0
+            layer.enabled: false
+            tint: Appearance.colors.colPrimaryContainer
+            tintOpacity: 0.55
+            trackX: root.x
+            trackY: root.y
         }
     }
 }

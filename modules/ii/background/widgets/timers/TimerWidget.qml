@@ -49,7 +49,7 @@ AbstractBackgroundWidget {
             anchors.fill: parent
             blurSource: root.wallpaperItem
             cardRadius: timerCard.radius
-            tint: Appearance.colors.colLayer1
+            tint: Appearance.colors.colPrimaryContainer
             tintOpacity: 0.55
             trackX: timerCard.x + root.x
             trackY: timerCard.y + root.y

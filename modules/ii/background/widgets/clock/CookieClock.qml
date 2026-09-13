@@ -137,7 +137,7 @@ Item {
             anchors.fill: parent
             blurSource: root.wallpaperItem
             cardRadius: 0
-            tint: Appearance.colors.colLayer1
+            tint: Appearance.colors.colPrimaryContainer
             tintOpacity: 0.55
             trackX: root.originX + root.x
             trackY: root.originY + root.y

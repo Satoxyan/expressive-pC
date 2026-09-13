@@ -46,7 +46,7 @@ AbstractBackgroundWidget {
             anchors.fill: parent
             blurSource: root.wallpaperItem
             cardRadius: statCard.radius
-            tint: Appearance.colors.colLayer1
+            tint: statCard.bgColor
             tintOpacity: 0.55
             trackX: statCard.x + root.x
             trackY: statCard.y + root.y
