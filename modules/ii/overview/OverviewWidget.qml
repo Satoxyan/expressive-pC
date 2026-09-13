@@ -197,14 +197,16 @@ Item {
                     windowData: windowByAddress[address]
 
                     property bool atInitPosition: (initX == x && initY == y)
+                    property real dragStartX: 0
+                    property real dragStartY: 0
 
                     // Offset on the canvas
                     property int workspaceColIndex: getWsColumn(windowData?.workspace.id)
                     property int workspaceRowIndex: getWsRow(windowData?.workspace.id)
                     xOffset: (root.workspaceImplicitWidth + workspaceSpacing) * workspaceColIndex
                     yOffset: (root.workspaceImplicitHeight + workspaceSpacing) * workspaceRowIndex
-                    property real xWithinWorkspaceWidget: (windowData?.at[0] - (monitor?.x ?? 0) - monitorData?.reserved[0]) * root.scale
-                    property real yWithinWorkspaceWidget: (windowData?.at[1] - (monitor?.y ?? 0) - monitorData?.reserved[1]) * root.scale
+                    property real xWithinWorkspaceWidget: Math.max((windowData?.at[0] - (monitor?.x ?? 0) - monitorData?.reserved[0]) * root.scale, 0)
+                    property real yWithinWorkspaceWidget: Math.max((windowData?.at[1] - (monitor?.y ?? 0) - monitorData?.reserved[1]) * root.scale, 0)
 
                     // Radius
                     property real minRadius: Appearance.rounding.small
@@ -254,11 +256,14 @@ Item {
                         onPressed: (mouse) => {
                             root.draggingFromWorkspace = windowData?.workspace.id
                             window.pressed = true
+                            window.dragStartX = window.x
+                            window.dragStartY = window.y
+                            window.x = window.x
+                            window.y = window.y
                             window.Drag.active = true
                             window.Drag.source = window
                             window.Drag.hotSpot.x = mouse.x
                             window.Drag.hotSpot.y = mouse.y
-                            // console.log(`[OverviewWindow] Dragging window ${windowData?.address} from position (${window.x}, ${window.y})`)
                         }
                         onReleased: {
                             const targetWorkspace = root.draggingTargetWorkspace
@@ -266,35 +271,37 @@ Item {
                             window.Drag.active = false
                             root.draggingFromWorkspace = -1
                             if (targetWorkspace !== -1 && targetWorkspace !== windowData?.workspace.id) {
-                                Hyprland.dispatch(`hl.dsp.window.move({ workspace = ${targetWorkspace}, follow = false, window = "address:${window.windowData?.address}" })`)
-                                window.x = Qt.binding(() => window.initX)
-                                window.y = Qt.binding(() => window.initY)
+                                if (!window.windowData.floating) {
+                                    Hyprland.dispatch(`hl.dsp.window.move({ workspace = ${targetWorkspace}, follow = false, window = "address:${window.windowData?.address}" })`)
+                                    // Animate non-float to center of target workspace cell
+                                    const targetColIndex = getWsColumn(targetWorkspace)
+                                    const targetRowIndex = getWsRow(targetWorkspace)
+                                    const targetXOffset = (root.workspaceImplicitWidth + workspaceSpacing) * targetColIndex
+                                    const targetYOffset = (root.workspaceImplicitHeight + workspaceSpacing) * targetRowIndex
+                                    window.x = targetXOffset + (root.workspaceImplicitWidth - window.width) / 2
+                                    window.y = targetYOffset + (root.workspaceImplicitHeight - window.height) / 2
+                                } else {
+                                    // Float: keep consistent screen position across workspaces
+                                    Hyprland.dispatch(`hl.dsp.window.move({ workspace = ${targetWorkspace}, follow = false, window = "address:${window.windowData?.address}" })`)
+                                    // Use captured dragStart position (most accurate) instead of initX (may be stale)
+                                    const percentageX = (window.dragStartX - xOffset) / root.workspaceImplicitWidth
+                                    const percentageY = (window.dragStartY - yOffset) / root.workspaceImplicitHeight
+                                    const targetColIndex = getWsColumn(targetWorkspace)
+                                    const targetRowIndex = getWsRow(targetWorkspace)
+                                    const targetXOffset = (root.workspaceImplicitWidth + workspaceSpacing) * targetColIndex
+                                    const targetYOffset = (root.workspaceImplicitHeight + workspaceSpacing) * targetRowIndex
+                                    window.x = targetXOffset + percentageX * root.workspaceImplicitWidth
+                                    window.y = targetYOffset + percentageY * root.workspaceImplicitHeight
+                                }
                             }
                             else {
                                 if (!window.windowData.floating) {
                                     updateWindowPosition.restart()
                                     return
                                 }
-                                // ponytail: keep at least 30px inside frame, not fully outside
-                                const visibleMin = 10
-                                const minX = xOffset - window.width + visibleMin
-                                const maxX = xOffset + root.workspaceImplicitWidth - visibleMin
-                                const minY = yOffset - window.height + visibleMin
-                                const maxY = yOffset + root.workspaceImplicitHeight - visibleMin
-                                const clampedX = Math.max(minX, Math.min(maxX, window.x))
-                                const clampedY = Math.max(minY, Math.min(maxY, window.y))
-                                window.x = clampedX
-                                window.y = clampedY
-                                const percentageX = (clampedX - xOffset) / root.workspaceImplicitWidth
-                                const percentageY = (clampedY - yOffset) / root.workspaceImplicitHeight
-                                const monitor = window.monitor
-                                const reserved = monitor?.reserved ?? [0, 0, 0, 0]
-                                const scaleF = monitor?.scale ?? 1
-                                const mw = monitor?.width ?? root.screen.width
-                                const mh = monitor?.height ?? root.screen.height
-                                const targetX = (monitor?.x ?? 0) + reserved[0] + (percentageX * (mw - reserved[0] - reserved[2])) / scaleF
-                                const targetY = (monitor?.y ?? 0) + reserved[1] + (percentageY * (mh - reserved[1] - reserved[3])) / scaleF
-                                Hyprland.dispatch(`hl.dsp.window.move({ x = "${targetX}", y = "${targetY}", window = "address:${window.windowData?.address}" })`)
+                                const percentageX = (window.x - xOffset) / root.workspaceImplicitWidth
+                                const percentageY = (window.y - yOffset) / root.workspaceImplicitHeight
+                                Hyprland.dispatch(`hl.dsp.window.move({ x = "${percentageX * root.screen.width}", y = "${percentageY * root.screen.height}", window = "address:${window.windowData?.address}" })`)
                             }
                         }
                         onClicked: (event) => {

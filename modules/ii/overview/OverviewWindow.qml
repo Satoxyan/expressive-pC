@@ -27,11 +27,11 @@ Item { // Window
         return (widgetHeight * monitorData.scale) / (monitorHeight * widgetMonitor.scale);
     }
     property real initX: {
-        return (windowData?.at[0] - (monitorData?.x ?? 0) - monitorData?.reserved[0]) * widthRatio * root.scale + xOffset;
+        return Math.max((windowData?.at[0] - (monitorData?.x ?? 0) - monitorData?.reserved[0]) * widthRatio * root.scale, 0) + xOffset;
     }
 
     property real initY: {
-        return (windowData?.at[1] - (monitorData?.y ?? 0) - monitorData?.reserved[1]) * heightRatio * root.scale + yOffset;
+        return Math.max((windowData?.at[1] - (monitorData?.y ?? 0) - monitorData?.reserved[1]) * heightRatio * root.scale, 0) + yOffset;
     }
     property real xOffset: 0
     property real yOffset: 0
