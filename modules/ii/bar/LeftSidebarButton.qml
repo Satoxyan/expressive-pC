@@ -12,7 +12,7 @@ RippleButton {
     property bool aiChatEnabled: Config.options.policies.ai !== 0
     property bool translatorEnabled: Config.options.sidebar.translator.enable
     property bool animeEnabled: Config.options.policies.weeb !== 0
-    property bool isMaterial: Config.options.bar.cornerStyle === 3
+    property bool isMaterial: Config.options.bar.cornerStyle === 3 || Config.options.bar.cornerStyle === 4
     property real buttonPadding: 5
 
     visible: aiChatEnabled || translatorEnabled || animeEnabled

@@ -18,7 +18,7 @@ Item {
     property real btnSize:       28
     property real btnSpacing:    2
     property bool vertical:    Config.options.bar.vertical
-    property bool isMaterial:  Config.options.bar.cornerStyle === 3
+    property bool isMaterial:  Config.options.bar.cornerStyle === 3 || Config.options.bar.cornerStyle === 4
     property var pinnedApps: Config.options?.dock.pinnedApps ?? []
     property var activeUnpinned: TaskbarApps.apps.filter(
         a => !a.pinned && a.appId !== "SEPARATOR" && a.toplevels.length > 0

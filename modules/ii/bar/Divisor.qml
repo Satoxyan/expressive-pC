@@ -7,7 +7,7 @@ Item {
     property bool vertical: Config.options.bar.vertical
     property real btnSize: 40
     property real btnSpacing: 2
-    property bool isMaterial: Config.options.bar.cornerStyle === 3
+    property bool isMaterial: Config.options.bar.cornerStyle === 3 || Config.options.bar.cornerStyle === 4
     property string style: Config.options.bar.divider.style // "rect" - "dot" - "space"
     property int dividerSpacing: Config.options.bar.divider.spacing
 

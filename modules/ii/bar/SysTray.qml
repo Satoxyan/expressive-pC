@@ -16,7 +16,7 @@ Item {
     property bool showOverflowMenu: true
     property var activeMenu: null
     readonly property bool isOnLeft: Config.options.bar.layouts.leftLayout.includes("sysTray")
-    readonly property bool isMaterial: Config.options.bar.cornerStyle === 3
+    readonly property bool isMaterial: Config.options.bar.cornerStyle === 3 || Config.options.bar.cornerStyle === 4
 
     visible: SystemTray.items.values.length > 0
     implicitWidth: vertical ? Appearance.sizes.verticalBarWidth : (isMaterial ? pill.implicitWidth - 4 : gridLayout.implicitWidth)

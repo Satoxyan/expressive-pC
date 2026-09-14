@@ -257,6 +257,16 @@ ApplicationWindow {
                                         displayName: Translation.tr("Rect"),
                                         icon: "toolbar",
                                         value: 2
+                                    },
+                                    {
+                                        displayName: Translation.tr("M3"),
+                                        icon: "interests",
+                                        value: 3
+                                    },
+                                    {
+                                        displayName: Translation.tr("M3 Hug"),
+                                        icon: "category",
+                                        value: 4
                                     }
                                 ]
                             }

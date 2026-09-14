@@ -13,7 +13,7 @@ Item {
     property bool borderless: Config.options.bar.borderless
     property bool showDate: Config.options.bar.verbose
     property bool vertical: Config.options.bar.vertical
-    property bool isMaterial: Config.options.bar.cornerStyle === 3
+    property bool isMaterial: Config.options.bar.cornerStyle === 3 || Config.options.bar.cornerStyle === 4
 
     implicitWidth: root.vertical ? 32 : flow.implicitWidth + 4
     implicitHeight: root.vertical ? flow.implicitHeight + 4 : 32

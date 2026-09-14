@@ -204,7 +204,8 @@ Scope {
                             bottom: undefined
                         }
                         height: Appearance.rounding.screenRounding
-                        active: showBarBackground && Config.options.bar.cornerStyle === 0 && !barContent.centerOnly// Hug
+                        active: (showBarBackground && Config.options.bar.cornerStyle === 0 && !barContent.centerOnly)
+                             || (Config.options.bar.cornerStyle === 4)
 
                         states: State {
                             name: "bottom"
@@ -223,7 +224,7 @@ Scope {
                         sourceComponent: Item {
                             implicitHeight: Appearance.rounding.screenRounding
 
-                            readonly property color decoratorColor: showBarBackground
+                            readonly property color decoratorColor: (Config.options.bar.cornerStyle === 4 || showBarBackground)
                                 ? (Config.options.bar.followFrameColor && Config.options.bar.frameColor
                                     ? Appearance.getColorFromName(Config.options.bar.frameColor)
                                     : Appearance.colors.colLayer0)
@@ -231,6 +232,7 @@ Scope {
 
                             RoundCorner {
                                 id: leftCorner
+                                visible: Config.options.bar.cornerStyle === 0 || barContent.effectiveLeftLayout.length > 0
                                 anchors {
                                     top: parent.top
                                     bottom: parent.bottom
@@ -251,6 +253,7 @@ Scope {
                             }
                             RoundCorner {
                                 id: rightCorner
+                                visible: Config.options.bar.cornerStyle === 0 || barContent.effectiveRightLayout.length > 0
                                 anchors {
                                     right: parent.right
                                     top: !Config.options.bar.bottom ? parent.top : undefined

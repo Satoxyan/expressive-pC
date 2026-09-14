@@ -7,7 +7,7 @@ Item {
     property bool vertical: false
     property int currentIndex: 0
     property int totalCount: 0
-    property bool isMaterial: Config.options.bar.cornerStyle === 3
+    property bool isMaterial: Config.options.bar.cornerStyle === 3 || Config.options.bar.cornerStyle === 4
     property bool paintMaterialPill: false
     property bool paintBackground: true
     property real padding: (root.isMaterial && !root.paintMaterialPill) ? 0 : 5

@@ -18,7 +18,7 @@ Item {
     
     property bool vertical: false
     property bool borderless: Config.options.bar.borderless
-    property bool isMaterial: Config.options.bar.cornerStyle === 3
+    property bool isMaterial: Config.options.bar.cornerStyle === 3 || Config.options.bar.cornerStyle === 4
     readonly property MprisPlayer activePlayer: {
         const preferred = Config.options.bar.media.preferredPlayer.trim().toLowerCase()
         if (preferred.length === 0) return MprisController.activePlayer

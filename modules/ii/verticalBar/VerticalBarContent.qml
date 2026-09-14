@@ -17,7 +17,7 @@ Item {
     height: parent.height
 
     readonly property real barPadding: 0
-    readonly property bool isMaterial: Config.options.bar.cornerStyle === 3
+    readonly property bool isMaterial: Config.options.bar.cornerStyle === 3 || Config.options.bar.cornerStyle === 4
     readonly property bool trayHasItems: SystemTray.items.values.length > 0
 
     function filterLayout(layout) {
@@ -36,7 +36,7 @@ Item {
     readonly property real centerPillHeight: centerPill.height
 
     function shouldPaintMaterialPill(name) {
-        if (Config.options.bar.cornerStyle !== 3) return false;
+        if (!root.isMaterial) return false;
         const blacklist = ["workspaces", "divisor", "powerButton", "media", "docktoPanel", "leftSidebarButton", "dynamicIsland"];
         if (blacklist.includes(name)) {
             return false;
@@ -45,7 +45,7 @@ Item {
     }
 
     function getMaterialPillColor(name) {
-        if (Config.options.bar.cornerStyle !== 3) return Appearance.colors.colPrimaryContainer;
+        if (!root.isMaterial) return Appearance.colors.colPrimaryContainer;
         switch(name) {
             case "media":
             case "sysTray":

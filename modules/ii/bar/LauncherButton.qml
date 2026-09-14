@@ -8,7 +8,7 @@ import qs.modules.common.functions
 RippleButton {
     id: root
     property bool vertical: Config.options.bar.vertical
-    property bool isMaterial: Config.options.bar.cornerStyle === 3
+    property bool isMaterial: Config.options.bar.cornerStyle === 3 || Config.options.bar.cornerStyle === 4
 
     implicitWidth: 22
     implicitHeight: 22
