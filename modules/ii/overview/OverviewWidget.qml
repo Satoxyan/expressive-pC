@@ -195,6 +195,8 @@ Item {
                     scale: root.scale
                     widgetMonitor: HyprlandData.monitors.find(m => m.id == root.monitor.id)
                     windowData: windowByAddress[address]
+                    workspaceWidth: root.workspaceImplicitWidth
+                    workspaceHeight: root.workspaceImplicitHeight
 
                     property bool atInitPosition: (initX == x && initY == y)
                     property real dragStartX: 0
