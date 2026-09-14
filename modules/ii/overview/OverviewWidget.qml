@@ -258,10 +258,12 @@ Item {
                         onPressed: (mouse) => {
                             root.draggingFromWorkspace = windowData?.workspace.id
                             window.pressed = true
-                            window.dragStartX = window.x
-                            window.dragStartY = window.y
+                            window.dragging = true
+                            // Stop any lingering Behavior animation from previous release
                             window.x = window.x
                             window.y = window.y
+                            window.dragStartX = window.x
+                            window.dragStartY = window.y
                             window.Drag.active = true
                             window.Drag.source = window
                             window.Drag.hotSpot.x = mouse.x
@@ -270,6 +272,7 @@ Item {
                         onReleased: {
                             const targetWorkspace = root.draggingTargetWorkspace
                             window.pressed = false
+                            window.dragging = false
                             window.Drag.active = false
                             root.draggingFromWorkspace = -1
                             if (targetWorkspace !== -1 && targetWorkspace !== windowData?.workspace.id) {

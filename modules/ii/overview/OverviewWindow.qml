@@ -69,6 +69,7 @@ Item { // Window
     }
     property bool hovered: false
     property bool pressed: false
+    property bool dragging: false
 
     property bool centerIcons: Config.options.overview.centerIcons
     property real iconGapRatio: 0.06
@@ -104,9 +105,11 @@ Item { // Window
     }
 
     Behavior on x {
+        enabled: !window.Drag.active && !window.dragging
         animation: Appearance.animation.elementMoveEnter.numberAnimation.createObject(this)
     }
     Behavior on y {
+        enabled: !window.Drag.active && !window.dragging
         animation: Appearance.animation.elementMoveEnter.numberAnimation.createObject(this)
     }
     Behavior on width {
