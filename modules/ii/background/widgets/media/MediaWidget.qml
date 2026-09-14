@@ -841,7 +841,7 @@ AbstractBackgroundWidget {
 
                             StyledText {
                                 Layout.fillWidth: true
-                                text: root.currentPlayer?.trackTitle ?? Translation.tr("Something")
+                                text: root.currentPlayer?.trackTitle ?? Translation.tr("Play")
                                 font.pixelSize: Appearance.font.pixelSize.small
                                 font.weight: Font.DemiBold
                                 font.italic: true
@@ -850,7 +850,7 @@ AbstractBackgroundWidget {
                             }
                             StyledText {
                                 Layout.fillWidth: true
-                                text: root.currentPlayer?.trackArtist ?? "Play"
+                                text: root.currentPlayer?.trackArtist ?? "Something"
                                 font.pixelSize: Appearance.font.pixelSize.smaller
                                 color: Appearance.colors.colOnPrimaryContainer
                                 opacity: 0.65

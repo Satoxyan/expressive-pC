@@ -22,6 +22,7 @@ Item {
         ? Appearance.sizes.verticalBarWidth
         : Appearance.sizes.barHeight) * 0.7
     property real maxVisualizerValue: 1000
+    property color barColor: Appearance.colors.colPrimary
 
     implicitWidth: vertical
         ? Appearance.sizes.verticalBarWidth

@@ -42,7 +42,7 @@ Item {
 
     function shouldPaintMaterialPill(name) {
         if (Config.options.bar.cornerStyle !== 3) return false;
-        const blacklist = ["workspaces", "divisor", "powerButton", "docktoPanel", "leftSidebarButton", "activeWindow"];
+        const blacklist = ["workspaces", "divisor", "powerButton", "docktoPanel", "leftSidebarButton", "activeWindow", "dynamicIsland"];
         if (blacklist.includes(name)) {
             return false;
         }
@@ -86,6 +86,13 @@ Item {
     readonly property bool centerOnly: root.effectiveLeftLayout.length === 0
         && root.effectiveRightLayout.length === 0
 
+    Binding {
+        target: GlobalStates
+        property: "barCenterOnly"
+        value: root.centerOnly
+        restoreMode: Binding.RestoreBinding
+    }
+
     RoundCorner {
         id: leftPillCorner
         visible: root.centerOnly && Config.options.bar.showBackground && Config.options.bar.cornerStyle === 0 
@@ -118,15 +125,17 @@ Item {
 
     Rectangle {
         id: centerPill
-        visible: centerOnly && Config.options.bar.showBackground && Config.options.bar.cornerStyle !== 2
+        visible: centerOnly && Config.options.bar.showBackground && Config.options.bar.cornerStyle !== 2 
         anchors.verticalCenter: parent.verticalCenter
         anchors.horizontalCenter: parent.horizontalCenter
-        width: middleRow.implicitWidth + 10
-        height: parent.height - (Config.options.bar.cornerStyle === 1 ? Appearance.sizes.hyprlandGapsOut * 2 : 0)
+        width: GlobalStates.dynamicIslandEnabled
+            ? (Config.options.bar.cornerStyle === 1 ? middleRow.implicitWidth + 8 : middleRow.implicitWidth - 4)
+            : middleRow.implicitWidth + 10
+        height: GlobalStates.dynamicIslandEnabled ? parent.height : parent.height - (Config.options.bar.cornerStyle === 1 ? Appearance.sizes.hyprlandGapsOut * 2 : 0)
         color: Config.options.bar.followFrameColor
             ? Appearance.getColorFromName(Config.options.bar.frameColor)
             : Appearance.colors.colLayer0
-        radius: Config.options.bar.cornerStyle === 1 ? Appearance.rounding.windowRounding : 0
+        radius: Config.options.bar.cornerStyle === 1 || root.isMaterial ? Appearance.rounding.windowRounding : 0
         border.width: Config.options.bar.cornerStyle === 1 ? 1 : 0
         border.color: Appearance.colors.colLayer0Border
 
@@ -297,6 +306,7 @@ Item {
                         BarGroup {
                             Layout.fillHeight: true
                             currentIndex: index
+                            paintBackground: modelData !== "dynamicIsland"
                             totalCount: root.effectiveMiddleLayout.length
                             paintMaterialPill: root.shouldPaintMaterialPill(modelData)
                             bgColor: root.getMaterialPillColor(modelData)
@@ -330,6 +340,7 @@ Item {
                     BarGroup {
                         Layout.fillHeight: true
                         currentIndex: index
+                        paintBackground: modelData !== "dynamicIsland"
                         totalCount: root.effectiveMiddleLayout.length
                         Loader {
                             Layout.fillHeight: true

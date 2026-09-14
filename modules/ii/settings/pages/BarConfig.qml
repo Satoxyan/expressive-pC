@@ -56,17 +56,27 @@ ContentPage {
         { id: "hyprlandXkbIndicator",   name: Translation.tr("Keyboard Layout"), icon: "keyboard" },
         { id: "divisor",            name: Translation.tr("Divider"),             icon: "horizontal_distribute" },
         { id: "launcherButton",     name: Translation.tr("Launcher Button"),     icon: "search" },
+        { id: "dynamicIsland",     name: Translation.tr("Dynamic Island"),     icon: "nest_wifi_pro" },
     ]
 
-    function availableFor() {
+    function availableFor(section) {
         let used = [
             ...Config.options.bar.layouts.leftLayout,
             ...Config.options.bar.layouts.middleLayout,
             ...Config.options.bar.layouts.rightLayout
         ]
+        if (section === "middle" && Config.options.bar.layouts.middleLayout.length > 0) {
+            return Config.options.bar.layouts.middleLayout.includes("dynamicIsland") ? [] : allWidgets.filter(w => {
+                if (w.id === "dynamicIsland") return false
+                if (w.id === "divisor" && Config.options.bar.borderless !== "transparent") return false
+                const multipleAllowed = ["visualizer", "divisor"]
+                return !used.includes(w.id) || multipleAllowed.includes(w.id)
+            })
+        }
         const multipleAllowed = ["visualizer", "divisor"]
         return allWidgets.filter(w => {
             if (w.id === "divisor" && Config.options.bar.borderless !== "transparent") return false
+            if (w.id === "dynamicIsland" && (Config.options.bar.vertical || section !== "middle")) return false
             return !used.includes(w.id) || multipleAllowed.includes(w.id)
         })
     }
@@ -177,7 +187,7 @@ ContentPage {
                 LayoutSection {
                     sectionTitle: Config.options.bar.vertical ? Translation.tr("Top") : Translation.tr("Left")
                     layout: Config.options.bar.layouts.leftLayout
-                    availableWidgets: page.availableFor()
+                    availableWidgets: page.availableFor("left")
                     getWidgetName: page.getWidgetName
                     onUpdate: list => Config.options.bar.layouts.leftLayout = list
                 }
@@ -185,7 +195,7 @@ ContentPage {
                 LayoutSection {
                     sectionTitle: Translation.tr("Center")
                     layout: Config.options.bar.layouts.middleLayout
-                    availableWidgets: page.availableFor()
+                    availableWidgets: page.availableFor("middle")
                     getWidgetName: page.getWidgetName
                     onUpdate: list => Config.options.bar.layouts.middleLayout = list
                 }
@@ -193,7 +203,7 @@ ContentPage {
                 LayoutSection {
                     sectionTitle: Config.options.bar.vertical ? Translation.tr("Bottom") : Translation.tr("Right")
                     layout: Config.options.bar.layouts.rightLayout
-                    availableWidgets: page.availableFor()
+                    availableWidgets: page.availableFor("right")
                     getWidgetName: page.getWidgetName
                     onUpdate: list => Config.options.bar.layouts.rightLayout = list
                 }
@@ -322,6 +332,36 @@ ContentPage {
                     currentValue: Config.options.bar.frameColor
                     onSelected: newValue => {
                         Config.options.bar.frameColor = newValue
+                    }
+                }
+            }
+        }
+
+        ContentSection {
+            icon: "nest_wifi_pro"
+            shape: MaterialShape.Shape.Cookie4Sided
+            title: Translation.tr("Dynamic Island")
+            
+            ContentSubsection {
+                Layout.topMargin: 10
+                title: Translation.tr("Media")
+                GroupedList {
+                    ConfigSelectionArray {
+                        text: Translation.tr("Visualizer style")
+                        icon: "graphic_eq"
+                        currentValue: Config.options.bar.dynamicIsland.visualizerStyle
+                        onSelected: newValue => { Config.options.bar.dynamicIsland.visualizerStyle = newValue; }
+                        options: [
+                            { displayName: Translation.tr(""),      icon: "block",       value: "none" },
+                            { displayName: Translation.tr("Dots"),  icon: "steppers",     value: "dots" },
+                            { displayName: Translation.tr("Wave"),  icon: "ssid_chart",   value: "wave" }
+                        ]
+                    }
+                    ConfigSwitch {
+                        buttonIcon: "play_circle"
+                        text: Translation.tr("Show media controls")
+                        checked: Config.options.bar.dynamicIsland.showMediaControls
+                        onCheckedChanged: { Config.options.bar.dynamicIsland.showMediaControls = checked; }
                     }
                 }
             }
