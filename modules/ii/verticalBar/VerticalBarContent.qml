@@ -246,7 +246,7 @@ Item {
             Rectangle {
                 id: centerMaterialPill
                 visible: root.isMaterial && root.effectiveMiddleLayout.length > 0
-                anchors.centerIn: parent
+                anchors.verticalCenter: parent.verticalCenter
                 anchors.left: parent.left
                 anchors.right: parent.right
                 height: root.effectiveMiddleLayout.length > 0
