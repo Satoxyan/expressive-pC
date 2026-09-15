@@ -60,6 +60,7 @@ Singleton {
         order = cfg.wallhavenOrder || "desc"
         ratios = cfg.wallhavenRatios || ""
         colors = cfg.wallhavenColors || ""
+        topRange = cfg.wallhavenTopRange || "1y"
         currentQuery = cfg.wallhavenQuery || ""
     }
 
@@ -74,6 +75,7 @@ Singleton {
         cfg.wallhavenOrder = order
         cfg.wallhavenRatios = ratios
         cfg.wallhavenColors = colors
+        cfg.wallhavenTopRange = topRange
         cfg.wallhavenQuery = currentQuery
         if (apiKey.length > 0)
             KeyringStorage.setNestedField(["apiKeys", "wallhaven"], apiKey)

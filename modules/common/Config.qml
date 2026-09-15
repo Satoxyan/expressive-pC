@@ -936,6 +936,7 @@ Singleton {
                 property string wallhavenRatios: ""
                 property string wallhavenColors: ""
                 property string wallhavenQuery: ""
+                property string wallhavenTopRange: "1y"
                 property string sortMode: "time"
             }
 

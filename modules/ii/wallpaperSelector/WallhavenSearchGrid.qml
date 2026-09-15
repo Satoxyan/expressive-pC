@@ -28,6 +28,7 @@ Item {
 
     readonly property var browseModes: [
         { label: Translation.tr("Top"), sort: "toplist" },
+        { label: Translation.tr("Hot"), sort: "hot" },
         { label: Translation.tr("Latest"), sort: "date_added" },
         { label: Translation.tr("Random"), sort: "random" },
         { label: Translation.tr("Views"), sort: "views" }
