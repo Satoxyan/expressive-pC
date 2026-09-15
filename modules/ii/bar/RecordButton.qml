@@ -49,8 +49,12 @@ Item {
     Rectangle {
         id: pill
         anchors.fill: parent
-        implicitHeight: Math.max(26, layout.implicitHeight)
+        implicitHeight: {
+            if (root.vertical && root.material && root.hoveredState) return 54
+            return Math.max(26, layout.implicitHeight)
+        }
         implicitWidth: {
+            if (root.vertical) return Math.max(26, layout.implicitWidth)
             if (root.textVisible) return layout.implicitWidth + 24
             if (root.material && root.isRecording) return layout.implicitWidth + 24
             if (root.material && root.hoveredState) return 54
@@ -77,6 +81,7 @@ Item {
         Behavior on color { ColorAnimation { duration: 200 } }
         Behavior on radius { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
         Behavior on implicitWidth { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+        Behavior on implicitHeight { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
         Row {
             id: layout
