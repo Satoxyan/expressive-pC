@@ -249,6 +249,36 @@ Item {
                                         color: Appearance.colors.colOnPrimaryContainer
                                         visible: avatarImage.status === Image.Error
                                     }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            GlobalStates.sidebarRightOpen = false
+                                            FilePicker.pickImage(function(path) {
+                                                if (path && path !== "") {
+                                                    const faceDir = FileUtils.trimFileProtocol(Directories.home) + "/.face"
+                                                    const outputPath = faceDir + "/avatar.png"
+                                                    const srcPath = FileUtils.trimFileProtocol(path)
+                                                    avatarCropProc.command = ["bash", "-c",
+                                                        `mkdir -p '${faceDir}' && convert '${srcPath}' -resize 512x512^ -gravity center -extent 512x512 PNG:'${outputPath}'`]
+                                                    avatarCropProc.outputPath = outputPath
+                                                    avatarCropProc.running = true
+                                                }
+                                            })
+                                        }
+                                    }
+                                }
+
+                                Process {
+                                    id: avatarCropProc
+                                    property string outputPath: ""
+                                    onExited: (code) => {
+                                        if (code === 0 && avatarCropProc.outputPath !== "") {
+                                            Config.options.profile.avatarPath = ""
+                                            Config.options.profile.avatarPicture = avatarCropProc.outputPath
+                                        }
+                                    }
                                 }
 
                                 StyledText {

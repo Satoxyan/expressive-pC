@@ -102,6 +102,34 @@ ContentPage {
         nameFilters: ["*.png", "*.svg", "*.jpg", "*.jpeg", "*.webp"]
     }
 
+    property string _pendingAvatarPath: ""
+
+    Process {
+        id: avatarCropProc
+        property string outputPath: ""
+        onExited: (code) => {
+            if (code === 0 && avatarCropProc.outputPath !== "") {
+                Config.options.profile.avatarPath = ""
+                Config.options.profile.avatarPicture = avatarCropProc.outputPath
+                avatarFolderModel.folder = Qt.resolvedUrl(Avatar.folder)
+            }
+        }
+    }
+
+    function openAvatarPicker() {
+        FilePicker.pickImage(function(path) {
+            if (path && path !== "") {
+                const faceDir = FileUtils.trimFileProtocol(Directories.home) + "/.face"
+                const outputPath = faceDir + "/avatar.png"
+                const srcPath = FileUtils.trimFileProtocol(path)
+                const cmd = `mkdir -p '${faceDir}' && convert '${srcPath}' -resize 512x512^ -gravity center -extent 512x512 PNG:'${outputPath}'`
+                avatarCropProc.command = ["bash", "-c", cmd]
+                avatarCropProc.outputPath = outputPath
+                avatarCropProc.running = true
+            }
+        })
+    }
+
     Process {
         id: hostnameSetProc
         onExited: (exitCode, exitStatus) => {
@@ -391,6 +419,31 @@ ContentPage {
                                 }
                             }
                         }
+
+                        // "+" button to pick new avatar image
+                        Rectangle {
+                            width: 64
+                            height: 64
+                            radius: width / 2
+                            color: addAvatarMouse.containsMouse ? Appearance.colors.colLayer2Active : Appearance.colors.colLayer2
+                            border.color: Appearance.colors.colOutline
+                            border.width: 1
+
+                            MaterialSymbol {
+                                anchors.centerIn: parent
+                                text: "add"
+                                iconSize: 28
+                                color: Appearance.colors.colOnLayer2
+                            }
+
+                            MouseArea {
+                                id: addAvatarMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: page.openAvatarPicker()
+                            }
+                        }
                     }
 
                     ColumnLayout {
@@ -402,13 +455,13 @@ ContentPage {
 
                         MaterialSymbol {
                             Layout.alignment: Qt.AlignHCenter
-                            text: "image"
+                            text: "add_a_photo"
                             iconSize: 32
                             color: Appearance.colors.colSubtext
                         }
                         StyledText {
                             Layout.alignment: Qt.AlignHCenter
-                            text: Translation.tr("Pick a folder above to see avatars here")
+                            text: Translation.tr("Click + to pick an avatar image")
                             font.pixelSize: Appearance.font.pixelSize.smaller
                             color: Appearance.colors.colSubtext
                         }
