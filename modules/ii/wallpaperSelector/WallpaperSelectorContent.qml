@@ -728,6 +728,8 @@ MouseArea {
                                     return (0.299 * r + 0.587 * g + 0.114 * b) > 140 ? "#000000" : "#ffffff"
                                 }
 
+                                property bool _searchFieldReady: false
+
                                 Timer {
                                     id: searchDebounce
                                     interval: 500
@@ -739,7 +741,10 @@ MouseArea {
                                     text: WallhavenSearch.currentQuery
                                     placeholderText: Translation.tr("Search Wallhaven...")
                                     Layout.preferredWidth: 220
-                                    onTextChanged: searchDebounce.restart()
+                                    onTextChanged: {
+                                        if (wallhavenToolbar._searchFieldReady)
+                                            searchDebounce.restart()
+                                    }
                                     onAccepted: {
                                         searchDebounce.stop()
                                         WallhavenSearch.search(text, 1)
@@ -752,6 +757,7 @@ MouseArea {
                                         }
                                         event.accepted = false
                                     }
+                                    Component.onCompleted: Qt.callLater(() => wallhavenToolbar._searchFieldReady = true)
                                 }
 
                                 // Pagination
