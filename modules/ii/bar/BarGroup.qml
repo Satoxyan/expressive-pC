@@ -20,9 +20,16 @@ Item {
     }
 
     readonly property bool isSegmented: Config.options?.bar.borderless === "segmented"
+    readonly property bool isPanel: Config.options.bar.cornerStyle === 4
+    readonly property real panelRadius: Appearance.rounding.unsharpenmore + 4
 
-    readonly property real fullRadius: height / 2
-    readonly property real midRadius: root.isSegmented ? 0 : (Config.options.bar.cornerStyle === 2 ? Appearance.rounding.unsharpenmore + 2 : Appearance.rounding.unsharpenmore)
+    readonly property real fullRadius: root.isPanel ? root.panelRadius : height / 2
+    readonly property real midRadius: root.isPanel
+        ? root.panelRadius
+        : root.isSegmented
+            ? 0
+            : (Config.options.bar.cornerStyle === 2 ? Appearance.rounding.unsharpenmore + 2 : Appearance.rounding.unsharpenmore)
+
     property real startRadius: {
         if (totalCount <= 1) return fullRadius;
         if (currentIndex === 0) return fullRadius;

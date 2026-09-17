@@ -57,7 +57,7 @@ Item {
 
                     StyledText {
                         Layout.alignment: Qt.AlignVCenter
-                        visible: volumeItem.hovered
+                        visible: false
                         font.pixelSize: Appearance.font.pixelSize.small
                         font.features: { "tnum": 1 }
                         color: root.isMaterial ? Appearance.colors.colOnPrimary : Appearance.colors.colOnLayer1
@@ -83,7 +83,7 @@ Item {
 
                     StyledText {
                         Layout.alignment: Qt.AlignHCenter
-                        visible: volumeItem.hovered
+                        visible: false
                         font.pixelSize: Appearance.font.pixelSize.smallest
                         font.features: { "tnum": 1 }
                         color: root.isMaterial ? Appearance.colors.colOnPrimary : Appearance.colors.colOnLayer1

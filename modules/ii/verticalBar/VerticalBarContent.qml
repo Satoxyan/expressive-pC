@@ -23,6 +23,7 @@ Item {
         ? Appearance.getColorFromName(Config.options.bar.frameColor)
         : Appearance.colors.colLayer0
     readonly property bool trayHasItems: SystemTray.items.values.length > 0
+    readonly property bool isPanel: Config.options.bar.cornerStyle === 4
 
     function filterLayout(layout) {
         if (trayHasItems) return layout
@@ -197,7 +198,10 @@ Item {
                 id: topCol
                 anchors.fill: parent
                 visible: !root.isMaterial
-                spacing: Config.options.bar.borderless === "transparent" ? -4 : Config.options?.bar.borderless === "segmented" ? -2 : 2
+                spacing: Config.options.bar.borderless === "transparent" ? -4
+                    : (Config.options?.bar.borderless === "segmented" && root.isPanel) ? 3
+                    : Config.options?.bar.borderless === "segmented" ? -2
+                    : root.isPanel ? 4 : 2
 
                 Repeater {
                     model: root.effectiveLeftLayout
@@ -311,7 +315,10 @@ Item {
                 id: middleCol
                 anchors.fill: parent
                 visible: !root.isMaterial
-                spacing: Config.options.bar.borderless === "transparent" ? -4 : Config.options?.bar.borderless === "segmented" ? -2 : 2
+                spacing: Config.options.bar.borderless === "transparent" ? -4
+                    : (Config.options?.bar.borderless === "segmented" && root.isPanel) ? 3
+                    : Config.options?.bar.borderless === "segmented" ? -2
+                    : root.isPanel ? 4 : 2
 
                 Repeater {
                     model: root.effectiveMiddleLayout
@@ -414,7 +421,10 @@ Item {
                 id: bottomCol
                 anchors.fill: parent
                 visible: !root.isMaterial
-                spacing: Config.options.bar.borderless === "transparent" ? -4 : Config.options?.bar.borderless === "segmented" ? -2 : 2
+                spacing: Config.options.bar.borderless === "transparent" ? -4
+                    : (Config.options?.bar.borderless === "segmented" && root.isPanel) ? 3
+                    : Config.options?.bar.borderless === "segmented" ? -2
+                    : root.isPanel ? 4 : 2
 
                 Repeater {
                     model: root.effectiveRightLayout

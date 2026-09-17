@@ -190,18 +190,24 @@ Singleton {
     }
 
     function discardNotification(id) {
-        console.log("[Notifications] Discarding notification with ID: " + id);
-        const index = root.list.findIndex((notif) => notif.notificationId === id);
-        const notifServerIndex = notifServer.trackedNotifications.values.findIndex((notif) => notif.id + root.idOffset === id);
-        if (index !== -1) {
-            root.list.splice(index, 1);
+        root.discardNotifications([id]);
+    }
+
+    function discardNotifications(ids) {
+        console.log("[Notifications] Discarding notifications with IDs: " + ids.join(", "));
+        const idSet = new Set(ids);
+        // Assign a new array instead of splicing: on a list<> property, splice()
+        // shifts the following elements one by one and emits listChanged for each,
+        // re-running the grouping and every model bound to the list each time.
+        const remaining = root.list.filter((notif) => !idSet.has(notif.notificationId));
+        if (remaining.length !== root.list.length) {
+            root.list = remaining;
             notifFileView.setText(stringifyList(root.list));
-            triggerListChange()
         }
-        if (notifServerIndex !== -1) {
-            notifServer.trackedNotifications.values[notifServerIndex].dismiss()
-        }
-        root.discard(id); // Emit signal
+        notifServer.trackedNotifications.values
+            .filter((notif) => idSet.has(notif.id + root.idOffset))
+            .forEach((notif) => notif.dismiss());
+        ids.forEach((id) => root.discard(id)); // Emit signal
     }
 
     function discardAllNotifications() {
