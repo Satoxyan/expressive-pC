@@ -23,7 +23,7 @@ Item {
         ? Appearance.getColorFromName(Config.options.bar.frameColor)
         : Appearance.colors.colLayer0
     readonly property bool trayHasItems: SystemTray.items.values.length > 0
-    readonly property bool isPanel: Config.options.bar.cornerStyle === 4
+    readonly property bool isPanel: false
 
     function filterLayout(layout) {
         if (trayHasItems) return layout
