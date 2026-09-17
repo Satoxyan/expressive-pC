@@ -4,10 +4,11 @@
 
 <div align="center">
 
-# 💠 end4-pC
+# 💠 expressive-pC
 
-**A personal fork of [illogical-impulse](https://github.com/end-4/dots-hyprland) by [@end-4](https://github.com/end-4)**  
-Customized and maintained by **pctrade**
+**A personal fork of [illogical-impulse](https://github.com/end-4/dots-hyprland) by [@end-4](https://github.com/end-4) and
+[end4-pC](https://github.com/pctrade/end4-pC) by [@pctrade](https://github.com/pctrade)**  
+Customized and maintained by **Satoxyan**
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
