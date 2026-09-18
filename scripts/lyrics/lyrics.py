@@ -13,7 +13,7 @@ import datetime
 import urllib.request
 import urllib.parse
 
-DEFAULT_PROVIDERS = "musixmatch,youlyplus,paxsenix,betterlyric,simpmusic,lrclib,kugou"
+DEFAULT_PROVIDERS = "musixmatch,youlyplus,unison,paxsenix,betterlyric,simpmusic,lrclib,kugou"
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
@@ -181,7 +181,12 @@ def _ttml_role(el):
 
 
 def _ttml_line_text(p):
-    parts = []
+    """Extract plain text from a TTML <p> element, merging syllables.
+
+    Consecutive spans without a space between them (tail is None or empty)
+    are joined into single words, matching the karaoke word boundaries.
+    """
+    spans = []
     for span in p.iter():
         tag = span.tag.rsplit("}", 1)[-1]
         if tag != "span":
@@ -190,17 +195,28 @@ def _ttml_line_text(p):
         if role in ("x-translation", "x-roman", "x-bg"):
             continue
         if span.text and span.text.strip():
-            parts.append(span.text.strip())
-    if parts:
-        return " ".join(parts)
+            has_space = span.tail is not None and len(span.tail) > 0
+            spans.append((span.text.strip(), has_space))
+
+    if spans:
+        words = []
+        for text, has_space in spans:
+            if words and not words[-1][1]:
+                words[-1] = (words[-1][0] + text, has_space)
+            else:
+                words.append((text, has_space))
+        return " ".join(w[0] for w in words)
+
     return " ".join("".join(p.itertext()).split())
 
 
 def _ttml_line_words(p):
     """Extract per-word timings from a TTML <p> element (Apple Music style).
 
-    Each <span> typically carries its own begin time. Words without a span
-    begin fall back to the line's begin time.
+    Each <span> typically carries its own begin time. Consecutive spans
+    without a space between them (tail is None or empty) are merged into
+    a single word (syllable merging) so the karaoke sweep highlights
+    whole words instead of individual syllables.
     """
     words = []
     for span in p.iter():
@@ -214,14 +230,31 @@ def _ttml_line_words(p):
         if begin:
             text = "".join(span.itertext()).strip()
             if text:
-                words.append({"t": _ttml_time(begin), "w": text})
-    if words:
-        return words
-    # No per-span timings: treat whole line as a single "word"
-    text = _ttml_line_text(p)
-    if text:
-        return [{"t": _ttml_time(p.get("begin")), "w": text}]
-    return []
+                # tail is the text node AFTER </span>; non-empty = space = word boundary
+                tail = span.tail
+                has_space = tail is not None and len(tail) > 0
+                words.append({"t": _ttml_time(begin), "w": text, "_space": has_space})
+
+    if not words:
+        text = _ttml_line_text(p)
+        if text:
+            return [{"t": _ttml_time(p.get("begin")), "w": text}]
+        return []
+
+    # Merge syllables: if the previous word had NO space after it,
+    # the current span is a syllable of the same word.
+    merged = []
+    for w in words:
+        has_space = w.pop("_space", True)
+        if merged and not merged[-1]["_space"]:
+            merged[-1]["w"] += w["w"]
+            merged[-1]["_space"] = has_space  # carry forward the boundary flag
+        else:
+            merged.append({"t": w["t"], "w": w["w"], "_space": has_space})
+
+    for w in merged:
+        w.pop("_space", None)
+    return merged
 
 
 def ttml_to_lrc(ttml):
@@ -476,6 +509,106 @@ def fetch_youlyplus(title, artist, duration):
                     return sorted(lrc, key=lambda x: x["time"])
         except Exception:
             continue
+    return []
+
+
+# ---------------------------------------------------------------------------
+# Provider: unison (unison.boidu.dev)
+# ---------------------------------------------------------------------------
+
+UNISON_BASE = "https://unison.boidu.dev"
+
+
+def _unison_fetch_entry(entry):
+    """Fetch and parse lyrics from a single Unison search result entry."""
+    vid = entry.get("videoId") or ""
+    if not vid:
+        return []
+    try:
+        url = f"{UNISON_BASE}/lyrics?v={vid}"
+        data = _http_json(url)
+    except Exception:
+        return []
+    if not data.get("success"):
+        return []
+    e = data.get("data") or {}
+    lyrics_raw = e.get("lyrics") or ""
+    fmt = e.get("format") or ""
+    if not lyrics_raw.strip():
+        return []
+    if fmt == "ttml":
+        return ttml_to_lrc(lyrics_raw)
+    elif fmt == "lrc":
+        return _parse_lrc(lyrics_raw)
+    elif fmt == "plain":
+        return [{"time": 0, "text": line.strip(), "words": []}
+                for line in lyrics_raw.splitlines() if line.strip()]
+    return []
+
+
+def fetch_unison(title, artist, duration):
+    cleaned_title = clean_title(title)
+    cleaned_artist = clean_artist(artist)
+
+    # Try direct lookup first
+    for params in [{"song": cleaned_title, "artist": cleaned_artist},
+                    {"song": title.strip(), "artist": artist.strip()}]:
+        try:
+            url = f"{UNISON_BASE}/lyrics?" + urllib.parse.urlencode(params)
+            data = _http_json(url)
+            if data.get("success"):
+                entry = data.get("data") or {}
+                lines = _unison_fetch_entry(entry)
+                if lines:
+                    return lines
+        except Exception:
+            continue
+
+    # Fallback: search endpoint (song+artist, then q)
+    for params in [
+        {"song": cleaned_title, "artist": cleaned_artist},
+        {"q": f"{cleaned_title} {cleaned_artist}"},
+    ]:
+        try:
+            url = f"{UNISON_BASE}/lyrics/search?" + urllib.parse.urlencode(params)
+            data = _http_json(url)
+        except Exception:
+            continue
+        if not data.get("success"):
+            continue
+        entries = data.get("data") or []
+        if not entries:
+            continue
+
+        def score(e):
+            s = 0
+            et = (e.get("song") or "").lower()
+            if et == cleaned_title.lower():
+                s += 100
+            elif cleaned_title.lower() in et or et in cleaned_title.lower():
+                s += 50
+            ea = (e.get("artist") or "").lower()
+            if cleaned_artist.lower() in ea or ea in cleaned_artist.lower():
+                s += 50
+            ed = e.get("duration")
+            if duration and ed:
+                diff = abs(int(ed) - int(duration))
+                if diff <= 3:
+                    s += 80
+                elif diff <= 10:
+                    s += 30
+            sync = e.get("syncType") or ""
+            if sync == "richsync":
+                s += 20
+            elif sync == "linesync":
+                s += 10
+            return s
+
+        entries.sort(key=score, reverse=True)
+        for entry in entries[:3]:
+            lines = _unison_fetch_entry(entry)
+            if lines:
+                return lines
     return []
 
 
@@ -935,6 +1068,7 @@ def fetch_kugou(title, artist, duration):
 PROVIDERS = {
     "musixmatch": fetch_musixmatch,
     "youlyplus": fetch_youlyplus,
+    "unison": fetch_unison,
     "paxsenix": fetch_paxsenix,
     "betterlyric": fetch_betterlyric,
     "simpmusic": fetch_simpmusic,
