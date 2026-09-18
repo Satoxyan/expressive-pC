@@ -426,6 +426,8 @@ Item {
                 onEntered: {
                     if (!root.isDragging) {
                         grid.currentIndex = delegateCell.index;
+                        if (!delegateCell.modelData.fileIsDir && Config.options.background.enableWallpaperPreview)
+                            Wallpapers.startPreview(delegateCell.modelData.filePath);
                     }
                 }
 
