@@ -346,7 +346,7 @@ ContentPage {
             GroupedList {
                 ConfigSelectionArray {
                     text: Translation.tr("Left widget")
-                    icon: "left_panel_open"
+                    icon: "right_panel_open"
                     currentValue: Config.options.bar.dynamicIsland.leftWidget
                     onSelected: newValue => { Config.options.bar.dynamicIsland.leftWidget = newValue; }
                     options: [
@@ -358,7 +358,7 @@ ContentPage {
                 }
                 ConfigSelectionArray {
                     text: Translation.tr("Right widget")
-                    icon: "right_panel_open"
+                    icon: "left_panel_open"
                     currentValue: Config.options.bar.dynamicIsland.rightWidget
                     onSelected: newValue => { Config.options.bar.dynamicIsland.rightWidget = newValue; }
                     options: [

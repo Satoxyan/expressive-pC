@@ -264,6 +264,7 @@ Singleton {
                 property bool widgetsLocked: false
                 property bool showGrid: true
                 property bool showBlur: false
+                property real blurRadius: 32
                 property string splitRatio: "100" // 25 50 100
                 property string splitSide: "left"
                 property bool showSnapLines: true
@@ -412,19 +413,22 @@ Singleton {
                         property bool showWhenLocked: false
                         property bool hideWhenCovered: true
                         property bool hideWhenFullscreen: true
-                        property int height: 600 // in pixels
                         property real barRounding: 0.5
-                        property real smoothing: 0.05
+                        property real smoothing: 0.18
                         property real opacity: 1
-                        property real barSpacing: 10 // in pixels
-                        property int targetBarWidth: 50 // in pixels, rough target
+                        property real barSpacing: 10
+                        property int targetBarWidth: 50
                         property bool mono: true
-                        property string mode: "bars" // "bars" or "wave"
                         property real waveFillOpacity: 0.5
                         property real dataSmoothing: 0.5
-                        property int waveBorderWidth: 3    // 0 = no border
-                        property int renderEveryXFrames: -1  // -1 = auto (System), 1 = every frame, 2 = every other frame, etc. Only for "wave" mode
+                        property int waveBorderWidth: 3
+                        property int renderEveryXFrames: -1
                         property real z: -1000
+                        property string style: "bars" // "default", "bars", "wave", "aurora", "ring", "dots", "mirror"
+                        property string colorSource: "theme"
+                        property real sensitivity: 1
+                        property int height: 260
+                        property int ringSize: 380
                     }
 
                     property JsonObject resources: JsonObject {
@@ -462,6 +466,20 @@ Singleton {
                         property real y: 500
                         property real z: 0
                         property string sizeMode: "1x3" 
+                    }
+
+                    property JsonObject customText: JsonObject {
+                        property bool enable: false
+                        property string placementStrategy: "free"
+                        property real x: 400
+                        property real y: 300
+                        property real z: 0
+                        property string content: "Hello world"
+                        property string fontFamily: "Caveat"
+                        property int fontSize: 72
+                        property string color: "" // "" = automatic, otherwise an Appearance color name
+                        property string alignment: "center" // "left", "center", "right"
+                        property bool shadow: true
                     }
                 }
                 property list<string> screenList: [] 

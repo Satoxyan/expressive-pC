@@ -86,7 +86,8 @@ Singleton {
         { displayName: Translation.tr("ScreenShot Region"),        value: "regionSelectorOpen" },
         { displayName: Translation.tr("Screen Translator"),      value: "screenTranslatorOpen" },
         { displayName: Translation.tr("On-screen Keyboard"),     value: "oskOpen" },
-        { displayName: Translation.tr("Session Menu"),           value: "sessionOpen" }
+        { displayName: Translation.tr("Session Menu"),           value: "sessionOpen" },
+        { displayName: Translation.tr("Equalizer"),           value: "equalizerOpen" }
     ]
 
     function toggleState(name) {

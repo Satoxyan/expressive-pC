@@ -235,6 +235,18 @@ ContentPage {
                     }
                 }
 
+                ConfigSlider {
+                    Layout.fillWidth: true
+                    text: Translation.tr("Blur Size")
+                    value: Config.options.background.blurRadius ?? 32
+                    usePercentTooltip: false
+                    buttonIcon: "aspect_ratio"
+                    from: 1
+                    to: 64
+                    stopIndicatorValues: [32]
+                    onValueChanged: Config.options.background.blurRadius = value
+                }
+
                 ConfigSelectionArray {
                     text: Translation.tr("Split blur amount")
                     icon: "split_scene"
@@ -1133,6 +1145,174 @@ ContentPage {
         }
 
         ContentSection {
+            id: settingsCustomText
+            icon: "text_fields"
+            shape: MaterialShape.Shape.Cookie4Sided
+            title: Translation.tr("Text")
+
+            readonly property var entry: Config.options.background.widgets.customText
+
+            GroupedList {
+                ConfigSwitch {
+                    Layout.fillWidth: true
+                    buttonIcon: "check"
+                    text: Translation.tr("Enable")
+                    checked: settingsCustomText.entry.enable
+                    onCheckedChanged: {
+                        settingsCustomText.entry.enable = checked;
+                    }
+                }
+                ConfigSwitch {
+                    Layout.fillWidth: true
+                    buttonIcon: "shadow"
+                    text: Translation.tr("Shadow")
+                    checked: settingsCustomText.entry.shadow
+                    onCheckedChanged: {
+                        settingsCustomText.entry.shadow = checked;
+                    }
+                }
+            }
+
+            NoticeBox {
+                Layout.fillWidth: true
+                materialIcon: "touch_app"
+                text: Translation.tr("Double-click the text on your desktop to edit it, drag its corner to resize it")
+            }
+
+            MaterialTextArea {
+                Layout.fillWidth: true
+                placeholderText: Translation.tr("Text to display")
+                text: settingsCustomText.entry.content
+                wrapMode: TextEdit.Wrap
+
+                Timer {
+                    id: customTextContentDebounce
+                    interval: 500
+                    repeat: false
+                    onTriggered: {
+                        settingsCustomText.entry.content = parent.text
+                    }
+                }
+
+                onTextChanged: {
+                    if (activeFocus) customTextContentDebounce.restart()
+                }
+            }
+
+            ContentSubsection {
+                Layout.topMargin: 10
+                title: Translation.tr("Font")
+
+                GroupedList {
+                    ConfigComboBox {
+                        Layout.fillWidth: true
+                        buttonIcon: "font_download"
+                        fieldWidth: 50
+                        text: Translation.tr("Font family")
+                        textRole: "displayName"
+                        model: Fonts.handwritingFamilies.map(family => ({
+                            displayName: family,
+                            value: family
+                        }))
+                        currentValue: settingsCustomText.entry.fontFamily
+                        onSelected: newValue => { settingsCustomText.entry.fontFamily = newValue; }
+                    }
+                    ConfigTextArea {
+                        id: settingsCustomFontField
+                        buttonIcon: "custom_typography"
+                        text: Translation.tr("Custom Font")
+                        Layout.fillWidth: true
+                        Layout.topMargin: 6
+                        placeholderText: Translation.tr("Any installed font family")
+                        value: Fonts.handwritingFamilies.includes(settingsCustomText.entry.fontFamily) ? "" : settingsCustomText.entry.fontFamily
+
+                        onValueChanged: {
+                            customTextFontDebounce.restart();
+                        }
+
+                        Timer {
+                            id: customTextFontDebounce
+                            interval: 500
+                            repeat: false
+                            onTriggered: {
+                                if (settingsCustomFontField.value.trim() !== "")
+                                    settingsCustomText.entry.fontFamily = settingsCustomFontField.value.trim()
+                            }
+                        }
+                    }
+
+                    ConfigSlider {
+                        text: Translation.tr("Font size")
+                        value: settingsCustomText.entry.fontSize
+                        usePercentTooltip: false
+                        buttonIcon: "format_size"
+                        from: 12
+                        to: 400
+                        stopIndicatorValues: [72]
+                        onValueChanged: {
+                            settingsCustomText.entry.fontSize = Math.round(value);
+                        }
+                    }
+
+                    ConfigSelectionArray {
+                        text: Translation.tr("Alignment")
+                        icon: "format_align_center"
+                        currentValue: settingsCustomText.entry.alignment
+                        onSelected: newValue => {
+                            settingsCustomText.entry.alignment = newValue;
+                        }
+                        options: [
+                            {
+                                displayName: Translation.tr("Left"),
+                                icon: "format_align_left",
+                                value: "left"
+                            },
+                            {
+                                displayName: Translation.tr("Center"),
+                                icon: "format_align_center",
+                                value: "center"
+                            },
+                            {
+                                displayName: Translation.tr("Right"),
+                                icon: "format_align_right",
+                                value: "right"
+                            }
+                        ]
+                    }
+                }
+            }
+
+            ContentSubsection {
+                Layout.topMargin: 10
+                title: Translation.tr("Colors")
+                
+                GroupedList {
+                    ConfigSwitch {
+                        id: customTextAutoColorSwitch
+                        buttonIcon: "auto_awesome"
+                        text: Translation.tr("Automatic colors")
+                        checked: settingsCustomText.entry.color === ""
+                        onCheckedChanged: {
+                            if (checked) {
+                                settingsCustomText.entry.color = ""
+                            }
+                        }
+                    }
+
+                    ColorSelectionArray {
+                        icon: "palette"
+                        text: Translation.tr("Color")
+                        currentValue: settingsCustomText.entry.color
+                        onSelected: newValue => {
+                            settingsCustomText.entry.color = newValue
+                            customTextAutoColorSwitch.checked = false
+                        }
+                    }
+                }
+            }
+        }
+
+        ContentSection {
             icon: "widgets"
             shape: MaterialShape.Shape.Pill
             title: Translation.tr("Widgets")
@@ -1414,8 +1594,11 @@ ContentPage {
             title: Translation.tr("Visualizer")
             visible: Config.options.background.widgets.visualizer.enable
 
-            readonly property bool isWave: Config.options.background.widgets.visualizer.mode === "wave"
-            readonly property bool isDefault: Config.options.background.widgets.visualizer.mode === "default"
+            readonly property bool isCanvas: ["default", "bars", "wave"].includes(Config.options.background.widgets.visualizer.style)
+            readonly property bool isWave: Config.options.background.widgets.visualizer.style === "wave"
+            readonly property bool isDefault: Config.options.background.widgets.visualizer.style === "default"
+            readonly property bool isShader: ["aurora", "ring", "dots", "mirror"].includes(Config.options.background.widgets.visualizer.style)
+            readonly property bool isRing: Config.options.background.widgets.visualizer.style === "ring"
 
             ColumnLayout {
                 Layout.fillWidth: true
@@ -1427,14 +1610,18 @@ ContentPage {
                     GroupedList {
                         ConfigSelectionArray {
                             Layout.fillWidth: false
-                            currentValue: Config.options.background.widgets.visualizer.mode
+                            currentValue: Config.options.background.widgets.visualizer.style
                             onSelected: newValue => {
-                                Config.options.background.widgets.visualizer.mode = newValue;
+                                Config.options.background.widgets.visualizer.style = newValue;
                             }
                             options: [
                                 { displayName: Translation.tr("Default"), icon: "equalizer", value: "default" },
                                 { displayName: Translation.tr("Bars"), icon: "equalizer", value: "bars" },
-                                { displayName: Translation.tr("Wave"), icon: "airwave", value: "wave" }
+                                { displayName: Translation.tr("Wave"), icon: "airwave", value: "wave" },
+                                { displayName: Translation.tr("Aurora"), icon: "auto_awesome", value: "aurora" },
+                                { displayName: Translation.tr("Ring"), icon: "radio_button_checked", value: "ring" },
+                                { displayName: Translation.tr("Dots"), icon: "grain", value: "dots" },
+                                { displayName: Translation.tr("Mirror"), icon: "filter_drama", value: "mirror" }
                             ]
                         }
                     }
@@ -1477,7 +1664,7 @@ ContentPage {
                 }
 
                 ContentSubsection {
-                    visible: visualizerSection.isWave
+                    visible: visualizerSection.isCanvas && !visualizerSection.isDefault
                     title: Translation.tr("Performance mode")
                     tooltip: Translation.tr("Note: Auto mode requires 'power-profiles-daemon' (Arch) package")
 
@@ -1571,7 +1758,7 @@ ContentPage {
                             }
                         }
                         GroupedList {
-                            visible: !visualizerSection.isDefault
+                            visible: visualizerSection.isCanvas && !visualizerSection.isDefault
                             ConfigSpinBox {
                                 icon: "view_column"
                                 text: visualizerSection.isWave ? Translation.tr("Point Width") : Translation.tr("Bar Width")
@@ -1587,7 +1774,7 @@ ContentPage {
                     ConfigRow {
                         uniform: true
                         GroupedList {
-                            visible: !visualizerSection.isDefault
+                            visible: visualizerSection.isCanvas && !visualizerSection.isDefault
                             ConfigSpinBox {
                                 icon: "space_bar"
                                 text: visualizerSection.isWave ? Translation.tr("Point Gap") : Translation.tr("Bar Gap")
@@ -1599,7 +1786,7 @@ ContentPage {
                             }
                         }
                         GroupedList {
-                            visible: !visualizerSection.isDefault
+                            visible: visualizerSection.isCanvas && !visualizerSection.isDefault
                             ConfigSpinBox {
                                 icon: "line_weight"
                                 text: visualizerSection.isWave ? Translation.tr("Line Thickness") : Translation.tr("Border Width")
@@ -1657,20 +1844,7 @@ ContentPage {
                         }
                     }
                     GroupedList {
-                        visible: !visualizerSection.isWave && !visualizerSection.isDefault
-                        ConfigSlider {
-                            buttonIcon: "format_color_reset"
-                            text: Translation.tr("Border Opacity")
-                            value: Config.options.background.widgets.visualizer.waveFillOpacity * 100
-                            from: 0; to: 100
-                            stopIndicatorValues: [50]
-                            onValueChanged: {
-                                Config.options.background.widgets.visualizer.waveFillOpacity = value / 100
-                            }
-                        }
-                    }
-                    GroupedList {
-                        visible: !visualizerSection.isWave && !visualizerSection.isDefault
+                        visible: visualizerSection.isCanvas && !visualizerSection.isWave && !visualizerSection.isDefault
                         ConfigSlider {
                             buttonIcon: "rounded_corner"
                             text: Translation.tr("Bar Roundness")
@@ -1679,6 +1853,55 @@ ContentPage {
                             stopIndicatorValues: [25]
                             onValueChanged: {
                                 Config.options.background.widgets.visualizer.barRounding = value / 100
+                            }
+                        }
+                    }
+                }
+
+                ContentSubsection {
+                    title: Translation.tr("Colors & Effects")
+
+                    GroupedList {
+                        ConfigSelectionArray {
+                            text: Translation.tr("Color Source")
+                            icon: "palette"
+                            currentValue: Config.options.background.widgets.visualizer.colorSource
+                            onSelected: newValue => {
+                                Config.options.background.widgets.visualizer.colorSource = newValue;
+                            }
+                            options: [
+                                { displayName: Translation.tr("Theme"), icon: "palette", value: "theme" },
+                                { displayName: Translation.tr("Album cover"), icon: "album", value: "cover" }
+                            ]
+                        }
+                    }
+
+                    GroupedList {
+                        visible: visualizerSection.isShader
+                        ConfigSlider {
+                            text: Translation.tr("Sensitivity")
+                            buttonIcon: "tune"
+                            usePercentTooltip: false
+                            value: Config.options.background.widgets.visualizer.sensitivity * 100
+                            from: 50; to: 300
+                            stopIndicatorValues: [100]
+                            onValueChanged: {
+                                Config.options.background.widgets.visualizer.sensitivity = Math.round(value) / 100;
+                            }
+                        }
+                    }
+
+                    GroupedList {
+                        visible: visualizerSection.isRing
+                        ConfigSlider {
+                            text: Translation.tr("Ring Size")
+                            buttonIcon: "radio_button_checked"
+                            usePercentTooltip: false
+                            value: Config.options.background.widgets.visualizer.ringSize
+                            from: 200; to: 900
+                            stopIndicatorValues: [380]
+                            onValueChanged: {
+                                Config.options.background.widgets.visualizer.ringSize = Math.round(value);
                             }
                         }
                     }
