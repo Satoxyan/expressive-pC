@@ -149,7 +149,8 @@ AbstractBackgroundWidget {
     // Bar counts per mode
     readonly property int defaultBarCount: Math.max(1, Math.floor(screenWidth / 12))
     readonly property int canvasBarCount: Math.max(1, Math.floor(screenWidth / (root.targetBarWidth + root.barSpacing)))
-    readonly property int wavePointCount: Math.max(2, Math.floor(screenWidth / 12))
+    // Wave uses same point count as bars — bezier curves smooth the fewer points
+    readonly property int wavePointCount: Math.max(2, canvasBarCount)
     readonly property real defaultMaxBarHeight: Math.min(root.height, 220)
     readonly property real defaultBarWidth: 4
     readonly property real defaultBarSpacing: 8
