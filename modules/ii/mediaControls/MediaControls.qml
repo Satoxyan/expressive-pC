@@ -91,7 +91,7 @@ Scope {
                 (Config.options.bar.dynamicIsland.visualizerStyle === "dots" && !Config.options.bar.dynamicIsland.showMediaControls))) ||
             Config.options.bar.layouts.rightLayout.includes("visualizer") ||
             Config.options.background.widgets.visualizer.enable)
-            && MprisController.activePlayer !== null
+            && (MprisController.activePlayer?.isPlaying ?? false)
         onRunningChanged: {
             if (!cavaProc.running) {
                 GlobalStates.visualizerPoints = [];

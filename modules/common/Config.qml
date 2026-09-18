@@ -603,6 +603,7 @@ Singleton {
                     property bool onlyTitle: false
                     property int maxWidth: 280
                     property int minWidth: 100
+                    property bool showLyrics: false
                 }
             }
 
@@ -898,7 +899,7 @@ Singleton {
             }
 
             property JsonObject custom: JsonObject {
-                property string distroIcon: "spark"
+                property string distroIcon: "google-gemini-symbolic"
                 property bool colorizeIcon: true
             }
 
