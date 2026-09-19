@@ -38,6 +38,8 @@ Item {
         model: [
             { key: "visualizer" },
             { key: "customImages" },
+            { key: "customImage" },
+            { key: "sticker" },
             { key: "calendar" },
             { key: "clock", alwaysOnLock: true },
             { key: "weather" },
@@ -78,6 +80,8 @@ Item {
                 switch (loaderDelegate.modelData.key) {
                     case "visualizer":  return visualizerComp
                     case "customImages": return customImageComp
+                    case "customImage": return customImageComp
+                    case "sticker":     return stickerComp
                     case "calendar":    return calendarComp
                     case "weather":     return weatherComp
                     case "clock":       return clockComp
@@ -144,6 +148,17 @@ Item {
                     wallpaperItem: root.wallpaperItem
                 }
             }
+        }
+    }
+    Component {
+        id: stickerComp
+        StickerWidget {
+            screenWidth: root.screen.width
+            screenHeight: root.screen.height
+            scaledScreenWidth: root.screen.width
+            scaledScreenHeight: root.screen.height
+            wallpaperScale: 1
+            wallpaperItem: root.wallpaperItem
         }
     }
     Component {

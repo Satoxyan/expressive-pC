@@ -257,6 +257,7 @@ Singleton {
                 property string style: "default" // default - minimal
                 property real borderSize: 1
                 property string borderColor: "layer0Border"
+                property list<string> collapsedSections: []
             }
 
             property JsonObject background: JsonObject {
@@ -429,6 +430,31 @@ Singleton {
                         property real sensitivity: 1
                         property int height: 260
                         property int ringSize: 380
+                    }
+
+                    property JsonObject customImage: JsonObject {
+                        property bool enable: false
+                        property string placementStrategy: "free"
+                        property real x: 400
+                        property real y: 100
+                        property real z: 0
+                        property string path: ""
+                        property string shape: "Cookie4Sided"
+                        property real size: 200
+                    }
+
+                    property JsonObject sticker: JsonObject {
+                        property bool enable: false
+                        property list<var> items: [] // if someone sees this and wants to add more stickers, make a PR too lazy 
+                        property string placementStrategy: "free"
+                        property real x: 400
+                        property real y: 100
+                        property real z: 0
+                        property string path: ""
+                        property real size: 200
+                        property real rotation: 0
+                        property string outlineColor: "#ffffff" //dont work =(
+                        property real outlineWidth: 8
                     }
 
                     property JsonObject resources: JsonObject {

@@ -82,6 +82,7 @@ ContentPage {
             title: Translation.tr("Wallpaper & Colors")
             shape: MaterialShape.Shape.Puffy
             Layout.fillWidth: true
+            collapsible: false
 
             RowLayout {
                 Layout.fillWidth: true
@@ -288,6 +289,7 @@ ContentPage {
             title: Translation.tr("Bar & Screen")
             shape: MaterialShape.Shape.ClamShell
             Layout.fillWidth: true
+            collapsible: false
             visible: !isMinimal
             GroupedList {
                 ConfigSelectionArray {

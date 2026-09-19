@@ -1388,7 +1388,12 @@ ContentPage {
                             icon: "timer",
                             name: Translation.tr("Timers"),
                             configKey: "timers",
-                        }
+                        },
+                        {
+                            icon: "sticker",
+                            name: Translation.tr("Sticker"),
+                            enabled: Config.options.background.widgets.sticker.enable
+                        },
                     ]
                     delegate: Rectangle {
                         id: widgetTile
