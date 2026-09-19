@@ -54,7 +54,7 @@ Item {
             checked: Config.options.background.widgets.blurWidgets
             onCheckedChanged: {
                 Config.options.background.widgets.blurWidgets = checked
-                const keys = ["weather","images","media","resources","calendar","worldClock","userCard","notes","todo","timers"]
+                const keys = ["weather","clock","images","media","resources","calendar","worldClock","userCard","notes","todo","timers"]
                 keys.forEach(k => { Config.options.background.widgets[k].blur = checked })
             }
         }
@@ -67,7 +67,7 @@ Item {
             checked: Config.options.background.widgets.tintBlur
             onCheckedChanged: {
                 Config.options.background.widgets.tintBlur = checked
-                const keys = ["weather","images","media","resources","calendar","worldClock","userCard","notes","todo","timers"]
+                const keys = ["weather","clock","images","media","resources","calendar","worldClock","userCard","notes","todo","timers"]
                 keys.forEach(k => { Config.options.background.widgets[k].tintBlur = checked })
             }
         }

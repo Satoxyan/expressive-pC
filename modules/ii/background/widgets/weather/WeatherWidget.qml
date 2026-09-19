@@ -1002,7 +1002,7 @@ AbstractBackgroundWidget {
         visible: root.style === "pill"
         anchors.fill: parent
         shape: MaterialShape.Shape.Pill
-        color: Config.options.background.widgets.blurWidgets ? "transparent" : Appearance.colors.colPrimaryContainer
+        color: Config.options.background.widgets.weather.blur ? "transparent" : Appearance.colors.colPrimaryContainer
         implicitSize: 200
 
         StyledText {
@@ -1055,6 +1055,7 @@ AbstractBackgroundWidget {
             layer.enabled: false
             tint: Appearance.colors.colPrimaryContainer
             tintOpacity: 0.55
+            tintEnabled: Config.options.background.widgets.weather.tintBlur
             trackX: root.x
             trackY: root.y
         }

@@ -22,7 +22,7 @@ Item {
     required property Item wallpaperItem
     property real originX: 0
     property real originY: 0
-    property bool blurWidgets: Config.options.background.widgets.blurWidgets
+    property bool blurWidgets: Config.options.background.widgets.clock.blur
 
     property color colShadow: Appearance.colors.colShadow
     property color colBackground: Appearance.colors.colPrimaryContainer
@@ -139,6 +139,7 @@ Item {
             cardRadius: 0
             tint: Appearance.colors.colPrimaryContainer
             tintOpacity: 0.55
+            tintEnabled: Config.options.background.widgets.clock.tintBlur
             trackX: root.originX + root.x
             trackY: root.originY + root.y
             visible: false

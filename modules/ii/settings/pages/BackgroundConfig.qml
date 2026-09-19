@@ -1340,6 +1340,11 @@ ContentPage {
                             configKey: "weather",
                         },
                         {
+                            icon: "schedule",
+                            name: Translation.tr("Clock"),
+                            configKey: "clock",
+                        },
+                        {
                             icon: "image",
                             name: Translation.tr("Image converter"),
                             configKey: "images",
@@ -1392,7 +1397,7 @@ ContentPage {
                         {
                             icon: "sticker",
                             name: Translation.tr("Sticker"),
-                            enabled: Config.options.background.widgets.sticker.enable
+                            configKey: "sticker",
                         },
                     ]
                     delegate: Rectangle {

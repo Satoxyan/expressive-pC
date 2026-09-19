@@ -275,6 +275,8 @@ Singleton {
                     property real blurRadius: 32
                     property JsonObject clock: JsonObject {
                         property bool enable: true
+                        property bool blur: true
+                        property bool tintBlur: true
                         property bool showOnlyWhenLocked: false
                         property string placementStrategy: "leastBusy" // "free", "leastBusy", "mostBusy"
                         property real x: 100
@@ -445,6 +447,8 @@ Singleton {
 
                     property JsonObject sticker: JsonObject {
                         property bool enable: false
+                        property bool blur: true
+                        property bool tintBlur: true
                         property list<var> items: [] // if someone sees this and wants to add more stickers, make a PR too lazy 
                         property string placementStrategy: "free"
                         property real x: 400

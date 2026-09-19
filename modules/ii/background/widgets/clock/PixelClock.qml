@@ -56,7 +56,7 @@ Item {
     }
     readonly property var fringeSamples: ringSamples(16, fringeSize)
 
-    property bool blurWidgets: Config.options.background.widgets.blurWidgets
+    property bool blurWidgets: Config.options.background.widgets.clock.blur
 
     StyledDropShadow {
         target: glyphStage
@@ -131,6 +131,7 @@ Item {
             blurSource: root.wallpaperItem
             tint: root.tintSoft
             tintOpacity: 0.55
+            tintEnabled: Config.options.background.widgets.clock.tintBlur
             trackX: root.originX + root.pos0X
             trackY: root.originY + root.pos0Y
             visible: false
@@ -188,6 +189,7 @@ Item {
             blurSource: root.wallpaperItem
             tint: root.tintBold
             tintOpacity: 0.55
+            tintEnabled: Config.options.background.widgets.clock.tintBlur
             trackX: root.originX + root.pos1X
             trackY: root.originY + root.pos1Y
             visible: false
@@ -244,6 +246,7 @@ Item {
             blurSource: root.wallpaperItem
             tint: root.tintBold
             tintOpacity: 0.55
+            tintEnabled: Config.options.background.widgets.clock.tintBlur
             trackX: root.originX + root.pos2X
             trackY: root.originY + root.pos2Y
             visible: false
@@ -286,6 +289,7 @@ Item {
             blurSource: root.wallpaperItem
             tint: root.tintSoft
             tintOpacity: 0.55
+            tintEnabled: Config.options.background.widgets.clock.tintBlur
             trackX: root.originX + root.pos3X
             trackY: root.originY + root.pos3Y
             visible: false
@@ -317,6 +321,7 @@ Item {
                     blurSource: root.wallpaperItem
                     tint: root.tintBold
                     tintOpacity: 0.55
+                    tintEnabled: Config.options.background.widgets.clock.tintBlur
                     trackX: root.originX + root.colonX
                     trackY: root.originY + root.pos0Y + root.tileH / 2 - height / 2
                     visible: root.blurWidgets
@@ -334,6 +339,7 @@ Item {
                     blurSource: root.wallpaperItem
                     tint: root.tintBold
                     tintOpacity: 0.55
+                    tintEnabled: Config.options.background.widgets.clock.tintBlur
                     trackX: root.originX + root.colonX
                     trackY: root.originY + root.pos0Y + root.tileH / 2 - height / 2 + root.colonGap + root.colonDotSize
                     visible: root.blurWidgets
