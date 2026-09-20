@@ -680,28 +680,23 @@ Singleton {
                 property JsonObject scrolling: JsonObject {
                     property bool fasterTouchpadScroll: true // Master switch for inertial scroll engine
 
-                    // === Touchpad physics (Firefox APZ-like) ===
-                    // Source: StaticPrefList.yaml apz.fling_friction default: 0.002 (per ms)
+                    // === Touchpad physics ===
                     property real flingFriction: 0.002
-                    // Source: apz.fling_stopped_threshold default: 0.01 (px/ms)
                     property real flingStopThreshold: 0.01
                     // Sensitivity: pixels per angleDelta unit during finger-follow phase
                     property real touchpadSensitivity: 3.5
                     // Velocity reflection coefficient at bounds (0 = hard stop, 1 = perfect bounce)
                     property real bounceDamping: 0.3
 
-                    // === Mouse wheel (Firefox Bezier-like) ===
-                    // Source: mousewheel.min_line_scroll_amount(5) x ~20px = 100px per tick
+                    // === Mouse wheel ===
                     property int wheelScrollAmount: 100
-                    // Source: general.smoothScroll.mouseWheel.durationMinMS
                     property int wheelDurationMin: 200
-                    // Source: general.smoothScroll.mouseWheel.durationMaxMS
                     property int wheelDurationMax: 400
 
                     // === Detection ===
                     property int mouseScrollDeltaThreshold: 120 // angleDelta >= this = mouse wheel
 
-                    // === Legacy (used as relative multipliers in Anime.qml / AiChat.qml) ===
+                    // === Relative Multipliers ===
                     property real touchpadScrollFactor: 1.0 // scales touchpadSensitivity per-instance
                     property real mouseScrollFactor: 1.0    // scales wheelScrollAmount per-instance
                 }

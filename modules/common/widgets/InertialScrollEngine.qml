@@ -2,7 +2,7 @@ import QtQuick
 import qs.modules.common
 
 /**
- * Firefox-like inertial scroll engine.
+ * Inertial scroll engine.
  *
  * ARCHITECTURE: This item is placed INSIDE the Flickable (as a child).
  * It does NOT handle events itself — instead, it exposes handleWheel()
@@ -10,17 +10,16 @@ import qs.modules.common
  * parent (an ancestor). Ancestor WheelHandlers intercept events BEFORE
  * the Flickable's C++ wheelEvent handler in Qt 6.
  *
- * Two scroll paths matching Firefox:
- * 1. TOUCHPAD: direct delta + exponential decay fling after lift
- *    v(t) = v0 * (1 - flingFriction)^dt_ms  [Firefox DesktopFlingPhysics.h]
- * 2. MOUSE WHEEL: animated target, OutCubic 200-400ms [Firefox BezierPhysics]
+ * Implements two scrolling paths:
+ * 1. TOUCHPAD: Direct delta tracking + exponential decay fling after lift.
+ * 2. MOUSE WHEEL: Animated target using an OutCubic curve.
  */
 Item {
     id: root
 
     required property var flickable
 
-    // === Touchpad physics (Firefox APZ defaults) ===
+    // === Touchpad physics ===
     property real flingFriction: Config?.options.interactions.scrolling.flingFriction ?? 0.002
     property real flingStopThreshold: Config?.options.interactions.scrolling.flingStopThreshold ?? 0.01
     readonly property real flingMinVelocity: 0.5
@@ -28,7 +27,7 @@ Item {
                                        * (Config?.options.interactions.scrolling.touchpadScrollFactor ?? 1.0)
     property real bounceDamping: Config?.options.interactions.scrolling.bounceDamping ?? 0.3
 
-    // === Mouse wheel (Firefox Bezier-like) ===
+    // === Mouse wheel physics ===
     property int wheelScrollAmount: Math.round(
         (Config?.options.interactions.scrolling.wheelScrollAmount ?? 100)
         * (Config?.options.interactions.scrolling.mouseScrollFactor ?? 1.0))
