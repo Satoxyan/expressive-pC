@@ -64,19 +64,49 @@ Item {
         easing.type: Easing.OutCubic
     }
 
-    // Touchpad fling: exponential decay physics loop
+    // Touchpad fling & overscroll spring: physics loop
     Timer {
         id: _flingTimer
         interval: 16
         repeat: true
         onTriggered: {
-            root._flingVelocity *= 0.94          // friction ≈ Firefox flingFriction
             var maxY = Math.max(0, flickable.contentHeight - flickable.height)
-            var newY = Math.max(0, Math.min(flickable.contentY + root._flingVelocity, maxY))
-            flickable.contentY = newY
-            if (Math.abs(root._flingVelocity) < 0.5 || newY <= 0 || newY >= maxY) {
-                _flingTimer.stop()
-                root._flingVelocity = 0
+            var y = flickable.contentY
+            var step = 0
+            
+            if (y < 0) {
+                if (root._flingVelocity < -0.1) {
+                    root._flingVelocity *= 0.65       // Stop quickly when pushing out
+                    step = root._flingVelocity * 16
+                } else {
+                    root._flingVelocity = 0
+                    step = (0 - y) * 0.2              // Smooth glide back to 0
+                }
+            } else if (y > maxY) {
+                if (root._flingVelocity > 0.1) {
+                    root._flingVelocity *= 0.65       // Stop quickly when pushing out
+                    step = root._flingVelocity * 16
+                } else {
+                    root._flingVelocity = 0
+                    step = (maxY - y) * 0.2           // Smooth glide back to maxY
+                }
+            } else {
+                root._flingVelocity *= 0.96           // Normal friction inside bounds
+                step = root._flingVelocity * 16
+            }
+            
+            flickable.contentY = y + step
+            
+            // Stop condition: low velocity AND we are safely inside/at bounds
+            if (Math.abs(step) < 0.5) {
+                var finalY = flickable.contentY
+                if (finalY < 0.5 && finalY > -0.5) flickable.contentY = 0
+                else if (finalY > maxY - 0.5 && finalY < maxY + 0.5) flickable.contentY = maxY
+                
+                if (flickable.contentY >= 0 && flickable.contentY <= maxY) {
+                    _flingTimer.stop()
+                    root._flingVelocity = 0
+                }
             }
         }
     }
@@ -86,14 +116,21 @@ Item {
         id: _liftTimer
         interval: 80
         onTriggered: {
-            if (root._samples.length === 0) return
-            var total = 0, ws = 0
-            for (var i = 0; i < root._samples.length; i++) {
-                var w = i + 1; total += root._samples[i] * w; ws += w
+            if (root._samples.length > 0) {
+                var total = 0, ws = 0
+                for (var i = 0; i < root._samples.length; i++) {
+                    var w = i + 1; total += root._samples[i] * w; ws += w
+                }
+                root._flingVelocity = total / ws  // result in px/ms
+                root._samples = []
             }
-            root._flingVelocity = total / ws
-            root._samples = []
-            if (Math.abs(root._flingVelocity) >= 1.5) _flingTimer.restart()
+            
+            var maxY = Math.max(0, flickable.contentHeight - flickable.height)
+            var outOfBounds = (flickable.contentY < 0 || flickable.contentY > maxY)
+            
+            if (Math.abs(root._flingVelocity * 16) >= 1.0 || outOfBounds) {
+                _flingTimer.restart()
+            }
         }
     }
 
@@ -106,6 +143,12 @@ Item {
         _wheelAnim.stop()
         _flingTimer.stop()
         var deltaPx = -dy * 1.2          // 1.2 px per angleDelta unit (touchpad feels natural)
+        var maxY = Math.max(0, flickable.contentHeight - flickable.height)
+        
+        // Resistance when dragging out of bounds
+        if (flickable.contentY < 0 && deltaPx < 0) deltaPx *= 0.3
+        if (flickable.contentY > maxY && deltaPx > 0) deltaPx *= 0.3
+        
         var now = Date.now()
         var dt = now - root._lastT
         if (dt > 0 && dt < 150) {
@@ -115,7 +158,7 @@ Item {
             root._samples = []
         }
         root._lastT = now
-        flickable.contentY = _clampY(flickable.contentY + deltaPx)
+        flickable.contentY = flickable.contentY + deltaPx
         _liftTimer.restart()
     }
 
