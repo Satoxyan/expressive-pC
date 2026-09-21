@@ -198,9 +198,14 @@ AbstractBackgroundWidget {
             }
         }
 
-        // Remove button (top-left), visible on hover in edit mode
+        // Remove button (top-left area), positioned inward to stay in hover area
         MaterialShapeWrappedMaterialSymbol {
-            anchors { top: parent.top; left: parent.left; margins: 8 }
+            anchors {
+                top: parent.top
+                left: parent.left
+                topMargin: parent.height * 0.15
+                leftMargin: parent.width * 0.15
+            }
             visible: root.containsMouse && !Config.options.background.widgetsLocked
             wrappedShape: MaterialShape.Shape.Circle
             color: Appearance.colors.colError ?? Appearance.colors.colPrimary
@@ -219,9 +224,14 @@ AbstractBackgroundWidget {
             }
         }
 
-        // Shape cycle button (top-right), visible on hover in edit mode
+        // Shape cycle button (top-right area), positioned inward to stay in hover area
         MaterialShapeWrappedMaterialSymbol {
-            anchors { top: parent.top; right: parent.right; margins: 8 }
+            anchors {
+                top: parent.top
+                right: parent.right
+                topMargin: parent.height * 0.15
+                rightMargin: parent.width * 0.15
+            }
             visible: root.containsMouse && !Config.options.background.widgetsLocked
             wrappedShape: MaterialShape.Shape.Circle
             color: Appearance.colors.colPrimary
