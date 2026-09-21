@@ -23,12 +23,11 @@ Singleton {
     property var _placementScanDone: ({})
 
     function _customImagesPath() {
-        return Directories.config + "/custom-images.json"
+        return FileUtils.trimFileProtocol(Directories.config) + "/custom-images.json"
     }
 
     function _saveCustomImages() {
-        _customImagesAdapter.data = JSON.parse(JSON.stringify(root.customImages))
-        _customImagesFileView.writeAdapter()
+        _customImagesFileView.setText(JSON.stringify(root.customImages))
     }
 
     function updateCustomImage(index, props) {
@@ -57,12 +56,11 @@ Singleton {
 
     // --- Stickers ---
     function _stickersPath() {
-        return Directories.config + "/stickers.json"
+        return FileUtils.trimFileProtocol(Directories.config) + "/stickers.json"
     }
 
     function _saveStickers() {
-        _stickersAdapter.data = JSON.parse(JSON.stringify(root.stickers))
-        _stickersFileView.writeAdapter()
+        _stickersFileView.setText(JSON.stringify(root.stickers))
     }
 
     function updateSticker(index, props) {
@@ -1071,20 +1069,20 @@ Singleton {
         path: root._customImagesPath()
         watchChanges: false
         onLoaded: {
-            const d = _customImagesAdapter.data
-            if (Array.isArray(d))
-                root.customImages = d
+            const raw = _customImagesFileView.text()
+            if (!raw) return
+            try {
+                const d = JSON.parse(raw)
+                if (Array.isArray(d))
+                    root.customImages = d
+            } catch (e) {
+                console.warn("Config: failed to parse custom-images.json:", e)
+            }
         }
         onLoadFailed: error => {
             if (error == FileViewError.FileNotFound) {
-                _customImagesAdapter.data = []
-                writeAdapter()
+                _customImagesFileView.setText("[]")
             }
-        }
-
-        JsonAdapter {
-            id: _customImagesAdapter
-            property var data: []
         }
 
         Component.onCompleted: load()
@@ -1095,20 +1093,20 @@ Singleton {
         path: root._stickersPath()
         watchChanges: false
         onLoaded: {
-            const d = _stickersAdapter.data
-            if (Array.isArray(d))
-                root.stickers = d
+            const raw = _stickersFileView.text()
+            if (!raw) return
+            try {
+                const d = JSON.parse(raw)
+                if (Array.isArray(d))
+                    root.stickers = d
+            } catch (e) {
+                console.warn("Config: failed to parse stickers.json:", e)
+            }
         }
         onLoadFailed: error => {
             if (error == FileViewError.FileNotFound) {
-                _stickersAdapter.data = []
-                writeAdapter()
+                _stickersFileView.setText("[]")
             }
-        }
-
-        JsonAdapter {
-            id: _stickersAdapter
-            property var data: []
         }
 
         Component.onCompleted: load()
