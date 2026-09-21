@@ -16,6 +16,9 @@ Singleton {
     // customImages — persisted in its own file to avoid JsonObject re-read crashes
     property var customImages: []
 
+    // stickers — persisted in its own file to avoid JsonObject re-read crashes
+    property var stickers: []
+
     // Track which widgets have completed their placement scan (not persisted)
     property var _placementScanDone: ({})
 
@@ -50,6 +53,38 @@ Singleton {
         if (!Array.isArray(arr) || !arr[index]) return;
         Object.assign(arr[index], props);
         _saveCustomImages();
+    }
+
+    // --- Stickers ---
+    function _stickersPath() {
+        return Directories.config + "/stickers.json"
+    }
+
+    function _saveStickers() {
+        _stickersAdapter.data = JSON.parse(JSON.stringify(root.stickers))
+        _stickersFileView.writeAdapter()
+    }
+
+    function updateSticker(index, props) {
+        const current = Array.isArray(root.stickers) ? root.stickers : [];
+        root.stickers = current.map((e, i) => i === index ? Object.assign({}, e, props) : e);
+        _saveStickers();
+    }
+    function addSticker() {
+        const current = Array.isArray(root.stickers) ? root.stickers : [];
+        root.stickers = [...current, { enable: true, placementStrategy: "free", x: 400, y: 100, path: "", size: 200, rotation: 0, outlineColor: "#ffffff", outlineWidth: 8 }];
+        _saveStickers();
+    }
+    function removeSticker(index) {
+        const current = Array.isArray(root.stickers) ? root.stickers : [];
+        root.stickers = current.filter((_, i) => i !== index);
+        _saveStickers();
+    }
+    function saveStickerProps(index, props) {
+        const arr = root.stickers;
+        if (!Array.isArray(arr) || !arr[index]) return;
+        Object.assign(arr[index], props);
+        _saveStickers();
     }
 
     function setNestedValue(nestedKey, value) {
@@ -1049,6 +1084,30 @@ Singleton {
 
         JsonAdapter {
             id: _customImagesAdapter
+            property var data: []
+        }
+
+        Component.onCompleted: load()
+    }
+
+    FileView {
+        id: _stickersFileView
+        path: root._stickersPath()
+        watchChanges: false
+        onLoaded: {
+            const d = _stickersAdapter.data
+            if (Array.isArray(d))
+                root.stickers = d
+        }
+        onLoadFailed: error => {
+            if (error == FileViewError.FileNotFound) {
+                _stickersAdapter.data = []
+                writeAdapter()
+            }
+        }
+
+        JsonAdapter {
+            id: _stickersAdapter
             property var data: []
         }
 
