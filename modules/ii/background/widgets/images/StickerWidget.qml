@@ -40,13 +40,14 @@ AbstractBackgroundWidget {
             animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
         }
 
-        StyledImage {
+        AnimatedImage {
             id: stickerImage
             anchors.fill: parent
             source: root.imagePath !== "" ? root.imagePath : ""
             fillMode: Image.PreserveAspectFit
             cache: false
             antialiasing: true
+            playing: root.imagePath !== "" && root.visible
             sourceSize.width: parent.width * 2
             sourceSize.height: parent.height * 2
             visible: root.imagePath !== ""
