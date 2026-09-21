@@ -24,6 +24,8 @@ AbstractBackgroundWidget {
     hoverEnabled: true
 
     property bool dropHover: false
+    property real liveSize: -1
+    property real currentWidgetRotation: root.stickerRotation
 
     implicitWidth: contentItem.implicitWidth
     implicitHeight: contentItem.implicitHeight
@@ -41,14 +43,16 @@ AbstractBackgroundWidget {
 
     Item {
         id: contentItem
-        implicitWidth: root.stickerSize
-        implicitHeight: root.stickerSize
-        rotation: root.stickerRotation
+        implicitWidth: root.liveSize > 0 ? root.liveSize : root.stickerSize
+        implicitHeight: root.liveSize > 0 ? root.liveSize : root.stickerSize
+        rotation: root.currentWidgetRotation
 
         Behavior on implicitWidth {
+            enabled: root.liveSize < 0
             animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
         }
         Behavior on implicitHeight {
+            enabled: root.liveSize < 0
             animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
         }
 
@@ -150,10 +154,10 @@ AbstractBackgroundWidget {
                 root.liveSize = -1
             }
             onRotated: (newAngle) => {
-                root.widgetRotation = newAngle
+                root.currentWidgetRotation = newAngle
             }
             onRotateFinished: {
-                Config.updateSticker(root.stickerIndex, { rotation: root.widgetRotation })
+                Config.updateSticker(root.stickerIndex, { rotation: root.currentWidgetRotation })
             }
         }
     }
