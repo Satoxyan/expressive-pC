@@ -5,6 +5,9 @@ import QtQuick.Layouts
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 import Quickshell
+import Quickshell.Hyprland
+import qs
+import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.ii.background.widgets
@@ -26,6 +29,29 @@ AbstractBackgroundWidget {
     property bool dropHover: false
     property real liveSize: -1
     property real currentWidgetRotation: root.stickerRotation
+    property bool coveredByWindow: false
+
+    Connections {
+        target: HyprlandData
+        function onWindowListChanged() { root.updateCovered() }
+        function onActiveWorkspaceChanged() { root.updateCovered() }
+    }
+    Component.onCompleted: updateCovered()
+
+    function updateCovered() {
+        const wl = HyprlandData.windowList;
+        if (!wl || wl.length === 0) { coveredByWindow = false; return; }
+        const aw = HyprlandData.activeWorkspace;
+        if (!aw) { coveredByWindow = false; return; }
+        for (let i = 0; i < wl.length; i++) {
+            const win = wl[i];
+            if (win.workspace?.id !== aw.id) continue;
+            const isMax = (win.maximized || win.wayland?.maximized);
+            const isFS = (win.fullscreen || win.wayland?.fullscreen);
+            if (win.floating === false || isMax || isFS) { coveredByWindow = true; return; }
+        }
+        coveredByWindow = false;
+    }
 
     implicitWidth: contentItem.implicitWidth
     implicitHeight: contentItem.implicitHeight
@@ -63,7 +89,7 @@ AbstractBackgroundWidget {
             fillMode: Image.PreserveAspectFit
             cache: false
             antialiasing: true
-            playing: root.imagePath !== "" && root.visible
+            playing: root.imagePath !== "" && root.visible && !root.coveredByWindow
             sourceSize.width: parent.width * 2
             sourceSize.height: parent.height * 2
             visible: root.imagePath !== ""
