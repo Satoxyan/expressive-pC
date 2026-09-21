@@ -36,7 +36,18 @@ AbstractBackgroundWidget {
         function onWindowListChanged() { root.updateCovered() }
         function onActiveWorkspaceChanged() { root.updateCovered() }
     }
-    Component.onCompleted: updateCovered()
+    Component.onCompleted: {
+        updateCovered();
+        if (root.imagePath !== "") _gifDelay.start();
+    }
+
+    property bool _gifStarted: false
+
+    Timer {
+        id: _gifDelay
+        interval: 100
+        onTriggered: root._gifStarted = true
+    }
 
     function updateCovered() {
         const wl = HyprlandData.windowList;
@@ -89,7 +100,7 @@ AbstractBackgroundWidget {
             fillMode: Image.PreserveAspectFit
             cache: false
             antialiasing: true
-            playing: root.imagePath !== "" && root.visible && !root.coveredByWindow
+            playing: root._gifStarted && root.imagePath !== "" && root.visible && !root.coveredByWindow
             sourceSize.width: parent.width * 2
             sourceSize.height: parent.height * 2
             visible: root.imagePath !== ""

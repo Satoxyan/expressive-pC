@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 import Quickshell
+import Quickshell.Hyprland
 import qs
 import qs.services
 import qs.modules.common
@@ -28,6 +29,40 @@ AbstractBackgroundWidget {
     property real liveSize: -1 // during resize gesture, before persisting
     readonly property real effectiveSize: liveSize > 0 ? liveSize : imageSize
     property real currentWidgetRotation: root.imageRotation
+    property bool coveredByWindow: false
+
+    Connections {
+        target: HyprlandData
+        function onWindowListChanged() { root.updateCovered() }
+        function onActiveWorkspaceChanged() { root.updateCovered() }
+    }
+    Component.onCompleted: {
+        updateCovered();
+        if (root.imagePath !== "") _gifDelay.start();
+    }
+
+    property bool _gifStarted: false
+
+    Timer {
+        id: _gifDelay
+        interval: 100
+        onTriggered: root._gifStarted = true
+    }
+
+    function updateCovered() {
+        const wl = HyprlandData.windowList;
+        if (!wl || wl.length === 0) { coveredByWindow = false; return; }
+        const aw = HyprlandData.activeWorkspace;
+        if (!aw) { coveredByWindow = false; return; }
+        for (let i = 0; i < wl.length; i++) {
+            const win = wl[i];
+            if (win.workspace?.id !== aw.id) continue;
+            const isMax = (win.maximized || win.wayland?.maximized);
+            const isFS = (win.fullscreen || win.wayland?.fullscreen);
+            if (win.floating === false || isMax || isFS) { coveredByWindow = true; return; }
+        }
+        coveredByWindow = false;
+    }
 
     readonly property var shapeList: [
         "Circle", "Square", "Slanted", "Arch", "Arrow", "SemiCircle", "Oval", "Pill",
@@ -150,12 +185,13 @@ AbstractBackgroundWidget {
                 }
             }
 
-            StyledImage {
+            AnimatedImage {
                 anchors.fill: parent
                 source: root.imagePath !== "" ? root.imagePath : ""
                 fillMode: Image.PreserveAspectCrop
                 cache: false
                 antialiasing: true
+                playing: root._gifStarted && root.imagePath !== "" && root.visible && !root.coveredByWindow
                 sourceSize.width: parent.width
                 sourceSize.height: parent.height
                 visible: root.imagePath !== ""
