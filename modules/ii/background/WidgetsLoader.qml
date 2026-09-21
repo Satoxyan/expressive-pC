@@ -146,6 +146,7 @@ Item {
                     imagePath: modelData.path ?? ""
                     imageShape: modelData.shape ?? "Cookie4Sided"
                     imageSize: modelData.size ?? 200
+                    imageRotation: modelData.rotation ?? 0
                     screenWidth: root.screen.width
                     screenHeight: root.screen.height
                     scaledScreenWidth: root.screen.width

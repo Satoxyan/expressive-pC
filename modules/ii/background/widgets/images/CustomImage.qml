@@ -22,10 +22,12 @@ AbstractBackgroundWidget {
     required property string imagePath
     required property string imageShape
     required property real imageSize
+    required property real imageRotation
 
     property bool dropHover: false
     property real liveSize: -1 // during resize gesture, before persisting
     readonly property real effectiveSize: liveSize > 0 ? liveSize : imageSize
+    property real currentWidgetRotation: root.imageRotation
 
     readonly property var shapeList: [
         "Circle", "Square", "Slanted", "Arch", "Arrow", "SemiCircle", "Oval", "Pill",
@@ -107,11 +109,14 @@ AbstractBackgroundWidget {
         id: contentItem
         implicitWidth: root.effectiveSize
         implicitHeight: root.effectiveSize
+        rotation: root.currentWidgetRotation
 
         Behavior on implicitWidth {
+            enabled: root.liveSize < 0
             animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
         }
         Behavior on implicitHeight {
+            enabled: root.liveSize < 0
             animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
         }
 
@@ -243,6 +248,8 @@ AbstractBackgroundWidget {
             locked: Config.options.background.widgetsLocked
             currentWidth: root.effectiveSize
             resizeMode: "diagonal"
+            rotatable: true
+            currentRotation: root.currentWidgetRotation
             z: 1
             onResized: (newValue) => {
                 root.liveSize = Math.max(80, newValue)
@@ -253,6 +260,12 @@ AbstractBackgroundWidget {
                 if (root.liveSize > 0)
                     Config.updateCustomImage(root.imageIndex, { size: root.liveSize })
                 root.liveSize = -1
+            }
+            onRotated: (newAngle) => {
+                root.currentWidgetRotation = newAngle
+            }
+            onRotateFinished: {
+                Config.updateCustomImage(root.imageIndex, { rotation: root.currentWidgetRotation })
             }
         }
     }

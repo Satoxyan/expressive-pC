@@ -38,7 +38,7 @@ Singleton {
     }
     function addCustomImage() {
         const current = Array.isArray(root.customImages) ? root.customImages : [];
-        root.customImages = [...current, { enable: true, placementStrategy: "free", x: 400, y: 100, path: "", shape: "Cookie4Sided", size: 200 }];
+        root.customImages = [...current, { enable: true, placementStrategy: "free", x: 400, y: 100, path: "", shape: "Cookie4Sided", size: 200, rotation: 0 }];
         _saveCustomImages();
     }
     function removeCustomImage(index) {
