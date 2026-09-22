@@ -1084,8 +1084,6 @@ Singleton {
                 _customImagesFileView.setText("[]")
             }
         }
-
-        Component.onCompleted: load()
     }
 
     FileView {
@@ -1108,7 +1106,5 @@ Singleton {
                 _stickersFileView.setText("[]")
             }
         }
-
-        Component.onCompleted: load()
     }
 }

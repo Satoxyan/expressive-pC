@@ -1218,7 +1218,8 @@ ContentPage {
                             color: Appearance.colors.colOnSurfaceVariant
                             Layout.fillWidth: true
                         }
-                        Slider {
+                        StyledSlider {
+                            Layout.preferredWidth: 150
                             from: 0
                             to: 24
                             value: modelData.outlineWidth ?? 8
