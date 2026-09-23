@@ -258,7 +258,7 @@ MouseArea {
 
                     Toolbar {
                         anchors.centerIn: parent
-                        visible: root.source !== "wallhaven" && root.source !== "blapples" && root.source !== "naive"
+                        visible: root.source !== "blapples" && root.source !== "naive" && root.source !== "wallhaven"
 
                         Loader {
                             active: root.source === "local"
@@ -658,7 +658,7 @@ MouseArea {
                         }
 
                         Loader {
-                            active: root.source === "unsplash" || root.source === "pexels"
+                            active: root.source !== "local" && root.source !== "wallhaven"
                             visible: active
                             sourceComponent: Toolbar {
                                 ToolbarTextField {
@@ -697,29 +697,24 @@ MouseArea {
                             sourceComponent: Toolbar {
                                 id: wallhavenToolbar
 
-                                // Broad color families. Each ORs several wallhaven palette colors (the API
-                                // accepts a comma-separated list) so one swatch = a wide range of wallpapers.
-                                // `hex` is the display swatch; `q` is the comma-joined wallhaven colors value.
                                 readonly property var colorGroups: [
-                                    { hex: "cc0000", q: "660000,990000,cc0000,cc3333" },        // Red
-                                    { hex: "ff6600", q: "ffcc33,ff9900,ff6600" },               // Orange
-                                    { hex: "cccc33", q: "666600,999900,cccc33,ffff00" },        // Yellow
-                                    { hex: "669900", q: "77cc33,669900,336600" },               // Green
-                                    { hex: "66cccc", q: "66cccc,0099cc" },                      // Teal
-                                    { hex: "0066cc", q: "0066cc,0099cc,333399" },               // Blue
-                                    { hex: "663399", q: "ea4c88,993399,663399,333399" },        // Purple / pink
-                                    { hex: "996633", q: "cc6633,996633,663300" },               // Brown
-                                    { hex: "999999", q: "000000,999999,cccccc,ffffff,424153" }  // Neutral
+                                    { hex: "cc0000", q: "660000,990000,cc0000,cc3333" },
+                                    { hex: "ff6600", q: "ffcc33,ff9900,ff6600" },
+                                    { hex: "cccc33", q: "666600,999900,cccc33,ffff00" },
+                                    { hex: "669900", q: "77cc33,669900,336600" },
+                                    { hex: "66cccc", q: "66cccc,0099cc" },
+                                    { hex: "0066cc", q: "0066cc,0099cc,333399" },
+                                    { hex: "663399", q: "ea4c88,993399,663399,333399" },
+                                    { hex: "996633", q: "cc6633,996633,663300" },
+                                    { hex: "999999", q: "000000,999999,cccccc,ffffff,424153" }
                                 ]
 
-                                // Display hex of the currently-active family ("" if none) — drives the button color
                                 readonly property string activeHex: {
                                     for (let i = 0; i < colorGroups.length; i++)
                                         if (colorGroups[i].q === WallhavenSearch.colors) return colorGroups[i].hex
                                     return ""
                                 }
 
-                                // Black/white that reads on a given hex (relative luminance)
                                 function contrastColor(hex) {
                                     if (!hex || hex.length < 6) return Appearance.colors.colOnLayer1
                                     const r = parseInt(hex.substr(0, 2), 16)
@@ -760,7 +755,6 @@ MouseArea {
                                     Component.onCompleted: Qt.callLater(() => wallhavenToolbar._searchFieldReady = true)
                                 }
 
-                                // Pagination
                                 RowLayout {
                                     visible: WallhavenSearch.currentResults.length > 0
                                     spacing: 4
@@ -773,24 +767,10 @@ MouseArea {
                                     }
 
                                     ToolbarTextField {
-                                        id: pageField
-                                        implicitWidth: 44
-                                        Layout.preferredWidth: 44
-                                        Layout.fillWidth: false
+                                        id: wallhavenPageField
+                                        implicitWidth: Math.max(40, wallhavenPageField.contentWidth + 24)
                                         horizontalAlignment: Text.AlignHCenter
-                                        text: WallhavenSearch.currentPage
-                                        inputMethodHints: Qt.ImhDigitsOnly
-                                        onAccepted: WallhavenSearch.goToPage(text)
-                                        Connections {
-                                            target: WallhavenSearch
-                                            function onCurrentPageChanged() {
-                                                pageField.text = WallhavenSearch.currentPage
-                                            }
-                                        }
-                                    }
-
-                                    StyledText {
-                                        text: " / " + WallhavenSearch.lastPage
+                                        text: WallhavenSearch.currentPage.toString()
                                         font.pixelSize: Appearance.font.pixelSize.small
                                         inputMethodHints: Qt.ImhDigitsOnly
                                         validator: IntValidator { bottom: 1; top: WallhavenSearch.lastPage }
@@ -829,7 +809,6 @@ MouseArea {
                                     implicitWidth: height
                                     text: "palette"
                                     toggled: colorMenu.visible || WallhavenSearch.colors.length > 0
-                                    // Reflect the active color family on the button itself
                                     colBackgroundToggled: wallhavenToolbar.activeHex.length > 0 ? ("#" + wallhavenToolbar.activeHex) : Appearance.colors.colSecondaryContainer
                                     colBackgroundToggledHover: wallhavenToolbar.activeHex.length > 0 ? ("#" + wallhavenToolbar.activeHex) : Appearance.colors.colSecondaryContainerHover
                                     colText: wallhavenToolbar.activeHex.length > 0
@@ -840,7 +819,6 @@ MouseArea {
                                         text: Translation.tr("Filter by color")
                                     }
 
-                                    // Drop-down color grid (opens upward since the toolbar sits at the bottom)
                                     Popup {
                                         id: colorMenu
                                         y: -height - 6
@@ -854,7 +832,6 @@ MouseArea {
                                         exit: Transition { NumberAnimation { property: "opacity"; from: 1; to: 0; duration: 100 } }
 
                                         background: Rectangle {
-                                            // m3 token is opaque (colLayer1 is alpha-blended → looked see-through)
                                             color: Appearance.m3colors.m3surfaceContainerHigh
                                             radius: Appearance.rounding.normal
                                             border.width: 1
@@ -872,7 +849,6 @@ MouseArea {
                                                     font.pixelSize: Appearance.font.pixelSize.small
                                                     color: Appearance.colors.colSubtext
                                                 }
-                                                // Clear / any-color
                                                 RippleButton {
                                                     visible: WallhavenSearch.colors.length > 0
                                                     implicitHeight: 24
