@@ -17,26 +17,10 @@ Item {
 
     readonly property var cfg: Config.options.bar.dynamicIsland
     readonly property real pillHeight: 32
-    readonly property real idleCollapsedWidth: 144
-    readonly property real sessionWidth: 164
-    property real idleTextContentWidth: 0
-    readonly property real idleWidth: Math.max(root.idleCollapsedWidth, root.idleTextContentWidth)
-    readonly property real mediaCollapsedWidth: 140
-    readonly property real mediaExpandedWidthCap: 220
-    property real mediaTextContentWidth: 0
-    property bool mediaTrackInfoVisible: mediaHoverHandler.hovered || mediaTrackChangeTimer.running
-    readonly property real mediaExpandedWidth: Math.min(root.mediaExpandedWidthCap, root.mediaTextContentWidth)
-    readonly property real mediaWidth: root.mediaTrackInfoVisible ? root.mediaExpandedWidth : root.mediaCollapsedWidth
-    readonly property real timerWidth: 130
-    readonly property real osdWidth: 132
-    readonly property real notificationWidth: 220
-    readonly property real batteryWidth: 170
-    readonly property real badgeSize: 32
-    readonly property real badgeSpacing: 6
-    readonly property bool isMaterial: Config.options.bar.cornerStyle === 3 || Config.options.bar.cornerStyle === 4
     // The gap between the pill and a detached capsule. It has to clear pillHeight / 3.6 (~9px) or the
     // "droplet" connector below never fully thins to nothing, leaving the capsule looking glued to the pill.
     readonly property real capsuleGap: 11
+    readonly property bool isMaterial: Config.options.bar.cornerStyle === 3
     property bool vertical: Config.options.bar.vertical
 
     readonly property color surfaceColor: Config.options.bar.followFrameColor
@@ -46,7 +30,7 @@ Item {
         ? "transparent" : root.surfaceColor
     readonly property color capsuleColor: root.isMaterial ? Appearance.colors.colLayer1 : root.surfaceColor
 
-    // Only the visible island may react (BarContent used to build the middle layout twice, material + classic)
+    // BarContent instantiates the middle layout twice (material + classic); only the visible island may react
     readonly property bool onFocusedScreen: root.visible && (root.QsWindow.window?.screen?.name ?? "") === (Hyprland.focusedMonitor?.name ?? "")
 
     // Media
@@ -71,8 +55,9 @@ Item {
         && LyricsService.activeIndex >= 0 && (root.activePlayer?.isPlaying ?? false)
         ? (LyricsService.slots[LyricsService.before] ?? "") : ""
     readonly property bool mediaTrackInfoVisible: root.hoverRevealed || mediaTrackChangeTimer.running
-    // The same width hovered or not: growing on hover used to slide the skip buttons out from under the pointer
-    readonly property real mediaWidth: root.lyricLine !== "" ? 250 : Math.max(140, Math.min(260, root.mediaTextContentWidth))
+    readonly property real mediaWidth: root.mediaTrackInfoVisible
+        ? Math.max(140, Math.min(260, root.mediaTextContentWidth))
+        : (root.lyricLine !== "" ? 250 : 140)
 
     Timer {
         id: mediaTrackChangeTimer
@@ -114,8 +99,7 @@ Item {
 
     ColorQuantizer {
         id: artQuantizer
-        // Off: the cover is never quantized at all
-        source: (root.cfg.albumColors ?? true) && root.mediaArtReady ? `file://${root.mediaArtPath}` : ""
+        source: root.mediaArtReady ? `file://${root.mediaArtPath}` : ""
         depth: 0
         rescaleSize: 1
     }
@@ -139,10 +123,6 @@ Item {
         target: Notifications
         function onNotify(notif) {
             if (Notifications.popupInhibited || IslandEvents.isMuted(notif)) return
-            if (root.buried) {
-                root.fsOnNotify(notif)
-                return
-            }
             // Critical ones always; otherwise only apps with priority (WhatsApp by default)
             if ((notif.urgency ?? "").toLowerCase() === "critical"
                     || (notif.image !== "" && IslandEvents.isPriorityNotification(notif))) root.peek()
@@ -498,11 +478,6 @@ Item {
         function onViewRequested(view) {
             if (root.onFocusedScreen) root.expandTo(2, view)
         }
-        function onSplitRequested(id) {
-            if (!root.onFocusedScreen) return
-            root.splitSwapDir = 1
-            root.splitId = id
-        }
         function onScrollRequested(direction) {
             if (root.onFocusedScreen) root.scrollVertical(direction)
         }
@@ -514,11 +489,6 @@ Item {
         }
         function onSilenceRequested() {
             if (root.onFocusedScreen) root.silenceIsland(root.primaryId)
-        }
-        function onQuietRequested() {
-            if (!root.onFocusedScreen) return
-            if (root.buried) root.fsToggleQuiet()
-            else IslandEvents.toggleFocus()
         }
         function onSimulateRequested(name) {
             if (!root.onFocusedScreen) return
@@ -545,16 +515,6 @@ Item {
                     f1FlagTimer.interval = 6000
                     f1FlagTimer.restart()
                     simFlagTimer.restart()
-                    break
-                case "watchTop3":
-                case "watchTop10":
-                case "watchBest":
-                case "watchHigh":
-                case "watchPlain":
-                    WatchRating.simulate(name.slice(5).toLowerCase())
-                    break
-                case "watchNext":
-                    WatchRating.announceNext(true)
                     break
                 case "f1Tyre":
                     root.showF1Event({ kind: "tyre", letter: "H", color: F1.tyreColor("HARD"),
@@ -618,53 +578,31 @@ Item {
         target: DropShelf
         function onItemsAdded(paths) {
             if (!root.visible) return
-            root.dropFeedback = null
             root.lastShelfAdded = paths
             root.shelfAddedFlash = true
             shelfAddedTimer.restart()
         }
     }
 
-    // Smart Drop (seção 21): while something is dragged over the island, the pill splits into one zone per
-    // action that makes sense for it (services/SmartDrop.qml); where you let go picks the action.
-    property var dropActions: []
-    property int dropZone: 0
-    property var dropFeedback: null
-
     DropArea {
         anchors.fill: parent
         enabled: !root.vertical
         onEntered: drag => {
             drag.accept(Qt.CopyAction)
-            root.dropActions = SmartDrop.actionsFor(drag.hasUrls ? drag.urls : [], drag.hasText ? drag.text : "")
-            root.dropZone = 0
             root.dropHovering = true
-        }
-        onPositionChanged: drag => {
-            const count = Math.max(1, root.dropActions.length)
-            root.dropZone = Math.max(0, Math.min(count - 1, Math.floor(drag.x / Math.max(1, pill.width / count))))
         }
         onExited: root.dropHovering = false
         onDropped: drop => {
             root.dropHovering = false
-            const action = root.dropActions[root.dropZone] ?? "shelf"
-            const urls = drop.hasUrls ? drop.urls : []
-            const text = drop.hasText ? drop.text : ""
+            if (drop.hasUrls && drop.urls.length > 0) DropShelf.addItems(drop.urls)
+            else if (drop.hasText) DropShelf.addText(drop.text)
             drop.accept(Qt.CopyAction)
-            if (action === "shelf") {
-                if (urls.length > 0) DropShelf.addItems(urls)
-                else if (text !== "") DropShelf.addText(text)
-                return
-            }
-            root.dropFeedback = SmartDrop.run(action, urls, text)
-            root.shelfAddedFlash = true
-            shelfAddedTimer.restart()
         }
     }
 
     // Providers: interrupts are short-lived and take the pill; persistent ones share it via split capsules
     readonly property var interruptIds: ["session", "f1Start", "osd", "notification", "battery", "bluetooth",
-        "audioOutput", "screenshot", "clipboard", "songRecResult", "weather", "f1Flag", "shelfDrop", "f1Event", "networkAlert", "hardware", "hibernate", "downloadDone", "watchRating", "approval", "fsDigest"]
+        "audioOutput", "screenshot", "clipboard", "songRecResult", "weather", "f1Flag", "shelfDrop", "f1Event", "networkAlert", "hardware", "hibernate", "downloadDone"]
 
     // The semantic model (ILHA.md § Modelo semântico): every id above answers to one of four questions.
     // CRITICAL and PEEK are both `interruptIds` — CRITICAL is the subset that can genuinely preempt (a
@@ -674,11 +612,9 @@ Item {
     // back exactly as it was. LIVE is what persists and is the only thing the scroll wheel walks through
     // (`cycleIds` below). TOOL is content you asked to see; it never competes for the pill or the wheel —
     // it only opens from the Tool Dock in the expanded Home (`DiXIdle.qml`) or the switcher strip.
-    readonly property var criticalIds: ["hibernate", "session", "approval"]
-    readonly property var liveIds: ["recording", "call", "f1", "timer", "activity", "systemLoad", "download", "agents", "songRec", "media"]
+    readonly property var criticalIds: ["hibernate", "session"]
+    readonly property var liveIds: ["recording", "f1", "timer", "activity", "systemLoad", "download", "agents", "songRec", "media"]
     readonly property var toolIds: ["weather", "shelf", "clipboard", "system", "zerotier", "history"]
-    // Everything else in `interruptIds` that isn't dynamically critical (see `isCriticalNow`) is a Peek.
-    readonly property var peekIds: root.interruptIds.filter(id => !root.criticalIds.includes(id))
 
     function isCriticalNow(id) {
         if (root.criticalIds.includes(id)) return true
@@ -687,310 +623,9 @@ Item {
         return false
     }
 
-    // ── Tela cheia (seção 29) ───────────────────────────────────────────────────────────────────────────
-    // A fullscreen window buries the bar and the pill with it. Nothing non-critical should break through a video
-    // or a game, but nothing should be lost either, so every island answers to one tier while buried:
-    //   critical  → a floating mini island over the fullscreen window (DiFullscreenPeek.qml), takes input
-    //   feedback  → the same mini island for a moment, click-through (you caused it: volume, a screenshot)
-    //   attention → the hairline pulses until you answer (an agent waiting on a permission)
-    //   live      → stays quiet; only a recording leaves its red dot
-    //   ambient   → queues up behind the hairline and comes back as one summary once the fullscreen ends
-    readonly property var fsMonitor: HyprlandData.monitors.find(m => m.name === root.QsWindow.window?.screen?.name) ?? null
-    // Quickshell's own model follows a workspace switch at once; HyprlandData's copy lags until it refreshes
-    readonly property int fsWorkspaceId: (root.QsWindow.window?.screen ? Hyprland.monitorFor(root.QsWindow.window.screen)?.activeWorkspace?.id : undefined)
-        ?? root.fsMonitor?.activeWorkspace?.id ?? -1
-    // True fullscreen only (mode 2): a maximized window (mode 1) leaves the bar where it is
-    readonly property var fsWindow: root.fsWorkspaceId === -1 ? null
-        : (HyprlandData.windowList.find(w => w.workspace?.id === root.fsWorkspaceId && w.fullscreen === 2) ?? null)
-    // A special workspace over the fullscreen window brings the bar back on top (Bar.qml), so nothing is buried then
-    readonly property bool buried: root.visible && !root.vertical && root.fsWindow !== null
-        && (root.fsMonitor?.specialWorkspace?.name ?? "") === ""
-    // Games: the top edge takes no input at all (strategy games scroll the map by pushing the pointer there)
-    readonly property bool fsGame: {
-        const w = root.fsWindow
-        if (!w) return false
-        if (w.contentType === "game") return true
-        const cls = `${w.class ?? ""} ${w.initialClass ?? ""}`.toLowerCase()
-        return (root.cfg.fullscreenGameClasses ?? []).some(c => String(c) !== "" && cls.includes(String(c).toLowerCase()))
-    }
-
-    // Noise once you are back: things you did yourself or that only mattered in the moment
-    readonly property var fsIgnoredIds: ["clipboard", "shelfDrop", "fsDigest"]
-
-    function fullscreenTier(id) {
-        if (id === "approval") return "attention"
-        if (id === "session" || id === "hibernate") return "critical"
-        if (id === "battery" && root.batteryAlertKind === "critical") return "critical"
-        if (id === "hardware" && ((IslandHardware.payload.urgent ?? false) || IslandHardware.payload.kind === "thermal")) return "critical"
-        if (id === "notification" && root.latestNotificationCritical) return "critical"
-        if (id === "osd" || id === "screenshot") return (root.cfg.fullscreenFeedback ?? true) ? "feedback" : "ignored"
-        if (root.fsIgnoredIds.includes(id)) return "ignored"
-        if (root.liveIds.includes(id)) return "live"
-        return "ambient"
-    }
-
-    readonly property string fsCriticalId: root.buried ? (root.activeIds.find(id => root.fullscreenTier(id) === "critical") ?? "") : ""
-    readonly property string fsFeedbackId: root.buried && !root.fsQuiet ? (root.activeIds.find(id => root.fullscreenTier(id) === "feedback") ?? "") : ""
-    // What the mini island shows: critical first, then what you just did
-    readonly property string fsMiniId: root.fsCriticalId !== "" ? root.fsCriticalId : root.fsFeedbackId
-    readonly property bool fsAttention: root.buried && root.activeIds.includes("approval")
-    readonly property bool fsRecording: root.buried && root.isRecording
-
-    // What went by while buried, newest first: { id, icon, title, level, time }
-    property var fsQueue: []
-    // Bumps on every new entry, so the hairline pulses again even when the colour stays the same
-    property int fsQueueSerial: 0
-    readonly property int fsQueueLevel: root.fsQueue.reduce((top, e) => Math.max(top, e.level), 0)
-
-    function fsEnqueue(id, icon, title, level, key) {
-        const entry = { id: id, icon: icon, title: title, level: level, time: Date.now(), key: key ?? "" }
-        // One line per island: a second Wi-Fi change replaces the first. Every notification is its own line.
-        const rest = id === "notification" ? root.fsQueue : root.fsQueue.filter(e => e.id !== id)
-        root.fsQueue = [entry, ...rest].slice(0, 20)
-        root.fsQueueSerial++
-    }
-
-    // Seen: opening History from the hairline or the summary empties the queue
-    function fsClearQueue() {
-        root.fsQueue = []
-    }
-
-    // Quiet (one key, `ipc call island quiet`, or a middle click on the hairline): until this fullscreen ends,
-    // no messages and no feedback come up and the hairline stops pulsing — it still counts, and critical and an
-    // agent waiting on you still get through
-    property bool fsQuiet: false
-
-    function fsToggleQuiet() {
-        root.fsQuiet = !root.fsQuiet
-        if (root.fsQuiet) root.fsMessage = null
-        root.fsNotify(root.fsQuiet ? "notifications_paused" : "notifications_active",
-            root.fsQuiet ? Translation.tr("Quiet until fullscreen ends") : Translation.tr("Notifying again"))
-    }
-
-    // A message from a priority app (WhatsApp by default) as one discreet line: sender and text, a few seconds,
-    // nothing to click unless you want to — reply, mute that conversation, or hush everything
-    property var fsMessage: null
-    // A short confirmation in the same place ("Conversation muted"), optionally with one action (undo)
-    property var fsNotice: null
-
-    function fsOnNotify(notif) {
-        const parts = IslandEvents.notificationParts(notif)
-        const critical = (notif.urgency ?? "").toLowerCase() === "critical"
-        // A timer or pomodoro you set yourself ringing: it's the one thing you asked to be told, even in quiet
-        // (TimerService sends them as "Shell" notifications)
-        if ((notif.appName ?? "") === "Shell" && ["Timers", "Pomodoro"].includes(notif.summary ?? "")) {
-            root.fsShowLine({ icon: "alarm", title: notif.summary === "Pomodoro" ? "Pomodoro" : Translation.tr("Timer"),
-                body: parts.body.replace(/^[^A-Za-z0-9À-ÿ]+/, ""), color: IslandEvents.colorAttention }, 8000, true)
-            return
-        }
-        const key = IslandEvents.conversationKey(notif)
-        root.fsEnqueue("notification", "notifications", parts.title || parts.app || Translation.tr("Notification"), critical ? 2 : 1, key)
-        if (critical || !(root.cfg.fullscreenMessages ?? true) || !IslandEvents.isPriorityNotification(notif)) return
-        root.fsShowLine({
-            key: key,
-            app: parts.app,
-            title: parts.author !== "" ? `${parts.author} · ${parts.title}` : parts.title,
-            body: parts.body,
-            brand: parts.brand,
-            icon: parts.media?.icon ?? "chat",
-            messaging: IslandEvents.isMessagingApp(parts.app),
-            notificationId: notif.notificationId
-        }, Math.min(6000, IslandEvents.readingTime(notif)), false)
-    }
-
-    // One discreet line at a time: { icon, title, body, color?, brand?, app?, key? (mutable), messaging? }.
-    // `force` gets through quiet mode (only a timer you set does that).
-    function fsShowLine(line, ms, force) {
-        if (!root.buried || (root.fsQuiet && !force)) return
-        root.fsMessage = line
-        fsMessageTimer.interval = ms
-        if (!root.fsMessageHeld) fsMessageTimer.restart()
-    }
-
-    // Important but not critical: worth a discreet line instead of only a place in the queue
-    function fsImportantLine(id) {
-        switch (id) {
-            // The episode's own IMDb rating: this is the only place it can actually be seen most of the time,
-            // since it used to be dropped outright while fullscreen — and a fullscreen video is how it's watched
-            case "watchRating": {
-                const now = WatchRating.now
-                if (!now) return null
-                const next = IslandEvents.watchRating.payload?.next ?? null
-                const isFilm = !next && (now.season ?? 0) <= 0
-                const rating = next ? next.rating : isFilm ? WatchRating.seriesRating : WatchRating.episodeRating
-                const tier = next ? next.tier : isFilm ? "" : WatchRating.tier
-                const badge = tier === "top3" ? Translation.tr("Top 3 of the show")
-                    : tier === "top10" ? Translation.tr("Top 10 of the show")
-                    : tier === "best" ? Translation.tr("Best of the season") : ""
-                const body = `${rating >= 0 ? rating.toFixed(1) : "–"} IMDb${badge !== "" ? " · " + badge : ""}`
-                return { icon: "movie", title: now.series, body: body,
-                    color: rating >= 8.5 ? "#F5C518" : Appearance.colors.colPrimary }
-            }
-            case "battery":
-                if (root.batteryAlertKind !== "low") return null
-                return { icon: root.batteryIcon(), title: Translation.tr("Battery low"), body: `${Math.round(Battery.percentage * 100)}%`, color: Appearance.colors.colError }
-            case "bluetooth":
-                if (IslandEvents.bluetooth.payload?.phase !== "lowBattery") return null
-                return { icon: "bluetooth", title: IslandEvents.bluetooth.payload?.name ?? "Bluetooth", body: Translation.tr("Low battery"), color: IslandEvents.colorAttention }
-            case "hardware": {
-                const hw = IslandHardware.payload
-                if (["caps", "layout"].includes(hw.kind)) return null
-                return { icon: hw.icon ?? "memory", title: hw.title ?? Translation.tr("Hardware"), body: hw.subtitle ?? "",
-                    color: hw.tone === "error" ? Appearance.colors.colError : (hw.tone === "progress" ? Appearance.colors.colPrimary : IslandEvents.colorAttention) }
-            }
-            default:
-                return null
-        }
-    }
-
-    // A task that ended while you were away (an agent finishing, a build, a command that failed) comes through
-    // History's log; only what happened after the fullscreen started counts
-    property double fsSince: 0
-    Connections {
-        target: IslandEvents
-        function onEventLogChanged() {
-            const entry = IslandEvents.eventLog[0]
-            if (!root.buried || !entry || entry.time < root.fsSince) return
-            if (entry.kind !== "error" && entry.kind !== "activity") return
-            root.fsSince = entry.time + 1
-            root.fsEnqueue(entry.kind === "error" ? "activityError" : "activityDone", entry.icon || "task_alt", entry.title, entry.kind === "error" ? 2 : 1)
-            root.fsShowLine({ icon: entry.kind === "error" ? "error" : (entry.icon || "task_alt"), title: entry.title, body: entry.subtitle,
-                color: entry.kind === "error" ? Appearance.colors.colError : IslandEvents.colorSuccess }, 5000, false)
-        }
-    }
-
-    // Games (seção 29): quiet by itself, only critical and your own timers get through
-    function fsApplyGameQuiet() {
-        if (root.buried && root.fsGame && !root.fsQuiet && (root.cfg.fullscreenGameQuiet ?? true)) {
-            root.fsQuiet = true
-            root.fsMessage = null
-        }
-    }
-    onFsGameChanged: Qt.callLater(root.fsApplyGameQuiet)
-
-    property bool fsMessageHeld: false
-    onFsMessageHeldChanged: {
-        if (root.fsMessageHeld) {
-            fsMessageTimer.stop()
-            fsMessageHoldCap.restart()
-        } else if (root.fsMessage !== null) {
-            fsMessageHoldCap.stop()
-            fsMessageTimer.interval = 2000
-            fsMessageTimer.restart()
-        }
-    }
-
-    Timer {
-        id: fsMessageTimer
-        onTriggered: root.fsMessage = null
-    }
-    // A pointer parked where the line happens to appear must not pin it there forever
-    Timer {
-        id: fsMessageHoldCap
-        interval: 15000
-        onTriggered: root.fsMessage = null
-    }
-
-    function fsNotify(icon, text, actionLabel, action) {
-        root.fsNotice = { icon: icon, text: text, actionLabel: actionLabel ?? "", action: action ?? null }
-        fsNoticeTimer.restart()
-    }
-
-    Timer {
-        id: fsNoticeTimer
-        interval: 2600
-        onTriggered: root.fsNotice = null
-    }
-
-    // Mutes the conversation for good (same list as the notification view), takes its lines out of the queue,
-    // and offers an undo for a moment
-    function fsMuteConversation(key, ms) {
-        if ((key ?? "") === "" || IslandEvents.isKeyMuted(key)) return
-        IslandEvents.muteKeyFor(key, ms ?? 0)
-        if (root.fsMessage?.key === key) root.fsMessage = null
-        root.fsQueue = root.fsQueue.filter(e => e.key !== key)
-        const name = key.split("|").slice(1).join("|") || key
-        root.fsNotify("notifications_off", Translation.tr("%1 muted").arg(name), Translation.tr("Undo"),
-            () => IslandEvents.unmuteKey(key))
-    }
-
-    // Answering from fullscreen: the notification view with its reply field, keyboard included
-    function fsOpenMessage() {
-        const message = root.fsMessage
-        root.fsMessage = null
-        if (message && root.primaryId === "notification" && message.messaging) root.requestReply()
-        else {
-            root.fsClearQueue()
-            root.expandTo(2, "history")
-        }
-    }
-
-    function fsSummary(queue) {
-        const notifs = queue.filter(e => e.id === "notification").length
-        const others = queue.filter(e => e.id !== "notification")
-        const parts = []
-        if (notifs === 1) parts.push(Translation.tr("1 notification"))
-        else if (notifs > 1) parts.push(Translation.tr("%1 notifications").arg(notifs))
-        for (const e of others.slice(0, 2)) parts.push(e.title)
-        if (others.length > 2) parts.push(`+${others.length - 2}`)
-        return parts.join(" · ")
-    }
-
-    // Ambient islands that come up while buried go to the queue (and to History, which only keeps notifications,
-    // activities and downloads on its own) instead of flashing behind the fullscreen window where nobody sees them
-    property var fsLastActive: []
-    onActiveIdsChanged: {
-        const before = root.fsLastActive
-        root.fsLastActive = root.activeIds
-        if (!root.buried) return
-        for (const id of root.activeIds) {
-            if (before.includes(id) || id === "notification") continue
-            if (root.fullscreenTier(id) !== "ambient") continue
-            const title = root.longNameForId(id)
-            const icon = root.iconForId(id)
-            root.fsEnqueue(id, icon, title, root.importance(id))
-            const line = root.fsImportantLine(id)
-            if (line) root.fsShowLine(line, 5000, false)
-            if (!["activity", "download", "downloadDone"].includes(id))
-                IslandEvents.logEvent(id === "hardware" && (IslandHardware.payload.urgent ?? false) ? "error" : "peek", icon, title, "")
-        }
-    }
-
-    onBuriedChanged: {
-        Qt.callLater(root.fsReportBuried)
-        root.fsQuiet = false
-        root.fsMessage = null
-        root.fsNotice = null
-        root.fsSince = Date.now()
-        if (root.buried) {
-            Qt.callLater(root.fsApplyGameQuiet)
-            // What was already on screen before the fullscreen started is not news
-            root.fsLastActive = root.activeIds
-            root.fsQueue = []
-            if (root.expanded && root.fsCriticalId === "") root.collapse()
-            return
-        }
-        if (root.fsQueue.length > 0 && (root.cfg.fullscreenCatchUp ?? true))
-            IslandEvents.fullscreenDigest.show({ count: root.fsQueue.length, level: root.fsQueueLevel, summary: root.fsSummary(root.fsQueue) })
-        root.fsQueue = []
-    }
-
-    // Only the island actually on screen reports (BarContent also builds a hidden copy of it)
-    function fsReportBuried() {
-        const name = root.QsWindow.window?.screen?.name ?? ""
-        if (name === "" || !root.visible) return
-        const map = Object.assign({}, GlobalStates.islandBuriedByScreen)
-        if (map[name] === root.buried) return
-        map[name] = root.buried
-        GlobalStates.islandBuriedByScreen = map
-    }
-    onVisibleChanged: Qt.callLater(root.fsReportBuried)
-
     readonly property var activeIds: {
         const ids = []
         if (root.hibernateSeconds >= 0) ids.push("hibernate")
-        // An agent blocked on a permission dialog outranks everything else (it's stuck until you answer)
-        if (ClaudeCode.approval !== null && (root.cfg.claudeCode ?? true)) ids.push("approval")
         if (root.dropHovering || root.shelfAddedFlash) ids.push("shelfDrop")
         if (GlobalStates.diSessionOpen) ids.push("session")
         if (root.f1StartActive) ids.push("f1Start")
@@ -1007,24 +642,14 @@ Item {
         if (root.f1EventActive || root.heldId === "f1Event") ids.push("f1Event")
         if (IslandEvents.networkAlert.active) ids.push("networkAlert")
         if (IslandEvents.downloadDone.active) ids.push("downloadDone")
-        if (IslandEvents.fullscreenDigest.active) ids.push("fsDigest")
-        if (IslandEvents.watchRating.active && WatchRating.active) ids.push("watchRating")
         if (IslandHardware.active || root.heldId === "hardware") ids.push("hardware")
         if (root.isRecording) ids.push("recording")
-        if (IslandEvents.voiceCallActive && (root.cfg.callActivity ?? true)) ids.push("call")
         if (F1.enabled && (F1.sessionLive || F1.countdownActive)) ids.push("f1")
         if (root.hasActiveTimer) ids.push("timer")
-        // While an approval is up it *is* that agent's island: its own activity (and the agents summary below)
-        // would only repeat the same mark beside it
-        const approvalActivity = ClaudeCode.approval ? ClaudeCode.activityId(ClaudeCode.approval.key) : ""
-        if (IslandEvents.activities.some(a => a.id !== approvalActivity && !(approvalActivity !== "" && a.id === "agents-waiting"))) ids.push("activity")
+        if (IslandEvents.activities.length > 0) ids.push("activity")
         if (IslandEvents.systemLoadActive) ids.push("systemLoad")
         if (IslandEvents.downloadActive || root.heldId === "download") ids.push("download")
-        // One island per agent session, not two: while a specific task is already showing as an "activity"
-        // (richer: title, subtitle, progress), the general "agents" summary would just repeat the same
-        // agent's mark a second time — same fact, two Live ids competing for the pill/deck at once.
-        const agentActivityShown = IslandEvents.activities.some(a => ["claude", "codex", "gemini"].includes(a.icon))
-        if (ClaudeCode.openCount > 0 && (root.cfg.claudeCode ?? true) && !agentActivityShown && approvalActivity === "") ids.push("agents")
+        if (ClaudeCode.openCount > 0 && (root.cfg.claudeCode ?? true)) ids.push("agents")
         if (DropShelf.items.length > 0) ids.push("shelf")
         if (SongRec.running) ids.push("songRec")
         if (root.hasMedia) ids.push("media")
@@ -1070,15 +695,7 @@ Item {
         return worst
     }
 
-    // "Always show the time": the clock never gives its place away — what would have replaced it (battery, call
-    // length, a timer…) stays as the icon beside it, and it stays even on islands that normally take the whole pill
-    readonly property bool anchorAlwaysTime: root.cfg.anchorAlwaysTime ?? false
     readonly property var anchorInfo: {
-        const info = root.anchorFact
-        if (!root.anchorAlwaysTime || (info.text === DateTime.time)) return info
-        return { text: DateTime.time, icon: info.icon, tone: info.tone === "error" ? "error" : "plain" }
-    }
-    readonly property var anchorFact: {
         if (Battery.available && !Battery.isCharging && Battery.percentage <= 0.15)
             return { text: `${Math.round(Battery.percentage * 100)}%`, icon: "battery_alert", tone: "error" }
         if (root.isRecording)
@@ -1086,7 +703,7 @@ Item {
         if (root.hasActiveTimer)
             return { text: root.timerValueText(), icon: root.timerIcon(), tone: "attention" }
         // On a call you lose track of time in a different way: the clock matters less than how long you have been talking
-        if (IslandEvents.voiceCallActive && root.primaryId !== "call")
+        if (IslandEvents.voiceCallActive)
             return { text: IslandEvents.voiceCallMinutes < 1 ? DateTime.time : `${IslandEvents.voiceCallMinutes} min`,
                 icon: "call", tone: "plain" }
         // About to run out of agent budget is more urgent than the time, and only you can act on it
@@ -1109,11 +726,11 @@ Item {
     // volume you are turning — get the whole pill. Anything that sits there for minutes shares it with the anchor.
     readonly property var anchorFreeIds: ["notification", "bluetooth", "audioOutput", "osd", "screenshot",
         "clipboard", "songRecResult", "weather", "f1Flag", "f1Start", "f1Event", "shelfDrop", "networkAlert",
-        "downloadDone", "hardware", "session", "hibernate", "battery", "idle", "history", "watchRating", "fsDigest"]
+        "downloadDone", "hardware", "session", "hibernate", "battery", "idle", "history"]
 
     readonly property bool anchorShown: !root.vertical && !root.overlayShown
         && (root.cfg.anchor ?? true)
-        && (root.anchorAlwaysTime ? !["idle", "session", "hibernate"].includes(root.primaryId) : !root.anchorFreeIds.includes(root.primaryId))
+        && !root.anchorFreeIds.includes(root.primaryId)
         && root.anchorInfo.text !== ""
 
     readonly property real anchorInset: root.anchorShown ? anchorRow.implicitWidth + 16 : 0
@@ -1200,7 +817,7 @@ Item {
 
     // What is actually shown: follows the hierarchy but keeps each island up for a minimum time,
     // so a new event doesn't yank away something you just started reading. Urgent ones and your own switches skip the wait.
-    readonly property var urgentIds: ["hibernate", "approval", "session", "osd", "f1Start", "shelfDrop"]
+    readonly property var urgentIds: ["hibernate", "session", "osd", "f1Start", "shelfDrop"]
     property string primaryId: "idle"
     property real primarySince: 0
     property bool userSwitch: false
@@ -1273,23 +890,6 @@ Item {
     function updateShownNotification() {
         const next = root.latestNotification
         if (next === root.shownNotification) return
-        const current = root.shownNotification
-        const currentParts = IslandEvents.notificationParts(current)
-        // A personal chat message holds its place for its whole display time against anything from elsewhere
-        // (a usage-limit notice, an app's popup); a newer message from the same conversation still takes over
-        // at once, and while you're reading it (hover / open) it doesn't move at all
-        const personal = current && IslandEvents.isMessagingApp(currentParts.app) && currentParts.author === ""
-        const sameConversation = next && current && IslandEvents.conversationKey(next) === IslandEvents.conversationKey(current)
-        if (current && next && !sameConversation && Notifications.popupList.includes(current)
-                && (root.heldId === "notification" || personal)) {
-            const hold = root.heldId === "notification" ? 1500
-                : IslandEvents.displayTime(current) - (Date.now() - root.notificationSince)
-            if (hold > 0) {
-                notificationDwell.interval = Math.max(500, hold)
-                notificationDwell.restart()
-                return
-            }
-        }
         const wait = IslandEvents.readingTime(root.shownNotification) * 0.6 - (Date.now() - root.notificationSince)
         if (root.shownNotification && next && wait > 0 && Notifications.popupList.includes(root.shownNotification)) {
             notificationDwell.interval = wait
@@ -1327,9 +927,6 @@ Item {
             case "timer":        return 52
             case "recording":    return 70
             case "shelf":        return 110
-            // Quick buttons for what was just copied (Gemini / search or open / drawer)
-            case "clipboard":    return IslandEvents.clipboard.active ? 80 : 0
-            case "battery":      return ["low", "critical"].includes(root.batteryAlertKind) && !Battery.isPluggedIn ? 96 : 0
             default:             return 0
         }
     }
@@ -1338,7 +935,7 @@ Item {
         switch (id) {
             case "media":         return root.mediaWidth
             case "osd":           return 196
-            case "notification":  return Math.max(200, Math.min(380, root.notifContentWidth))
+            case "notification":  return Math.max(200, Math.min(340, root.notifContentWidth))
             case "battery":       return 236
             case "bluetooth":     return IslandEvents.bluetooth.payload?.phase === "lowBattery" ? 270 : 240
             case "audioOutput":   return 216
@@ -1352,15 +949,13 @@ Item {
             case "f1":            return F1.sessionLive ? 222 : 186
             case "timer":         return 150
             case "activity":      return 236
-            case "systemLoad":    return Pressure.culprit || Pressure.top ? 280 : 200
+            case "systemLoad":    return 190
             case "system":        return 214
             case "songRec":       return 150
             case "shelf":         return 132
-            case "shelfDrop":     return root.dropHovering ? Math.max(236, root.dropActions.length * 82 + 10) : 236
+            case "shelfDrop":     return 236
             case "f1Event":       return 262
             case "hibernate":     return 280
-            case "approval":      return 430
-            case "call":          return 290
             case "networkAlert":  return 300
             case "hardware":      return ["caps", "layout"].includes(IslandHardware.payload.kind) ? 214 : 300
             case "download":      return 250
@@ -1368,8 +963,6 @@ Item {
             case "history":       return 240
             case "zerotier":      return 210
             case "downloadDone":  return 320
-            case "watchRating":   return 300
-            case "fsDigest":      return 300
             case "session":       return 164
             default:              return Math.max(144, root.idleTextContentWidth)
         }
@@ -1384,7 +977,6 @@ Item {
             case "idle":         return 0
             case "battery":      return root.batteryAlertKind === "critical" ? 2 : 1
             case "hibernate":    return 2
-            case "approval":     return 2
             case "notification": return root.latestNotificationCritical ? 2 : 1
             case "f1Flag":       return F1.flag === "red" ? 2 : 1
             default:             return root.interruptIds.includes(id) ? 1 : 0
@@ -1409,8 +1001,6 @@ Item {
             case "weather":       return IslandEvents.weather
             case "networkAlert":  return IslandEvents.networkAlert
             case "downloadDone":  return IslandEvents.downloadDone
-            case "watchRating":   return IslandEvents.watchRating
-            case "fsDigest":      return IslandEvents.fullscreenDigest
             case "hardware":      return IslandHardware
             default:              return null
         }
@@ -1431,7 +1021,6 @@ Item {
             case "f1Start":  root.f1StartActive = false; break
             case "f1Event":  root.f1EventActive = false; break
             case "hibernate": root.cancelHibernate(); break
-            case "approval":  if (ClaudeCode.approval) ClaudeCode.hideApproval(ClaudeCode.approval.key); break
             case "shelfDrop":
                 root.shelfAddedFlash = false
                 root.dropHovering = false
@@ -1465,11 +1054,8 @@ Item {
             // Release has to restart the timer of the notification that was held, not of whatever is newest by then:
             // otherwise a notification arriving mid-hover leaves the old one frozen on the island forever.
             if (value) {
-                // The one on screen, not merely the newest: a notice arriving meanwhile must not let the message
-                // you're reading run out
-                const held = root.shownNotification ?? root.latestNotification
-                if (!held) return
-                root.heldNotificationId = held.notificationId
+                if (!root.latestNotification) return
+                root.heldNotificationId = root.latestNotification.notificationId
                 Notifications.cancelTimeout(root.heldNotificationId)
             } else {
                 const held = Notifications.list.find(n => n.notificationId === root.heldNotificationId)
@@ -1505,7 +1091,7 @@ Item {
     }
     // Views worth opening even when nothing is happening in them: the system one now holds the temperature,
     // the power profile and every peripheral battery, and the network one holds the downloads
-    readonly property var standaloneViews: ["watchRating", "privacy", "f1", "idle", "weather", "shelf", "overview", "system", "download", "history", "audioOutput", "calendar", "agents", "clipboard", "zerotier"]
+    readonly property var standaloneViews: ["privacy", "f1", "idle", "weather", "shelf", "overview", "system", "download", "history", "audioOutput", "calendar"]
     readonly property string expandedId: root.expandedOverride !== "" ? root.expandedOverride : root.primaryId
 
     readonly property Item surfaceItem: {
@@ -1534,17 +1120,9 @@ Item {
             root.expandedOverride = ""
     }
 
-    // A split partner goes away only when the thing itself is over (a recording that stopped, a timer that
-    // rang) — not merely because it has no full view to open
-    onPersistentIdsChanged: {
-        if (root.splitId !== "" && !root.persistentIds.includes(root.splitId) && !root.standaloneViews.includes(root.splitId))
-            root.splitId = ""
-    }
-
     function hasDetails(id) {
         if (id === "hardware") return (IslandHardware.payload.actions ?? []).length > 0
-        // The fullscreen summary opens History itself (DiFsDigest.qml): it has no full view of its own
-        return !["session", "f1Start", "recording", "networkAlert", "hibernate", "downloadDone", "fsDigest"].includes(id)
+        return !["session", "f1Start", "battery", "recording", "networkAlert", "hibernate", "downloadDone"].includes(id)
     }
 
     function canExpand(id) {
@@ -1579,193 +1157,15 @@ Item {
         root.wantsKeyboard = false
         root.replyRequested = false
         root.expandedOverride = ""
-        root.openedByHover = false
-        root.lastCollapseAt = Date.now()
-        // splitId survives on purpose: it's what the compact pill shows beside the main one
-        root.splitArmed = false
-    }
-
-    // Opened by the pointer passing over it rather than by a click: the chat view then waits for the pointer to
-    // be inside before taking the keyboard
-    property bool openedByHover: false
-    property double lastCollapseAt: 0
-
-    // Watchdog: the keyboard asked for while the overlay isn't open (an open that never happened, anything) would
-    // leave the desktop without a keyboard. A moment of grace covers the instant between asking and opening.
-    Timer {
-        interval: 800
-        running: root.wantsKeyboard && !root.expanded
-        onTriggered: root.wantsKeyboard = false
     }
 
     function toggleExpanded() {
-        root.openedByHover = false
-        // A chat opened with a click comes up ready to type (keyboard asked for before opening, never after)
-        if (!root.expanded && root.primaryId === "notification"
-                && IslandEvents.isMessagingApp(IslandEvents.notificationParts(root.latestNotification).app)) {
-            root.requestReply()
-            return
-        }
         if (root.expanded) root.collapse()
         else root.expandTo(2)
     }
 
     function selectIsland(id) {
         root.expandedOverride = id === root.primaryId ? "" : id
-    }
-
-    // Split View (seção 13): two Tools/Activities side by side in the expanded surface. Never automatic —
-    // only ever entered by an explicit tap (arm, then pick the second one), never by the island itself.
-    property string splitId: ""
-    property bool splitArmed: false
-
-    function toggleSplitArm() {
-        if (root.splitId !== "") { root.splitId = ""; return }
-        root.splitArmed = !root.splitArmed
-    }
-
-    // Anything worth keeping beside the pill, active or not: what's live right now, plus the views that make
-    // sense even when nothing is happening in them (the system, the drawer, the agents…)
-    readonly property var splitCandidates: {
-        const always = ["system", "shelf", "agents", "zerotier", "history"]
-        if (F1.enabled) always.push("f1")
-        if (root.hasMedia) always.push("media")
-        const ids = []
-        for (const id of [...root.persistentIds, ...always])
-            if (!ids.includes(id) && id !== root.primaryId && !["idle", "notification"].includes(id)) ids.push(id)
-        return ids
-    }
-
-    function openSplitPicker() {
-        root.splitArmed = true
-        root.expandTo(2, root.hasDetails(root.primaryId) ? undefined : "idle")
-    }
-
-    // Picked from the chooser: close the overlay so the pill splits in two right in front of you
-    function chooseSplit(id) {
-        root.splitArmed = false
-        root.splitSwapDir = 1
-        root.splitId = id
-        root.collapse()
-    }
-
-    function cycleSplit(direction) {
-        const list = root.splitCandidates
-        if (list.length === 0) return
-        const index = list.indexOf(root.splitId)
-        root.splitSwapDir = direction
-        root.splitId = list[(index + direction + list.length) % list.length]
-    }
-
-    function dismissSplit() {
-        root.splitId = ""
-    }
-
-    // The compact second pill lags splitId on purpose: when it's cleared the pill still has to be drawn while
-    // it's reabsorbed into the main one, and when it changes the old content has to leave before the new arrives.
-    property string splitShownId: ""
-    property real splitProgress: 0
-    property int splitSwapDir: 1
-    property real splitDragX: 0
-    property real splitFade: 1
-    property real splitContentY: 0
-    property real splitContentOpacity: 1
-    readonly property bool splitShown: root.splitShownId !== "" && root.splitShownId !== root.primaryId && !root.vertical
-
-    onSplitIdChanged: {
-        if (root.splitId !== "") {
-            splitOut.stop()
-            if (root.splitShownId === "" || root.splitProgress < 0.98) {
-                root.splitShownId = root.splitId
-                splitIn.restart()
-                gulpPulse.restart()
-            } else if (root.splitShownId !== root.splitId) {
-                splitSwap.restart()
-            }
-        } else if (root.splitShownId !== "" && !splitFling.running) {
-            splitIn.stop()
-            splitOut.restart()
-        }
-    }
-
-    // The main pill squashes a touch when it pushes the second one out, and again when it swallows it back
-    property real gulp: 0
-    SequentialAnimation {
-        id: gulpPulse
-        NumberAnimation { target: root; property: "gulp"; to: 1; duration: 110; easing.type: Easing.OutQuad }
-        NumberAnimation { target: root; property: "gulp"; to: 0; duration: 420; easing.type: Easing.OutBack; easing.overshoot: 2.2 }
-    }
-
-    // Mitosis: the second pill buds off the main one's right edge; the neck between them thins and lets go
-    NumberAnimation {
-        id: splitIn
-        target: root
-        property: "splitProgress"
-        to: 1
-        duration: 720
-        easing.type: Easing.OutBack
-        easing.overshoot: 0.9
-    }
-
-    // …and in reverse: reabsorbed into the main pill
-    NumberAnimation {
-        id: splitOut
-        target: root
-        property: "splitProgress"
-        to: 0
-        duration: 460
-        easing.type: Easing.InOutCubic
-        onFinished: {
-            root.splitShownId = ""
-            root.splitDragX = 0
-            gulpPulse.restart()
-        }
-    }
-
-    // Changing what the second pill shows (scroll over it): a slot-machine roll in the wheel's direction
-    SequentialAnimation {
-        id: splitSwap
-        ParallelAnimation {
-            NumberAnimation { target: root; property: "splitContentY"; to: -root.splitSwapDir * 14; duration: 130; easing.type: Easing.InCubic }
-            NumberAnimation { target: root; property: "splitContentOpacity"; to: 0; duration: 130; easing.type: Easing.InCubic }
-        }
-        ScriptAction {
-            script: {
-                root.splitShownId = root.splitId
-                root.splitContentY = root.splitSwapDir * 14
-            }
-        }
-        ParallelAnimation {
-            NumberAnimation { target: root; property: "splitContentY"; to: 0; duration: 300; easing.type: Easing.OutBack; easing.overshoot: 1.4 }
-            NumberAnimation { target: root; property: "splitContentOpacity"; to: 1; duration: 220; easing.type: Easing.OutCubic }
-        }
-    }
-
-    // Thrown away with a drag: it keeps going the way you flicked it and fades, no reabsorbing
-    ParallelAnimation {
-        id: splitFling
-        property real toX: 160
-        NumberAnimation { target: root; property: "splitDragX"; to: splitFling.toX; duration: 240; easing.type: Easing.OutCubic }
-        NumberAnimation { target: root; property: "splitFade"; to: 0; duration: 220; easing.type: Easing.OutCubic }
-        onFinished: {
-            root.splitShownId = ""
-            root.splitProgress = 0
-            root.splitDragX = 0
-            root.splitFade = 1
-            root.splitId = ""
-        }
-    }
-
-    // What a pip tap does while armed: pick the split partner instead of replacing the main view
-    function selectForSplit(id) {
-        if (!root.splitArmed) { root.selectIsland(id); return }
-        root.splitArmed = false
-        if (id === root.expandedId) return
-        root.splitId = id
-    }
-
-    function exitSplit() {
-        root.splitId = ""
     }
 
     function focusIsland(id) {
@@ -2015,11 +1415,7 @@ Item {
     readonly property int collapseDelay: 4000
     onExpandedChanged: {
         if (root.expanded && !root.cardHovered) collapseTimer.restart()
-        if (!root.expanded) {
-            collapseTimer.stop()
-            // Closed means closed: whatever asked for the keyboard gives it back
-            root.wantsKeyboard = false
-        }
+        if (!root.expanded) collapseTimer.stop()
     }
 
     Timer {
@@ -2068,7 +1464,6 @@ Item {
 
     function componentFor(id) {
         switch (id) {
-            case "watchRating":   return watchRatingComponent
             case "media":         return mediaComponent
             case "osd":           return osdComponent
             case "notification":  return notificationComponent
@@ -2092,8 +1487,6 @@ Item {
             case "shelfDrop":     return shelfDropComponent
             case "f1Event":       return f1EventComponent
             case "hibernate":     return batteryComponent
-            case "approval":      return approvalComponent
-            case "call":          return callComponent
             case "networkAlert":
             case "download":      return networkComponent
             case "agents":        return agentsComponent
@@ -2102,7 +1495,6 @@ Item {
             case "downloadDone":  return downloadDoneComponent
             case "hardware":      return hardwareComponent
             case "session":       return sessionComponent
-            case "fsDigest":      return fsDigestComponent
             default:              return idleComponent
         }
     }
@@ -2137,7 +1529,6 @@ Item {
         root.primarySince = Date.now()
         root.shownNotification = root.latestNotification
         root.switchContent()
-        Qt.callLater(root.fsReportBuried)
     }
 
     component ContentSlot: Loader {
@@ -2223,7 +1614,6 @@ Item {
     implicitHeight: root.pillHeight
     implicitWidth: pill.width + (capsuleRow.visible ? capsuleRow.width : 0)
         + (homeTab.visible ? homeTab.width + 8 : 0) + (f1Chip.visible ? f1Chip.width + 8 : 0) + (deck.visible ? deck.width + 8 : 0)
-        + (root.splitShown ? Math.max(0, splitPill.x + splitPill.width - pill.width) : 0)
 
     // Covers the pill and its bubbles, so hovering a bubble keeps the island revealed
     HoverHandler {
@@ -2276,8 +1666,7 @@ Item {
         ScriptAction {
             script: {
                 root.markUserSwitch()
-                root.expandTo(2, root.primaryId === "fsDigest" ? "history"
-                    : (root.hasDetails(root.primaryId) ? undefined : "overview"))
+                root.expandTo(2, root.hasDetails(root.primaryId) ? undefined : "overview")
                 insistRelease.restart()
             }
         }
@@ -2330,9 +1719,7 @@ Item {
                 const title = IslandEvents.latestActivity?.title ?? Translation.tr("Activity")
                 return title.split(" · ")[0]
             }
-            case "systemLoad": return Pressure.title(Pressure.kind || "cpu")
-            case "approval":   return Translation.tr("Needs permission")
-            case "call":       return Translation.tr("On a call")
+            case "systemLoad": return Translation.tr("System")
             case "system":     return Translation.tr("System")
             case "songRec":    return Translation.tr("Listening…")
             case "shelf":      return Translation.tr("Drawer")
@@ -2350,9 +1737,7 @@ Item {
             case "screenshot": return Translation.tr("Screenshots")
             case "weather":    return Weather.data?.temp ?? Translation.tr("Weather")
             case "privacy":    return Translation.tr("Privacy")
-            case "watchRating": return WatchRating.now?.series ?? "IMDb"
             case "hardware":   return IslandHardware.payload.title ?? Translation.tr("Hardware")
-            case "fsDigest":   return Translation.tr("While fullscreen")
             default:           return id
         }
     }
@@ -2364,9 +1749,7 @@ Item {
             case "f1":         return "sports_motorsports"
             case "timer":      return root.timerIcon()
             case "activity":   return IslandEvents.latestActivity?.icon ?? "bolt"
-            case "systemLoad": return Pressure.icon(Pressure.kind || "cpu")
-            case "approval":   return "front_hand"
-            case "call":       return "call"
+            case "systemLoad": return "memory"
             case "system":     return "monitoring"
             case "songRec":    return "graphic_eq"
             case "shelf":      return "inventory_2"
@@ -2384,9 +1767,7 @@ Item {
             case "screenshot": return "screenshot_monitor"
             case "weather":    return IslandEvents.weatherSymbol(Weather.data?.wCode ?? 800)
             case "privacy":    return "privacy_tip"
-            case "watchRating": return "movie"
             case "hardware":   return IslandHardware.payload.icon ?? "memory"
-            case "fsDigest":   return "fullscreen_exit"
             default:           return "stacks"
         }
     }
@@ -2396,7 +1777,7 @@ Item {
         id: homeTab
         // Only on a pinned island: a leftover from natural priority or a scroll comes with the pips and the
         // deck already, and this tab used to show for those too — a home icon with no pinned tab in sight.
-        visible: !root.vertical && root.onPinnedView && !root.splitShown
+        visible: !root.vertical && root.onPinnedView
         x: pill.width + 6
         anchors.verticalCenter: pill.verticalCenter
         width: visible ? 24 : 0
@@ -2438,7 +1819,7 @@ Item {
         id: f1Chip
         readonly property var driver: F1.focusDriver
         visible: !root.vertical && !root.overlayShown && F1.enabled && F1.sessionLive && f1Chip.driver !== null
-            && root.primaryId !== "f1" && (root.cfg.f1.pinPosition ?? true) && !root.splitShown
+            && root.primaryId !== "f1" && (root.cfg.f1.pinPosition ?? true)
         x: pill.width + 6 + (homeTab.visible ? homeTab.width + 6 : 0)
         anchors.verticalCenter: pill.verticalCenter
         width: visible ? f1ChipRow.implicitWidth + 14 : 0
@@ -2496,7 +1877,7 @@ Item {
     // The top card shows what comes next; scrolling/swiping up-down (or a click) deals it.
     Item {
         id: deck
-        visible: !root.vertical && root.stackDepth > 0 && !root.splitShown
+        visible: !root.vertical && root.stackDepth > 0
         x: pill.width + 12 + (homeTab.visible ? homeTab.width + 6 : 0) + (f1Chip.visible ? f1Chip.width + 6 : 0)
         anchors.verticalCenter: pill.verticalCenter
         width: visible ? 18 + (root.stackDepth - 1) * 4 + (deckLabel.implicitWidth > 0 ? deckLabel.implicitWidth + 5 : 0) : 0
@@ -2787,9 +2168,9 @@ Item {
             Translate { x: root.shakeX },
             Scale {
                 origin.x: pill.width / 2
-                origin.y: pill.height / 2
-                xScale: 1 + 0.04 * root.insist + 0.03 * root.gulp
-                yScale: 1 + 0.16 * root.insist - 0.07 * root.gulp
+                origin.y: 0
+                xScale: 1 + 0.04 * root.insist
+                yScale: 1 + 0.16 * root.insist
             }
         ]
 
@@ -2805,8 +2186,6 @@ Item {
             anchors.fill: parent
             anchors.rightMargin: root.anchorInset
             clip: true
-            // Buried under a fullscreen window nobody sees it: stop drawing (visualizer, spinners, marquees)
-            visible: !root.buried
             transform: Translate { x: root.swipeOffsetX; y: root.swipeOffsetY }
 
             Behavior on anchors.rightMargin {
@@ -3004,6 +2383,34 @@ Item {
             }
         }
 
+        Row {
+            id: privacyDots
+            anchors {
+                right: parent.right
+                rightMargin: 12
+                top: parent.top
+                topMargin: 2
+            }
+            spacing: 3
+            visible: (root.cfg.privacyIndicators ?? true) && IslandEvents.anyPrivacy
+
+            Repeater {
+                model: [
+                    { show: IslandEvents.micInUse, color: IslandEvents.colorAttention },
+                    { show: IslandEvents.cameraInUse || IslandEvents.screenInUse, color: "#30D158" }
+                ].filter(d => d.show)
+                delegate: Rectangle {
+                    required property var modelData
+                    width: 6
+                    height: 6
+                    radius: 3
+                    color: modelData.color
+
+                }
+            }
+
+        }
+
         // Getting something out of the way: a middle click dismisses what is on screen, holding it silences that
         // island until you ask for it back. Kept on its own handler so a hold never also counts as a tap.
         TapHandler {
@@ -3017,16 +2424,13 @@ Item {
             acceptedButtons: Qt.LeftButton | Qt.RightButton
             onTapped: (eventPoint, button) => {
                 if (button === Qt.RightButton) {
-                    root.openSplitPicker()
+                    root.togglePin()
                     return
                 }
-                // The fullscreen summary leads straight to what it summarizes
-                if (root.primaryId === "fsDigest") {
-                    IslandEvents.fullscreenDigest.dismiss()
-                    root.expandTo(2, "history")
-                    return
-                }
-                if (root.hasDetails(root.primaryId)) root.toggleExpanded()
+                const onPrivacy = privacyDots.visible
+                    && privacyDots.contains(privacyDots.mapFromItem(pill, eventPoint.position.x, eventPoint.position.y))
+                if (onPrivacy) root.expandTo(2, "privacy")
+                else if (root.hasDetails(root.primaryId)) root.toggleExpanded()
             }
         }
 
@@ -3074,7 +2478,7 @@ Item {
             left: pill.right
             verticalCenter: pill.verticalCenter
         }
-        visible: !root.vertical && root.secondaryIds.length > 0 && !root.splitShown
+        visible: !root.vertical && root.secondaryIds.length > 0
         opacity: root.overlayShown ? 0 : 1
 
         Behavior on opacity {
@@ -3173,354 +2577,12 @@ Item {
                                 root.dismiss(capsuleDelegate.modelData)
                                 return
                             }
-                            // A tap on a capsule is "show me this", not "swap places": open it straight away
-                            // when it has a full view (the drawer, agents, F1…), otherwise bring it to the pill
-                            const id = capsuleDelegate.modelData
-                            if (root.hasDetails(id)) {
-                                root.expandTo(2, id)
-                                return
-                            }
                             root.forceIdle = false
-                            root.manualFocusId = id
+                            root.manualFocusId = capsuleDelegate.modelData
                         }
                     }
                 }
             }
-        }
-    }
-
-    // ── Compact split ─────────────────────────────────────────────────────────────────────────────────────
-    // A second pill beside the main one, holding whatever you chose (live or not). It buds off the main pill's
-    // edge (the neck thins and lets go), rolls to another island when you scroll over it, and goes away when
-    // you throw it off to the side, push it back into the main pill, middle-click it, or tap the × that only
-    // shows up under the pointer.
-    readonly property real splitTargetW: root.splitShownId === "" ? root.pillHeight
-        : Math.max(root.pillHeight + 40, Math.min(220, root.baseWidth(root.splitShownId)))
-    readonly property real splitP: Math.max(0, root.splitProgress)
-    readonly property real splitPc: Math.min(1, root.splitP)
-
-    Rectangle {
-        id: splitNeck
-        visible: splitPill.visible && root.splitPc < 0.9
-        readonly property real thickness: root.pillHeight * 0.8 * Math.max(0, 1 - root.splitPc * 1.35)
-        x: pill.width - 12
-        width: Math.max(0, splitPill.x - pill.width) + 24
-        height: splitNeck.thickness
-        anchors.verticalCenter: pill.verticalCenter
-        radius: height / 2
-        color: root.capsuleColor
-        opacity: splitPill.opacity
-    }
-
-    Rectangle {
-        id: splitPill
-        visible: root.splitShown && root.splitProgress > 0.001
-        x: pill.width + root.capsuleGap * root.splitPc - (1 - root.splitPc) * root.pillHeight * 0.85 + root.splitDragX
-        width: root.pillHeight + (root.splitTargetW - root.pillHeight) * root.splitP
-        height: root.pillHeight
-        anchors.verticalCenter: pill.verticalCenter
-        radius: height / 2
-        color: root.capsuleColor
-        clip: true
-        opacity: Math.min(1, root.splitP * 3) * root.splitFade * (root.overlayShown ? 0 : 1)
-            * (1 - Math.max(0, Math.min(0.6, root.splitDragX / 220)))
-        scale: splitHover.hovered && !splitDrag.active ? 1.03 : 1
-        z: 2
-
-        Behavior on scale {
-            NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
-        }
-        Behavior on width {
-            enabled: !splitIn.running && !splitOut.running
-            NumberAnimation { duration: 380; easing.type: Easing.BezierSpline; easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial }
-        }
-
-        Item {
-            anchors.fill: parent
-            opacity: Math.max(0, Math.min(1, (root.splitPc - 0.5) / 0.35)) * root.splitContentOpacity
-            transform: Translate { y: root.splitContentY }
-
-            // Display only: the pill's own gestures below own every tap, drag and scroll
-            Loader {
-                anchors.fill: parent
-                enabled: false
-                active: root.splitShownId !== ""
-                sourceComponent: root.splitShownId !== "" ? root.componentFor(root.splitShownId) : null
-            }
-        }
-
-        Rectangle {
-            id: splitClose
-            anchors {
-                right: parent.right
-                rightMargin: 6
-                verticalCenter: parent.verticalCenter
-            }
-            width: 20
-            height: 20
-            radius: 10
-            color: Appearance.colors.colLayer2
-            opacity: splitHover.hovered && !splitDrag.active ? 1 : 0
-            scale: splitHover.hovered ? 1 : 0.4
-
-            Behavior on opacity {
-                NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
-            }
-            Behavior on scale {
-                NumberAnimation { duration: 260; easing.type: Easing.OutBack; easing.overshoot: 1.8 }
-            }
-
-            MaterialSymbol {
-                anchors.centerIn: parent
-                text: "close"
-                iconSize: 12
-                fill: 1
-                color: Appearance.colors.colOnLayer1
-            }
-        }
-
-        HoverHandler {
-            id: splitHover
-            cursorShape: splitDrag.active ? Qt.ClosedHandCursor : Qt.PointingHandCursor
-        }
-
-        DragHandler {
-            id: splitDrag
-            target: null
-            xAxis.enabled: true
-            yAxis.enabled: false
-            onTranslationChanged: {
-                const dx = splitDrag.translation.x
-                root.splitDragX = dx > 0 ? dx : root.rubber(dx, 16)
-            }
-            onActiveChanged: {
-                if (splitDrag.active) {
-                    splitSnap.stop()
-                    return
-                }
-                const dx = splitDrag.translation.x
-                if (dx > 44) {
-                    splitFling.toX = root.splitDragX + 150
-                    splitFling.restart()
-                } else if (dx < -36) {
-                    root.splitDragX = 0
-                    root.dismissSplit()
-                } else {
-                    splitSnap.restart()
-                }
-            }
-        }
-
-        NumberAnimation {
-            id: splitSnap
-            target: root
-            property: "splitDragX"
-            to: 0
-            duration: 420
-            easing.type: Easing.OutBack
-            easing.overshoot: 1.6
-        }
-
-        TapHandler {
-            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-            onTapped: (eventPoint, button) => {
-                if (button === Qt.MiddleButton) {
-                    root.dismissSplit()
-                    return
-                }
-                const p = splitClose.mapFromItem(splitPill, eventPoint.position.x, eventPoint.position.y)
-                if (splitClose.opacity > 0.5 && splitClose.contains(p)) {
-                    root.dismissSplit()
-                    return
-                }
-                root.expandTo(2, root.hasDetails(root.primaryId) ? undefined : root.splitShownId)
-            }
-        }
-
-        WheelHandler {
-            id: splitWheel
-            target: null
-            property bool cooling: false
-            onWheel: event => {
-                if (splitWheel.cooling) return
-                splitWheel.cooling = true
-                splitWheelCool.restart()
-                const delta = Math.abs(event.angleDelta.y) >= Math.abs(event.angleDelta.x) ? event.angleDelta.y : event.angleDelta.x
-                root.cycleSplit(delta < 0 ? 1 : -1)
-            }
-        }
-
-        Timer {
-            id: splitWheelCool
-            interval: 260
-            onTriggered: splitWheel.cooling = false
-        }
-    }
-
-    // The way in, for the pointer: a small "+" that slides out beside the island while you hover it
-    Timer {
-        id: splitTabGrace
-        interval: 800
-    }
-    onHoverArmedChanged: {
-        if (!root.hoverArmed) {
-            splitTabGrace.restart()
-            return
-        }
-        // A chat message isn't worth a half-step: under the pointer it opens straight into the full view,
-        // with the whole message and the reply field
-        // Not again right after it closed: the pill comes back under a pointer that hasn't moved, and reopening
-        // on that would loop open/close
-        if (root.primaryId === "notification" && (root.cfg.hoverExpandsMessages ?? true)
-                && Date.now() - root.lastCollapseAt > 1500
-                && IslandEvents.isMessagingApp(IslandEvents.notificationParts(root.latestNotification).app)) {
-            root.openedByHover = true
-            root.expandTo(2)
-        }
-    }
-
-    Rectangle {
-        id: splitTab
-        readonly property bool wanted: !root.vertical && !root.overlayShown && !root.splitShown && !root.expanded
-            && root.splitCandidates.length > 0
-            && (root.hoverArmed || tabHover.hovered || splitTabGrace.running)
-        x: root.implicitWidth + 6
-        anchors.verticalCenter: pill.verticalCenter
-        width: 24
-        height: 24
-        radius: 12
-        color: tabHover.hovered ? Appearance.colors.colLayer2 : root.capsuleColor
-        opacity: splitTab.wanted ? 1 : 0
-        scale: splitTab.wanted ? (tabHover.hovered ? 1.1 : 1) : 0.3
-        visible: opacity > 0.01
-
-        Behavior on opacity {
-            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
-        }
-        Behavior on scale {
-            NumberAnimation { duration: 340; easing.type: Easing.OutBack; easing.overshoot: 1.8 }
-        }
-        Behavior on color {
-            ColorAnimation { duration: 140 }
-        }
-
-        MaterialSymbol {
-            anchors.centerIn: parent
-            text: "add"
-            iconSize: 16
-            fill: 1
-            color: Appearance.colors.colOnLayer1
-            rotation: splitTab.wanted ? 0 : -90
-
-            Behavior on rotation {
-                NumberAnimation { duration: 340; easing.type: Easing.OutCubic }
-            }
-        }
-
-        HoverHandler {
-            id: tabHover
-            cursorShape: Qt.PointingHandCursor
-        }
-        TapHandler {
-            onTapped: root.openSplitPicker()
-        }
-    }
-
-    // Privacy: a pip just outside the pill's left edge (like the phone's green/orange dot beside the island),
-    // so it never sits on top of whatever the pill is showing. Mic and camera/screen stack as two dots.
-    // It breathes very slowly while on and sends out one ripple the moment it turns on.
-    Item {
-        id: privacyPip
-        readonly property bool on: (root.cfg.privacyIndicators ?? true) && IslandEvents.anyPrivacy && !root.vertical
-        readonly property var dots: [
-            { show: IslandEvents.micInUse, color: IslandEvents.colorAttention },
-            { show: IslandEvents.cameraInUse || IslandEvents.screenInUse, color: "#30D158" }
-        ].filter(d => d.show)
-        width: 6
-        height: privacyPip.dots.length > 1 ? 15 : 6
-        x: pill.x - width - 7
-        anchors.verticalCenter: pill.verticalCenter
-        opacity: privacyPip.on && !root.overlayShown ? 1 : 0
-        scale: privacyPip.on ? (pipHover.hovered ? 1.35 : 1) : 0.2
-        visible: opacity > 0.01
-
-        Behavior on opacity {
-            NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
-        }
-        Behavior on scale {
-            NumberAnimation { duration: 380; easing.type: Easing.OutBack; easing.overshoot: 2.2 }
-        }
-        Behavior on height {
-            NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
-        }
-
-        onOnChanged: if (privacyPip.on) pipRipple.restart()
-
-        Column {
-            anchors.centerIn: parent
-            spacing: 3
-
-            Repeater {
-                model: privacyPip.dots
-                delegate: Item {
-                    required property var modelData
-                    width: 6
-                    height: 6
-
-                    // Soft halo that breathes: present, never flashing
-                    Rectangle {
-                        anchors.centerIn: parent
-                        width: 12
-                        height: 12
-                        radius: 6
-                        color: modelData.color
-                        opacity: 0.18
-
-                        SequentialAnimation on opacity {
-                            running: privacyPip.on
-                            loops: Animation.Infinite
-                            NumberAnimation { to: 0.05; duration: 1600; easing.type: Easing.InOutSine }
-                            NumberAnimation { to: 0.22; duration: 1600; easing.type: Easing.InOutSine }
-                        }
-                    }
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 3
-                        color: modelData.color
-                    }
-                }
-            }
-        }
-
-        // One ripple when it turns on — the only moment it asks for attention
-        Rectangle {
-            id: ripple
-            anchors.centerIn: parent
-            width: 6
-            height: 6
-            radius: width / 2
-            color: "transparent"
-            border.width: 1.5
-            border.color: privacyPip.dots[0]?.color ?? IslandEvents.colorAttention
-            opacity: 0
-
-            ParallelAnimation {
-                id: pipRipple
-                NumberAnimation { target: ripple; property: "width"; from: 6; to: 30; duration: 900; easing.type: Easing.OutCubic }
-                NumberAnimation { target: ripple; property: "height"; from: 6; to: 30; duration: 900; easing.type: Easing.OutCubic }
-                NumberAnimation { target: ripple; property: "opacity"; from: 0.8; to: 0; duration: 900; easing.type: Easing.OutQuad }
-            }
-        }
-
-        HoverHandler {
-            id: pipHover
-            margin: 6
-            cursorShape: Qt.PointingHandCursor
-        }
-        TapHandler {
-            margin: 6
-            onTapped: root.expandTo(2, "privacy")
         }
     }
 
@@ -3548,8 +2610,6 @@ Item {
     Component { id: audioOutputComponent; DiAudioOutput { di: root } }
     Component { id: screenshotComponent; DiScreenshot { di: root } }
     Component { id: clipboardComponent; DiClipboard { di: root } }
-    Component { id: approvalComponent; DiApproval { di: root } }
-    Component { id: callComponent; DiCall { di: root } }
     Component { id: songRecComponent; DiSongRec { di: root } }
     Component { id: weatherComponent; DiWeather { di: root } }
     Component { id: f1FlagComponent; DiF1Flag { di: root } }
@@ -3570,6 +2630,4 @@ Item {
     Component { id: zerotierComponent; DiZeroTier { di: root } }
     Component { id: hardwareComponent; DiHardware { di: root } }
     Component { id: sessionComponent; DiSession { di: root } }
-    Component { id: watchRatingComponent; DiWatch { di: root } }
-    Component { id: fsDigestComponent; DiFsDigest { di: root } }
 }
