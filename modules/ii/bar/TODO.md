@@ -143,6 +143,18 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
         limite dos agentes só perto de 70%; limpeza de atividades 1 s → 2 s.
       - fica: Caps Lock (0,5 s lendo /sys, irrisório — o 100% por evento seria um bind do Hyprland avisando a
         Ilha) e ZeroTier (2 min parado; 5 s só em chamada).
+- [x] Notificação de mensagem (WhatsApp e outros chats): pílula em duas linhas (nome + mensagem com a
+      largura toda, até 380 px), anel da cor do app na foto em vez do contorno, entrada discreta (~250 ms,
+      sem efeito de digitação — atrapalhava a leitura). Mensagem pessoal fica 15–25 s (grupos e outros apps
+      como antes). Hover numa mensagem abre a expandida direto. Expandida redesenhada: largura fixa (~420),
+      balão de chat que quebra linha, mensagens anteriores da conversa acima, respostas rápidas, ícones
+      discretos no cabeçalho, balões subindo em sequência.
+- [x] Resposta direta no WhatsApp Web (`scripts/island/reply-send.sh`): aciona a ação "default" da própria
+      notificação (abre a conversa certa), confirma que a janela focada é o WhatsApp, digita com wtype (sem
+      clipboard) e aperta Enter. Se a conversa não abrir, não digita nada e deixa copiado. NÃO testado com
+      mensagem real (não dá pra testar sem enviar para alguém).
+- [x] Figurinha: preview impossível — a notificação do WhatsApp Web só traz a foto do contato e o texto
+      "💟 Figurinha"; responder funciona igual a qualquer mensagem.
 - [ ] Periféricos/HDMI (auditoria): já existem disco conectado/remoção segura, monitor conectado com
       Estender/Espelhar/Só externo + confirmação/reversão, bateria de periférico baixa, temperatura.
       Falta: aviso de armazenamento quase cheio (deve ser por evento, não polling).

@@ -33,6 +33,8 @@ Singleton {
         property string summary: notification?.summary ?? ""
         property double time
         property string urgency: notification?.urgency.toString() ?? "normal"
+        property bool hasInlineReply: notification?.hasInlineReply ?? false
+        property string inlineReplyPlaceholder: notification?.inlineReplyPlaceholder ?? ""
         property Timer timer
 
         onNotificationChanged: {
@@ -72,11 +74,12 @@ Singleton {
             }
             const notifObject = root.list[index];
             print("[Notifications] Notification timer triggered for ID: " + notificationId + ", transient: " + notifObject?.isTransient);
+            if (!notifObject) { destroy(); return; }
             // The Phone tab is this notification's archive, so the card is
             // dropped rather than dismissed: dismissing would tell the daemon
             // the notification closed, and take the row out of the tab too.
             if (root.isPhoneOwnedNotification(notifObject)) root.forgetNotification(notificationId);
-            else if (notifObject?.isTransient) root.discardNotification(notificationId);
+            else if (notifObject.isTransient) root.discardNotification(notificationId);
             else root.timeoutNotification(notificationId);
             destroy()
         }
@@ -106,6 +109,21 @@ Singleton {
     Component {
         id: notifTimerComponent
         NotifTimer {}
+    }
+
+    // Safety net: a popup whose timer was stopped (hover, an overlay) and never restarted would stay on the island
+    // forever. Anything non-critical older than two minutes stops being a popup; it stays in the notification list.
+    Timer {
+        interval: 10000
+        running: root.popupList.length > 0
+        repeat: true
+        onTriggered: {
+            const now = Date.now();
+            root.popupList.forEach((notif) => {
+                if ((notif.urgency ?? "").toLowerCase() === "critical") return;
+                if (now - notif.time > 120000) root.timeoutNotification(notif.notificationId);
+            });
+        }
     }
 
     function stringifyList(list) {
@@ -177,6 +195,7 @@ Singleton {
         bodyMarkupSupported: true
         bodySupported: true
         imageSupported: true
+        inlineReplySupported: true
         keepOnReload: false
         persistenceSupported: true
 
@@ -188,6 +207,7 @@ Singleton {
             const phoneCopy = root.isPhoneOwnedNotification(notification);
             if (phoneCopy && root.popupInhibited)
                 return;
+            if (IslandEvents.handleNotification(notification)) return
             notification.tracked = true
             const newNotifObject = notifComponent.createObject(root, {
                 "notificationId": notification.id + root.idOffset,
@@ -201,11 +221,14 @@ Singleton {
                 newNotifObject.popup = true;
                 // The phone asks for no expiry, which would otherwise leave the
                 // card sitting in the list once the popup band hides.
+                // expireTimeout 0 asks for a popup that never leaves. Only critical ones get that: a browser tab
+                // saying a livestream started also sends 0, and it would sit on the island forever.
                 const statedTimeout = notification.expireTimeout > 0 ? notification.expireTimeout : 0;
-                if (phoneCopy || notification.expireTimeout != 0) {
+                const critical = (notification.urgency?.toString() ?? "").toLowerCase() === "critical";
+                if (phoneCopy || notification.expireTimeout != 0 || !critical) {
                     newNotifObject.timer = notifTimerComponent.createObject(root, {
                         "notificationId": newNotifObject.notificationId,
-                        "interval": statedTimeout || (Config?.options.notifications.timeout ?? 7000),
+                        "interval": Math.max(statedTimeout || (Config?.options.notifications.timeout ?? 7000), IslandEvents.displayTime(newNotifObject)),
                     });
                 }
                 if (!phoneCopy)
@@ -219,6 +242,12 @@ Singleton {
 
     function markAllRead() {
         root.unread = 0;
+    }
+
+    function sendInlineReply(id, text) {
+        const serverNotif = notifServer.trackedNotifications.values.find((notif) => notif.id + root.idOffset === id);
+        if (serverNotif?.hasInlineReply) serverNotif.sendInlineReply(text);
+        root.discardNotification(id);
     }
 
     function discardNotification(id) {
