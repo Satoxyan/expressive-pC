@@ -101,7 +101,9 @@ Item {
         if (dy === 0) return
         if (wheelAnim.running) { wheelAnim.stop(); root._wheelTargetY = root.flickable.contentY }
         physicsLoop.running = false
-        var deltaPx = -dy * root.touchpadSensitivity
+        // Prefer pixelDelta from compositor (exact pixels), fall back to angleDelta * multiplier
+        var px = event.pixelDelta.y
+        var deltaPx = (px !== 0) ? -px : -dy * root.touchpadSensitivity
         var now = Date.now()
         var dt = now - root._lastEventTime
         if (dt > 0 && dt < 150) {

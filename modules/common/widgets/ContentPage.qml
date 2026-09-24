@@ -138,11 +138,14 @@ Item {
         return Math.max(0, Math.min(y, Math.max(0, flickable.contentHeight - flickable.height)))
     }
 
-    function _handleTouchpad(dy) {
+    function _handleTouchpad(event) {
+        var dy = event.angleDelta.y
         if (dy === 0) return
         _wheelAnim.stop()
         _flingTimer.stop()
-        var deltaPx = -dy * 1.2          // 1.2 px per angleDelta unit (touchpad feels natural)
+        // Prefer pixelDelta from compositor (exact pixels), fall back to angleDelta * multiplier
+        var px = event.pixelDelta.y
+        var deltaPx = (px !== 0) ? -px : -dy * 1.2
         var maxY = Math.max(0, flickable.contentHeight - flickable.height)
         
         // Resistance when dragging out of bounds
@@ -193,7 +196,7 @@ Item {
             if (Math.abs(dy) % 120 === 0) {
                 root._handleMouseWheel(dy)
             } else {
-                root._handleTouchpad(dy)
+                root._handleTouchpad(wheel)
             }
             wheel.accepted = true
         }
