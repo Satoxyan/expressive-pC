@@ -83,6 +83,19 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
 - [x] Causa raiz real do "Claude duplicado": `activity` (tarefa específica) e `agents` (resumo geral)
       ficavam ativos ao mesmo tempo pro mesmo agente — um na pílula, outro no deck atrás dela.
       `agents` agora só entra em `activeIds` quando nenhuma `activity` atual já é desse agente.
+## Rodada 2 — feedback de uso (2026-09-24)
+
+- [x] Bug: ícone da gaveta não abria — clicar numa cápsula lateral só trocava ela de lugar com a principal; agora abre a expandida dela direto
+- [x] Bug: capacete da F1 não tinha área de clique; agora abre a F1. `agents`/`clipboard`/`zerotier` entraram em `standaloneViews` (antes a expandida voltava sozinha pra Home)
+- [ ] Animação da gaveta melhor
+- [x] Indicador de privacidade: saiu de dentro da pílula (cobria o relógio) pra um ponto do lado de fora, à esquerda; halo respirando lento, um ripple só ao ligar
+- [ ] Split na pílula COMPACTA: duas ilhas lado a lado, qualquer uma (mesmo inativa, ex. Sistema),
+      escolha intuitiva, divisão bonita, animação entre as duas, dispensar a segunda por arrasto/scroll
+      (sem X sempre visível)
+- [x] Home compacta: bandeja de status uniforme (`StatusGlyph`): mesmo tamanho/tom, cor só em alerta, contagem como badge, hover circular, todos clicáveis
+- [ ] Home expandida confusa: difícil chegar nas ilhas ativas úteis
+- [ ] Motion graphics criativos (Fase 6)
+
 ## Ordem sugerida daqui pra frente
 
-Smart Drop → periféricos/HDMI (auditoria) → Motion (Fase 6).
+Rodada 2 → Smart Drop → periféricos/HDMI (auditoria).
