@@ -158,6 +158,10 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
       cada nova). Expandida com a conversa inteira da última hora (até 30) num fio rolável que abre no fim.
       Campo de resposta focado ao abrir: por clique, na hora; por hover, só quando o ponteiro entra no card
       (e devolve o teclado se sair sem digitar) — pra não roubar o que você digita em outro lugar.
+- [x] "Perguntar ao Gemini" na expandida de chat: manda a conversa (mais antigas primeiro) pro Gemini WEB
+      pedindo 3 respostas curtas. O texto vai no #fragmento do link (não sai do navegador) e
+      `scripts/island/gemini-prompt.user.js` (Tampermonkey) coloca na caixa (`rich-textarea .ql-editor`, só via
+      insertText — a página bloqueia innerHTML) e clica "Enviar mensagem". Seletores validados na página real.
 - [x] Figurinha: preview impossível — a notificação do WhatsApp Web só traz a foto do contato e o texto
       "💟 Figurinha"; responder funciona igual a qualquer mensagem.
 - [ ] Periféricos/HDMI (auditoria): já existem disco conectado/remoção segura, monitor conectado com
