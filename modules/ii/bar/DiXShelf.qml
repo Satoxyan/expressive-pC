@@ -12,8 +12,6 @@ ColumnLayout {
     required property Item di
     spacing: 10
     implicitWidth: 410
-    // Layouts overwrite implicitWidth with their children's; the container reads this instead
-    readonly property real wantedWidth: 410
 
     readonly property var pdfs: DropShelf.items.filter(p => DropShelf.isPdf(p))
 
@@ -91,17 +89,17 @@ ColumnLayout {
         transform: Translate { y: (1 - tile.enterT) * -30 - (tileMouse.containsMouse && !tileMouse.drag.active ? 3 : 0) }
 
         Behavior on color {
-            ColorAnimation { duration: IslandMotion.micro }
+            ColorAnimation { duration: 150 }
         }
         Behavior on scale {
             enabled: tile.enterT >= 1
-            NumberAnimation { duration: IslandMotion.short; easing.type: Easing.OutBack }
+            NumberAnimation { duration: 180; easing.type: Easing.OutBack }
         }
 
         SequentialAnimation {
             running: true
             PauseAnimation { duration: 40 + Math.min(tile.order, 12) * 38 }
-            NumberAnimation { target: tile; property: "enterT"; to: 1; duration: IslandMotion.long; easing.type: Easing.OutBack; easing.overshoot: 1.1 }
+            NumberAnimation { target: tile; property: "enterT"; to: 1; duration: 460; easing.type: Easing.OutBack; easing.overshoot: 1.1 }
         }
 
         Drag.active: tileMouse.drag.active
@@ -215,7 +213,7 @@ ColumnLayout {
             opacity: tileMouse.containsMouse || buttonsHover.hovered ? 1 : 0
 
             Behavior on opacity {
-                NumberAnimation { duration: IslandMotion.micro }
+                NumberAnimation { duration: 150 }
             }
 
             HoverHandler {
