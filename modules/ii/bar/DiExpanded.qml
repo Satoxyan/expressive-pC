@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Layouts
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
@@ -66,11 +65,8 @@ Scope {
             WlrLayershell.namespace: "quickshell:dynamicIsland"
             WlrLayershell.layer: WlrLayer.Overlay
             // Typing a reply grabs the keyboard right away; a visible reply field still accepts focus on click
-            // The keyboard is asked for *before* the overlay opens (requestReply), never switched while it's open:
-            // changing mode mid-way breaks the focus grab and the overlay closes itself. A watchdog in
-            // DynamicIsland gives it back if it's ever left asked for while closed.
             WlrLayershell.keyboardFocus: scope.di.wantsKeyboard ? WlrKeyboardFocus.Exclusive
-                : (scope.di.expanded && scope.di.replyReady ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
+                : (scope.di.replyReady ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
 
             anchors {
                 top: !win.bottomBar
@@ -124,14 +120,11 @@ Scope {
                 readonly property bool splitActive: scope.di.splitId !== "" && scope.di.splitId !== scope.di.expandedId
                     && scope.di.hasDetails(scope.di.splitId)
 
-                // The bottom strip: page dots + split button, and the split chooser above them while it's armed
-                readonly property real bottomReserve: 18 + (scope.di.splitArmed ? splitPicker.implicitHeight + 10 : 0)
-
                 readonly property real wantedW: Math.min(island.maxW, Math.max(island.startW,
                     detail.implicitWidth + (island.splitActive ? 12 + splitDetail.implicitWidth : 0)))
                 readonly property real wantedH: Math.max(island.startH,
                     Math.max(detail.implicitHeight, island.splitActive ? splitDetail.implicitHeight : 0)
-                        + island.bottomReserve)
+                        + (pager.visible ? pager.height : 0))
 
                 // ...and what it is allowed to be while you are using it. Content that changes under the pointer
                 // (a list refreshing, a line appearing) used to shrink the overlay out from under the cursor:
@@ -262,7 +255,7 @@ Scope {
                     id: detail
                     di: scope.di
                     contentId: scope.di.expandedId
-                    maxHeight: island.maxH - island.bottomReserve
+                    maxHeight: island.maxH - (pager.visible ? pager.height : 0)
                     x: (island.width - island.pairW) / 2
                     y: win.bottomBar ? island.height - height : 0
                     width: island.splitActive ? Math.min(island.maxW, implicitWidth)
@@ -292,13 +285,41 @@ Scope {
                     id: splitDetail
                     di: scope.di
                     contentId: island.splitActive ? scope.di.splitId : ""
-                    maxHeight: island.maxH - island.bottomReserve
+                    maxHeight: island.maxH - (pager.visible ? pager.height : 0)
                     x: detail.x + detail.width + 12
                     y: win.bottomBar ? island.height - height : 0
                     width: Math.min(island.maxW, implicitWidth)
                     height: implicitHeight
                     opacity: island.splitActive ? detail.opacity : 0
                     visible: island.splitActive && island.shown
+                }
+
+                // Closes the split pane without collapsing the whole overlay
+                Rectangle {
+                    visible: island.splitActive && island.shown && splitDetail.opacity > 0.6
+                    x: splitDetail.x + splitDetail.width - 11
+                    y: splitDetail.y + 8
+                    width: 22
+                    height: 22
+                    radius: 11
+                    color: splitCloseMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1
+                    opacity: splitDetail.opacity
+
+                    MaterialSymbol {
+                        anchors.centerIn: parent
+                        text: "close"
+                        iconSize: 13
+                        fill: 1
+                        color: Appearance.colors.colOnLayer1
+                    }
+
+                    MouseArea {
+                        id: splitCloseMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: scope.di.exitSplit()
+                    }
                 }
 
                 // Shared elements (a view's `hero: { key, item }`): when the compact and the full view have the same one,
@@ -362,6 +383,31 @@ Scope {
                     spacing: 5
                     opacity: Math.max(0, Math.min(1, (island.p - 0.6) / 0.4))
 
+                    // Split View entry point: tap to arm ("pick a second view"), tap a pip, or tap again to exit
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        implicitWidth: 14
+                        implicitHeight: 14
+                        radius: 4
+                        color: (scope.di.splitArmed || island.splitActive) ? Appearance.colors.colPrimary : "transparent"
+
+                        MaterialSymbol {
+                            anchors.centerIn: parent
+                            text: "splitscreen"
+                            iconSize: 10
+                            fill: 1
+                            color: (scope.di.splitArmed || island.splitActive)
+                                ? Appearance.colors.colOnPrimary : ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.5)
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            anchors.margins: -4
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: scope.di.toggleSplitArm()
+                        }
+                    }
+
                     Repeater {
                         model: scope.di.switcherIds
                         delegate: Rectangle {
@@ -385,120 +431,6 @@ Scope {
                                 anchors.margins: -4
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: scope.di.selectForSplit(parent.modelData)
-                            }
-                        }
-                    }
-                }
-
-                // Split button: always there at the bottom-right corner — arms the chooser, or ends a split
-                Rectangle {
-                    id: splitButton
-                    readonly property bool lit: scope.di.splitArmed || scope.di.splitId !== ""
-                    // Clear of the rounded corner, level with the page dots
-                    x: island.width - width - Math.max(12, island.radius * 0.75)
-                    y: win.bottomBar ? 5 : island.height - height - 5
-                    width: 22
-                    height: 14
-                    radius: 7
-                    color: splitButton.lit ? Appearance.colors.colPrimary
-                        : (splitButtonMouse.containsMouse ? Appearance.colors.colLayer2 : "transparent")
-                    opacity: Math.max(0, Math.min(1, (island.p - 0.6) / 0.4))
-
-                    Behavior on color {
-                        ColorAnimation { duration: 160 }
-                    }
-
-                    MaterialSymbol {
-                        anchors.centerIn: parent
-                        text: scope.di.splitId !== "" ? "close" : "splitscreen_right"
-                        iconSize: 11
-                        fill: 1
-                        color: splitButton.lit ? Appearance.colors.colOnPrimary
-                            : ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.35)
-                    }
-
-                    MouseArea {
-                        id: splitButtonMouse
-                        anchors.fill: parent
-                        anchors.margins: -5
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: scope.di.toggleSplitArm()
-                    }
-                }
-
-                // The chooser: every island that can sit beside the main one, active or not. Chips deal in one
-                // after another from the split button's corner.
-                Flow {
-                    id: splitPicker
-                    visible: scope.di.splitArmed
-                    x: 14
-                    width: island.width - 28
-                    y: win.bottomBar ? 22 : island.height - 18 - height - 6
-                    spacing: 6
-                    opacity: scope.di.splitArmed ? 1 : 0
-
-                    Behavior on opacity {
-                        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
-                    }
-
-                    Repeater {
-                        model: scope.di.splitArmed ? scope.di.splitCandidates : []
-                        delegate: Rectangle {
-                            id: pickChip
-                            required property string modelData
-                            required property int index
-                            implicitWidth: pickRow.implicitWidth + 18
-                            implicitHeight: 28
-                            radius: 14
-                            color: pickMouse.containsMouse ? Appearance.colors.colPrimaryContainer : Appearance.colors.colLayer1
-                            scale: 0.4
-                            opacity: 0
-                            transformOrigin: Item.Right
-
-                            Behavior on color {
-                                ColorAnimation { duration: 140 }
-                            }
-
-                            SequentialAnimation {
-                                running: true
-                                PauseAnimation { duration: pickChip.index * 32 }
-                                ParallelAnimation {
-                                    NumberAnimation { target: pickChip; property: "scale"; to: 1; duration: 340; easing.type: Easing.OutBack; easing.overshoot: 1.5 }
-                                    NumberAnimation { target: pickChip; property: "opacity"; to: 1; duration: 200; easing.type: Easing.OutCubic }
-                                }
-                            }
-
-                            RowLayout {
-                                id: pickRow
-                                anchors.centerIn: parent
-                                spacing: 6
-
-                                DiClaudeIcon {
-                                    visible: ["claude", "codex", "gemini"].includes(scope.di.iconForId(pickChip.modelData))
-                                    agent: scope.di.iconForId(pickChip.modelData)
-                                    size: 14
-                                }
-                                MaterialSymbol {
-                                    visible: !["claude", "codex", "gemini"].includes(scope.di.iconForId(pickChip.modelData))
-                                    text: scope.di.iconForId(pickChip.modelData)
-                                    iconSize: 15
-                                    fill: 1
-                                    color: pickMouse.containsMouse ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colOnLayer1
-                                }
-                                StyledText {
-                                    text: scope.di.nameForId(pickChip.modelData)
-                                    font.pixelSize: Appearance.font.pixelSize.smaller
-                                    color: pickMouse.containsMouse ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colOnLayer1
-                                }
-                            }
-
-                            MouseArea {
-                                id: pickMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: scope.di.chooseSplit(pickChip.modelData)
                             }
                         }
                     }
