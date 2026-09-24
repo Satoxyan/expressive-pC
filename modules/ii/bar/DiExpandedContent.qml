@@ -15,8 +15,7 @@ Item {
     readonly property real naturalHeight: (loader.item?.implicitHeight ?? 60) + content.padding * 2
     readonly property bool scrollable: content.naturalHeight > content.maxHeight + 1
 
-    // A view's own width: layouts overwrite implicitWidth with their children's, so views declare `wantedWidth`
-    implicitWidth: Math.max(loader.item?.implicitWidth ?? 280, loader.item?.wantedWidth ?? 0) + content.padding * 2
+    implicitWidth: (loader.item?.implicitWidth ?? 280) + content.padding * 2
     implicitHeight: Math.min(content.naturalHeight, content.maxHeight)
 
     Component.onCompleted: content.shownId = content.contentId
@@ -49,10 +48,9 @@ Item {
             case "audioOutput":   return audioView
             case "bluetooth":     return bluetoothView
             case "activity":
-            case "approval":
             case "agents":        return activitiesView
-            case "system":        return systemView
-            case "systemLoad":    return loadView
+            case "system":
+            case "systemLoad":    return systemView
             case "battery":       return batteryView
             case "screenshot":    return screenshotView
             case "clipboard":     return clipboardView
@@ -70,7 +68,6 @@ Item {
             case "download":
             case "zerotier":      return networkView
             case "hardware":      return hardwareView
-            case "call":          return callView
             default:              return idleView
         }
     }
@@ -84,21 +81,6 @@ Item {
         contentWidth: width
         contentHeight: content.naturalHeight
         boundsBehavior: Flickable.StopAtBounds
-
-        // A view taller than the overlay scrolls on its own and keeps every wheel event, even at the ends, so
-        // scrolling to the bottom doesn't carry on into the next view
-        MouseArea {
-            parent: flick
-            anchors.fill: parent
-            z: 10
-            enabled: content.scrollable
-            acceptedButtons: Qt.NoButton
-            onWheel: wheel => {
-                const step = wheel.pixelDelta.y !== 0 ? wheel.pixelDelta.y : wheel.angleDelta.y / 120 * 48
-                flick.contentY = Math.max(0, Math.min(flick.contentHeight - flick.height, flick.contentY - step))
-                wheel.accepted = true
-            }
-        }
 
         Loader {
             id: loader
@@ -136,8 +118,6 @@ Item {
     Component { id: bluetoothView; DiXBluetooth { di: content.di } }
     Component { id: activitiesView; DiXActivities { di: content.di } }
     Component { id: systemView; DiXSystem { di: content.di } }
-    Component { id: loadView; DiXLoad { di: content.di } }
-    Component { id: callView; DiXCall { di: content.di } }
     Component { id: batteryView; DiXBattery { di: content.di } }
     Component { id: screenshotView; DiXScreenshot { di: content.di } }
     Component { id: clipboardView; DiXClipboard { di: content.di } }
