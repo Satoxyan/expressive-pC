@@ -243,13 +243,26 @@ Item {
         anchors.fill: barBackground
         anchors.margins: root.barPadding
 
+        // How much room the island is taking from each side right now. A long notification or a download used to
+        // slide under the widgets; instead the sides slip outwards and fade, and come back when it shrinks.
+        readonly property real sideRoom: Math.max(0, contentContainer.width / 2 - absoluteCenter.width / 2 - 14)
+        readonly property real leftPush: Math.max(0, leftSection.width - contentContainer.sideRoom)
+        readonly property real rightPush: Math.max(0, rightSection.width - contentContainer.sideRoom)
+
         // Left
         Item {
+            id: leftSection
             anchors.left: parent.left
             anchors.leftMargin: root.hasTabs ? 0 : (root.useTabWrapper ? (Config.options.hyprland.general.gapsOut || 5) : (Config.options.bar.cornerStyle === 1 ? 4 : Config.options.bar.cornerStyle === 5 ? 4 : 8))
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             width: root.useTabWrapper ? (leftMaterialPill.width + (root.hasTabs && root.effectiveLeftLayout.length > 0 ? leftRightOutwardCorner.implicitSize : 0)) : leftRow.implicitWidth
+            opacity: contentContainer.leftPush > 0 ? Math.max(0.25, 1 - contentContainer.leftPush / 120) : 1
+            transform: Translate { x: -contentContainer.leftPush }
+
+            Behavior on opacity {
+                NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
+            }
 
             // Material pill wrapper
             Rectangle {
@@ -421,6 +434,7 @@ Item {
             // Material pill wrapper
             Rectangle {
                 id: centerMaterialPill
+                objectName: "dynamicIslandSurface"
                 WindowGlass {
                     anchors.fill: parent
                     anchors.leftMargin: -root.tabFlare
@@ -438,6 +452,10 @@ Item {
                 }
                 visible: root.useTabWrapper && root.effectiveMiddleLayout.length > 0
                 anchors.centerIn: parent
+                // Follows the island when it grows away from the pointer (see DynamicIsland.growShift)
+                transform: Translate {
+                    x: GlobalStates.islandGrowScreen === (QsWindow.window?.screen?.name ?? "") ? GlobalStates.islandGrowShift : 0
+                }
                 width: centerMaterialRow.implicitWidth + (root.hasTabs ? 16 : 10)
                 height: root.hasTabs ? parent.height : centerMaterialRow.implicitHeight 
                 radius: root.hasTabs ? 0 : Appearance.rounding.full
@@ -545,11 +563,18 @@ Item {
 
         // Right
         Item {
+            id: rightSection
             anchors.right: parent.right
             anchors.rightMargin: root.hasTabs ? 0 : (root.useTabWrapper ? (Config.options.hyprland.general.gapsOut || 5) : (Config.options.bar.cornerStyle === 1 ? 4 : Config.options.bar.cornerStyle === 5 ? 4 : 8))
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             width: root.useTabWrapper ? (rightMaterialPill.width + (root.hasTabs && root.effectiveRightLayout.length > 0 ? rightLeftOutwardCorner.implicitSize : 0)) : rightRow.implicitWidth
+            opacity: contentContainer.rightPush > 0 ? Math.max(0.25, 1 - contentContainer.rightPush / 120) : 1
+            transform: Translate { x: contentContainer.rightPush }
+
+            Behavior on opacity {
+                NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
+            }
 
             RoundCorner {
                 id: rightLeftOutwardCorner

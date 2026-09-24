@@ -99,6 +99,16 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
 - [x] Home expandida: seção "Agora" (uma linha tocável por ilha ativa + F1 quando a sessão está a <3 dias, entrada escalonada), cabeçalho alinhado à esquerda, dock com colunas iguais, rótulos em pt-BR, contagem legível ("13h 52min")
 - [x] Motion: mitose/reabsorção do split com "gole" da pílula principal, rolagem caça-níquel ao trocar a ilha do split, arremesso ao arrastar, ripple da privacidade, "+" que gira ao entrar, bandeja com hover que salta, lista "Agora" e seletor de split entrando escalonados
 
+## Rodada 3
+
+- [x] Hover que "foge" do mouse: a ilha agora cresce para o lado oposto ao do ponteiro (o lado por onde o
+      mouse entrou fica parado — botões de mídia na borda direita não escapam mais). `growShift` em
+      `DynamicIsland.qml`, espelhado na superfície material via `GlobalStates.islandGrowShift`.
+      Validação visual pendente (usuário estava em tela cheia).
+- [ ] IMDb/OMDb: nota da série/episódio do que está tocando no navegador (decisão de fonte do episódio pendente)
+- [ ] Smart Drop (seção 21)
+- [ ] Periféricos/HDMI (auditoria)
+
 ## Ordem sugerida daqui pra frente
 
 Rodada 2 → Smart Drop → periféricos/HDMI (auditoria).
