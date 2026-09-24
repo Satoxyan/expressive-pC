@@ -23,17 +23,7 @@ AbstractBackgroundWidget {
     hoverEnabled: true
 
     readonly property var playerList: MprisController.players
-    property MprisPlayer currentPlayer: {
-        const preferred = Config.options.bar.media.preferredPlayer.trim().toLowerCase()
-        if (preferred.length === 0) return MprisController.activePlayer
-        const _ = MprisController.players.count
-        for (const p of MprisController.players) {
-            if ((p.identity ?? "").toLowerCase().includes(preferred) ||
-                (p.desktopEntry ?? "").toLowerCase().includes(preferred))
-                return p
-        }
-        return MprisController.activePlayer
-    }
+    property MprisPlayer currentPlayer: MprisController.activePlayer
     property var artUrl: currentPlayer?.trackArtUrl
     property string artDownloadLocation: Directories.coverArt
     property string artFileName: Qt.md5(artUrl)
@@ -132,6 +122,7 @@ AbstractBackgroundWidget {
     StyledRectangularShadow {
         target: card
         z: -2
+        visible: Config.options.background.widgets.shadow
     }
 
     Rectangle {

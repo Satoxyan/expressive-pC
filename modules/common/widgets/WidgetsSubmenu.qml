@@ -46,7 +46,13 @@ Item {
             checked: Config.options.background.widgetsLocked
             onCheckedChanged: Config.options.background.widgetsLocked = checked
         }
-
+        ConfigSwitch {
+            Layout.fillWidth: true
+            buttonIcon: "shadow"
+            text: Translation.tr("Shadow")
+            checked: Config.options.background.widgets.shadow 
+            onCheckedChanged: Config.options.background.widgets.shadow = checked
+        }
         ConfigSwitch {
             Layout.fillWidth: true
             buttonIcon: "blur_on"
