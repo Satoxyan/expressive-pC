@@ -112,5 +112,10 @@ meio** silencia até o fim da sessão, e o chip "trazer de volta" na expandida d
 - `scripts/island/dev-island.sh <id> [título]` — Dev Activity (seção 26): `npm run dev 2>&1 | dev-island.sh
   myapp "My App"`. Genérico por design — só procura uma URL localhost e palavras de erro/pronto na saída,
   não entende nenhum framework específico. Mantém a Live Activity viva enquanto a porta responder.
+- `scripts/island/watch-rating.user.js` — userscript (Tampermonkey) da nota do IMDb: escreve série/temporada/
+  episódio nos metadados de mídia da Netflix/Disney+ (title = episódio, artist = série, album = `S03E05`), que
+  o Chrome repassa ao MPRIS. `services/WatchRating.qml` lê isso, consulta a OMDb (cache por série e por
+  temporada) e dispara o Peek `watchRating` uma vez por episódio. Sem o script, só a nota da série.
+- `~/.config/illogical-impulse/omdb.key` — chave da OMDb. **Nunca no repo** (tem remoto público).
 - `~/.config/foot/foot.ini` — `pipe-command-output`, que é como a ilha lê a saída de um comando que falhou.
 - `~/.config/hypr-profiles/end4/custom/rules.lua` — a regra `no_anim` acima.

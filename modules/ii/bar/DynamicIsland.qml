@@ -623,7 +623,7 @@ Item {
 
     // Providers: interrupts are short-lived and take the pill; persistent ones share it via split capsules
     readonly property var interruptIds: ["session", "f1Start", "osd", "notification", "battery", "bluetooth",
-        "audioOutput", "screenshot", "clipboard", "songRecResult", "weather", "f1Flag", "shelfDrop", "f1Event", "networkAlert", "hardware", "hibernate", "downloadDone"]
+        "audioOutput", "screenshot", "clipboard", "songRecResult", "weather", "f1Flag", "shelfDrop", "f1Event", "networkAlert", "hardware", "hibernate", "downloadDone", "watchRating"]
 
     // The semantic model (ILHA.md § Modelo semântico): every id above answers to one of four questions.
     // CRITICAL and PEEK are both `interruptIds` — CRITICAL is the subset that can genuinely preempt (a
@@ -665,6 +665,7 @@ Item {
         if (root.f1EventActive || root.heldId === "f1Event") ids.push("f1Event")
         if (IslandEvents.networkAlert.active) ids.push("networkAlert")
         if (IslandEvents.downloadDone.active) ids.push("downloadDone")
+        if (IslandEvents.watchRating.active && WatchRating.active) ids.push("watchRating")
         if (IslandHardware.active || root.heldId === "hardware") ids.push("hardware")
         if (root.isRecording) ids.push("recording")
         if (F1.enabled && (F1.sessionLive || F1.countdownActive)) ids.push("f1")
@@ -753,7 +754,7 @@ Item {
     // volume you are turning — get the whole pill. Anything that sits there for minutes shares it with the anchor.
     readonly property var anchorFreeIds: ["notification", "bluetooth", "audioOutput", "osd", "screenshot",
         "clipboard", "songRecResult", "weather", "f1Flag", "f1Start", "f1Event", "shelfDrop", "networkAlert",
-        "downloadDone", "hardware", "session", "hibernate", "battery", "idle", "history"]
+        "downloadDone", "hardware", "session", "hibernate", "battery", "idle", "history", "watchRating"]
 
     readonly property bool anchorShown: !root.vertical && !root.overlayShown
         && (root.cfg.anchor ?? true)
@@ -990,6 +991,7 @@ Item {
             case "history":       return 240
             case "zerotier":      return 210
             case "downloadDone":  return 320
+            case "watchRating":   return 300
             case "session":       return 164
             default:              return Math.max(144, root.idleTextContentWidth)
         }
@@ -1028,6 +1030,7 @@ Item {
             case "weather":       return IslandEvents.weather
             case "networkAlert":  return IslandEvents.networkAlert
             case "downloadDone":  return IslandEvents.downloadDone
+            case "watchRating":   return IslandEvents.watchRating
             case "hardware":      return IslandHardware
             default:              return null
         }
@@ -1118,7 +1121,7 @@ Item {
     }
     // Views worth opening even when nothing is happening in them: the system one now holds the temperature,
     // the power profile and every peripheral battery, and the network one holds the downloads
-    readonly property var standaloneViews: ["privacy", "f1", "idle", "weather", "shelf", "overview", "system", "download", "history", "audioOutput", "calendar", "agents", "clipboard", "zerotier"]
+    readonly property var standaloneViews: ["watchRating", "privacy", "f1", "idle", "weather", "shelf", "overview", "system", "download", "history", "audioOutput", "calendar", "agents", "clipboard", "zerotier"]
     readonly property string expandedId: root.expandedOverride !== "" ? root.expandedOverride : root.primaryId
 
     readonly property Item surfaceItem: {
@@ -1654,6 +1657,7 @@ Item {
 
     function componentFor(id) {
         switch (id) {
+            case "watchRating":   return watchRatingComponent
             case "media":         return mediaComponent
             case "osd":           return osdComponent
             case "notification":  return notificationComponent
@@ -1965,6 +1969,7 @@ Item {
             case "screenshot": return Translation.tr("Screenshots")
             case "weather":    return Weather.data?.temp ?? Translation.tr("Weather")
             case "privacy":    return Translation.tr("Privacy")
+            case "watchRating": return WatchRating.now?.series ?? "IMDb"
             case "hardware":   return IslandHardware.payload.title ?? Translation.tr("Hardware")
             default:           return id
         }
@@ -1995,6 +2000,7 @@ Item {
             case "screenshot": return "screenshot_monitor"
             case "weather":    return IslandEvents.weatherSymbol(Weather.data?.wCode ?? 800)
             case "privacy":    return "privacy_tip"
+            case "watchRating": return "movie"
             case "hardware":   return IslandHardware.payload.icon ?? "memory"
             default:           return "stacks"
         }
@@ -3154,4 +3160,5 @@ Item {
     Component { id: zerotierComponent; DiZeroTier { di: root } }
     Component { id: hardwareComponent; DiHardware { di: root } }
     Component { id: sessionComponent; DiSession { di: root } }
+    Component { id: watchRatingComponent; DiWatch { di: root } }
 }

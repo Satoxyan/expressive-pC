@@ -105,7 +105,11 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
       mouse entrou fica parado — botões de mídia na borda direita não escapam mais). `growShift` em
       `DynamicIsland.qml`, espelhado na superfície material via `GlobalStates.islandGrowShift`.
       Validação visual pendente (usuário estava em tela cheia).
-- [ ] IMDb/OMDb: nota da série/episódio do que está tocando no navegador (decisão de fonte do episódio pendente)
+- [x] IMDb/OMDb (testado com dado real: Modern Family ★8.5): `services/WatchRating.qml` + Peek `DiWatch`
+      (nota conta até o valor; coroa + brilho no melhor da temporada) + expandida `DiXWatch` (temporada em
+      barras que crescem em sequência, atual destacado, melhor em dourado, hover mostra o episódio). Fonte do
+      episódio: `scripts/island/watch-rating.user.js` (Tampermonkey). Aparece em "Agora" enquanto toca.
+      Pendente: validar os seletores do userscript na Netflix/Disney+ reais (só testei o caminho sem script).
 - [ ] Smart Drop (seção 21)
 - [ ] Periféricos/HDMI (auditoria)
 
