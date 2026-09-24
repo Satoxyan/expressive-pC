@@ -131,11 +131,18 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
       série (paginada acima de 250). Teste: `island simulate watchTop3|watchTop10|watchBest|watchHigh`.
       Validado: Netflix por estado do player (a tela não mostra a temporada), Disney+ por Shadow DOM.
       Limitação do Chrome: só a aba que tocou por último vai pro MPRIS (YouTube em 2º plano esconde a série).
-- [ ] Auditoria de passividade (regra no ILHA.md) — timers que rodam sempre, mesmo sem nada acontecendo:
-      F1.qml:259 (1s sempre que há próxima sessão), IslandEvents 433 (carga da CPU a cada 1s), 1649 (rede 1s),
-      654 (rede/ZeroTier 5s–2min), IslandHardware 488/792/814 (5s–2min), ClaudeCode 369/429 (limites 1–10min),
-      IslandHardware:270 e IslandEvents:1724 (checar quem inicia). Trocar por sinais/hooks ou ligar só com a
-      atividade viva.
+- [x] Auditoria de passividade (regra no ILHA.md). Parado agora: nenhum processo auxiliar da Ilha rodando.
+      - F1: sem processo entre sessões (`live --until-idle` + um despertador 30 min antes); contagem por minuto,
+        por segundo só na última hora.
+      - downloads: FolderListModel (inotify) liga o watcher só com um parcial sendo escrito; ele sai sozinho.
+        Parciais abandonados não contam (havia um .crdownload de 4 GB de agosto segurando o processo).
+      - CPU e temperatura: escutam o ResourceUsage (que já amostra pra barra) em vez de timers próprios.
+      - rede: /proc/net/dev a cada 5 s parada, 1 s só com tráfego/download/chamada/tela aberta.
+      - net_sources.py: não roda mais só porque um filme está tocando (só download real ou tela de rede).
+      - periféricos: sem tick de 30 s (UPower/BlueZ avisam sozinhos); perfil/ventoinha só com a tela Sistema;
+        limite dos agentes só perto de 70%; limpeza de atividades 1 s → 2 s.
+      - fica: Caps Lock (0,5 s lendo /sys, irrisório — o 100% por evento seria um bind do Hyprland avisando a
+        Ilha) e ZeroTier (2 min parado; 5 s só em chamada).
 - [ ] Periféricos/HDMI (auditoria): já existem disco conectado/remoção segura, monitor conectado com
       Estender/Espelhar/Só externo + confirmação/reversão, bateria de periférico baixa, temperatura.
       Falta: aviso de armazenamento quase cheio (deve ser por evento, não polling).
