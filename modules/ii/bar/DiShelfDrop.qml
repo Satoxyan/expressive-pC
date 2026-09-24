@@ -44,7 +44,7 @@ Item {
             color: Appearance.colors.colPrimaryContainer
 
             Behavior on x {
-                NumberAnimation { duration: IslandMotion.medium; easing.type: Easing.OutBack; easing.overshoot: 1.4 }
+                NumberAnimation { duration: 320; easing.type: Easing.OutBack; easing.overshoot: 1.4 }
             }
         }
 
@@ -76,7 +76,7 @@ Item {
                             scale: zone.aimed ? 1.15 : 1
 
                             Behavior on scale {
-                                NumberAnimation { duration: IslandMotion.medium; easing.type: Easing.OutBack; easing.overshoot: 2.2 }
+                                NumberAnimation { duration: 280; easing.type: Easing.OutBack; easing.overshoot: 2.2 }
                             }
                         }
                         StyledText {
@@ -94,7 +94,7 @@ Item {
                         running: dropState.hovering
                         from: 0
                         to: 1
-                        duration: IslandMotion.short
+                        duration: 260
                     }
                 }
             }
@@ -125,7 +125,7 @@ Item {
                 running: !dropState.hovering
                 from: 0.3
                 to: 1
-                duration: IslandMotion.long
+                duration: 480
                 easing.type: Easing.OutBack
                 easing.overshoot: 2.4
             }
