@@ -83,6 +83,12 @@ meio** silencia até o fim da sessão, e o chip "trazer de volta" na expandida d
 
 ## Regras aprendidas do jeito difícil
 
+- **Tudo é passivo.** Cada recurso reage a eventos (sinais do DBus/MPRIS, hooks de shell/agentes, eventos da
+  página) e só faz trabalho pesado (rede, processos, parsing) quando o próprio serviço começa — F1 só busca
+  quando há F1, a nota do IMDb só consulta quando um episódio começa. Nada de polling permanente, download ou
+  rebuild diário: cada feature que fica "checando" soma consumo pra sempre. Timer só enquanto a atividade está
+  viva, e para junto com ela.
+
 - **Ícone é fonte, não imagem.** `MaterialSymbol` desenha o texto numa fonte de ícones: um nome inexistente vira
   uma caixinha com letras. Marcas (Claude, Codex, Gemini, WhatsApp) são SVG e vão em `DiClaudeIcon`/`DiBrandIcon`.
 - **Nunca sobreponha com âncoras.** Foto à esquerda + texto à direita, ambos ancorados, colidem no primeiro texto

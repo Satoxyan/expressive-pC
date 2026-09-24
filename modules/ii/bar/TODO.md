@@ -115,7 +115,24 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
       que desliza pra zona sob o cursor; soltar executa. Imagem: Gaveta/Editar(swappy)/Copiar/PNG ·
       PDF: Gaveta/Abrir/Caminho · zip: Extrair/Gaveta/Abrir · código: Gaveta/Copiar/Editor(code) ·
       link: Abrir/Copiar/QR/Gaveta. Arraste real não testado (só os comandos).
-- [ ] Periféricos/HDMI (auditoria)
+- [x] Nota por episódio, sempre que um episódio começa (inclusive autoplay), com logo do serviço:
+      - validado na página real do Disney+: player em Shadow DOM; episódio atual em `title-bug` (só com os
+        controles na tela); "a seguir" em `pivot-tray-tile.episodeTitle` (sempre presente) → usado no autoplay
+        e pra inferir o atual (próximo − 1). Userscript v3 orientado a eventos (sem setInterval).
+      - notas: OMDb deixava 15/24 episódios sem nota; agora 1 requisição GraphQL do IMDb por temporada, só
+        quando um episódio começa (endpoint não oficial do site do IMDb; OMDb só identifica a série).
+      - pílula só com a nota do EPISÓDIO (série fica pequena na expandida); anel que se desenha até a nota
+        com o número contando, cor pela qualidade, título sobe depois, coroa + brilho no melhor.
+      - logos: Simple Icons (Netflix, Prime Video, Max, Apple TV, Crunchyroll, Paramount+) + Disney+
+        (Wikimedia, domínio público) em `assets/island/apps/`.
+- [ ] Auditoria de passividade (regra no ILHA.md) — timers que rodam sempre, mesmo sem nada acontecendo:
+      F1.qml:259 (1s sempre que há próxima sessão), IslandEvents 433 (carga da CPU a cada 1s), 1649 (rede 1s),
+      654 (rede/ZeroTier 5s–2min), IslandHardware 488/792/814 (5s–2min), ClaudeCode 369/429 (limites 1–10min),
+      IslandHardware:270 e IslandEvents:1724 (checar quem inicia). Trocar por sinais/hooks ou ligar só com a
+      atividade viva.
+- [ ] Periféricos/HDMI (auditoria): já existem disco conectado/remoção segura, monitor conectado com
+      Estender/Espelhar/Só externo + confirmação/reversão, bateria de periférico baixa, temperatura.
+      Falta: aviso de armazenamento quase cheio (deve ser por evento, não polling).
 
 ## Ordem sugerida daqui pra frente
 
