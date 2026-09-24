@@ -46,34 +46,14 @@ ColumnLayout {
         xn.di.wantsKeyboard = true
         Qt.callLater(() => replyField.forceActiveFocus())
     }
-    // Chats opened with a click arrive ready to type: the island asks for the keyboard *before* opening (see
-    // DynamicIsland.toggleExpanded → requestReply), so the window never switches keyboard mode while open —
-    // switching it mid-way breaks the focus grab and the overlay closes itself. Opened by hovering, it leaves the
-    // keyboard alone; one click in the field and you're typing.
+    Component.onCompleted: xn.focusReplyIfRequested()
     Connections {
         target: xn.di
         function onReplyRequestedChanged() { xn.focusReplyIfRequested() }
     }
-    // Locked on the notification you opened: one arriving meanwhile (another app, a usage-limit notice) waits in
-    // the pager instead of swapping out the conversation you're reading or answering. The arrows move the lock.
-    property int lockedId: -1
-    readonly property int lockedIndex: xn.popups.findIndex(n => n.notificationId === xn.lockedId)
-    readonly property int index: xn.lockedIndex >= 0 ? xn.lockedIndex : Math.max(0, xn.popups.length - 1)
-    readonly property var notif: xn.popups[xn.index]
-    // Muting asks for how long (1 h, until tomorrow, always) right in the header
-    property bool muteChoosing: false
-    onNotifChanged: xn.muteChoosing = false
-        ?? Notifications.list.find(n => n.notificationId === xn.lockedId)
-        ?? xn.di.shownNotification ?? xn.di.latestNotification
-    function lockOn(index) {
-        const target = xn.popups[Math.max(0, Math.min(xn.popups.length - 1, index))]
-        if (target) xn.lockedId = target.notificationId
-    }
-    Component.onCompleted: {
-        const opened = xn.di.shownNotification ?? xn.di.latestNotification
-        xn.lockedId = opened?.notificationId ?? -1
-        xn.focusReplyIfRequested()
-    }
+    property int back: 0
+    readonly property int index: Math.max(0, xn.popups.length - 1 - Math.min(xn.back, xn.popups.length - 1))
+    readonly property var notif: xn.popups[xn.index] ?? xn.di.latestNotification
     readonly property var parts: IslandEvents.notificationParts(xn.notif)
     readonly property bool critical: (xn.notif?.urgency ?? "").toLowerCase() === "critical"
     readonly property color accent: xn.critical ? Appearance.colors.colError : IslandEvents.appColor(xn.parts.app, Appearance.colors.colPrimary)
@@ -91,17 +71,11 @@ ColumnLayout {
     readonly property bool messaging: /whats|zap|telegram|discord|vesktop|signal|slack|teams|instagram|messenger/i.test(xn.parts.app)
     property string replyHint: ""
 
-    // The rest of the conversation — every message from the same person in the last hour, oldest first — so the
-    // thread can be scrolled back instead of showing only the newest one
+    // Earlier messages from the same conversation, oldest first, for context (at most two)
     readonly property var earlier: {
         if (!xn.notif || !xn.messaging) return []
         const key = IslandEvents.conversationKey(xn.notif)
-        const since = (xn.notif.time ?? Date.now()) - 60 * 60000
-        return Notifications.list
-            .filter(n => n.notificationId !== xn.notif.notificationId && IslandEvents.conversationKey(n) === key
-                && (n.time ?? 0) >= since && (n.time ?? 0) <= (xn.notif.time ?? Date.now()))
-            .sort((a, b) => (a.time ?? 0) - (b.time ?? 0))
-            .slice(-30)
+        return xn.popups.slice(0, xn.index).filter(n => IslandEvents.conversationKey(n) === key).slice(-2)
     }
 
     function escaped(text) {
@@ -184,11 +158,11 @@ ColumnLayout {
                 text: "chevron_left"
                 iconSize: 18
                 color: Appearance.colors.colOnLayer0
-                opacity: xn.index > 0 ? 0.9 : 0.3
+                opacity: xn.back < xn.popups.length - 1 ? 0.9 : 0.3
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: xn.lockOn(xn.index - 1)
+                    onClicked: xn.back = Math.min(xn.back + 1, xn.popups.length - 1)
                 }
             }
             StyledText {
@@ -202,11 +176,11 @@ ColumnLayout {
                 text: "chevron_right"
                 iconSize: 18
                 color: Appearance.colors.colOnLayer0
-                opacity: xn.index < xn.popups.length - 1 ? 0.9 : 0.3
+                opacity: xn.back > 0 ? 0.9 : 0.3
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: xn.lockOn(xn.index + 1)
+                    onClicked: xn.back = Math.max(xn.back - 1, 0)
                 }
             }
         }
@@ -222,7 +196,7 @@ ColumnLayout {
             color: headerIconArea.containsMouse ? Appearance.colors.colLayer2 : "transparent"
 
             Behavior on color {
-                ColorAnimation { duration: IslandMotion.micro }
+                ColorAnimation { duration: 140 }
             }
 
             MaterialSymbol {
@@ -247,7 +221,7 @@ ColumnLayout {
         }
 
         HeaderIcon {
-            visible: xn.notif !== null && !xn.muteChoosing
+            visible: xn.notif !== null
             icon: "open_in_new"
             tip: `${Translation.tr("Open in")} ${xn.parts.app || Translation.tr("app")}`
             onTap: () => {
@@ -257,45 +231,16 @@ ColumnLayout {
         }
         HeaderIcon {
             visible: xn.notif !== null
-            icon: xn.muteChoosing ? "arrow_back" : "notifications_off"
-            tip: xn.muteChoosing ? Translation.tr("Back") : Translation.tr("Mute conversation")
-            onTap: () => { xn.muteChoosing = !xn.muteChoosing }
-        }
-        Repeater {
-            model: xn.muteChoosing ? IslandEvents.muteChoices() : []
-            delegate: Rectangle {
-                id: choice
-                required property var modelData
-                implicitWidth: choiceText.implicitWidth + 16
-                implicitHeight: 24
-                radius: 12
-                color: choiceArea.containsMouse ? Appearance.colors.colPrimary : Appearance.colors.colLayer2
-
-                StyledText {
-                    id: choiceText
-                    anchors.centerIn: parent
-                    text: choice.modelData.label
-                    font.pixelSize: Appearance.font.pixelSize.smallest
-                    font.weight: Font.DemiBold
-                    color: choiceArea.containsMouse ? Appearance.colors.colOnPrimary : Appearance.colors.colOnLayer2
-                }
-                MouseArea {
-                    id: choiceArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        const target = xn.notif
-                        IslandEvents.muteKeyFor(IslandEvents.conversationKey(target), choice.modelData.ms)
-                        Notifications.timeoutNotification(target.notificationId)
-                        xn.muteChoosing = false
-                        xn.di.collapse()
-                    }
-                }
+            icon: "notifications_off"
+            tip: Translation.tr("Mute conversation")
+            onTap: () => {
+                const target = xn.notif
+                IslandEvents.toggleMute(target)
+                Notifications.timeoutNotification(target.notificationId)
+                xn.di.collapse()
             }
         }
         HeaderIcon {
-            visible: !xn.muteChoosing
             icon: "close"
             tip: Translation.tr("Dismiss")
             onTap: () => { if (xn.notif) Notifications.discardNotification(xn.notif.notificationId) }
@@ -351,151 +296,110 @@ ColumnLayout {
                 opacity: xn.rise(0)
             }
 
-            // The thread: scrolls back through the conversation, opens at the newest message
-            Flickable {
-                id: thread
-                Layout.fillWidth: true
-                Layout.preferredWidth: 1
-                Layout.preferredHeight: Math.min(threadColumn.implicitHeight, 250)
-                contentWidth: width
-                contentHeight: threadColumn.implicitHeight
-                clip: true
-                interactive: contentHeight > height
-                boundsBehavior: Flickable.StopAtBounds
-                onContentHeightChanged: thread.contentY = Math.max(0, thread.contentHeight - thread.height)
-                onHeightChanged: thread.contentY = Math.max(0, thread.contentHeight - thread.height)
+            // Earlier in the same conversation: smaller, quieter bubbles
+            Repeater {
+                model: xn.earlier
+                delegate: Rectangle {
+                    id: earlierBubble
+                    required property var modelData
+                    required property int index
+                    readonly property var p: IslandEvents.notificationParts(earlierBubble.modelData)
+                    Layout.maximumWidth: parent.width
+                    Layout.preferredWidth: earlierText.implicitWidth + 22
+                    implicitHeight: earlierText.implicitHeight + 12
+                    radius: 12
+                    topLeftRadius: 4
+                    color: Appearance.colors.colLayer1
+                    opacity: 0.75 * xn.rise(earlierBubble.index + 1)
+                    transform: Translate { y: (1 - xn.rise(earlierBubble.index + 1)) * 10 }
 
-                ColumnLayout {
-                    id: threadColumn
-                    width: thread.width
-                    spacing: 5
-
-                    // Earlier in the same conversation: smaller, quieter bubbles
-                    Repeater {
-                        model: xn.earlier
-                        delegate: Rectangle {
-                            id: earlierBubble
-                            required property var modelData
-                            required property int index
-                            readonly property var p: IslandEvents.notificationParts(earlierBubble.modelData)
-                            Layout.maximumWidth: thread.width
-                            Layout.preferredWidth: earlierText.implicitWidth + 22
-                            implicitHeight: earlierText.implicitHeight + 12
-                            radius: 12
-                            topLeftRadius: 4
-                            color: Appearance.colors.colLayer1
-                            opacity: 0.75 * xn.rise(Math.min(3, xn.earlier.length - earlierBubble.index))
-                            transform: Translate { y: (1 - xn.rise(Math.min(3, xn.earlier.length - earlierBubble.index))) * 10 }
-
-                            StyledText {
-                                id: earlierText
-                                anchors {
-                                    left: parent.left
-                                    right: parent.right
-                                    verticalCenter: parent.verticalCenter
-                                    leftMargin: 11
-                                    rightMargin: 11
-                                }
-                                text: earlierBubble.p.body || (earlierBubble.p.media?.label ?? "")
-                                font.pixelSize: Appearance.font.pixelSize.smaller
-                                color: Appearance.colors.colOnLayer1
-                                wrapMode: Text.Wrap
-                                maximumLineCount: 2
-                                elide: Text.ElideRight
-                            }
+                    StyledText {
+                        id: earlierText
+                        anchors {
+                            left: parent.left
+                            right: parent.right
+                            verticalCenter: parent.verticalCenter
+                            leftMargin: 11
+                            rightMargin: 11
                         }
-                    }
-
-                    // The message itself, in a bubble with its time tucked into the corner
-                    Rectangle {
-                        id: bubble
-                        visible: xn.parts.body !== "" || xn.parts.media !== null
-                        Layout.fillWidth: true
-                        Layout.preferredWidth: 1
-                        implicitHeight: bubbleColumn.implicitHeight + 18
-                        radius: 16
-                        topLeftRadius: 5
-                        color: ColorUtils.mix(Appearance.colors.colLayer2, xn.accent, 0.9)
-                        border.width: 1
-                        border.color: ColorUtils.transparentize(xn.accent, 0.8)
-                        readonly property real r: xn.rise(Math.min(3, xn.earlier.length) + 1)
-                        opacity: bubble.r
-                        transform: Translate { y: (1 - bubble.r) * 12 }
-
-                        ColumnLayout {
-                            id: bubbleColumn
-                            anchors {
-                                left: parent.left
-                                right: parent.right
-                                top: parent.top
-                                margins: 9
-                                leftMargin: 12
-                                rightMargin: 12
-                            }
-                            spacing: 2
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 6
-
-                                MaterialSymbol {
-                                    Layout.alignment: Qt.AlignTop
-                                    visible: xn.parts.media !== null
-                                    text: xn.parts.media?.icon ?? ""
-                                    iconSize: 17
-                                    fill: 1
-                                    color: xn.accent
-                                }
-                                StyledText {
-                                    Layout.fillWidth: true
-                                    Layout.preferredWidth: 1
-                                    text: {
-                                        const body = xn.parts.body || (xn.parts.media?.label ?? "")
-                                        return xn.parts.author !== ""
-                                            ? `<b><font color="${xn.accent}">${xn.escaped(xn.parts.author)}</font></b><br>${xn.escaped(body)}`
-                                            : xn.escaped(body)
-                                    }
-                                    textFormat: Text.StyledText
-                                    font.pixelSize: Appearance.font.pixelSize.small
-                                    color: Appearance.colors.colOnLayer0
-                                    wrapMode: Text.Wrap
-                                    maximumLineCount: 8
-                                    elide: Text.ElideRight
-                                    lineHeight: 1.1
-                                }
-                            }
-                            StyledText {
-                                Layout.alignment: Qt.AlignRight
-                                text: xn.notif ? Qt.formatTime(new Date(xn.notif.time), "hh:mm") : ""
-                                font.pixelSize: Appearance.font.pixelSize.smallest
-                                font.features: { "tnum": 1 }
-                                color: Appearance.colors.colOnLayer0
-                                opacity: 0.5
-                            }
-                        }
+                        text: earlierBubble.p.body || (earlierBubble.p.media?.label ?? "")
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        color: Appearance.colors.colOnLayer1
+                        wrapMode: Text.Wrap
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
                     }
                 }
-
-                ScrollBar.vertical: ScrollBar {
-                    policy: thread.interactive ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
-                    width: 4
-                }
-                // Every wheel event over the thread stays here — including a touchpad's momentum once it hits the
-                // end — instead of spilling over into the island's "next view" scrolling
-                MouseArea {
-                    parent: thread
-                    anchors.fill: parent
-                    z: 10
-                    acceptedButtons: Qt.NoButton
-                    onWheel: wheel => {
-                        const step = wheel.pixelDelta.y !== 0 ? wheel.pixelDelta.y : wheel.angleDelta.y / 120 * 48
-                        thread.contentY = Math.max(0, Math.min(thread.contentHeight - thread.height, thread.contentY - step))
-                        wheel.accepted = true
-                    }
-                }
-
             }
 
+            // The message itself, in a bubble with its time tucked into the corner
+            Rectangle {
+                id: bubble
+                visible: xn.parts.body !== "" || xn.parts.media !== null
+                Layout.fillWidth: true
+                Layout.preferredWidth: 1
+                implicitHeight: bubbleColumn.implicitHeight + 18
+                radius: 16
+                topLeftRadius: 5
+                color: ColorUtils.mix(Appearance.colors.colLayer2, xn.accent, 0.9)
+                border.width: 1
+                border.color: ColorUtils.transparentize(xn.accent, 0.8)
+                readonly property real r: xn.rise(xn.earlier.length + 1)
+                opacity: bubble.r
+                transform: Translate { y: (1 - bubble.r) * 12 }
+
+                ColumnLayout {
+                    id: bubbleColumn
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                        top: parent.top
+                        margins: 9
+                        leftMargin: 12
+                        rightMargin: 12
+                    }
+                    spacing: 2
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+
+                        MaterialSymbol {
+                            Layout.alignment: Qt.AlignTop
+                            visible: xn.parts.media !== null
+                            text: xn.parts.media?.icon ?? ""
+                            iconSize: 17
+                            fill: 1
+                            color: xn.accent
+                        }
+                        StyledText {
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 1
+                            text: {
+                                const body = xn.parts.body || (xn.parts.media?.label ?? "")
+                                return xn.parts.author !== ""
+                                    ? `<b><font color="${xn.accent}">${xn.escaped(xn.parts.author)}</font></b><br>${xn.escaped(body)}`
+                                    : xn.escaped(body)
+                            }
+                            textFormat: Text.StyledText
+                            font.pixelSize: Appearance.font.pixelSize.small
+                            color: Appearance.colors.colOnLayer0
+                            wrapMode: Text.Wrap
+                            maximumLineCount: 8
+                            elide: Text.ElideRight
+                            lineHeight: 1.1
+                        }
+                    }
+                    StyledText {
+                        Layout.alignment: Qt.AlignRight
+                        text: xn.notif ? Qt.formatTime(new Date(xn.notif.time), "hh:mm") : ""
+                        font.pixelSize: Appearance.font.pixelSize.smallest
+                        font.features: { "tnum": 1 }
+                        color: Appearance.colors.colOnLayer0
+                        opacity: 0.5
+                    }
+                }
+            }
         }
     }
 
@@ -531,7 +435,7 @@ ColumnLayout {
             running: mediaFrame.visible
             from: 0.6
             to: 1
-            duration: IslandMotion.long
+            duration: 520
             easing.type: Easing.OutBack
         }
     }
@@ -553,7 +457,7 @@ ColumnLayout {
                 color: actionMouse.containsMouse ? ColorUtils.transparentize(xn.accent, 0.65) : ColorUtils.transparentize(xn.accent, 0.82)
 
                 Behavior on color {
-                    ColorAnimation { duration: IslandMotion.micro }
+                    ColorAnimation { duration: 150 }
                 }
 
                 StyledText {
@@ -582,46 +486,6 @@ ColumnLayout {
         visible: replyRow.visible
         spacing: 6
 
-        // The whole conversation to Gemini (the shell's AI chat), for a few suggested replies
-        Rectangle {
-            id: geminiChip
-            implicitWidth: geminiRow.implicitWidth + 20
-            implicitHeight: 28
-            radius: 14
-            color: geminiArea.containsMouse ? ColorUtils.transparentize("#4796E3", 0.7) : Appearance.colors.colLayer1
-            scale: Math.max(0.01, xn.rise(xn.earlier.length + 2)) * (geminiArea.pressed ? 0.92 : 1)
-
-            Behavior on color {
-                ColorAnimation { duration: IslandMotion.micro }
-            }
-
-            RowLayout {
-                id: geminiRow
-                anchors.centerIn: parent
-                spacing: 5
-                DiClaudeIcon {
-                    agent: "gemini"
-                    size: 13
-                    color: "#4796E3"
-                }
-                StyledText {
-                    text: Translation.tr("Ask Gemini")
-                    font.pixelSize: Appearance.font.pixelSize.smaller
-                    color: Appearance.colors.colOnLayer1
-                }
-            }
-            MouseArea {
-                id: geminiArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    IslandEvents.askGemini([...xn.earlier, xn.notif])
-                    xn.di.collapse()
-                }
-            }
-        }
-
         Repeater {
             model: ["👍", "❤️", "😂", Translation.tr("Already looking"), Translation.tr("Ok!")]
             delegate: Rectangle {
@@ -635,7 +499,7 @@ ColumnLayout {
                 scale: Math.max(0.01, xn.rise(xn.earlier.length + 2 + quick.index * 0.35)) * (quickArea.pressed ? 0.92 : 1)
 
                 Behavior on color {
-                    ColorAnimation { duration: IslandMotion.micro }
+                    ColorAnimation { duration: 140 }
                 }
 
                 StyledText {
@@ -716,10 +580,10 @@ ColumnLayout {
             opacity: replyField.text !== "" ? 1 : 0.6
 
             Behavior on scale {
-                NumberAnimation { duration: IslandMotion.short; easing.type: Easing.OutBack; easing.overshoot: 2.2 }
+                NumberAnimation { duration: 260; easing.type: Easing.OutBack; easing.overshoot: 2.2 }
             }
             Behavior on opacity {
-                NumberAnimation { duration: IslandMotion.micro }
+                NumberAnimation { duration: 160 }
             }
 
             MaterialSymbol {
