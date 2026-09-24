@@ -67,7 +67,10 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
    building → ready (URL detectada, fica Live enquanto a porta responder) → error/remove. Usa o handler
    IPC novo `island dev` (`IslandEvents.qml`). Sem botão de ação na expandida ainda — mesmo nível que
    Terminal Activity hoje (ação só existe no Histórico depois). Sem suporte por framework de propósito.
-9. [ ] Focus Mode (seção 33) — toggle que manda não-importantes pro histórico sem peek. **Não existe.**
+9. [x] Focus Mode (seção 33) — `IslandEvents.focusOn`/`toggleFocus()`. Enquanto ligado, notificação
+   não-crítica nunca vira Peek (via `isMuted`, sem efeito colateral em binding — contagem via
+   `Connections.onNotify`, que é imperativo). Ao desligar, mostra "Focus finished · N min · M waiting"
+   como Live Activity (`upsertActivity`, mesmo padrão do caffeine). Chip em Home → More.
 10. [ ] Periféricos (seção 27) — USB/SSD, bateria de fones/mouse/controle, armazenamento cheio,
     thermal — não auditado a fundo ainda (thermal já existe via `IslandHardware`)
 11. [ ] HDMI/Monitor (seção 28) — não auditado a fundo ainda; `IslandHardware` já tem
@@ -82,4 +85,4 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
       `agents` agora só entra em `activeIds` quando nenhuma `activity` atual já é desse agente.
 ## Ordem sugerida daqui pra frente
 
-Focus Mode → Smart Drop → periféricos/HDMI (auditoria) → Motion (Fase 6).
+Smart Drop → periféricos/HDMI (auditoria) → Motion (Fase 6).
