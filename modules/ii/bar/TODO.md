@@ -96,7 +96,7 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
       seletor com todas as candidatas (ativas + Sistema/Gaveta/Agentes/ZeroTier/Histórico/F1/Mídia).
       Mesmo `splitId` alimenta a expandida lado a lado. IPC: `island split <id>` / `island split ""`.
 - [x] Home compacta: bandeja de status uniforme (`StatusGlyph`): mesmo tamanho/tom, cor só em alerta, contagem como badge, hover circular, todos clicáveis
-- [ ] Home expandida confusa: difícil chegar nas ilhas ativas úteis
+- [x] Home expandida: seção "Agora" (uma linha tocável por ilha ativa + F1 quando a sessão está a <3 dias, entrada escalonada), cabeçalho alinhado à esquerda, dock com colunas iguais, rótulos em pt-BR, contagem legível ("13h 52min")
 - [ ] Motion graphics criativos (Fase 6)
 
 ## Ordem sugerida daqui pra frente
