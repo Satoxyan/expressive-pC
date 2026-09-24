@@ -89,9 +89,12 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
 - [x] Bug: capacete da F1 não tinha área de clique; agora abre a F1. `agents`/`clipboard`/`zerotier` entraram em `standaloneViews` (antes a expandida voltava sozinha pra Home)
 - [ ] Animação da gaveta melhor
 - [x] Indicador de privacidade: saiu de dentro da pílula (cobria o relógio) pra um ponto do lado de fora, à esquerda; halo respirando lento, um ripple só ao ligar
-- [ ] Split na pílula COMPACTA: duas ilhas lado a lado, qualquer uma (mesmo inativa, ex. Sistema),
-      escolha intuitiva, divisão bonita, animação entre as duas, dispensar a segunda por arrasto/scroll
-      (sem X sempre visível)
+- [x] Split na pílula COMPACTA (testado com print ao vivo): segunda pílula brota da principal ("mitose",
+      pescoço que afina e solta), scroll em cima troca a ilha (rolagem tipo caça-níquel), arrastar pra
+      longe joga fora, empurrar de volta pra principal reabsorve, clique do meio descarta, × só no hover.
+      Entrada: "+" que aparece ao lado no hover, clique direito na pílula, ou botão fixo na expandida →
+      seletor com todas as candidatas (ativas + Sistema/Gaveta/Agentes/ZeroTier/Histórico/F1/Mídia).
+      Mesmo `splitId` alimenta a expandida lado a lado. IPC: `island split <id>` / `island split ""`.
 - [x] Home compacta: bandeja de status uniforme (`StatusGlyph`): mesmo tamanho/tom, cor só em alerta, contagem como badge, hover circular, todos clicáveis
 - [ ] Home expandida confusa: difícil chegar nas ilhas ativas úteis
 - [ ] Motion graphics criativos (Fase 6)
