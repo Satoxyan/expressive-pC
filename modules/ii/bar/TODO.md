@@ -54,7 +54,7 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
 
 1. [x] Privacy Island — já completo (PipeWire real + indicador ambiente `privacyDots`), melhor que a
    spec literal (sem peek a cada toggle, ambient dots)
-2. [ ] Smart Drop (seção 21) — ações contextuais por tipo de arquivo (MIME) no drop da Shelf. **Não existe.**
+2. [x] Smart Drop (seção 21) — ver Rodada 3
 3. [~] Clipboard inteligente (seção 22) — já detecta URL/YouTube/PDF/endereço/idioma estrangeiro;
    falta cor (hex) e rótulo de linguagem de código
 4. [~] Agents 2.0 (seção 23) — já tem Live/waiting→attention/dashboard; falta confirmar promoção
@@ -110,7 +110,11 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
       barras que crescem em sequência, atual destacado, melhor em dourado, hover mostra o episódio). Fonte do
       episódio: `scripts/island/watch-rating.user.js` (Tampermonkey). Aparece em "Agora" enquanto toca.
       Pendente: validar os seletores do userscript na Netflix/Disney+ reais (só testei o caminho sem script).
-- [ ] Smart Drop (seção 21)
+- [x] Smart Drop (seção 21): `services/SmartDrop.qml` (tipo por extensão → ações; argv separado, testado
+      com nome de arquivo malicioso sem injeção). Ao arrastar, a pílula vira zonas de ação com um destaque
+      que desliza pra zona sob o cursor; soltar executa. Imagem: Gaveta/Editar(swappy)/Copiar/PNG ·
+      PDF: Gaveta/Abrir/Caminho · zip: Extrair/Gaveta/Abrir · código: Gaveta/Copiar/Editor(code) ·
+      link: Abrir/Copiar/QR/Gaveta. Arraste real não testado (só os comandos).
 - [ ] Periféricos/HDMI (auditoria)
 
 ## Ordem sugerida daqui pra frente
