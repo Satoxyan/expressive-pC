@@ -153,6 +153,10 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
       notificação (abre a conversa certa), confirma que a janela focada é o WhatsApp, digita com wtype (sem
       clipboard) e aperta Enter. Se a conversa não abrir, não digita nada e deixa copiado. NÃO testado com
       mensagem real (não dá pra testar sem enviar para alguém).
+- [x] Mensagens seguidas da mesma pessoa: badge numerado na foto (conta o histórico dos últimos 15 min, pula a
+      cada nova). Expandida com a conversa inteira da última hora (até 30) num fio rolável que abre no fim.
+      Campo de resposta focado ao abrir: por clique, na hora; por hover, só quando o ponteiro entra no card
+      (e devolve o teclado se sair sem digitar) — pra não roubar o que você digita em outro lugar.
 - [x] Figurinha: preview impossível — a notificação do WhatsApp Web só traz a foto do contato e o texto
       "💟 Figurinha"; responder funciona igual a qualquer mensagem.
 - [ ] Periféricos/HDMI (auditoria): já existem disco conectado/remoção segura, monitor conectado com
