@@ -63,7 +63,10 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
 6. [~] Call Activity (seção 30) — já detecta chamada via PipeWire e mostra no anchor; falta
    mute/deafen/sair como controles na expandida
 7. [~] Terminal Activity (seção 25) — já existe (`scripts/island/cmd-island.zsh`/`.sh`)
-8. [ ] Dev Activity (seção 26) — detecção de servidor local (localhost:PORT), building/ready/error. **Não existe.**
+8. [x] Dev Activity (seção 26) — `scripts/island/dev-island.sh` (genérico, testado com input simulado):
+   building → ready (URL detectada, fica Live enquanto a porta responder) → error/remove. Usa o handler
+   IPC novo `island dev` (`IslandEvents.qml`). Sem botão de ação na expandida ainda — mesmo nível que
+   Terminal Activity hoje (ação só existe no Histórico depois). Sem suporte por framework de propósito.
 9. [ ] Focus Mode (seção 33) — toggle que manda não-importantes pro histórico sem peek. **Não existe.**
 10. [ ] Periféricos (seção 27) — USB/SSD, bateria de fones/mouse/controle, armazenamento cheio,
     thermal — não auditado a fundo ainda (thermal já existe via `IslandHardware`)
@@ -79,4 +82,4 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
       `agents` agora só entra em `activeIds` quando nenhuma `activity` atual já é desse agente.
 ## Ordem sugerida daqui pra frente
 
-Dev Activity → Focus Mode → Smart Drop → periféricos/HDMI (auditoria) → Motion (Fase 6).
+Focus Mode → Smart Drop → periféricos/HDMI (auditoria) → Motion (Fase 6).

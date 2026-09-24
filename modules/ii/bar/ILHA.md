@@ -109,5 +109,8 @@ meio** silencia até o fim da sessão, e o chip "trazer de volta" na expandida d
 
 - `~/.claude/settings.json`, `~/.codex/hooks.json`, `~/.gemini/config/hooks.json` — hooks dos agentes.
 - `~/.config/fish/conf.d/island.fish` e `scripts/island/cmd-island.zsh` — comandos longos do terminal.
+- `scripts/island/dev-island.sh <id> [título]` — Dev Activity (seção 26): `npm run dev 2>&1 | dev-island.sh
+  myapp "My App"`. Genérico por design — só procura uma URL localhost e palavras de erro/pronto na saída,
+  não entende nenhum framework específico. Mantém a Live Activity viva enquanto a porta responder.
 - `~/.config/foot/foot.ini` — `pipe-command-output`, que é como a ilha lê a saída de um comando que falhou.
 - `~/.config/hypr-profiles/end4/custom/rules.lua` — a regra `no_anim` acima.
