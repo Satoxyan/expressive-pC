@@ -11,8 +11,6 @@ ColumnLayout {
     required property Item di
     spacing: 8
     implicitWidth: 390
-    // Layouts overwrite implicitWidth with their children's; the container reads this instead
-    readonly property real wantedWidth: 390
 
     // A ColumnLayout takes its width from its children and ignores implicitWidth; this is what holds 390
     Item {
@@ -58,10 +56,10 @@ ColumnLayout {
         scale: buttonMouse.pressed ? 0.94 : 1
 
         Behavior on color {
-            ColorAnimation { duration: IslandMotion.micro }
+            ColorAnimation { duration: 150 }
         }
         Behavior on scale {
-            NumberAnimation { duration: IslandMotion.micro; easing.type: Easing.OutBack }
+            NumberAnimation { duration: 160; easing.type: Easing.OutBack }
         }
 
         RowLayout {
@@ -165,7 +163,7 @@ ColumnLayout {
             opacity: session.ended ? 0.7 : 1
 
             Behavior on color {
-                ColorAnimation { duration: IslandMotion.short }
+                ColorAnimation { duration: 200 }
             }
 
             ColumnLayout {
@@ -289,7 +287,7 @@ ColumnLayout {
                             color: session.modelData.context >= 80 ? IslandEvents.colorAttention : Appearance.colors.colPrimary
 
                             Behavior on width {
-                                NumberAnimation { duration: IslandMotion.long; easing.type: Easing.OutCubic }
+                                NumberAnimation { duration: 400; easing.type: Easing.OutCubic }
                             }
                         }
                     }
@@ -488,7 +486,7 @@ ColumnLayout {
                         x: 0
 
                         Behavior on width {
-                            NumberAnimation { duration: IslandMotion.long; easing.type: Easing.OutCubic }
+                            NumberAnimation { duration: 400; easing.type: Easing.OutCubic }
                         }
 
                         NumberAnimation on x {
