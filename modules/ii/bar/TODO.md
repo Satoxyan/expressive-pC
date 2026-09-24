@@ -87,7 +87,7 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
 
 - [x] Bug: ícone da gaveta não abria — clicar numa cápsula lateral só trocava ela de lugar com a principal; agora abre a expandida dela direto
 - [x] Bug: capacete da F1 não tinha área de clique; agora abre a F1. `agents`/`clipboard`/`zerotier` entraram em `standaloneViews` (antes a expandida voltava sozinha pra Home)
-- [ ] Animação da gaveta melhor
+- [x] Gaveta: na compacta o leque de miniaturas abre no hover; na expandida os arquivos são distribuídos um a um (caem inclinados e assentam), sobem um pouco no hover
 - [x] Indicador de privacidade: saiu de dentro da pílula (cobria o relógio) pra um ponto do lado de fora, à esquerda; halo respirando lento, um ripple só ao ligar
 - [x] Split na pílula COMPACTA (testado com print ao vivo): segunda pílula brota da principal ("mitose",
       pescoço que afina e solta), scroll em cima troca a ilha (rolagem tipo caça-níquel), arrastar pra
@@ -97,7 +97,7 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
       Mesmo `splitId` alimenta a expandida lado a lado. IPC: `island split <id>` / `island split ""`.
 - [x] Home compacta: bandeja de status uniforme (`StatusGlyph`): mesmo tamanho/tom, cor só em alerta, contagem como badge, hover circular, todos clicáveis
 - [x] Home expandida: seção "Agora" (uma linha tocável por ilha ativa + F1 quando a sessão está a <3 dias, entrada escalonada), cabeçalho alinhado à esquerda, dock com colunas iguais, rótulos em pt-BR, contagem legível ("13h 52min")
-- [ ] Motion graphics criativos (Fase 6)
+- [x] Motion: mitose/reabsorção do split com "gole" da pílula principal, rolagem caça-níquel ao trocar a ilha do split, arremesso ao arrastar, ripple da privacidade, "+" que gira ao entrar, bandeja com hover que salta, lista "Agora" e seletor de split entrando escalonados
 
 ## Ordem sugerida daqui pra frente
 
