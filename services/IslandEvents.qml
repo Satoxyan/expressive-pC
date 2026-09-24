@@ -118,14 +118,10 @@ Singleton {
     signal pinToggleRequested()
     signal simulateRequested(string name)
     signal viewRequested(string view)
-    signal splitRequested(string id)
     signal scrollRequested(int direction)
     signal homeRequested()
     signal dismissRequested()
     signal silenceRequested()
-    // One key to hush everything: over a fullscreen window it silences the rest of that fullscreen, otherwise it
-    // toggles Focus Mode (DynamicIsland.qml decides which)
-    signal quietRequested()
 
     // Clipboard
     property string lastClipEntry: ""
@@ -427,11 +423,47 @@ Singleton {
         }
     }
 
-    // Sustained CPU / memory / GPU pressure lives in Pressure; these stay for the older readers (thermal alert)
-    readonly property bool systemLoadActive: Pressure.active
-    readonly property var cpuTop: (Pressure.procs.cpu ?? [])[0] ?? null
-    readonly property string topProcess: root.cpuTop?.label ?? ""
-    readonly property real topProcessCpu: (root.cpuTop?.value ?? 0) * 100
+    // Sustained CPU load
+    property int loadSeconds: 0
+    property bool systemLoadActive: false
+    property string topProcess: ""
+    property real topProcessCpu: 0
+
+    Timer {
+        interval: 1000
+        repeat: true
+        running: root.cfg.systemLoad ?? true
+        onTriggered: {
+            if (root.fakeLoad) return
+            const threshold = (root.cfg.systemLoadThreshold ?? 90) / 100
+            const cpu = ResourceUsage.cpuUsage
+            if (cpu >= threshold) root.loadSeconds = Math.min(root.loadSeconds + 1, 30)
+            else if (cpu < threshold - 0.1) root.loadSeconds = Math.max(root.loadSeconds - 2, 0)
+            if (!root.systemLoadActive && root.loadSeconds >= 10) root.systemLoadActive = true
+            else if (root.systemLoadActive && root.loadSeconds === 0) root.systemLoadActive = false
+        }
+    }
+
+    Timer {
+        interval: 3000
+        repeat: true
+        triggeredOnStart: true
+        running: root.systemLoadActive
+        onTriggered: topProcessProc.running = true
+    }
+
+    Process {
+        id: topProcessProc
+        command: ["bash", "-c", "ps -eo comm=,%cpu= --sort=-%cpu | head -n1"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const match = text.trim().match(/^(.*\S)\s+([\d.]+)$/)
+                if (!match) return
+                root.topProcess = match[1]
+                root.topProcessCpu = parseFloat(match[2])
+            }
+        }
+    }
 
     // Song recognition result
     property string lastSongTitle: ""
@@ -518,72 +550,10 @@ Singleton {
 
     // ZeroTier's virtual interface breaks WebRTC voice in Vesktop/Discord: warn during calls, offer to stop it,
     // and offer to bring it back once the call is over
-    readonly property bool voiceCallActive: root.fakeCall || root.privacyLinks.some(link => link.source.type === PwNodeType.AudioSource
+    readonly property bool voiceCallActive: root.privacyLinks.some(link => link.source.type === PwNodeType.AudioSource
         && /vesktop|discord|webcord/i.test(`${link.target.properties?.["application.name"] ?? ""} ${link.target.properties?.["application.process.binary"] ?? ""}`))
     property bool ztWarned: false
     property bool ztStoppedForCall: false
-
-    // Call controls, straight on the app's own PipeWire streams: the state shown is the real one, and it works
-    // whatever the app's keybinds are. Mute silences its capture stream; deafen also silences everything it plays.
-    // Leaving needs the app's own shortcut (Discord has none by default): set `callLeaveShortcut`, e.g.
-    // "CTRL SHIFT, E" matching Discord → Settings → Keybinds → "Disconnect from voice"; without it the button
-    // brings the call window up instead.
-    readonly property var callAppPattern: /vesktop|discord|webcord/i
-    readonly property var callInStreams: root.privacyLinks.filter(link => link.source.type === PwNodeType.AudioSource
-        && root.callAppPattern.test(`${link.target.properties?.["application.name"] ?? ""} ${link.target.properties?.["application.process.binary"] ?? ""}`))
-        .map(link => link.target)
-    readonly property var callOutStreams: root.voiceCallActive ? Pipewire.nodes.values.filter(n => n.type === PwNodeType.AudioOutStream
-        && root.callAppPattern.test(`${n.properties?.["application.name"] ?? ""} ${n.properties?.["application.process.binary"] ?? ""}`)) : []
-
-    PwObjectTracker {
-        objects: root.callOutStreams
-    }
-
-    readonly property bool callMuted: root.fakeCall ? root.fakeCallMuted : root.callInStreams.length > 0 && root.callInStreams.every(n => n.audio?.muted ?? false)
-    readonly property bool callDeafened: root.fakeCall ? root.fakeCallDeaf : root.callOutStreams.length > 0 && root.callOutStreams.every(n => n.audio?.muted ?? false)
-    // ilha-teste: a call without a call
-    property bool fakeCall: false
-    property bool fakeCallMuted: false
-    property bool fakeCallDeaf: false
-    readonly property string callApp: {
-        const node = root.callInStreams[0]
-        const name = `${node?.properties?.["application.name"] ?? ""}`
-        return /vesktop/i.test(name) ? "Vesktop" : /webcord/i.test(name) ? "WebCord" : "Discord"
-    }
-
-    function toggleCallMute() {
-        if (root.fakeCall) {
-            root.fakeCallMuted = !root.fakeCallMuted
-            return
-        }
-        const muted = !root.callMuted
-        for (const node of root.callInStreams) if (node.audio) node.audio.muted = muted
-    }
-    function toggleCallDeafen() {
-        if (root.fakeCall) {
-            root.fakeCallDeaf = !root.fakeCallDeaf
-            root.fakeCallMuted = root.fakeCallDeaf
-            return
-        }
-        const deaf = !root.callDeafened
-        for (const node of root.callOutStreams) if (node.audio) node.audio.muted = deaf
-        // Deafened means nobody hears you either, like the app's own deafen
-        if (deaf && !root.callMuted) root.toggleCallMute()
-        else if (!deaf && root.callMuted) root.toggleCallMute()
-    }
-    readonly property string callLeaveShortcut: root.cfg.callLeaveShortcut ?? ""
-    function leaveCall() {
-        const target = 'class:^(vesktop|discord|WebCord|webcord)$'
-        if (root.callLeaveShortcut !== "") {
-            const [mods, key] = root.callLeaveShortcut.split(",").map(p => p.trim())
-            root.hyprDispatch(`hl.dsp.send_shortcut({ mods = "${mods}", key = "${key}", window = "${target}" })`)
-        } else {
-            root.hyprDispatch(`hl.dsp.focus({ window = "${target}" })`)
-        }
-    }
-    function openCall() {
-        root.hyprDispatch(`hl.dsp.focus({ window = "class:^(vesktop|discord|WebCord|webcord)$" })`)
-    }
 
     // How long you have been on the call: worth anchoring, since a call is exactly when you lose track of time
     property double voiceCallSince: 0
@@ -785,56 +755,6 @@ Singleton {
         }
     }
 
-    // Focus Mode (seção 33): a context, not a timer app. While it's on, non-critical notifications skip
-    // the Peek entirely and go straight to History — Critical still gets through. No forced duration;
-    // it just changes how the island behaves until you turn it off yourself.
-    property bool focusOn: false
-    property double focusSince: 0
-    property int focusSuppressedCount: 0
-
-    function toggleFocus() {
-        if (root.focusOn) {
-            root.focusOn = false
-            const minutes = Math.max(1, Math.round((Date.now() - root.focusSince) / 60000))
-            const suppressed = root.focusSuppressedCount
-            root.focusSuppressedCount = 0
-            root.upsertActivity("focus", Translation.tr("Focus finished"),
-                suppressed > 0 ? Translation.tr("%1 min · %2 waiting").arg(minutes).arg(suppressed) : Translation.tr("%1 min").arg(minutes),
-                "psychology", 1, "done")
-            return
-        }
-        root.focusOn = true
-        root.focusSince = Date.now()
-        root.focusSuppressedCount = 0
-        root.upsertActivity("focus", Translation.tr("Focus"), "", "psychology", -1, "running")
-    }
-
-    Connections {
-        target: Notifications
-        function onNotify(notification) {
-            if (!root.focusOn) return
-            if ((notification?.urgency ?? "").toLowerCase() === "critical") return
-            root.focusSuppressedCount++
-        }
-    }
-
-    property double focusNow: 0
-    readonly property int focusMinutes: root.focusOn ? Math.max(0, Math.round((root.focusNow - root.focusSince) / 60000)) : 0
-
-    Timer {
-        interval: 20000
-        repeat: true
-        running: root.focusOn
-        triggeredOnStart: true
-        onTriggered: {
-            root.focusNow = Date.now()
-            root.upsertActivity("focus", Translation.tr("Focus"),
-                root.focusSuppressedCount > 0 ? Translation.tr("%1 min · %2 waiting").arg(root.focusMinutes).arg(root.focusSuppressedCount)
-                    : Translation.tr("%1 min").arg(root.focusMinutes),
-                "psychology", -1, "running")
-        }
-    }
-
     // Copied YouTube links: download the video or just the audio straight into the drawer
     readonly property bool mediaDownloadBusy: mediaDownloadProc.running
 
@@ -928,114 +848,6 @@ Singleton {
             rgb: `rgb(${r}, ${g}, ${b})`,
             hsl: `hsl(${Math.round(Math.max(0, color.hslHue) * 360)}, ${Math.round(color.hslSaturation * 100)}%, ${Math.round(color.hslLightness * 100)}%)`
         }
-    }
-
-    // What was copied, for its icon and label. One place decides it, so the pill, the expanded view and the
-    // history all agree. Returns { kind, label, brand?, color?, icon, swatch? }:
-    //   brand — an SVG in assets/island/apps (painted in `color`); icon — a Material Symbol fallback
-    //   swatch — a copied color shows itself instead of an icon
-    readonly property var linkBrands: [
-        { re: /(^|\.)(youtube\.com|youtu\.be)$/, brand: "youtube", color: "#FF0000", label: "YouTube" },
-        { re: /(^|\.)github\.com$/, brand: "github", color: "#FFFFFF", label: "GitHub" },
-        { re: /(^|\.)(x\.com|twitter\.com)$/, brand: "x", color: "#FFFFFF", label: "X" },
-        { re: /(^|\.)reddit\.com$/, brand: "reddit", color: "#FF4500", label: "Reddit" },
-        { re: /(^|\.)instagram\.com$/, brand: "instagram", color: "#E4405F", label: "Instagram" },
-        { re: /(^|\.)tiktok\.com$/, brand: "tiktok", color: "#FFFFFF", label: "TikTok" },
-        { re: /(^|\.)twitch\.tv$/, brand: "twitch", color: "#9146FF", label: "Twitch" },
-        { re: /(^|\.)pinterest\.[a-z.]+$/, brand: "pinterest", color: "#E60023", label: "Pinterest" },
-        { re: /(^|\.)open\.spotify\.com$/, brand: "spotify", color: "#1DB954", label: "Spotify" },
-        { re: /(^|\.)(wa\.me|whatsapp\.com)$/, brand: "whatsapp", color: "#25D366", label: "WhatsApp" },
-        { re: /(^|\.)(discord\.gg|discord\.com)$/, brand: "discord", color: "#5865F2", label: "Discord" },
-        { re: /(^|\.)(t\.me|telegram\.org)$/, brand: "telegram", color: "#26A5E4", label: "Telegram" },
-        { re: /^docs\.google\.com$/, path: /^\/spreadsheets/, brand: "googlesheets", color: "#34A853", label: "Google Sheets" },
-        { re: /^docs\.google\.com$/, brand: "googledocs", color: "#4285F4", label: "Google Docs" },
-        { re: /^drive\.google\.com$/, brand: "googledrive", color: "#4285F4", label: "Google Drive" },
-        { re: /^(maps\.google\.[a-z.]+|maps\.app\.goo\.gl|goo\.gl)$/, brand: "googlemaps", color: "#4285F4", label: "Google Maps" },
-        { re: /(^|\.)google\.[a-z.]+$/, path: /^\/maps/, brand: "googlemaps", color: "#4285F4", label: "Google Maps" },
-        { re: /^mail\.google\.com$/, brand: "gmail", color: "#EA4335", label: "Gmail" },
-        { re: /(^|\.)stackoverflow\.com$/, brand: "stackoverflow", color: "#F58025", label: "Stack Overflow" },
-        { re: /(^|\.)wikipedia\.org$/, brand: "wikipedia", color: "#FFFFFF", label: "Wikipedia" },
-        { re: /(^|\.)notion\.(so|site)$/, brand: "notion", color: "#FFFFFF", label: "Notion" },
-        { re: /(^|\.)figma\.com$/, brand: "figma", color: "#F24E1E", label: "Figma" },
-        { re: /(^|\.)netflix\.com$/, brand: "netflix", color: "#E50914", label: "Netflix" },
-        { re: /(^|\.)disneyplus\.com$/, brand: "disneyplus", color: "#FFFFFF", label: "Disney+" },
-        { re: /(^|\.)primevideo\.com$/, brand: "primevideo", color: "#00A8E1", label: "Prime Video" },
-        { re: /(^|\.)shopee\.com(\.br)?$/, brand: "shopee", color: "#EE4D2D", label: "Shopee" },
-        { re: /(^|\.)aliexpress\.[a-z.]+$/, brand: "aliexpress", color: "#FF4747", label: "AliExpress" }
-    ]
-    readonly property var codeBrands: ({
-        "Python": ["python", "#3776AB"], "JavaScript": ["javascript", "#F7DF1E"], "TypeScript": ["typescript", "#3178C6"],
-        "Shell": ["gnubash", "#4EAA25"], "PHP": ["php", "#777BB4"], "Rust": ["rust", "#FFFFFF"], "Go": ["go", "#00ADD8"],
-        "C++": ["cplusplus", "#00599C"], "C": ["c", "#A8B9CC"], "Java": ["openjdk", "#FFFFFF"], "HTML": ["html5", "#E34F26"],
-        "CSS": ["css", "#663399"], "Lua": ["lua", "#5B7CF0"], "QML": ["qt", "#41CD52"], "JSON": ["json", "#FFFFFF"],
-        "Markdown": ["markdown", "#FFFFFF"], "SQL": ["", ""]
-    })
-
-    function clipKind(payload) {
-        const text = (payload?.text ?? "").trim()
-        const files = payload?.files ?? []
-        if (payload?.isImage) return { kind: "image", label: Translation.tr("Image"), icon: "image" }
-        if (files.length > 1) return { kind: "files", label: `${files.length} ${Translation.tr("files")}`, icon: "file_copy" }
-        if (files.length === 1) return { kind: "file", label: DropShelf.fileName(files[0]), icon: DropShelf.iconFor(files[0]) }
-        if (text === "") return { kind: "text", label: Translation.tr("Clipboard"), icon: "content_paste" }
-
-        const color = root.parseColor(text)
-        if (color) return { kind: "color", label: color.hex, icon: "palette", swatch: color.color }
-
-        if (/^https?:\/\/\S+$/.test(text)) {
-            const m = /^https?:\/\/([^\/?#:]+)[^\/?#]*([^?#]*)/.exec(text)
-            const host = (m?.[1] ?? "").toLowerCase().replace(/^www\./, "")
-            const path = m?.[2] ?? ""
-            const hit = root.linkBrands.find(b => b.re.test(host) && (!b.path || b.path.test(path)))
-            if (hit) return { kind: "link", label: hit.label, brand: hit.brand, color: hit.color, icon: "link" }
-            if (/\.pdf([?#]|$)/i.test(text)) return { kind: "link", label: "PDF", icon: "picture_as_pdf" }
-            return { kind: "link", label: host, icon: "link" }
-        }
-        if (/^\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*$/.test(text)) return { kind: "email", label: Translation.tr("Email"), icon: "alternate_email" }
-        if (text.length <= 25 && /^[\s()+\-.\d]+$/.test(text) && text.replace(/\D/g, "").length >= 10) return { kind: "phone", label: Translation.tr("Phone"), icon: "call" }
-        if (/^\s*[A-Z]{2}\d{9}[A-Z]{2}\s*$/.test(text)) return { kind: "tracking", label: Translation.tr("Tracking code"), icon: "local_shipping" }
-        if (root.looksLikeAddress(text)) return { kind: "address", label: Translation.tr("Address"), brand: "googlemaps", color: "#4285F4", icon: "location_on" }
-
-        const language = root.codeLanguage(text)
-        if (language !== "") {
-            const b = root.codeBrands[language] ?? ["", ""]
-            return { kind: "code", label: language, brand: b[0], color: b[1], icon: language === "SQL" ? "database" : "code" }
-        }
-        return { kind: "text", label: "", icon: "content_paste" }
-    }
-
-    // Best guess at the language of copied code, or "" when it doesn't look like code. Only strong signals:
-    // prose that happens to contain "import" or a colon must stay prose.
-    function codeLanguage(text) {
-        const t = (text ?? "").trim()
-        if (t.length < 8 || t.length > 20000) return ""
-        const lines = t.split("\n")
-        const multi = lines.length > 1
-        if (/^\s*[\[{]/.test(t)) {
-            try {
-                JSON.parse(t)
-                return "JSON"
-            } catch (e) {}
-        }
-        if (/^#!.*\b(ba|z|fi)?sh\b/.test(t)) return "Shell"
-        if (/^<\?php/.test(t)) return "PHP"
-        if (/^\s*import Qt(Quick|Qml)?\b/m.test(t) || (/^\s*\w+ \{\s*$/m.test(t) && /^\s+(id|anchors\.\w+|property \w+ \w+):/m.test(t))) return "QML"
-        if (/^\s*(SELECT\s+[\s\S]+\s+FROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|CREATE\s+(TABLE|INDEX|VIEW)|ALTER\s+TABLE|DROP\s+TABLE)\b/i.test(t)) return "SQL"
-        if (/<(!DOCTYPE|html|head|body|div|span|section|a\s+href|p|ul|li|button|script)\b[^>]*>/i.test(t) && /<\/\w+>/.test(t)) return "HTML"
-        if (/\bfn\s+\w+\s*\(.*\)\s*(->\s*[\w<>&]+\s*)?\{/.test(t) || /\blet\s+mut\b/.test(t) || /\bimpl\b.*\{/.test(t)) return "Rust"
-        if (/^package\s+\w+/m.test(t) && /\bfunc\b/.test(t) || /\bfunc\s+(\(\w+\s+\*?\w+\)\s*)?\w+\(.*\)\s*[\w()*, ]*\{/.test(t) || /:=/.test(t) && /\bfunc\b/.test(t)) return "Go"
-        if (/#include\s*[<"]/.test(t)) return /\bstd::|\bclass\b|\bnamespace\b|\bcout\b|\btemplate\s*</.test(t) ? "C++" : "C"
-        if (/\bpublic\s+(static\s+)?(class|void|interface)\b/.test(t) || /System\.out\.print/.test(t)) return "Java"
-        if (/^\s*(def\s+\w+\(.*\)\s*(->\s*[\w\[\], .]+)?:|class\s+\w+(\(.*\))?:|from\s+[\w.]+\s+import\s+|import\s+[\w.]+(\s+as\s+\w+)?\s*$|if\s+__name__\s*==)/m.test(t)
-            || (/\bprint\(.*\)/.test(t) && /:\s*$/m.test(t) && !/;\s*$/m.test(t))) return "Python"
-        if (/^\s*local\s+(function\s+)?\w+/m.test(t) || (/\bfunction\b.*\)\s*$/m.test(t) && /^\s*end\s*$/m.test(t))) return "Lua"
-        const ts = /:\s*(string|number|boolean|void|any|unknown)\b[\s,;)=]/.test(t) || /\binterface\s+\w+\s*\{/.test(t) || /\btype\s+\w+\s*=/.test(t)
-        if (/\b(const|let|var)\s+\w+\s*=/.test(t) || /=>\s*[{(]?/.test(t) || /\bfunction\s*\w*\s*\(/.test(t) || /^\s*(import|export)\s+.*from\s+['"]/m.test(t) || /console\.log\(/.test(t))
-            return ts ? "TypeScript" : "JavaScript"
-        if (/^[.#@]?[\w-][^{}\n]{0,80}\{\s*$/m.test(t) && /^\s*[\w-]{2,}\s*:\s*[^;{}\n]{1,120};\s*$/m.test(t)) return "CSS"
-        if (/^\s*(if\s+\[|for\s+\w+\s+in\b|echo\s|export\s+\w+=|sudo\s|cd\s|ls(\s|$)|grep\s|curl\s|git\s|npm\s|pacman\s|systemctl\s|\w+=\$\()/m.test(t) && (multi || /[|&;$]/.test(t) || /^(sudo|git|npm|pacman|systemctl|curl)\s/.test(t))) return "Shell"
-        if (multi && /^#{1,6}\s+\S/m.test(t) && (/^\s*[-*]\s+\S/m.test(t) || /\[.+\]\(.+\)/.test(t) || /```/.test(t))) return "Markdown"
-        return ""
     }
 
     function looksLikeAddress(text) {
@@ -1211,7 +1023,7 @@ Singleton {
     }
 
     Timer {
-        interval: 2000
+        interval: 1000
         repeat: true
         running: root.activities.length > 0
         onTriggered: {
@@ -1313,76 +1125,19 @@ Singleton {
     }
 
     function isMuted(notif) {
-        if (root.isKeyMuted(root.conversationKey(notif))) return true
-        if (root.focusOn && (notif?.urgency ?? "").toLowerCase() !== "critical") return true
-        return false
+        return (root.cfg.mutedConversations ?? []).includes(root.conversationKey(notif))
     }
 
     function toggleMute(notif) {
-        root.toggleMuteKey(root.conversationKey(notif))
-    }
-
-    function toggleMuteKey(key) {
-        if ((key ?? "") === "") return
-        if (root.isKeyMuted(key)) root.unmuteKey(key)
-        else root.muteKeyFor(key, 0)
-    }
-
-    // Muting for a while: `ms` > 0 lasts that long, 0 is for good. Timed entries live in their own list as
-    // "<until>|App|Title" and simply stop counting once the time has passed (swept on the next mute).
-    function muteKeyFor(key, ms) {
-        if ((key ?? "") === "") return
-        const now = Date.now()
-        const timed = Array.from(root.cfg.mutedConversationsUntil ?? [])
-            .filter(entry => Number(entry.split("|")[0]) > now && entry.slice(entry.indexOf("|") + 1) !== key)
-        if (ms > 0) {
-            Config.options.bar.dynamicIsland.mutedConversationsUntil = [...timed, `${now + ms}|${key}`]
-            return
-        }
-        Config.options.bar.dynamicIsland.mutedConversationsUntil = timed
+        const key = root.conversationKey(notif)
         const muted = Array.from(root.cfg.mutedConversations ?? [])
-        if (!muted.includes(key)) Config.options.bar.dynamicIsland.mutedConversations = [...muted, key]
-    }
-
-    function unmuteKey(key) {
-        Config.options.bar.dynamicIsland.mutedConversations = Array.from(root.cfg.mutedConversations ?? []).filter(k => k !== key)
-        Config.options.bar.dynamicIsland.mutedConversationsUntil = Array.from(root.cfg.mutedConversationsUntil ?? [])
-            .filter(entry => entry.slice(entry.indexOf("|") + 1) !== key)
-    }
-
-    function isKeyMuted(key) {
-        if ((root.cfg.mutedConversations ?? []).includes(key)) return true
-        const now = Date.now()
-        return (root.cfg.mutedConversationsUntil ?? []).some(entry =>
-            Number(entry.split("|")[0]) > now && entry.slice(entry.indexOf("|") + 1) === key)
-    }
-
-    // The three lengths offered wherever a conversation can be muted
-    function muteChoices() {
-        const tomorrow = new Date()
-        tomorrow.setDate(tomorrow.getDate() + 1)
-        tomorrow.setHours(8, 0, 0, 0)
-        return [
-            { label: Translation.tr("1 h"), ms: 3600000 },
-            { label: Translation.tr("Until tomorrow"), ms: tomorrow.getTime() - Date.now() },
-            { label: Translation.tr("Always"), ms: 0 }
-        ]
+        Config.options.bar.dynamicIsland.mutedConversations = muted.includes(key) ? muted.filter(k => k !== key) : [...muted, key]
     }
 
     // How long a notification needs to be read: ~60 ms per character, between 3 and 8 seconds
     function readingTime(notif) {
         const length = `${notif?.summary ?? ""} ${(notif?.body ?? "").replace(/<[^>]*>/g, "")}`.length
         return Math.max(3000, Math.min(8000, 1500 + length * 60))
-    }
-
-    // How long a notification stays up. A personal chat message (one person, not a group) stays much longer:
-    // it's the kind you actually want to read, and it used to be gone before you'd finished it.
-    function displayTime(notif) {
-        const reading = root.readingTime(notif)
-        const parts = root.notificationParts(notif)
-        if (root.isMessagingApp(parts.app) && parts.author === "")
-            return Math.max(15000, Math.min(25000, reading * 2.5))
-        return reading
     }
 
     // Brings up the app a notification came from: its default action, its desktop entry, or the web app's site
@@ -1403,63 +1158,6 @@ Singleton {
     // Chat apps running as web apps (WhatsApp in Chrome, for one) don't offer the inline reply the notification
     // protocol has, so there is nothing to send the text to. The next best thing: copy it, bring the chat to the
     // front and paste it there, leaving the Enter to you — never send something you haven't seen in the chat.
-    // WhatsApp Web: a real reply. The notification's own "default" action (what clicking it does) makes the web
-    // app open *that* conversation; reply-send.sh then waits for the focused window to really be WhatsApp,
-    // types the text without touching the clipboard and presses Enter. If the chat never comes up nothing is
-    // typed anywhere — the text is left on the clipboard and the island says so.
-    function replyToChat(notif, text) {
-        if (!notif || text.trim() === "") return false
-        const parts = root.notificationParts(notif)
-        const canOpen = (notif.actions ?? []).some(a => a.identifier === "default")
-        if (/whats/i.test(parts.app) && canOpen) {
-            replySendProc.contact = parts.title || parts.app
-            Notifications.attemptInvokeAction(notif.notificationId, "default")
-            replySendProc.command = ["bash", Quickshell.shellPath("scripts/island/reply-send.sh"), text, "WhatsApp"]
-            replySendProc.running = true
-            return true
-        }
-        return root.pasteReplyInto(notif, text)
-    }
-
-    Process {
-        id: replySendProc
-        property string contact: ""
-        onExited: (exitCode, exitStatus) => {
-            if (exitCode === 0)
-                root.upsertActivity("reply", Translation.tr("Reply sent"), replySendProc.contact, "send", 1, "done")
-            else
-                root.upsertActivity("reply", Translation.tr("Couldn't find the chat"), Translation.tr("The reply is on the clipboard"), "content_paste", -1, "error")
-        }
-    }
-
-    // "Ask Gemini": the conversation goes to Gemini on the web. The prompt rides in the link's #fragment (never
-    // sent to any server) and scripts/island/gemini-prompt.user.js, on gemini.google.com, puts it in the box and
-    // sends it; it's copied to the clipboard as well, as a fallback.
-    function askGemini(notifs) {
-        const list = (notifs ?? []).filter(n => n)
-        if (list.length === 0) return
-        const parts = root.notificationParts(list[list.length - 1])
-        const who = parts.title || parts.app
-        const lines = list.map(n => {
-            const p = root.notificationParts(n)
-            const body = p.body || (p.media?.label ?? "")
-            return `- ${p.author !== "" ? p.author + ": " : ""}${body}`
-        })
-        const prompt = Translation.tr("Conversation on %1 with %2 (oldest first):").arg(parts.app).arg(who)
-            + "\n" + lines.join("\n") + "\n\n"
-            + Translation.tr("Suggest 3 short, natural replies in Portuguese, in the tone of a personal chat. Only the replies, numbered.")
-        root.sendToGemini(prompt)
-    }
-
-    // Any text to Gemini on the web (the userscript types and sends it). Also left on the clipboard: if the
-    // userscript isn't there (or the page changed), it's one paste away. The clipboard island itself uses this
-    // with what was copied, so it skips the copy — it's already there.
-    function sendToGemini(text, alreadyCopied) {
-        if (!text || text.trim() === "") return
-        if (!alreadyCopied) Quickshell.execDetached(["sh", "-c", 'printf %s "$1" | wl-copy', "sh", text])
-        Qt.openUrlExternally(`https://gemini.google.com/app#ilha=${encodeURIComponent(text)}`)
-    }
-
     function pasteReplyInto(notif, text) {
         if (text.trim() === "") return false
         const app = `${notif?.notification?.desktopEntry ?? ""} ${notif?.appName ?? ""}`.trim()
@@ -1616,7 +1314,7 @@ Singleton {
     property bool downloadActive: false
     property bool trafficBurst: false
     property bool fakeNet: false
-    property real fastSeconds: 0
+    property int fastSeconds: 0
     property real prevRx: -1
     property real prevTx: -1
     property double prevNetTime: 0
@@ -1643,51 +1341,15 @@ Singleton {
     }
     property var finishedDownload: null
     property Flash downloadDone: Flash { duration: 9000 }
-    // IMDb rating of the episode/film that just started in the browser (services/WatchRating.qml)
-    property Flash watchRating: Flash { duration: 6000 }
-    // What queued up behind a fullscreen window, handed back once it ends (DynamicIsland.qml § Tela cheia)
-    property Flash fullscreenDigest: Flash { duration: 9000 }
-
-    // Passive: the kernel tells Qt when the folder changes (FolderListModel sits on inotify), and only a partial
-    // file appearing starts the watcher, which follows the download and exits once nothing is arriving anymore.
-    // Before, the watcher lived all day and listed the folder every 4 seconds.
-    readonly property bool downloadWatchEnabled: (root.cfg.network ?? true) && root.downloadMode === "files" && !root.fakeNet
-
-    FolderListModel {
-        id: partialDownloads
-        folder: Directories.downloads
-        showDirs: false
-        showHidden: true
-        nameFilters: ["*.crdownload", "*.part", "*.partial", "*.download", "*.opdownload", "*.!ut"]
-        onCountChanged: root.startDownloadWatch()
-    }
-
-    // Only a partial file that's actually being written counts: an abandoned .crdownload from weeks ago would
-    // otherwise keep the watcher alive forever (and restart it every time it left)
-    function startDownloadWatch() {
-        if (!root.downloadWatchEnabled || downloadWatcher.running) return
-        for (let i = 0; i < partialDownloads.count; i++) {
-            const modified = partialDownloads.get(i, "fileModified")
-            if (modified && Date.now() - modified.getTime() < 60000) {
-                downloadWatcher.running = true
-                return
-            }
-        }
-    }
-    onDownloadWatchEnabledChanged: {
-        if (root.downloadWatchEnabled) root.startDownloadWatch()
-        else downloadWatcher.running = false
-    }
 
     Process {
         id: downloadWatcher
-        command: ["python3", Quickshell.shellPath("scripts/island/download_watch.py"), "--until-idle",
+        running: (root.cfg.network ?? true) && root.downloadMode === "files" && !root.fakeNet
+        command: ["python3", Quickshell.shellPath("scripts/island/download_watch.py"),
             FileUtils.trimFileProtocol(Directories.downloads)]
         stdout: SplitParser {
             onRead: line => root.handleDownloadWatch(line)
         }
-        // A new download may have started in the instant it was leaving
-        onExited: Qt.callLater(root.startDownloadWatch)
     }
 
     function handleDownloadWatch(line) {
@@ -1859,10 +1521,7 @@ Singleton {
 
     Process {
         id: netSourcesProc
-        // Who is using the network: only for a real download or with the network view open. A plain traffic
-        // burst (a film streaming) used to keep this running for the whole film.
-        running: !root.fakeNet && (root.downloadActive || root.downloadWatch || (root.trafficBurst && root.downloadMode === "traffic"))
-            && (root.cfg.network ?? true)
+        running: !root.fakeNet && (root.downloadActive || root.trafficBurst || root.downloadWatch) && (root.cfg.network ?? true)
         command: ["python3", Quickshell.shellPath("scripts/island/net_sources.py")]
         stdout: SplitParser {
             onRead: line => root.handleNetSources(line)
@@ -1904,9 +1563,8 @@ Singleton {
             const seconds = (now - root.prevNetTime) / 1000
             root.downloadRate = (rx - root.prevRx) / seconds
             root.uploadRate = (tx - root.prevTx) / seconds
-            // Counted in real seconds, since the sampling slows down to 5 s when the network is quiet
-            if (root.downloadRate > 350 * 1024) root.fastSeconds = Math.min(root.fastSeconds + seconds, 10)
-            else if (root.downloadRate < 80 * 1024) root.fastSeconds = Math.max(root.fastSeconds - 2 * seconds, 0)
+            if (root.downloadRate > 350 * 1024) root.fastSeconds = Math.min(root.fastSeconds + 1, 10)
+            else if (root.downloadRate < 80 * 1024) root.fastSeconds = Math.max(root.fastSeconds - 2, 0)
             if (!root.trafficBurst && root.fastSeconds >= 4 && (root.cfg.network ?? true)) {
                 root.trafficBurst = true
                 if (root.downloadMode === "traffic") root.downloadActive = true
@@ -1916,7 +1574,7 @@ Singleton {
                 root.downloadPeak = Math.max(root.downloadPeak, root.downloadRate)
                 root.downloadHistory = [...root.downloadHistory, root.downloadRate].slice(-40)
             }
-            if (root.trafficBurst && root.fastSeconds <= 0) {
+            if (root.trafficBurst && root.fastSeconds === 0) {
                 root.trafficBurst = false
                 if (root.downloadMode === "traffic") root.downloadActive = false
             }
@@ -1933,10 +1591,8 @@ Singleton {
         onLoaded: root.updateNet(netStats.text())
     }
 
-    // Network traffic has no event to listen to, so it's sampled — but slowly while nothing is happening, and
-    // every second only while something is actually moving (a burst, a download, the network view open)
     Timer {
-        interval: root.trafficBurst || root.downloadActive || root.downloadWatch || root.voiceCallActive ? 1000 : 5000
+        interval: 1000
         repeat: true
         running: root.cfg.network ?? true
         onTriggered: netStats.reload()
@@ -1997,6 +1653,7 @@ Singleton {
     }
 
     // Test helpers: fake the events that normally need real hardware or weather
+    property bool fakeLoad: false
     property bool fakePrivacy: false
     property var pendingStep: null
 
@@ -2046,19 +1703,14 @@ Singleton {
                 root.weather.show({ group: 5, code: 501, temp: Weather.data?.temp || "21°C", description: "chuva moderada", city: Weather.data?.city ?? "" })
                 break
             case "systemLoad":
-            case "cpuHigh":
-                Pressure.simulate("cpu")
-                break
-            case "call":
-                root.fakeCall = !root.fakeCall
-                root.fakeCallMuted = false
-                root.fakeCallDeaf = false
-                break
-            case "memoryHigh":
-                Pressure.simulate("memory")
-                break
-            case "gpuHigh":
-                Pressure.simulate("gpu")
+                root.fakeLoad = true
+                root.topProcess = "cargo"
+                root.topProcessCpu = 384
+                root.systemLoadActive = true
+                root.later(15000, () => {
+                    root.fakeLoad = false
+                    root.systemLoadActive = false
+                })
                 break
             case "songRec":
                 root.songRecResult.show({ title: "Blinding Lights", subtitle: "The Weeknd", url: "https://www.shazam.com" })
@@ -2161,10 +1813,6 @@ Singleton {
         function ocr(path: string): void {
             root.ocrImage(path)
         }
-        // Compact split: "island split system" puts System beside the main pill; "island split" (empty) ends it
-        function split(id: string): void {
-            root.splitRequested(id)
-        }
         function open(view: string): void {
             root.viewRequested(view)
         }
@@ -2179,9 +1827,6 @@ Singleton {
         }
         function silence(): void {
             root.silenceRequested()
-        }
-        function quiet(): void {
-            root.quietRequested()
         }
         function silenceId(id: string): void {
             root.silenceIsland(id)
