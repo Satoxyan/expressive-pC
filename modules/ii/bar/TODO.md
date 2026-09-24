@@ -41,7 +41,8 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
 - [x] Tool Dock (Now/Shelf/Clipboard/Agents/More) — dentro do Home
 - [~] Weather/System/ZeroTier/Calendar/History/Settings — já existiam como `standaloneViews`,
       só religados ao novo Dock
-- [ ] Split View (seção 13) — duas Tools/Activities lado a lado, ação explícita do usuário. **Não existe ainda.**
+- [x] Split View (seção 13) — duas Tools/Activities lado a lado; botão "splitscreen" no pager arma,
+      próximo pip vira parceiro, X fecha só o split. Nunca abre sozinho.
 
 ## Fase 6 — Motion e design system
 
@@ -73,7 +74,9 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
 
 - [x] `Gofile.qml` (seção 42) não existe no projeto nem no histórico git — não havia bug pendente
 - [x] Ícone de agente duplicado (DiIdle/DiAgents mostrando 1 selo por tipo aberto) — corrigido
-
+- [x] Causa raiz real do "Claude duplicado": `activity` (tarefa específica) e `agents` (resumo geral)
+      ficavam ativos ao mesmo tempo pro mesmo agente — um na pílula, outro no deck atrás dela.
+      `agents` agora só entra em `activeIds` quando nenhuma `activity` atual já é desse agente.
 ## Ordem sugerida daqui pra frente
 
-Split View → Dev Activity → Focus Mode → Smart Drop → periféricos/HDMI (auditoria) → Motion (Fase 6).
+Dev Activity → Focus Mode → Smart Drop → periféricos/HDMI (auditoria) → Motion (Fase 6).
