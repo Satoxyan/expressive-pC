@@ -125,6 +125,12 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
         com o número contando, cor pela qualidade, título sobe depois, coroa + brilho no melhor.
       - logos: Simple Icons (Netflix, Prime Video, Max, Apple TV, Crunchyroll, Paramount+) + Disney+
         (Wikimedia, domínio público) em `assets/island/apps/`.
+- [x] Destaques da nota por categoria (testado ao vivo com Suits/Netflix e Modern Family/Disney+):
+      top 3 da série (medalha ouro/prata/bronze, confete, brilho dourado), top 10 (troféu e brilho
+      violeta), melhor da temporada (coroa), nota ≥ 8.5 (anel pulsa). Série inteira numa requisição por
+      série (paginada acima de 250). Teste: `island simulate watchTop3|watchTop10|watchBest|watchHigh`.
+      Validado: Netflix por estado do player (a tela não mostra a temporada), Disney+ por Shadow DOM.
+      Limitação do Chrome: só a aba que tocou por último vai pro MPRIS (YouTube em 2º plano esconde a série).
 - [ ] Auditoria de passividade (regra no ILHA.md) — timers que rodam sempre, mesmo sem nada acontecendo:
       F1.qml:259 (1s sempre que há próxima sessão), IslandEvents 433 (carga da CPU a cada 1s), 1649 (rede 1s),
       654 (rede/ZeroTier 5s–2min), IslandHardware 488/792/814 (5s–2min), ClaudeCode 369/429 (limites 1–10min),
