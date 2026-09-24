@@ -101,10 +101,11 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
 
 ## Rodada 3
 
-- [x] Hover que "foge" do mouse: a ilha agora cresce para o lado oposto ao do ponteiro (o lado por onde o
-      mouse entrou fica parado — botões de mídia na borda direita não escapam mais). `growShift` em
-      `DynamicIsland.qml`, espelhado na superfície material via `GlobalStates.islandGrowShift`.
-      Validação visual pendente (usuário estava em tela cheia).
+- [x] Hover que "foge" do mouse: o deslocamento pro lado oposto (growShift) causava um loop de abre/fecha
+      com o cursor na borda (a ilha saía de baixo do mouse) — REMOVIDO. No lugar: a pílula de mídia tem
+      largura fixa (não cresce no hover), então os botões não se movem. O hover que abre mensagem não mexe
+      mais no teclado (trocar o modo de teclado com a janela aberta quebrava o focus grab e fechava), e não
+      reabre por 1,5 s depois de fechar. Testado: 8 s com o cursor em cima, sem fechar.
 - [x] IMDb/OMDb (testado com dado real: Modern Family ★8.5): `services/WatchRating.qml` + Peek `DiWatch`
       (nota conta até o valor; coroa + brilho no melhor da temporada) + expandida `DiXWatch` (temporada em
       barras que crescem em sequência, atual destacado, melhor em dourado, hover mostra o episódio). Fonte do

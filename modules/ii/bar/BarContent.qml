@@ -452,10 +452,6 @@ Item {
                 }
                 visible: root.useTabWrapper && root.effectiveMiddleLayout.length > 0
                 anchors.centerIn: parent
-                // Follows the island when it grows away from the pointer (see DynamicIsland.growShift)
-                transform: Translate {
-                    x: GlobalStates.islandGrowScreen === (QsWindow.window?.screen?.name ?? "") ? GlobalStates.islandGrowShift : 0
-                }
                 width: centerMaterialRow.implicitWidth + (root.hasTabs ? 16 : 10)
                 height: root.hasTabs ? parent.height : centerMaterialRow.implicitHeight 
                 radius: root.hasTabs ? 0 : Appearance.rounding.full
