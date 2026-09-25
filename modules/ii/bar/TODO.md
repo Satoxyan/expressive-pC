@@ -168,9 +168,21 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
       arquivos → Gaveta (a ilha alarga 80px só quando acabou de copiar).
 - [x] Figurinha: preview impossível — a notificação do WhatsApp Web só traz a foto do contato e o texto
       "💟 Figurinha"; responder funciona igual a qualquer mensagem.
-- [ ] Periféricos/HDMI (auditoria): já existem disco conectado/remoção segura, monitor conectado com
-      Estender/Espelhar/Só externo + confirmação/reversão, bateria de periférico baixa, temperatura.
-      Falta: aviso de armazenamento quase cheio (deve ser por evento, não polling).
+- [x] Periféricos/HDMI (auditoria): disco conectado/remoção segura, monitor conectado com
+      Estender/Espelhar/Só externo + confirmação/reversão, bateria de periférico baixa, temperatura e agora
+      **disco quase cheio** (IslandHardware): escuta o `df /` que o ResourceUsage já roda; < 10 GB ou < 5 % avisa
+      no máx. a cada 6 h, < 2 GB ou < 2 % a cada 30 min (estado em ~/.cache/quickshell/island-disk-alert.json).
+      Ações: "O que está ocupando" (dust num terminal), Lixeira (Dolphin) e Cache de pacotes (paccache num terminal,
+      visível) — com o tamanho real de cada um medido só quando o aviso dispara.
+- [x] Pressão do sistema (`services/Pressure.qml`): CPU, memória e GPU (RC6 da Intel, um arquivo do sysfs lido
+      na mesma batida do ResourceUsage). A pílula diz quem está fora do normal ("Chrome · aba fora do normal ·
+      4.8 GB"); a expandida (`DiXLoad`) tem abas CPU/Memória/GPU, histórico em `DiSparkline` e a lista de
+      processos (`DiProcessList`, `scripts/island/top_consumers.py`) com ícone do app, rolagem e botão de encerrar
+      (2 cliques; SIGTERM, depois "Forçar"; compositor/shell/áudio protegidos). A lista também está no painel
+      Sistema. A varredura de processos só roda com alerta ativo ou painel aberto.
+- [x] Bateria fraca/crítica: hover na pílula mostra economia de energia / escurecer tela / efeitos leves; a
+      expandida (`DiXBattery`) tem os toggles + Bluetooth (só se nada conectado), "Economizar tudo" e quem está
+      gastando mais. `services/PowerSaver.qml` desfaz tudo que ligou quando o carregador entra.
 
 ## Ordem sugerida daqui pra frente
 

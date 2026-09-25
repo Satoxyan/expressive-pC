@@ -87,7 +87,11 @@ meio** silencia até o fim da sessão, e o chip "trazer de volta" na expandida d
   página) e só faz trabalho pesado (rede, processos, parsing) quando o próprio serviço começa — F1 só busca
   quando há F1, a nota do IMDb só consulta quando um episódio começa. Nada de polling permanente, download ou
   rebuild diário: cada feature que fica "checando" soma consumo pra sempre. Timer só enquanto a atividade está
-  viva, e para junto com ela.
+  viva, e para junto com ela. Exemplos: pressão (CPU/memória/GPU) e disco quase cheio escutam as amostras que o
+  ResourceUsage já faz para a barra; a lista de processos só roda com alerta ativo ou painel aberto.
+- **Nunca `Array.prototype.flat()`** no JS do QML (não existe nessa engine): use `[].concat(...)`.
+- **`state` e `top` são propriedades do Item.** Nomeie de outro jeito (`killState`, `heaviest`), senão
+  "Cannot override FINAL property" e o componente inteiro some.
 
 - **Ícone é fonte, não imagem.** `MaterialSymbol` desenha o texto numa fonte de ícones: um nome inexistente vira
   uma caixinha com letras. Marcas (Claude, Codex, Gemini, WhatsApp) são SVG e vão em `DiClaudeIcon`/`DiBrandIcon`.
