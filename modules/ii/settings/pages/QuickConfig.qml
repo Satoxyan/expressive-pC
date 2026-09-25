@@ -96,9 +96,11 @@ ContentPage {
                 source: blurSource
                 radius: 128
             }
+            // Widget-style tint (FastBlurred), hardcoded on — no tintBlur toggle here.
             Rectangle {
                 anchors.fill: parent
-                color: ColorUtils.transparentize(Appearance.colors.colLayer1, 0.4)
+                color: Appearance.colors.colPrimaryContainer
+                opacity: 0.55
             }
         }
 
@@ -167,9 +169,11 @@ ContentPage {
                 source: popupBlurSource
                 radius: 64
             }
+            // Widget-style tint (FastBlurred), hardcoded on — no tintBlur toggle here.
             Rectangle {
                 anchors.fill: parent
-                color: ColorUtils.transparentize(Appearance.colors.colLayer1, 0.25)
+                color: Appearance.colors.colPrimaryContainer
+                opacity: 0.55
             }
         }
 
