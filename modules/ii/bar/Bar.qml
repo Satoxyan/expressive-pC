@@ -109,11 +109,11 @@ Scope {
                     ? Config.options.bar.frameThickness
                     : (Config.options.bar.cornerStyle === 4 || Config.options.bar.cornerStyle === 5 || Config.options.bar.cornerStyle === 6) ? normalExclusiveZone + 4 : normalExclusiveZone
                 WlrLayershell.namespace: "quickshell:bar"
-                // Overlay layer while a special workspace sits on top of a fullscreen window, or while
-                // something CRITICAL is happening — else Top layer so fullscreen apps cover the bar as normal
-                // (Hyprland buries Top layer under fullscreen+special). Quiet Mode (seção 29): everything
-                // non-critical stays buried behind the fullscreen window, same as always.
-                WlrLayershell.layer: (monitorHasFullscreen && (monitorHasSpecialOpen || monitorHasCritical)) ? WlrLayer.Overlay : WlrLayer.Top
+                // Overlay layer while a special workspace sits on top of a fullscreen window, else Top layer so
+                // fullscreen apps cover the bar as normal (Hyprland buries Top layer under fullscreen+special).
+                // Quiet Mode (seção 29): the bar never comes back over a fullscreen window by itself — what has
+                // to break through (critical, feedback) comes up as a floating mini island (DiFullscreenPeek.qml).
+                WlrLayershell.layer: (monitorHasFullscreen && monitorHasSpecialOpen) ? WlrLayer.Overlay : WlrLayer.Top
                 implicitHeight: Appearance.sizes.barHeight + Appearance.rounding.screenRounding
                 // When Overlay-layer, bar shares a layer with the screen-corner click zones (ScreenCorners.qml)
                 // and same-layer overlap is resolved by stacking, not layer priority - bar was winning and
