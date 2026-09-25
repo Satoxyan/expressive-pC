@@ -85,7 +85,6 @@ Singleton {
         return root.frameHover[`${screenName}:${side}`] ?? false;
     }
     property bool diSessionOpen: false
-    // Screen name -> whether that screen's island is buried under a fullscreen window (DynamicIsland.qml)
     property var islandBuriedByScreen: ({})
     property bool startupLockPending: true
 

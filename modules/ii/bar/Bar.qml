@@ -72,14 +72,9 @@ Scope {
                 property bool mustShow: hoverRegion.containsMouse || superShow
                     || (Config.options.bar.autoHide.enable && GlobalStates.isFrameHovered(barRoot.screen?.name, Config.options.bar.bottom ? "bottom" : "top"))
                 property var thisMonitorData: HyprlandData.monitors.find(m => m.name === barRoot.screen?.name)
-                // Straight from Quickshell's own Hyprland model: it follows a workspace switch immediately, while
-                // HyprlandData's copy only catches up after a refresh
                 property int activeWorkspaceId: Hyprland.monitorFor(barRoot.screen)?.activeWorkspace?.id ?? thisMonitorData?.activeWorkspace?.id ?? -1
                 property bool monitorHasFullscreen: HyprlandData.workspaceById[activeWorkspaceId]?.hasfullscreen ?? false
                 property bool monitorHasSpecialOpen: (thisMonitorData?.specialWorkspace?.name ?? "") !== ""
-                // A true fullscreen window (mode 2, not maximized) owns the screen. Hyprland 0.56 no longer buries the
-                // Top layer under it, so the bar steps aside itself instead of relying on the compositor; the island
-                // keeps living at the edge through DiFullscreenPeek.qml. A special workspace on top brings it back.
                 property bool hiddenByFullscreen: !monitorHasSpecialOpen
                     && HyprlandData.windowList.some(w => w.workspace?.id === barRoot.activeWorkspaceId && w.fullscreen === 2)
                 // CRITICAL still has to work in fullscreen (game/video): hibernating imminently, or the
@@ -109,10 +104,6 @@ Scope {
                     ? Config.options.bar.frameThickness
                     : (Config.options.bar.cornerStyle === 4 || Config.options.bar.cornerStyle === 5 || Config.options.bar.cornerStyle === 6) ? normalExclusiveZone + 4 : normalExclusiveZone
                 WlrLayershell.namespace: "quickshell:bar"
-                // Overlay layer while a special workspace sits on top of a fullscreen window, else Top layer so
-                // fullscreen apps cover the bar as normal (Hyprland buries Top layer under fullscreen+special).
-                // Quiet Mode (seção 29): the bar never comes back over a fullscreen window by itself — what has
-                // to break through (critical, feedback) comes up as a floating mini island (DiFullscreenPeek.qml).
                 WlrLayershell.layer: (monitorHasFullscreen && monitorHasSpecialOpen) ? WlrLayer.Overlay : WlrLayer.Top
                 implicitHeight: Appearance.sizes.barHeight + Appearance.rounding.screenRounding
                 // When Overlay-layer, bar shares a layer with the screen-corner click zones (ScreenCorners.qml)
@@ -186,7 +177,6 @@ Scope {
 
                     hoverEnabled: true
                     enabled: !barRoot.hiddenByFullscreen
-                    // Transparent rather than invisible: the island inside must stay "visible" to keep working
                     opacity: barRoot.hiddenByFullscreen ? 0 : 1
                     anchors {
                         fill: parent
