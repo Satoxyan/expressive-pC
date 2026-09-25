@@ -55,8 +55,8 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
 1. [x] Privacy Island — já completo (PipeWire real + indicador ambiente `privacyDots`), melhor que a
    spec literal (sem peek a cada toggle, ambient dots)
 2. [x] Smart Drop (seção 21) — ver Rodada 3
-3. [~] Clipboard inteligente (seção 22) — já detecta URL/YouTube/PDF/endereço/idioma estrangeiro;
-   falta cor (hex) e rótulo de linguagem de código
+3. [~] Clipboard inteligente (seção 22) — já detecta URL/YouTube/PDF/endereço/idioma estrangeiro/cor (hex,
+   com amostra); falta rótulo de linguagem de código
 4. [~] Agents 2.0 (seção 23) — já tem Live/waiting→attention/dashboard; falta confirmar promoção
    completa pra CRITICAL quando agente pede aprovação obrigatória
 5. [x] Fullscreen/Game Quiet Mode (seção 29) — feito na Fase 3
@@ -71,10 +71,9 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
    não-crítica nunca vira Peek (via `isMuted`, sem efeito colateral em binding — contagem via
    `Connections.onNotify`, que é imperativo). Ao desligar, mostra "Focus finished · N min · M waiting"
    como Live Activity (`upsertActivity`, mesmo padrão do caffeine). Chip em Home → More.
-10. [ ] Periféricos (seção 27) — USB/SSD, bateria de fones/mouse/controle, armazenamento cheio,
-    thermal — não auditado a fundo ainda (thermal já existe via `IslandHardware`)
-11. [ ] HDMI/Monitor (seção 28) — não auditado a fundo ainda; `IslandHardware` já tem
-    `applyMonitorLayout`/rollback, checar se o Peek de conexão já existe
+10. [x] Periféricos (seção 27) — USB/SSD com remoção segura, bateria de fones/mouse/controle, disco quase
+    cheio, thermal (ver "Periféricos/HDMI" em Bugs/achados)
+11. [x] HDMI/Monitor (seção 28) — Peek de conexão com Estender/Espelhar/Só externo + confirmação/reversão
 
 ## Bugs / achados avulsos
 
