@@ -97,6 +97,10 @@ meio** silencia até o fim da sessão, e o chip "trazer de volta" na expandida d
   uma caixinha com letras. Marcas (Claude, Codex, Gemini, WhatsApp) são SVG e vão em `DiClaudeIcon`/`DiBrandIcon`.
 - **Nunca sobreponha com âncoras.** Foto à esquerda + texto à direita, ambos ancorados, colidem no primeiro texto
   longo. Use um `RowLayout` único com espaçador; quem não couber elide.
+- **Largura de uma expandida é `wantedWidth`.** Um `ColumnLayout`/`RowLayout` raiz sobrescreve o próprio
+  `implicitWidth` com o dos filhos, então `implicitWidth: 380` não vale nada: a view ficava estreita e, no Split
+  View (onde cada painel usa a própria largura), espremida. Toda `DiX*.qml` declara
+  `readonly property real wantedWidth: N` e o `DiExpandedContent` usa o maior dos dois.
 - **`Layout.minimumWidth: 0`** em todo texto que deve elidir dentro de um layout, senão ele empurra os vizinhos.
 - **`data` é propriedade reservada do Qt.** Nunca nomeie uma property assim (use `commandData`).
 - **Largura de conteúdo sem laço:** meça com cópias invisíveis do texto (ver `DiNotifs.qml`), nunca com o
