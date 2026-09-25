@@ -34,7 +34,7 @@ Flow {
                 : toggleMouse.containsMouse ? Appearance.colors.colLayer2Hover : Appearance.colors.colLayer2
 
             Behavior on color {
-                ColorAnimation { duration: IslandMotion.micro }
+                ColorAnimation { duration: 160 }
             }
 
             // Staggered slide-in when the pill widens

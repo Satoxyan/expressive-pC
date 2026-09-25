@@ -12,8 +12,6 @@ ColumnLayout {
     required property Item di
     spacing: 10
     implicitWidth: 380
-    // Layouts overwrite implicitWidth with their children's; the container reads this instead
-    readonly property real wantedWidth: 380
 
     property string kind: Pressure.kind || "cpu"
     readonly property real usage: Pressure.usage(xl.kind)
@@ -84,7 +82,7 @@ ColumnLayout {
             color: Appearance.colors.colSecondaryContainer
 
             Behavior on x {
-                NumberAnimation { duration: IslandMotion.short; easing.type: Easing.OutCubic }
+                NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
             }
         }
 
