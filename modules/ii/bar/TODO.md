@@ -82,6 +82,12 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
       (melhor da temporada / top 10 / top 3). Um timer mirado no fim, re-mirado em pausa/seek, sem polling.
       Teste: `island simulate watchNext` com um episódio aberto.
 
+- [x] Configurações da ilha: nova seção "O que roda em segundo plano · mais pesados primeiro" (`IslandCostSwitch`:
+      o que roda, quando, selo Pesado/Médio/Leve). Auditoria de "desligar para de verdade": letras (buscava e
+      sincronizava mesmo desligadas → agora só com alguém mostrando e tocando), cores do álbum (quantizava mesmo
+      desligado), cava (rodava com a música pausada). "Sempre mostrar a hora" (`anchorAlwaysTime`): o urgente vira
+      o ícone ao lado do relógio. Chaves novas declaradas no Config (antes não persistiam pela tela).
+
 ## Bugs / achados avulsos
 
 - [x] `Gofile.qml` (seção 42) não existe no projeto nem no histórico git — não havia bug pendente

@@ -19,6 +19,14 @@ Singleton {
     id: root
 
     readonly property MprisPlayer activePlayer: MprisController.activePlayer
+    // Passive: fetched only while something shows lyrics (the island's lyric line, or a Lyrics widget on screen),
+    // and synced only while the music actually plays
+    property int viewers: 0
+    readonly property bool wanted: root.viewers > 0 || (Config.options?.bar?.dynamicIsland?.lyrics ?? true)
+    readonly property bool playing: root.activePlayer?.isPlaying ?? false
+    property string fetchedFor: ""
+    readonly property string trackKey: `${root.activePlayer?.trackTitle ?? ""}|${root.activePlayer?.trackArtist ?? ""}`
+    onWantedChanged: if (root.wanted && root.fetchedFor !== root.trackKey) root.restartLyrics()
 
     // Provider pilihan manual (dropdown di kartu media). Kosong = ikut rantai
     // Config.options.lyrics.providers. One choice for every player — it is what

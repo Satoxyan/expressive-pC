@@ -86,6 +86,17 @@ Item {
     readonly property int activeFontSize: Appearance.font.pixelSize.normal
     readonly property int farFontSize: Appearance.font.pixelSize.smallest
 
+    // Registers with LyricsService while on screen: lyrics are only fetched and synced while someone shows them
+    property bool registered: false
+    function syncViewer() {
+        if (root.visible === root.registered) return
+        root.registered = root.visible
+        LyricsService.viewers += root.visible ? 1 : -1
+    }
+    onVisibleChanged: root.syncViewer()
+    Component.onCompleted: root.syncViewer()
+    Component.onDestruction: if (root.registered) LyricsService.viewers--
+
     function fontSizeFor(dist) {
         // Big (active) to small (far) gradient, stepping every line so the
         // past/future lines visibly shrink away from the highlighted one;
