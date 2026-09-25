@@ -12,14 +12,11 @@ ColumnLayout {
     required property Item di
     spacing: 10
     implicitWidth: 380
-    // Layouts overwrite implicitWidth with their children's; the container reads this instead
-    readonly property real wantedWidth: 380
 
     // Pinned island opened with nothing just copied: show the latest item plus the history
     readonly property bool pinnedMode: !IslandEvents.clipboard.active
     readonly property var payload: xclip.pinnedMode ? IslandEvents.latestClipboard : (IslandEvents.clipboard.payload ?? ({}))
     readonly property bool isImage: xclip.payload.isImage ?? false
-    readonly property var kind: IslandEvents.clipKind(xclip.payload)
     readonly property var files: xclip.payload.files ?? []
     readonly property bool hasFiles: xclip.files.length > 0
     readonly property string text: xclip.payload.text ?? ""
@@ -131,12 +128,12 @@ ColumnLayout {
             : (chipMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1)
 
         Behavior on color {
-            ColorAnimation { duration: IslandMotion.micro }
+            ColorAnimation { duration: 140 }
         }
         scale: chipMouse.pressed ? 0.93 : 1
 
         Behavior on scale {
-            NumberAnimation { duration: IslandMotion.micro; easing.type: Easing.OutBack }
+            NumberAnimation { duration: 160; easing.type: Easing.OutBack }
         }
 
         RowLayout {
@@ -174,9 +171,11 @@ ColumnLayout {
     RowLayout {
         Layout.fillWidth: true
         spacing: 8
-        DiClipIcon {
-            kind: xclip.kind
-            size: 24
+        MaterialSymbol {
+            text: xclip.hasFiles ? "file_copy" : "content_paste"
+            iconSize: 18
+            fill: 1
+            color: Appearance.colors.colPrimary
         }
         StyledText {
             Layout.fillWidth: true
@@ -185,23 +184,6 @@ ColumnLayout {
             font.weight: Font.DemiBold
             color: xclip.status !== "" ? Appearance.m3colors.m3success : Appearance.colors.colOnLayer0
             elide: Text.ElideRight
-        }
-        // What it is, in a word: "Python", "YouTube", "#FF9F0A"
-        Rectangle {
-            visible: xclip.kind.label !== "" && !["text", "file", "files", "image"].includes(xclip.kind.kind)
-            implicitWidth: kindText.implicitWidth + 14
-            implicitHeight: 20
-            radius: 10
-            color: ColorUtils.transparentize(xclip.kind.color || Appearance.colors.colPrimary, 0.82)
-
-            StyledText {
-                id: kindText
-                anchors.centerIn: parent
-                text: xclip.kind.label
-                font.pixelSize: Appearance.font.pixelSize.smallest
-                font.weight: Font.DemiBold
-                color: Appearance.colors.colOnLayer0
-            }
         }
         MaterialSymbol {
             text: "drag_indicator"
@@ -554,7 +536,7 @@ ColumnLayout {
         color: segArea.containsMouse ? Appearance.colors.colLayer2 : "transparent"
 
         Behavior on color {
-            ColorAnimation { duration: IslandMotion.micro }
+            ColorAnimation { duration: 120 }
         }
 
         RowLayout {
@@ -719,7 +701,7 @@ ColumnLayout {
                 color: historyMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1
 
                 Behavior on color {
-                    ColorAnimation { duration: IslandMotion.micro }
+                    ColorAnimation { duration: 140 }
                 }
 
                 RowLayout {
@@ -740,11 +722,12 @@ ColumnLayout {
                             radius: 6
                         }
                     }
-                    DiClipIcon {
+                    MaterialSymbol {
                         visible: !historyItem.image
-                        kind: historyItem.image ? ({}) : IslandEvents.clipKind(IslandEvents.payloadFor(historyItem.modelData))
-                        size: 20
-                        tinted: false
+                        text: "content_paste"
+                        iconSize: 15
+                        color: Appearance.colors.colOnLayer1
+                        opacity: 0.6
                     }
                     StyledText {
                         Layout.fillWidth: true
