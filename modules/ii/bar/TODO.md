@@ -162,6 +162,10 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
       pedindo 3 respostas curtas. O texto vai no #fragmento do link (não sai do navegador) e
       `scripts/island/gemini-prompt.user.js` (Tampermonkey) coloca na caixa (e o texto também vai pro clipboard, como reserva) (`rich-textarea .ql-editor`, só via
       insertText — a página bloqueia innerHTML) e clica "Enviar mensagem". Seletores validados na página real.
+- [x] Clipboard: "Perguntar ao Gemini" (Gemini web, o texto já está copiado) e "Buscar" como ações principais
+      na expandida; o resto reorganizado — ABC/abc/limpar espaços num grupo, gaveta/remover discretos à direita.
+      Na pílula "Copiado", o hover revela botões rápidos: texto → Gemini, Buscar, Gaveta; link → Abrir, Gaveta;
+      arquivos → Gaveta (a ilha alarga 80px só quando acabou de copiar).
 - [x] Figurinha: preview impossível — a notificação do WhatsApp Web só traz a foto do contato e o texto
       "💟 Figurinha"; responder funciona igual a qualquer mensagem.
 - [ ] Periféricos/HDMI (auditoria): já existem disco conectado/remoção segura, monitor conectado com
