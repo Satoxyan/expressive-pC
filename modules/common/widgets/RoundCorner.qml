@@ -13,7 +13,7 @@ Item {
     property alias bottomVisualMargin: shape.anchors.bottomMargin
 
     property int implicitSize: 25
-    property color color: "#000000"
+    property color color: Config.options.bar.showFrame ? "transparent" : "#000000"
 
     implicitWidth: implicitSize
     implicitHeight: implicitSize
