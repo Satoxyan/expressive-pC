@@ -99,7 +99,7 @@ ColumnLayout {
                 : (deviceMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1)
 
             Behavior on color {
-                ColorAnimation { duration: IslandMotion.micro }
+                ColorAnimation { duration: 150 }
             }
 
             RowLayout {
@@ -155,7 +155,7 @@ ColumnLayout {
             color: profileMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1
 
             Behavior on color {
-                ColorAnimation { duration: IslandMotion.micro }
+                ColorAnimation { duration: 140 }
             }
 
             RowLayout {

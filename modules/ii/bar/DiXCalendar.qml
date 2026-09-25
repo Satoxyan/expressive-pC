@@ -110,7 +110,7 @@ ColumnLayout {
                 color: navMouse.containsMouse ? Appearance.colors.colLayer2 : "transparent"
 
                 Behavior on color {
-                    ColorAnimation { duration: IslandMotion.micro }
+                    ColorAnimation { duration: 140 }
                 }
 
                 MaterialSymbol {

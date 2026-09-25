@@ -104,7 +104,7 @@ ColumnLayout {
             color: entryMouse.containsMouse && entry.actionable ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1
 
             Behavior on color {
-                ColorAnimation { duration: IslandMotion.micro }
+                ColorAnimation { duration: 140 }
             }
 
             RowLayout {

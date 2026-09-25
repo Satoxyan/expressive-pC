@@ -88,13 +88,13 @@ ColumnLayout {
             opacity: xhw.layout === "only" ? 0.55 : 1
 
             Behavior on x {
-                NumberAnimation { duration: IslandMotion.long; easing.type: Easing.BezierSpline; easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial }
+                NumberAnimation { duration: 420; easing.type: Easing.BezierSpline; easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial }
             }
             Behavior on y {
-                NumberAnimation { duration: IslandMotion.long; easing.type: Easing.BezierSpline; easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial }
+                NumberAnimation { duration: 420; easing.type: Easing.BezierSpline; easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial }
             }
             Behavior on opacity {
-                NumberAnimation { duration: IslandMotion.short }
+                NumberAnimation { duration: 260 }
             }
 
             MaterialSymbol {
@@ -120,10 +120,10 @@ ColumnLayout {
             border.color: Appearance.colors.colPrimary
 
             Behavior on x {
-                NumberAnimation { duration: IslandMotion.long; easing.type: Easing.BezierSpline; easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial }
+                NumberAnimation { duration: 420; easing.type: Easing.BezierSpline; easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial }
             }
             Behavior on y {
-                NumberAnimation { duration: IslandMotion.long; easing.type: Easing.BezierSpline; easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial }
+                NumberAnimation { duration: 420; easing.type: Easing.BezierSpline; easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial }
             }
 
             ColumnLayout {
@@ -179,10 +179,10 @@ ColumnLayout {
                 scale: actionMouse.pressed ? 0.94 : 1
 
                 Behavior on color {
-                    ColorAnimation { duration: IslandMotion.short }
+                    ColorAnimation { duration: 180 }
                 }
                 Behavior on scale {
-                    NumberAnimation { duration: IslandMotion.micro; easing.type: Easing.OutBack }
+                    NumberAnimation { duration: 160; easing.type: Easing.OutBack }
                 }
 
                 RowLayout {
