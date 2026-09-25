@@ -12,7 +12,7 @@ Item {
     property int dividerSpacing: Config.options.bar.divider.spacing
 
     width:  vertical ? btnSize : (root.style === "space" ? root.dividerSpacing : root.style === "dot" ? dotText.implicitWidth + 10 : (1 + btnSpacing * 3))
-    height: vertical ? (root.style === "space" ? root.dividerSpacing : root.style === "dot" ? dotText.implicitHeight + 16 : (1 + btnSpacing * 3)) : btnSize
+    height: vertical ? (root.style === "space" ? root.dividerSpacing : root.style === "dot" ? dotText.implicitHeight - 4 : (1 + btnSpacing * 3)) : btnSize
 
     Rectangle {
         visible: root.style === "rect"

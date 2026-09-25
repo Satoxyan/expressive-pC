@@ -65,6 +65,7 @@ Item {
         samples: 16
         horizontalOffset: 5
         verticalOffset: 6
+        visible: Config.options.background.widgets.shadow
     }
 
     Item {

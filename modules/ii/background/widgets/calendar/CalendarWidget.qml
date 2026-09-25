@@ -161,6 +161,7 @@ AbstractBackgroundWidget {
         StyledRectangularShadow {
             target: card
             z: -2
+            visible: Config.options.background.widgets.shadow
         }
 
         Loader {

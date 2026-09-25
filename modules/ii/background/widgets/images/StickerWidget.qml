@@ -5,6 +5,9 @@ import QtQuick.Layouts
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 import Quickshell
+import Quickshell.Hyprland
+import qs
+import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.ii.background.widgets
@@ -12,41 +15,92 @@ import qs.modules.ii.background.widgets
 AbstractBackgroundWidget {
     id: root
 
-    configEntryName: "sticker"
+    required property int stickerIndex
+    required property string imagePath
+    required property real stickerSize
+    required property real stickerRotation
+    required property string outlineColor
+    required property real outlineWidth
+
+    configEntryName: "stickers"
+    configEntry: Config.stickers[root.stickerIndex]
     hoverEnabled: true
 
-    property string imagePath: Config.options.background.widgets.sticker.path ?? ""
     property bool dropHover: false
-    property real widgetSize: Config.options.background.widgets.sticker.size ?? 200
-    property real widgetRotation: Config.options.background.widgets.sticker.rotation ?? 0
-    property color outlineColor: Config.options.background.widgets.sticker.outlineColor !== ""
-        ? Config.options.background.widgets.sticker.outlineColor
-        : "#ffffff"
-    property real outlineWidth: Config.options.background.widgets.sticker.outlineWidth ?? 8
+    property real liveSize: -1
+    property real currentWidgetRotation: root.stickerRotation
+    property bool coveredByWindow: false
+
+    Connections {
+        target: HyprlandData
+        function onWindowListChanged() { root.updateCovered() }
+        function onActiveWorkspaceChanged() { root.updateCovered() }
+    }
+    Component.onCompleted: {
+        updateCovered();
+        if (root.imagePath !== "") _gifDelay.start();
+    }
+
+    property bool _gifStarted: false
+
+    Timer {
+        id: _gifDelay
+        interval: 100
+        onTriggered: root._gifStarted = true
+    }
+
+    function updateCovered() {
+        const wl = HyprlandData.windowList;
+        if (!wl || wl.length === 0) { coveredByWindow = false; return; }
+        const aw = HyprlandData.activeWorkspace;
+        if (!aw) { coveredByWindow = false; return; }
+        for (let i = 0; i < wl.length; i++) {
+            const win = wl[i];
+            if (win.workspace?.id !== aw.id) continue;
+            const isMax = (win.maximized || win.wayland?.maximized);
+            const isFS = (win.fullscreen || win.wayland?.fullscreen);
+            if (win.floating === false || isMax || isFS) { coveredByWindow = true; return; }
+        }
+        coveredByWindow = false;
+    }
 
     implicitWidth: contentItem.implicitWidth
     implicitHeight: contentItem.implicitHeight
 
+    Connections {
+        target: root
+        function onReleased() {
+            Config.saveStickerProps(root.stickerIndex, { x: root.x, y: root.y })
+        }
+        function onDragFinished() {
+            if (root.configEntry)
+                Config.saveStickerProps(root.stickerIndex, { placementStrategy: root.configEntry.placementStrategy })
+        }
+    }
+
     Item {
         id: contentItem
-        implicitWidth: root.widgetSize
-        implicitHeight: root.widgetSize
-        rotation: root.widgetRotation
+        implicitWidth: root.liveSize > 0 ? root.liveSize : root.stickerSize
+        implicitHeight: root.liveSize > 0 ? root.liveSize : root.stickerSize
+        rotation: root.currentWidgetRotation
 
         Behavior on implicitWidth {
+            enabled: root.liveSize < 0
             animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
         }
         Behavior on implicitHeight {
+            enabled: root.liveSize < 0
             animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
         }
 
-        StyledImage {
+        AnimatedImage {
             id: stickerImage
             anchors.fill: parent
             source: root.imagePath !== "" ? root.imagePath : ""
             fillMode: Image.PreserveAspectFit
             cache: false
             antialiasing: true
+            playing: root._gifStarted && root.imagePath !== "" && root.visible && !root.coveredByWindow
             sourceSize.width: parent.width * 2
             sourceSize.height: parent.height * 2
             visible: root.imagePath !== ""
@@ -58,7 +112,7 @@ AbstractBackgroundWidget {
                 radius: 4
                 spread: root.outlineWidth / 24 
                 samples: 24
-                color: root.outlineColor
+                color: root.outlineColor !== "" ? root.outlineColor : "#ffffff"
                 transparentBorder: true
             }
         }
@@ -91,10 +145,36 @@ AbstractBackgroundWidget {
                     var ext = cleanPath.split(".").pop().toLowerCase()
                     var accepted = ["png", "svg", "webp", "gif"] 
                     if (accepted.indexOf(ext) !== -1) {
-                        Config.options.background.widgets.sticker.path = cleanPath
+                        Config.updateSticker(root.stickerIndex, { path: cleanPath })
                     }
                 }
                 root.dropHover = false
+            }
+        }
+
+        // Remove button (top-left area), positioned inward to stay in hover area
+        MaterialShapeWrappedMaterialSymbol {
+            anchors {
+                top: parent.top
+                left: parent.left
+                topMargin: parent.height * 0.15
+                leftMargin: parent.width * 0.15
+            }
+            visible: root.containsMouse && !Config.options.background.widgetsLocked
+            wrappedShape: MaterialShape.Shape.Circle
+            color: Appearance.colors.colError ?? Appearance.colors.colPrimary
+            colSymbol: Appearance.colors.colOnError ?? Appearance.colors.colOnPrimary
+            text: "close"
+            iconSize: 16
+            fill: 1
+            padding: 6
+            implicitWidth: 30
+            implicitHeight: 30
+            z: 2
+
+            ButtonMouseArea {
+                anchors.fill: parent
+                onClicked: Config.removeSticker(root.stickerIndex)
             }
         }
 
@@ -102,22 +182,24 @@ AbstractBackgroundWidget {
             anchorItem: stickerImage
             hoverActive: root.containsMouse
             locked: Config.options.background.widgetsLocked
-            currentWidth: root.widgetSize
+            currentWidth: root.stickerSize
             resizeMode: "diagonal"
             rotatable: true
-            currentRotation: root.widgetRotation
+            currentRotation: root.stickerRotation
             z: 1
             onResized: (newValue) => {
-                root.widgetSize = Math.max(60, newValue)
+                root.liveSize = Math.max(60, newValue)
             }
             onResizeFinished: {
-                Config.options.background.widgets.sticker.size = root.widgetSize
+                if (root.liveSize > 0)
+                    Config.updateSticker(root.stickerIndex, { size: root.liveSize })
+                root.liveSize = -1
             }
             onRotated: (newAngle) => {
-                root.widgetRotation = newAngle
+                root.currentWidgetRotation = newAngle
             }
             onRotateFinished: {
-                Config.options.background.widgets.sticker.rotation = root.widgetRotation
+                Config.updateSticker(root.stickerIndex, { rotation: root.currentWidgetRotation })
             }
         }
     }

@@ -18,7 +18,20 @@ Singleton {
 	id: root;
 	property list<MprisPlayer> players: Mpris.players.values.filter(player => isRealPlayer(player));
 	property MprisPlayer trackedPlayer: null;
-	property MprisPlayer activePlayer: trackedPlayer ?? Mpris.players.values[0] ?? null;
+
+	readonly property string preferredPlayerName: Config.options.bar.media.preferredPlayer.trim().toLowerCase();
+	readonly property MprisPlayer preferredPlayer: {
+		if (preferredPlayerName.length === 0) return null;
+		const _ = root.players.length;
+		for (const p of root.players) {
+			if ((p.identity ?? "").toLowerCase().includes(preferredPlayerName) ||
+				(p.desktopEntry ?? "").toLowerCase().includes(preferredPlayerName))
+				return p;
+		}
+		return null;
+	}
+
+	property MprisPlayer activePlayer: preferredPlayer ?? trackedPlayer ?? Mpris.players.values[0] ?? null;
 	signal trackChanged(reverse: bool);
 
 	property bool __reverse: false;

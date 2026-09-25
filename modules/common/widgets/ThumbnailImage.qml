@@ -61,17 +61,17 @@ StyledImage {
             const thumbDir = thumb.substring(0, thumb.lastIndexOf("/"));
             if (root.isVideo) {
                 return ["bash", "-c",
-                    `mkdir -p '${thumbDir}' && [ -f '${thumb}' ] && exit 0; ffmpeg -y -ss 0 -i '${root.sourcePath}' -frames:v 1 -vf scale=${maxSize}:-1 -q:v 2 -update 1 '${thumb}' 2>/dev/null && exit 1 || exit 0`
+                    `mkdir -p '${thumbDir}' && [ -f '${thumb}' ] && exit 0; tmp='${thumb}.$$.tmp.png'; ffmpeg -y -ss 0 -i '${root.sourcePath}' -frames:v 1 -vf scale=${maxSize}:-1 -q:v 2 -update 1 '\${tmp}' 2>/dev/null && mv '\${tmp}' '${thumb}' && exit 1 || { rm -f '\${tmp}'; exit 0; }`
                 ]
             }
             return ["bash", "-c",
-                `mkdir -p '${thumbDir}' && [ -f '${thumb}' ] && exit 0 || { magick '${root.sourcePath}' -resize ${maxSize}x${maxSize} '${thumb}' && exit 1; }`
+                `mkdir -p '${thumbDir}' && [ -f '${thumb}' ] && exit 0 || { tmp='${thumb}.$$.tmp.png'; magick '${root.sourcePath}' -resize ${maxSize}x${maxSize} '\${tmp}' && mv '\${tmp}' '${thumb}' && exit 1; exit 2; }`
             ]
         }
         onExited: (exitCode, exitStatus) => {
-            if (exitCode === 1) { // Force reload if thumbnail had to be generated
+            if (exitCode === 1) {
                 root.source = "";
-                root.source = root.thumbnailPath; // Force reload
+                root.source = root.thumbnailPath;
             }
         }
     }

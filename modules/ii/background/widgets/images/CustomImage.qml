@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 import Quickshell
+import Quickshell.Hyprland
 import qs
 import qs.services
 import qs.modules.common
@@ -22,10 +23,46 @@ AbstractBackgroundWidget {
     required property string imagePath
     required property string imageShape
     required property real imageSize
+    required property real imageRotation
 
     property bool dropHover: false
     property real liveSize: -1 // during resize gesture, before persisting
     readonly property real effectiveSize: liveSize > 0 ? liveSize : imageSize
+    property real currentWidgetRotation: root.imageRotation
+    property bool coveredByWindow: false
+
+    Connections {
+        target: HyprlandData
+        function onWindowListChanged() { root.updateCovered() }
+        function onActiveWorkspaceChanged() { root.updateCovered() }
+    }
+    Component.onCompleted: {
+        updateCovered();
+        if (root.imagePath !== "") _gifDelay.start();
+    }
+
+    property bool _gifStarted: false
+
+    Timer {
+        id: _gifDelay
+        interval: 100
+        onTriggered: root._gifStarted = true
+    }
+
+    function updateCovered() {
+        const wl = HyprlandData.windowList;
+        if (!wl || wl.length === 0) { coveredByWindow = false; return; }
+        const aw = HyprlandData.activeWorkspace;
+        if (!aw) { coveredByWindow = false; return; }
+        for (let i = 0; i < wl.length; i++) {
+            const win = wl[i];
+            if (win.workspace?.id !== aw.id) continue;
+            const isMax = (win.maximized || win.wayland?.maximized);
+            const isFS = (win.fullscreen || win.wayland?.fullscreen);
+            if (win.floating === false || isMax || isFS) { coveredByWindow = true; return; }
+        }
+        coveredByWindow = false;
+    }
 
     readonly property var shapeList: [
         "Circle", "Square", "Slanted", "Arch", "Arrow", "SemiCircle", "Oval", "Pill",
@@ -107,11 +144,14 @@ AbstractBackgroundWidget {
         id: contentItem
         implicitWidth: root.effectiveSize
         implicitHeight: root.effectiveSize
+        rotation: root.currentWidgetRotation
 
         Behavior on implicitWidth {
+            enabled: root.liveSize < 0
             animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
         }
         Behavior on implicitHeight {
+            enabled: root.liveSize < 0
             animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
         }
 
@@ -126,6 +166,7 @@ AbstractBackgroundWidget {
         StyledDropShadow {
             target: shadowShape
             z: -1
+            visible: Config.options.background.widgets.shadow
         }
 
         MaterialShape {
@@ -144,12 +185,13 @@ AbstractBackgroundWidget {
                 }
             }
 
-            StyledImage {
+            AnimatedImage {
                 anchors.fill: parent
                 source: root.imagePath !== "" ? root.imagePath : ""
                 fillMode: Image.PreserveAspectCrop
                 cache: false
                 antialiasing: true
+                playing: root._gifStarted && root.imagePath !== "" && root.visible && !root.coveredByWindow
                 sourceSize.width: parent.width
                 sourceSize.height: parent.height
                 visible: root.imagePath !== ""
@@ -192,9 +234,14 @@ AbstractBackgroundWidget {
             }
         }
 
-        // Remove button (top-left), visible on hover in edit mode
+        // Remove button (top-left area), positioned inward to stay in hover area
         MaterialShapeWrappedMaterialSymbol {
-            anchors { top: parent.top; left: parent.left; margins: 8 }
+            anchors {
+                top: parent.top
+                left: parent.left
+                topMargin: parent.height * 0.15
+                leftMargin: parent.width * 0.15
+            }
             visible: root.containsMouse && !Config.options.background.widgetsLocked
             wrappedShape: MaterialShape.Shape.Circle
             color: Appearance.colors.colError ?? Appearance.colors.colPrimary
@@ -213,9 +260,14 @@ AbstractBackgroundWidget {
             }
         }
 
-        // Shape cycle button (top-right), visible on hover in edit mode
+        // Shape cycle button (top-right area), positioned inward to stay in hover area
         MaterialShapeWrappedMaterialSymbol {
-            anchors { top: parent.top; right: parent.right; margins: 8 }
+            anchors {
+                top: parent.top
+                right: parent.right
+                topMargin: parent.height * 0.15
+                rightMargin: parent.width * 0.15
+            }
             visible: root.containsMouse && !Config.options.background.widgetsLocked
             wrappedShape: MaterialShape.Shape.Circle
             color: Appearance.colors.colPrimary
@@ -242,6 +294,8 @@ AbstractBackgroundWidget {
             locked: Config.options.background.widgetsLocked
             currentWidth: root.effectiveSize
             resizeMode: "diagonal"
+            rotatable: true
+            currentRotation: root.currentWidgetRotation
             z: 1
             onResized: (newValue) => {
                 root.liveSize = Math.max(80, newValue)
@@ -252,6 +306,12 @@ AbstractBackgroundWidget {
                 if (root.liveSize > 0)
                     Config.updateCustomImage(root.imageIndex, { size: root.liveSize })
                 root.liveSize = -1
+            }
+            onRotated: (newAngle) => {
+                root.currentWidgetRotation = newAngle
+            }
+            onRotateFinished: {
+                Config.updateCustomImage(root.imageIndex, { rotation: root.currentWidgetRotation })
             }
         }
     }

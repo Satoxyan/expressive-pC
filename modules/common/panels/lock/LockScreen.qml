@@ -91,6 +91,9 @@ Scope {
         id: lock
         locked: GlobalStates.screenLocked
         surface: root.sessionLockSurface
+        onSecureChanged: {
+            if (lock.secure) GlobalStates.startupLockPending = false;
+        }
     }
 
     // The lock badge ("Locked") fades in before the screen locks and fades out
@@ -153,6 +156,7 @@ Scope {
             root.lock();
         } else {
             KeyringStorage.fetchKeyringData();
+            GlobalStates.startupLockPending = false;
         }
     }
     Connections {

@@ -67,6 +67,12 @@ Item {
                         && (loaderDelegate.modelData.alwaysOnLock
                             ? (GlobalStates.screenLocked || root.onThisScreen)
                             : root.onThisScreen)
+                if (loaderDelegate.modelData.key === "sticker")
+                    return Array.isArray(Config.stickers) && Config.stickers.length > 0
+                        && loaderDelegate.enableLoading
+                        && (loaderDelegate.modelData.alwaysOnLock
+                            ? (GlobalStates.screenLocked || root.onThisScreen)
+                            : root.onThisScreen)
                 const cfg = Config.options.background.widgets[loaderDelegate.modelData.key]
                 const isEnabled = cfg?.enable ?? false
                 return isEnabled
@@ -140,6 +146,7 @@ Item {
                     imagePath: modelData.path ?? ""
                     imageShape: modelData.shape ?? "Cookie4Sided"
                     imageSize: modelData.size ?? 200
+                    imageRotation: modelData.rotation ?? 0
                     screenWidth: root.screen.width
                     screenHeight: root.screen.height
                     scaledScreenWidth: root.screen.width
@@ -152,13 +159,26 @@ Item {
     }
     Component {
         id: stickerComp
-        StickerWidget {
-            screenWidth: root.screen.width
-            screenHeight: root.screen.height
-            scaledScreenWidth: root.screen.width
-            scaledScreenHeight: root.screen.height
-            wallpaperScale: 1
-            wallpaperItem: root.wallpaperItem
+        Item {
+            Repeater {
+                model: Config.stickers
+                delegate: StickerWidget {
+                    required property var modelData
+                    required property int index
+                    stickerIndex: index
+                    imagePath: modelData.path ?? ""
+                    stickerSize: modelData.size ?? 200
+                    stickerRotation: modelData.rotation ?? 0
+                    outlineColor: modelData.outlineColor ?? "#ffffff"
+                    outlineWidth: modelData.outlineWidth ?? 8
+                    screenWidth: root.screen.width
+                    screenHeight: root.screen.height
+                    scaledScreenWidth: root.screen.width
+                    scaledScreenHeight: root.screen.height
+                    wallpaperScale: 1
+                    wallpaperItem: root.wallpaperItem
+                }
+            }
         }
     }
     Component {

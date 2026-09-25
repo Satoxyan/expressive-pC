@@ -46,7 +46,13 @@ Item {
             checked: Config.options.background.widgetsLocked
             onCheckedChanged: Config.options.background.widgetsLocked = checked
         }
-
+        ConfigSwitch {
+            Layout.fillWidth: true
+            buttonIcon: "shadow"
+            text: Translation.tr("Shadow")
+            checked: Config.options.background.widgets.shadow 
+            onCheckedChanged: Config.options.background.widgets.shadow = checked
+        }
         ConfigSwitch {
             Layout.fillWidth: true
             buttonIcon: "blur_on"
@@ -102,7 +108,7 @@ Item {
                 required property var modelData
                 Layout.fillWidth: true
                 Layout.bottomMargin: 6 // ConfigSwitch normally carries this; it's lost inside a Loader
-                sourceComponent: entry.modelData.key === "customImage" ? addRow : toggleSwitch
+                sourceComponent: (entry.modelData.key === "customImage" || entry.modelData.key === "sticker") ? addRow : toggleSwitch
 
                 Component {
                     id: toggleSwitch
@@ -114,7 +120,7 @@ Item {
                     }
                 }
 
-                // Custom Image: mirrors ConfigSwitch structure exactly, "+" instead of the switch
+                // Custom Image / Sticker: mirrors ConfigSwitch structure exactly, "+" instead of the switch
                 Component {
                     id: addRow
                     RippleButton {
@@ -123,7 +129,7 @@ Item {
                         colBackgroundHover: "transparent"
                         implicitHeight: contentItem.implicitHeight + 8
                         font.pixelSize: Appearance.font.pixelSize.small
-                        onClicked: Config.addCustomImage()
+                        onClicked: entry.modelData.key === "sticker" ? Config.addSticker() : Config.addCustomImage()
 
                         contentItem: RowLayout {
                             spacing: 10
@@ -148,7 +154,7 @@ Item {
 
                                 ButtonMouseArea {
                                     anchors.fill: parent
-                                    onClicked: Config.addCustomImage()
+                                    onClicked: entry.modelData.key === "sticker" ? Config.addSticker() : Config.addCustomImage()
                                 }
                             }
                         }
