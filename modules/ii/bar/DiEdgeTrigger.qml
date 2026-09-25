@@ -11,8 +11,7 @@ Scope {
     required property Item di
 
     LazyLoader {
-        // Buried under a fullscreen window the pill can't be insisted on; the edge then belongs to DiFullscreenPeek
-        active: edge.di.visible && !edge.di.buried && !Config.options.bar.bottom && !edge.di.vertical
+        active: edge.di.visible && !Config.options.bar.bottom && !edge.di.vertical
 
         component: PanelWindow {
             id: strip
