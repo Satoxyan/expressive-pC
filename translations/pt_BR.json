@@ -1281,6 +1281,7 @@
   "IMDb episode ratings": "Notas do IMDb por episódio",
   "One lookup per show, when an episode starts in the browser": "Uma consulta por série, quando um episódio começa no navegador",
   "Call controls": "Controles de chamada",
+<<<<<<< HEAD
   "Uses the microphone links PipeWire already reports; no extra work": "Usa as conexões de microfone que o PipeWire já informa; nenhum trabalho extra",
   "While fullscreen": "Enquanto estava em tela cheia",
   "1 notification": "1 notificação",
@@ -1318,4 +1319,7 @@
   "Reuses what PipeWire already reports": "Reaproveita o que o PipeWire já informa",
   "High": "Alto",
   "Low": "Baixo"
+=======
+  "Uses the microphone links PipeWire already reports; no extra work": "Usa as conexões de microfone que o PipeWire já informa; nenhum trabalho extra"
+>>>>>>> b9958e2 (feat(island): settings show what each feature costs, work mode, always-show-clock option)
 }
