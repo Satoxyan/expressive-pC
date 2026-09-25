@@ -81,6 +81,16 @@ Quando esse estado muda (outra faixa, outro arquivo, outra sessão), ela volta s
 meio** silencia até o fim da sessão, e o chip "trazer de volta" na expandida do início desfaz. Pelo IPC:
 `island dismiss`, `island silence`, `island restore <id>`.
 
+## Motion
+
+Quatro velocidades, em `services/IslandMotion.qml` — cada uma com um papel, pra mesma mudança parecer igual em
+qualquer ilha: `micro` 150 ms (hover, press, cor), `short` 220 (um controle mudando de estado), `medium` 320
+(conteúdo trocando/deslizando), `long` 460 (tamanho e layout). Curva padrão `OutCubic`; `OutBack` só em chegada
+que deve ser sentida (selo, chips entrando) e nunca em cor/opacidade; a curva espacial expressiva é da forma da
+ilha. Loops (respirar, pulsar) são ambiente (~1 s por metade) e **sempre** presos ao estado que os justifica
+(`running:`) — auditado: nenhum loop roda sem motivo. Coreografias próprias ficam fora dos tokens: abrir/fechar
+(`DiExpanded`), a nota do IMDb (`DiWatch`), as luzes de largada da F1, a tampa do case dos fones.
+
 ## Regras aprendidas do jeito difícil
 
 - **Tudo é passivo.** Cada recurso reage a eventos (sinais do DBus/MPRIS, hooks de shell/agentes, eventos da

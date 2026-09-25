@@ -46,22 +46,23 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
 
 ## Fase 6 — Motion e design system
 
-- [ ] Não auditado ainda. Suspeita: já segue boa parte das regras (durações curtas, sem
-      SpringAnimation indiscriminado — ver comentários em `DynamicIsland.qml`), mas não verificado
-      seção a seção.
+- [x] Auditado: havia ~50 durações diferentes sem padrão. Agora 4 tokens (`IslandMotion`: micro/short/medium/long)
+      aplicados em 140 animações de 40 componentes; coreografias próprias mantidas. Todos os loops infinitos
+      conferidos — cada um preso ao estado que o justifica. `OutBack` só em escala/posição. Ver ILHA.md § Motion.
 
 ## Fase 7 — Integrações novas (prioridade da seção 43)
 
 1. [x] Privacy Island — já completo (PipeWire real + indicador ambiente `privacyDots`), melhor que a
    spec literal (sem peek a cada toggle, ambient dots)
 2. [x] Smart Drop (seção 21) — ver Rodada 3
-3. [~] Clipboard inteligente (seção 22) — já detecta URL/YouTube/PDF/endereço/idioma estrangeiro/cor (hex,
-   com amostra); falta rótulo de linguagem de código
-4. [~] Agents 2.0 (seção 23) — já tem Live/waiting→attention/dashboard; falta confirmar promoção
-   completa pra CRITICAL quando agente pede aprovação obrigatória
+3. [x] Clipboard inteligente (seção 22) — URL/YouTube/PDF/endereço/idioma estrangeiro/cor/e-mail/telefone/
+   rastreio e **linguagem de código** (`IslandEvents.codeLanguage`, 17 linguagens, só sinais fortes). Cada tipo
+   com seu ícone (`DiClipIcon`): marca do site (YouTube, GitHub, X…), da linguagem (Python, SQL…) ou a própria cor.
+4. [x] Agents 2.0 (seção 23) — pedido de permissão vira CRITICAL (`approval`): passa na frente de tudo, fura
+   tela cheia, e a pílula (`DiApproval`) tem Aprovar ("1"/"y" no terminal da sessão) e Negar (Esc).
 5. [x] Fullscreen/Game Quiet Mode (seção 29) — feito na Fase 3
-6. [~] Call Activity (seção 30) — já detecta chamada via PipeWire e mostra no anchor; falta
-   mute/deafen/sair como controles na expandida
+6. [x] Call Activity (seção 30) — Live `call` (`DiCall`/`DiXCall`): mutar e desligar áudio direto nos streams
+   PipeWire do Vesktop/Discord (estado real), abrir a chamada, e sair via `callLeaveShortcut` (atalho do Discord).
 7. [~] Terminal Activity (seção 25) — já existe (`scripts/island/cmd-island.zsh`/`.sh`)
 8. [x] Dev Activity (seção 26) — `scripts/island/dev-island.sh` (genérico, testado com input simulado):
    building → ready (URL detectada, fica Live enquanto a porta responder) → error/remove. Usa o handler
@@ -74,6 +75,12 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
 10. [x] Periféricos (seção 27) — USB/SSD com remoção segura, bateria de fones/mouse/controle, disco quase
     cheio, thermal (ver "Periféricos/HDMI" em Bugs/achados)
 11. [x] HDMI/Monitor (seção 28) — Peek de conexão com Estender/Espelhar/Só externo + confirmação/reversão
+
+## Rodada 4
+
+- [x] IMDb "a seguir": ~100 s antes do fim do episódio (créditos), a nota do próximo — mesmo efeito de destaque
+      (melhor da temporada / top 10 / top 3). Um timer mirado no fim, re-mirado em pausa/seek, sem polling.
+      Teste: `island simulate watchNext` com um episódio aberto.
 
 ## Bugs / achados avulsos
 
