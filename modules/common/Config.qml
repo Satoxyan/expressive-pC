@@ -727,10 +727,27 @@ Singleton {
 
             property JsonObject interactions: JsonObject {
                 property JsonObject scrolling: JsonObject {
-                    property bool fasterTouchpadScroll: false // Enable faster scrolling with touchpad
-                    property int mouseScrollDeltaThreshold: 120 // delta >= this then it gets detected as mouse scroll rather than touchpad
-                    property int mouseScrollFactor: 120
-                    property int touchpadScrollFactor: 450
+                    property bool fasterTouchpadScroll: true // Master switch for inertial scroll engine
+
+                    // === Touchpad physics ===
+                    property real flingFriction: 0.002
+                    property real flingStopThreshold: 0.01
+                    // Sensitivity: pixels per angleDelta unit during finger-follow phase
+                    property real touchpadSensitivity: 3.5
+                    // Velocity reflection coefficient at bounds (0 = hard stop, 1 = perfect bounce)
+                    property real bounceDamping: 0.3
+
+                    // === Mouse wheel ===
+                    property int wheelScrollAmount: 100
+                    property int wheelDurationMin: 200
+                    property int wheelDurationMax: 400
+
+                    // === Detection ===
+                    property int mouseScrollDeltaThreshold: 120 // angleDelta >= this = mouse wheel
+
+                    // === Relative Multipliers ===
+                    property real touchpadScrollFactor: 1.0 // scales touchpadSensitivity per-instance
+                    property real mouseScrollFactor: 1.0    // scales wheelScrollAmount per-instance
                 }
                 property JsonObject deadPixelWorkaround: JsonObject { // Hyprland leaves out 1 pixel on the right for interactions
                     property bool enable: false
