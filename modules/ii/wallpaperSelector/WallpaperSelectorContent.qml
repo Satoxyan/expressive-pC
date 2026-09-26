@@ -37,6 +37,19 @@ MouseArea {
         }
     ]
 
+    // Wallhaven 9-color filter groups — surfaced in the header array like blapples' picker.
+    readonly property var wallhavenColorGroups: [
+        { hex: "cc0000", name: Translation.tr("Red"),       q: "660000,990000,cc0000,cc3333" },
+        { hex: "ff6600", name: Translation.tr("Orange"),    q: "ffcc33,ff9900,ff6600" },
+        { hex: "cccc33", name: Translation.tr("Yellow"),    q: "666600,999900,cccc33,ffff00" },
+        { hex: "669900", name: Translation.tr("Green"),     q: "77cc33,669900,336600" },
+        { hex: "66cccc", name: Translation.tr("Cyan"),      q: "66cccc,0099cc" },
+        { hex: "0066cc", name: Translation.tr("Blue"),      q: "0066cc,0099cc,333399" },
+        { hex: "663399", name: Translation.tr("Purple"),    q: "ea4c88,993399,663399,333399" },
+        { hex: "996633", name: Translation.tr("Brown"),     q: "cc6633,996633,663300" },
+        { hex: "999999", name: Translation.tr("Grayscale"), q: "000000,999999,cccccc,ffffff,424153" }
+    ]
+
     function updateThumbnails() {
         const item = gridLoader.item;
         const totalImageMargin = (Appearance.sizes.wallpaperSelectorItemMargins + Appearance.sizes.wallpaperSelectorItemPadding) * 2;
@@ -329,21 +342,33 @@ MouseArea {
                     }
 
                     Loader {
-                        active: root.source === "naive" || root.source === "blapples"
+                        active: root.source === "naive" || root.source === "blapples" || root.source === "wallhaven"
                         visible: active
                         anchors.centerIn: parent
                         sourceComponent: CustomColorSelectionArray {
-                            currentValue: root.selectedColorGroup
-                            options: [
+                            currentValue: root.source === "wallhaven" ? WallhavenSearch.colors : root.selectedColorGroup
+                            options: root.source === "wallhaven"
+                                ? [{ value: "", displayName: Translation.tr("All colors"), color: "transparent", rainbow: true }]
+                                    .concat(root.wallhavenColorGroups.map(g => ({ value: g.q, displayName: g.name, color: "#" + g.hex })))
+                                : [
                                     { value: "",       displayName: Translation.tr("All colors"), color: "transparent", rainbow: true },
-                                { value: "red",    displayName: Translation.tr("Red"),        color: "#E0483E" },
-                                { value: "orange", displayName: Translation.tr("Orange"),     color: "#E08A3E" },
-                                { value: "yellow", displayName: Translation.tr("Yellow"),     color: "#E0C93E" },
-                                { value: "green",  displayName: Translation.tr("Green"),      color: "#6CBF5C" },
-                                { value: "blue",   displayName: Translation.tr("Blue"),       color: "#4C7FE0" },
-                                { value: "purple", displayName: Translation.tr("Purple"),     color: "#8A5CE0" },
-                            ]
-                            onSelected: newValue => root.selectedColorGroup = newValue
+                                    { value: "red",    displayName: Translation.tr("Red"),        color: "#E0483E" },
+                                    { value: "orange", displayName: Translation.tr("Orange"),     color: "#E08A3E" },
+                                    { value: "yellow", displayName: Translation.tr("Yellow"),     color: "#E0C93E" },
+                                    { value: "green",  displayName: Translation.tr("Green"),      color: "#6CBF5C" },
+                                    { value: "blue",   displayName: Translation.tr("Blue"),       color: "#4C7FE0" },
+                                    { value: "purple", displayName: Translation.tr("Purple"),     color: "#8A5CE0" },
+                                ]
+                            onSelected: newValue => {
+                                if (root.source === "wallhaven") {
+                                    // setColor toggles: picking the active color clears it.
+                                    // Skip only the no-op "All colors" while already clear.
+                                    if (newValue === "" && WallhavenSearch.colors === "") return
+                                    WallhavenSearch.setColor(newValue)
+                                } else {
+                                    root.selectedColorGroup = newValue
+                                }
+                            }
                         }
                     }
 
@@ -697,32 +722,6 @@ MouseArea {
                             sourceComponent: Toolbar {
                                 id: wallhavenToolbar
 
-                                readonly property var colorGroups: [
-                                    { hex: "cc0000", q: "660000,990000,cc0000,cc3333" },
-                                    { hex: "ff6600", q: "ffcc33,ff9900,ff6600" },
-                                    { hex: "cccc33", q: "666600,999900,cccc33,ffff00" },
-                                    { hex: "669900", q: "77cc33,669900,336600" },
-                                    { hex: "66cccc", q: "66cccc,0099cc" },
-                                    { hex: "0066cc", q: "0066cc,0099cc,333399" },
-                                    { hex: "663399", q: "ea4c88,993399,663399,333399" },
-                                    { hex: "996633", q: "cc6633,996633,663300" },
-                                    { hex: "999999", q: "000000,999999,cccccc,ffffff,424153" }
-                                ]
-
-                                readonly property string activeHex: {
-                                    for (let i = 0; i < colorGroups.length; i++)
-                                        if (colorGroups[i].q === WallhavenSearch.colors) return colorGroups[i].hex
-                                    return ""
-                                }
-
-                                function contrastColor(hex) {
-                                    if (!hex || hex.length < 6) return Appearance.colors.colOnLayer1
-                                    const r = parseInt(hex.substr(0, 2), 16)
-                                    const g = parseInt(hex.substr(2, 2), 16)
-                                    const b = parseInt(hex.substr(4, 2), 16)
-                                    return (0.299 * r + 0.587 * g + 0.114 * b) > 140 ? "#000000" : "#ffffff"
-                                }
-
                                 property bool _searchFieldReady: false
 
                                 Timer {
@@ -801,89 +800,6 @@ MouseArea {
                                         enabled: !WallhavenSearch.fetching && WallhavenSearch.currentPage < WallhavenSearch.lastPage
                                         text: "chevron_right"
                                         onClicked: WallhavenSearch.nextPage()
-                                    }
-                                }
-
-                                IconToolbarButton {
-                                    id: paletteButton
-                                    implicitWidth: height
-                                    text: "palette"
-                                    toggled: colorMenu.visible || WallhavenSearch.colors.length > 0
-                                    colBackgroundToggled: wallhavenToolbar.activeHex.length > 0 ? ("#" + wallhavenToolbar.activeHex) : Appearance.colors.colSecondaryContainer
-                                    colBackgroundToggledHover: wallhavenToolbar.activeHex.length > 0 ? ("#" + wallhavenToolbar.activeHex) : Appearance.colors.colSecondaryContainerHover
-                                    colText: wallhavenToolbar.activeHex.length > 0
-                                        ? wallhavenToolbar.contrastColor(wallhavenToolbar.activeHex)
-                                        : (toggled ? Appearance.colors.colOnSecondaryContainer : Appearance.colors.colOnSurfaceVariant)
-                                    onClicked: colorMenu.visible ? colorMenu.close() : colorMenu.open()
-                                    StyledToolTip {
-                                        text: Translation.tr("Filter by color")
-                                    }
-
-                                    Popup {
-                                        id: colorMenu
-                                        y: -height - 6
-                                        x: paletteButton.width - width
-                                        padding: 10
-                                        modal: false
-                                        focus: true
-                                        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-
-                                        enter: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 100 } }
-                                        exit: Transition { NumberAnimation { property: "opacity"; from: 1; to: 0; duration: 100 } }
-
-                                        background: Rectangle {
-                                            color: Appearance.m3colors.m3surfaceContainerHigh
-                                            radius: Appearance.rounding.normal
-                                            border.width: 1
-                                            border.color: Appearance.colors.colLayer0Border
-                                        }
-
-                                        contentItem: ColumnLayout {
-                                            spacing: 8
-
-                                            RowLayout {
-                                                Layout.fillWidth: true
-                                                StyledText {
-                                                    Layout.fillWidth: true
-                                                    text: Translation.tr("Filter by color")
-                                                    font.pixelSize: Appearance.font.pixelSize.small
-                                                    color: Appearance.colors.colSubtext
-                                                }
-                                                RippleButton {
-                                                    visible: WallhavenSearch.colors.length > 0
-                                                    implicitHeight: 24
-                                                    leftPadding: 8
-                                                    rightPadding: 8
-                                                    buttonRadius: height / 2
-                                                    onClicked: { WallhavenSearch.setColor(""); colorMenu.close() }
-                                                    contentItem: StyledText {
-                                                        text: Translation.tr("Clear")
-                                                        font.pixelSize: Appearance.font.pixelSize.smaller
-                                                        color: Appearance.colors.colOnLayer1
-                                                    }
-                                                }
-                                            }
-
-                                            Grid {
-                                                columns: 3
-                                                spacing: 8
-                                                Repeater {
-                                                    model: wallhavenToolbar.colorGroups
-                                                    delegate: Rectangle {
-                                                        required property var modelData
-                                                        width: 44; height: 44; radius: Appearance.rounding.small
-                                                        color: "#" + modelData.hex
-                                                        border.width: WallhavenSearch.colors === modelData.q ? 3 : 1
-                                                        border.color: WallhavenSearch.colors === modelData.q ? Appearance.colors.colPrimary : Appearance.colors.colLayer0Border
-                                                        MouseArea {
-                                                            anchors.fill: parent
-                                                            cursorShape: Qt.PointingHandCursor
-                                                            onClicked: { WallhavenSearch.setColor(parent.modelData.q); colorMenu.close() }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
                                     }
                                 }
 
