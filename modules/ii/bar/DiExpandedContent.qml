@@ -2,37 +2,37 @@ import QtQuick
 import qs.modules.common
 import qs.modules.common.widgets
 
+// The expanded island's content: one view at a time, handed over to the next with a crossfade between two layers
+// (DiExpandedSlot). The outgoing view drifts a few px against the direction of travel and fades; the incoming
+// one arrives from the other side. Both sit centred in the frame the island gives them, so the island's spring
+// resize and this handover play as a single motion.
 Item {
     id: content
     required property Item di
     required property string contentId
     property real maxHeight: 100000
-    readonly property real padding: 14
-    property string shownId: ""
+    // +1 travelling forward (scrolling to the next island), -1 back, 0 for a jump; consumed by the next swap
+    property int direction: 0
 
-    readonly property Item viewItem: loader.item
-    readonly property real naturalHeight: (loader.item?.implicitHeight ?? 60) + content.padding * 2
-    readonly property bool scrollable: content.naturalHeight > content.maxHeight + 1
+    property int activeSlot: 0
+    readonly property Item currentSlot: content.activeSlot === 0 ? slotA : slotB
+    readonly property Item viewItem: content.currentSlot.view
+    // What the incoming view needs, not what is fading out: the island starts resizing for it right away
+    readonly property real naturalHeight: content.currentSlot.naturalHeight
+    readonly property real naturalWidth: content.currentSlot.naturalWidth
 
-    implicitWidth: Math.max(loader.item?.implicitWidth ?? 280, loader.item?.wantedWidth ?? 0) + content.padding * 2
+    implicitWidth: content.naturalWidth
     implicitHeight: Math.min(content.naturalHeight, content.maxHeight)
 
-    Component.onCompleted: content.shownId = content.contentId
+    Component.onCompleted: if (content.contentId !== "") slotA.show(content.contentId, 0, true)
     onContentIdChanged: {
-        if (content.shownId === "") content.shownId = content.contentId
-        else swapAnim.restart()
-    }
-
-    SequentialAnimation {
-        id: swapAnim
-        NumberAnimation { target: loader; property: "opacity"; to: 0; duration: 110; easing.type: Easing.InCubic }
-        ScriptAction {
-            script: {
-                content.shownId = content.contentId
-                flick.contentY = 0
-            }
-        }
-        NumberAnimation { target: loader; property: "opacity"; to: 1; duration: 240; easing.type: Easing.OutCubic }
+        const outgoing = content.currentSlot
+        if (outgoing.contentId === content.contentId) return
+        const incoming = content.activeSlot === 0 ? slotB : slotA
+        if (outgoing.contentId !== "") outgoing.leave(content.direction)
+        if (content.contentId !== "") incoming.show(content.contentId, content.direction, false)
+        content.activeSlot = 1 - content.activeSlot
+        content.direction = 0
     }
 
     function componentFor(id) {
@@ -73,55 +73,11 @@ Item {
         }
     }
 
-    Flickable {
-        id: flick
-        anchors.fill: parent
-        clip: content.scrollable
-        interactive: content.scrollable
-        contentWidth: width
-        contentHeight: content.naturalHeight
-        boundsBehavior: Flickable.StopAtBounds
+    // A scrollable view pulled past its end: the island moves on to the next one
+    signal overscrolled(int direction)
 
-        MouseArea {
-            parent: flick
-            anchors.fill: parent
-            z: 10
-            enabled: content.scrollable
-            acceptedButtons: Qt.NoButton
-            onWheel: wheel => {
-                const step = wheel.pixelDelta.y !== 0 ? wheel.pixelDelta.y : wheel.angleDelta.y / 120 * 48
-                flick.contentY = Math.max(0, Math.min(flick.contentHeight - flick.height, flick.contentY - step))
-                wheel.accepted = true
-            }
-        }
-
-        Loader {
-            id: loader
-            x: content.padding
-            y: content.padding
-            width: flick.width - content.padding * 2
-            height: loader.item?.implicitHeight ?? 60
-            sourceComponent: content.shownId === "" ? null : content.componentFor(content.shownId)
-        }
-    }
-
-    Rectangle {
-        visible: content.scrollable
-        anchors {
-            right: parent.right
-            rightMargin: 4
-        }
-        y: content.padding + (content.height - content.padding * 2 - height) * (flick.contentY / Math.max(1, flick.contentHeight - flick.height))
-        width: 3
-        height: Math.max(24, (content.height - content.padding * 2) * flick.height / Math.max(1, flick.contentHeight))
-        radius: 1.5
-        color: Appearance.colors.colOnLayer0
-        opacity: flick.moving ? 0.5 : 0.2
-
-        Behavior on opacity {
-            NumberAnimation { duration: 200 }
-        }
-    }
+    DiExpandedSlot { id: slotA; host: content; onOverscrolled: direction => content.overscrolled(direction) }
+    DiExpandedSlot { id: slotB; host: content; onOverscrolled: direction => content.overscrolled(direction) }
 
     Component { id: notificationView; DiXNotification { di: content.di } }
     Component { id: mediaView; DiXMedia { di: content.di } }

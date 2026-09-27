@@ -22,4 +22,11 @@ Singleton {
     readonly property int short: 220
     readonly property int medium: 320
     readonly property int long: 460
+
+    // Springs (Material 3 Expressive: stiffness + damping ratio, see DiSpring.qml) for the expanded island's
+    // own shape. Opening may overshoot a hair, like a surface with some mass; resizing barely does; closing
+    // never does, so shrinking back reads as settling rather than bouncing.
+    readonly property var springOpen: ({ stiffness: 320, dampingRatio: 0.8 })
+    readonly property var springResize: ({ stiffness: 380, dampingRatio: 0.86 })
+    readonly property var springClose: ({ stiffness: 520, dampingRatio: 1 })
 }
