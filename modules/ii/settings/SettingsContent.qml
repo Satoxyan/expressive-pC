@@ -66,6 +66,8 @@ Item {
                 if (loader) loader.active = true
             }
             if (profileLoader) profileLoader.active = true
+            // A page asked for before this panel existed is still waiting in GlobalStates
+            root.applyRequestedPage()
         })
     }
 

@@ -24,8 +24,11 @@ satisfeito por implementação existente (sem trabalho novo necessário), `[ ]` 
 
 - [~] OSD, notificação, bluetooth, áudio, bateria, screenshot, downloadDone, SongRec, hardware —
       já eram `Flash`/interrupt com hold/dismiss/silence; só formalizado em `peekIds`
-- [x] Fullscreen Quiet Mode: Critical (hibernação iminente, bateria crítica, `kind:"thermal"`) agora
-      fura o layer do fullscreen (`Bar.qml`); resto continua enterrado como já era
+- [x] Fullscreen Quiet Mode refeito (ver `ILHA.md` § Tela cheia): níveis critical/feedback/attention/live/
+      ambient, mini ilha flutuante em vez de subir a barra inteira, fila + resumo ao sair, hairline só com algo
+      na fila (zona de input fixa, espera antes de abrir), aprovação de agente pulsando, modo jogo, barra se
+      esconde sozinha em modo 2 (Hyprland 0.56), sem pílula/cava desenhando enterrada, sem ilha duplicada no
+      `BarContent`
 
 ## Fase 4 — Live
 

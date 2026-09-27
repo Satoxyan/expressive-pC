@@ -552,8 +552,7 @@ ColumnLayout {
             label: Translation.tr("Island settings")
             onTap: () => {
                 xi.di.collapse()
-                GlobalStates.settingsPage = "Bar"
-                GlobalStates.settingsOpen = true
+                GlobalStates.openSettingsAt("Bar")
             }
         }
     }

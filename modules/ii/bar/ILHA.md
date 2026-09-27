@@ -91,6 +91,45 @@ ilha. Loops (respirar, pulsar) são ambiente (~1 s por metade) e **sempre** pres
 (`running:`) — auditado: nenhum loop roda sem motivo. Coreografias próprias ficam fora dos tokens: abrir/fechar
 (`DiExpanded`), a nota do IMDb (`DiWatch`), as luzes de largada da F1, a tampa do case dos fones.
 
+## Tela cheia (seção 29)
+
+Tela cheia de verdade é `fullscreen === 2` do cliente (o app pediu: YouTube com F, jogo). `SUPER+F` é
+`maximized` (modo 1) e mantém a barra. Com modo 2, `Bar.qml` esconde a própria barra (`hiddenByFullscreen`,
+opacidade 0 + máscara vazia): o Hyprland 0.56 não enterra mais a camada Top sob tela cheia. A ilha continua
+"visível" por dentro e fica `buried`. Enquanto enterrada, cada id cai em um nível (`fullscreenTier`):
+
+- **critical** (hibernate, sessão, bateria crítica, calor/hardware urgente, notificação crítica): mini ilha
+  flutuante em `DiFullscreenPeek.qml`, com o mesmo componente da pílula e com input.
+- **feedback** (OSD, screenshot): mesma mini ilha, sem input. Desliga com `fullscreenFeedback`.
+- **attention** (aprovação de agente): só a hairline pulsando sem parar. Descansar o mouse nela mostra a
+  pílula da aprovação com os botões.
+- **live**: quieto. Gravação deixa um ponto vermelho.
+- **ambient** (o resto): vai para `fsQueue` e para o History. Hairline acesa, largura pelo tamanho da fila,
+  vermelha se algo urgente. Ao sair, um resumo (`fsDigest`, `IslandEvents.fullscreenDigest`) que abre o History.
+
+A hairline só existe quando há algo. Tem uma zona de input fixa (260×6) que não se move com animação, espera
+`fullscreenHoverDelay` antes de abrir e 300 ms antes de fechar. Janelas de jogo (`fullscreenGameClasses`,
+`contentType === "game"`) não recebem input no topo. O `DiEdgeTrigger` desliga enquanto enterrada, e o
+conteúdo da pílula para de desenhar, assim como o cava da ilha.
+
+Mensagens de apps prioritários (`priorityNotificationApps`, WhatsApp) aparecem como uma **linha discreta**
+(`fsMessage`): remetente e texto por até 6 s. Com o mouse em cima, a linha fica parada (no máximo 15 s) e mostra
+Responder, Silenciar conversa (a mesma lista `mutedConversations`, com Desfazer) e Silenciar até sair.
+**Silencioso** (`fsQuiet`) corta mensagens e feedback e para o pulso da hairline. Críticos e aprovação continuam
+passando. Liga pelo clique do meio na hairline, pelo painel ou por `ipc call island quiet`, que fora da tela
+cheia alterna o Modo Foco. Tudo zera ao sair da tela cheia.
+
+A mesma linha discreta (`fsShowLine`) serve para o que é importante sem ser crítico (`fsImportantLine`):
+bateria fraca, fone com bateria fraca, alertas de hardware (disco, monitor, dock) e tarefas que terminaram ou
+falharam (agente, build, comando, vindos do `eventLog`). Timer e pomodoro tocando passam até pelo silencioso.
+Jogos começam silenciosos (`fullscreenGameQuiet`). Silenciar uma conversa pergunta por quanto tempo (1 h, até
+amanhã às 8 h, sempre): as entradas com prazo ficam em `mutedConversationsUntil` como `"<até>|App|Título"`.
+Vale para a linha discreta, para a fila e para a notificação expandida (`DiXNotification`).
+
+O workspace ativo vem de `Hyprland.monitorFor(screen)`, não do `HyprlandData.monitors`. A cópia do
+HyprlandData só atualizava monitores em evento de monitor, e a barra ficava escondida depois de trocar de
+workspace.
+
 ## Regras aprendidas do jeito difícil
 
 - **Tudo é passivo.** Cada recurso reage a eventos (sinais do DBus/MPRIS, hooks de shell/agentes, eventos da

@@ -168,6 +168,12 @@ Scope {
         function toggle(): void { GlobalStates.settingsOpen = !GlobalStates.settingsOpen; }
         function open(): void   { GlobalStates.settingsOpen = true; }
         function close(): void  { GlobalStates.settingsOpen = false; }
+        // Jump straight to a page (and optionally a setting), the way the launcher already does it:
+        //   qs -c end4-pC ipc call settings page Bar
+        function page(name: string): void {
+            const parts = name.split(":");
+            GlobalStates.openSettingsAt(parts[0], parts.length > 1 ? parts[1] : "");
+        }
     }
 
     CompositorGlobalShortcut {

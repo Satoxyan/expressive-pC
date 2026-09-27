@@ -373,7 +373,7 @@ ContentPage {
                     IslandCostSwitch {
                         buttonIcon: "graphic_eq"
                         title: Translation.tr("Music visualizer")
-                        detail: Translation.tr("A cava process analysing the sound, all the time the music plays")
+                        detail: Translation.tr("A cava process while music plays")
                         cost: "heavy"
                         checked: Config.options.bar.dynamicIsland.visualizerStyle !== "none"
                         onCheckedChanged: {
@@ -384,7 +384,7 @@ ContentPage {
                     IslandCostSwitch {
                         buttonIcon: "sports_motorsports"
                         title: Translation.tr("Formula 1 live timing")
-                        detail: Translation.tr("A live-timing script during sessions only; otherwise one timer until the next one")
+                        detail: Translation.tr("Live timing script, only during sessions")
                         cost: "heavy"
                         checked: Config.options.bar.dynamicIsland.f1.enable
                         onCheckedChanged: { Config.options.bar.dynamicIsland.f1.enable = checked; }
@@ -392,7 +392,7 @@ ContentPage {
                     IslandCostSwitch {
                         buttonIcon: "wifi"
                         title: Translation.tr("Network and downloads")
-                        detail: Translation.tr("Reads the traffic every 5 s (every second during a download); finds who is downloading only then")
+                        detail: Translation.tr("Traffic every 5 s, every second while downloading")
                         cost: "medium"
                         checked: Config.options.bar.dynamicIsland.network
                         onCheckedChanged: { Config.options.bar.dynamicIsland.network = checked; }
@@ -400,7 +400,7 @@ ContentPage {
                     IslandCostSwitch {
                         buttonIcon: "lyrics"
                         title: Translation.tr("Synced lyrics")
-                        detail: Translation.tr("Fetches the lyrics of each song and follows them while it plays")
+                        detail: Translation.tr("Fetches and follows the lyrics of each song")
                         cost: "medium"
                         checked: Config.options.bar.dynamicIsland.lyrics
                         onCheckedChanged: { Config.options.bar.dynamicIsland.lyrics = checked; }
@@ -408,7 +408,7 @@ ContentPage {
                     IslandCostSwitch {
                         buttonIcon: "system_update_alt"
                         title: Translation.tr("Check for updates")
-                        detail: Translation.tr("checkupdates every %1 min (network + pacman); also feeds the bar's counter").arg(Config.options.updates.checkInterval)
+                        detail: Translation.tr("checkupdates every %1 min (network + pacman)").arg(Config.options.updates.checkInterval)
                         cost: "medium"
                         checked: Config.options.updates.enableCheck
                         onCheckedChanged: { Config.options.updates.enableCheck = checked; }
@@ -416,7 +416,7 @@ ContentPage {
                     IslandCostSwitch {
                         buttonIcon: "memory"
                         title: Translation.tr("CPU, memory and GPU pressure")
-                        detail: Translation.tr("Reuses the bar's samples; lists processes only while an alert or panel is open")
+                        detail: Translation.tr("Reuses the bar's samples; processes only during alerts")
                         cost: "light"
                         checked: Config.options.bar.dynamicIsland.systemLoad
                         onCheckedChanged: { Config.options.bar.dynamicIsland.systemLoad = checked; }
@@ -424,7 +424,7 @@ ContentPage {
                     IslandCostSwitch {
                         buttonIcon: "cable"
                         title: Translation.tr("Hardware (monitors, drives, dock, heat, disk)")
-                        detail: Translation.tr("Listens to udev and UPower events; nothing runs between them")
+                        detail: Translation.tr("udev and UPower events, nothing in between")
                         cost: "light"
                         checked: Config.options.bar.dynamicIsland.hardware
                         onCheckedChanged: { Config.options.bar.dynamicIsland.hardware = checked; }
@@ -432,14 +432,14 @@ ContentPage {
                     IslandCostSwitch {
                         buttonIcon: "palette"
                         title: Translation.tr("Album colors")
-                        detail: Translation.tr("Reads each cover's colors once, when the song changes")
+                        detail: Translation.tr("Reads each cover once, when the song changes")
                         cost: "light"
                         checked: Config.options.bar.dynamicIsland.albumColors
                         onCheckedChanged: { Config.options.bar.dynamicIsland.albumColors = checked; }
                     }
                     IslandCostSwitch {
                         buttonIcon: "smart_toy"
-                        title: Translation.tr("AI agents (Claude, Codex, Gemini)")
+                        title: Translation.tr("Coding agents in the terminal")
                         detail: Translation.tr("Only the agents' own hooks; nothing is polled")
                         cost: "light"
                         checked: Config.options.bar.dynamicIsland.claudeCode
@@ -456,7 +456,7 @@ ContentPage {
                     IslandCostSwitch {
                         buttonIcon: "call"
                         title: Translation.tr("Call controls")
-                        detail: Translation.tr("Uses the microphone links PipeWire already reports; no extra work")
+                        detail: Translation.tr("Reuses what PipeWire already reports")
                         cost: "light"
                         checked: Config.options.bar.dynamicIsland.callActivity
                         onCheckedChanged: { Config.options.bar.dynamicIsland.callActivity = checked; }
@@ -647,11 +647,64 @@ ContentPage {
                             { displayName: Translation.tr("Any heavy traffic"), icon: "network_check", value: "traffic" }
                         ]
                     }
+                }
+            }
+
+            // Tela cheia (seção 29): critical still breaks through; everything else waits behind the hairline
+            ContentSubsection {
+                title: Translation.tr("Fullscreen")
+                GroupedList {
                     ConfigSwitch {
-                        buttonIcon: "fullscreen"
-                        text: Translation.tr("Hairline with events while fullscreen")
+                        buttonIcon: "horizontal_rule"
+                        text: Translation.tr("Hairline when something waits")
                         checked: Config.options.bar.dynamicIsland.fullscreenPeek
                         onCheckedChanged: { Config.options.bar.dynamicIsland.fullscreenPeek = checked; }
+                    }
+                    ConfigSwitch {
+                        buttonIcon: "volume_up"
+                        text: Translation.tr("Volume and screenshots still show")
+                        checked: Config.options.bar.dynamicIsland.fullscreenFeedback
+                        onCheckedChanged: { Config.options.bar.dynamicIsland.fullscreenFeedback = checked; }
+                    }
+                    ConfigSwitch {
+                        buttonIcon: "chat"
+                        text: Translation.tr("Discreet messages (priority apps)")
+                        checked: Config.options.bar.dynamicIsland.fullscreenMessages
+                        onCheckedChanged: { Config.options.bar.dynamicIsland.fullscreenMessages = checked; }
+                    }
+                    ConfigSwitch {
+                        buttonIcon: "fullscreen_exit"
+                        text: Translation.tr("Summary when leaving fullscreen")
+                        checked: Config.options.bar.dynamicIsland.fullscreenCatchUp
+                        onCheckedChanged: { Config.options.bar.dynamicIsland.fullscreenCatchUp = checked; }
+                    }
+                    ConfigSpinBox {
+                        icon: "timer"
+                        text: Translation.tr("Wait before opening the hairline (ms)")
+                        value: Config.options.bar.dynamicIsland.fullscreenHoverDelay
+                        from: 0
+                        to: 1500
+                        stepSize: 50
+                        onValueChanged: { Config.options.bar.dynamicIsland.fullscreenHoverDelay = value; }
+                    }
+                    ConfigSwitch {
+                        buttonIcon: "sports_esports"
+                        text: Translation.tr("Games start quiet")
+                        checked: Config.options.bar.dynamicIsland.fullscreenGameQuiet
+                        onCheckedChanged: { Config.options.bar.dynamicIsland.fullscreenGameQuiet = checked; }
+                    }
+                }
+
+                // Loaded once and written back parsed, never bound: a binding would rewrite the text (and move the
+                // cursor) on every keystroke
+                MaterialTextArea {
+                    Layout.fillWidth: true
+                    placeholderText: Translation.tr("Game windows (class, comma separated)")
+                    wrapMode: TextEdit.Wrap
+                    Component.onCompleted: text = (Config.options.bar.dynamicIsland.fullscreenGameClasses ?? []).join(", ")
+                    onTextChanged: {
+                        const classes = text.split(",").map(c => c.trim()).filter(c => c !== "")
+                        Qt.callLater(() => { Config.options.bar.dynamicIsland.fullscreenGameClasses = classes; })
                     }
                 }
             }
