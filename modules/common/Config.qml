@@ -1056,15 +1056,6 @@ Singleton {
                 property string wallhavenQuery: ""
                 property string wallhavenTopRange: "1y"
                 property string sortMode: "time"
-                property string wallhavenApiKey: "" // fallback; keyring ("/wallhaven <key>") takes precedence
-                property string wallhavenCategories: "111"
-                property string wallhavenPurity: "100"
-                property string wallhavenSorting: "relevance"
-                property string wallhavenOrder: "desc"
-                property string wallhavenRatios: ""
-                property string wallhavenColors: ""
-                property string wallhavenQuery: ""
-                property string wallhavenTopRange: "1y"
             }
 
             property JsonObject windows: JsonObject {
