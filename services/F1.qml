@@ -79,9 +79,16 @@ Singleton {
         calendarFetcher.running = true
     }
 
+    // A round asked for while another is still downloading waits here instead of being dropped
+    property string pendingResultsRound: ""
+
     function requestResults(round) {
-        if (!round || resultsFetcher.running) return
+        if (!round) return
         const key = String(round)
+        if (resultsFetcher.running) {
+            if (resultsFetcher.round !== key) root.pendingResultsRound = key
+            return
+        }
         if (root.resultsByRound[key] && Date.now() - (root.resultsRequestedAt[key] ?? 0) < root.resultsCacheMs) return
         root.resultsRequestedAt = Object.assign({}, root.resultsRequestedAt, { [key]: Date.now() })
         resultsFetcher.round = key
@@ -197,6 +204,11 @@ Singleton {
                     console.warn("[F1] results parse error:", e)
                 }
             }
+        }
+        onExited: {
+            const next = root.pendingResultsRound
+            root.pendingResultsRound = ""
+            if (next !== "") Qt.callLater(() => root.requestResults(next))
         }
     }
 
