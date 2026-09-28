@@ -1353,6 +1353,8 @@ Item {
         && (((root.cfg.expandOnHover ?? true) && root.hoverArmed) || root.forcedReveal || root.peekReveal)
 
     property int expandLevel: 0
+    // Set by taps handled inside the pill (the compact clock) so the pill's own tap does not undo them
+    property double childTapAt: 0
     readonly property bool expanded: root.expandLevel >= 2
     property bool overlayShown: false
     property bool cardHovered: false
@@ -2797,6 +2799,9 @@ Item {
                     root.openSplitPicker()
                     return
                 }
+                // The clock has its own tap (home); without this the pill would toggle right after and close it again
+                if (anchor.visible && anchor.contains(anchor.mapFromItem(pill, eventPoint.position))) return
+                if (Date.now() - root.childTapAt < 250) return
                 if (root.primaryId === "fsDigest") {
                     IslandEvents.fullscreenDigest.dismiss()
                     root.expandTo(2, "history")

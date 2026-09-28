@@ -372,7 +372,10 @@ Item {
                         anchors.fill: parent
                         anchors.margins: -4
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: diIdleRoot.di.expandTo(2, "idle")
+                        onClicked: {
+                            diIdleRoot.di.childTapAt = Date.now()
+                            diIdleRoot.di.expandTo(2, "idle")
+                        }
                     }
                 }
             }
