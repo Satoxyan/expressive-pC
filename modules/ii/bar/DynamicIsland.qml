@@ -2671,16 +2671,56 @@ Item {
                 ColumnLayout {
                     spacing: -3
 
-                    StyledText {
+                    // The date, and on hover a peek at the weather in its place. Both lines keep their size, so the
+                    // hover never changes the anchor's shape (it used to, and flickered at the bottom edge).
+                    Item {
+                        id: topLine
+                        clip: true
                         Layout.alignment: Qt.AlignRight
-                        visible: root.anchorInfo.tone === "plain" && (root.cfg.anchorDate ?? true)
-                            && !anchorHover.hovered && root.pillHeight >= 26
-                        text: DateTime.shortDate
-                        font.family: anchorText.font.family
-                        font.pixelSize: Appearance.font.pixelSize.smallest
-                        font.features: { "tnum": 1 }
-                        color: anchor.tone
-                        opacity: root.dateIsNews ? 0.9 : 0.5
+                        visible: root.anchorInfo.tone === "plain" && (root.cfg.anchorDate ?? true) && root.pillHeight >= 26
+                        readonly property bool peek: anchorHover.hovered && (Weather.data?.temp ?? "") !== ""
+                        implicitWidth: Math.max(dateLine.implicitWidth, weatherLine.implicitWidth)
+                        implicitHeight: dateLine.implicitHeight
+
+                        StyledText {
+                            id: dateLine
+                            anchors.right: parent.right
+                            y: topLine.peek ? -5 : 0
+                            text: DateTime.shortDate
+                            font.family: anchorText.font.family
+                            font.pixelSize: Appearance.font.pixelSize.smallest
+                            font.features: { "tnum": 1 }
+                            color: anchor.tone
+                            opacity: topLine.peek ? 0 : (root.dateIsNews ? 0.9 : 0.5)
+
+                            Behavior on y { NumberAnimation { duration: IslandMotion.short; easing.type: Easing.OutCubic } }
+                            Behavior on opacity { NumberAnimation { duration: IslandMotion.micro } }
+                        }
+                        Row {
+                            id: weatherLine
+                            anchors.right: parent.right
+                            y: topLine.peek ? 0 : 5
+                            spacing: 2
+                            opacity: topLine.peek ? 0.9 : 0
+
+                            Behavior on y { NumberAnimation { duration: IslandMotion.short; easing.type: Easing.OutCubic } }
+                            Behavior on opacity { NumberAnimation { duration: IslandMotion.micro } }
+
+                            MaterialSymbol {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: IslandEvents.weatherSymbol(Weather.data?.wCode ?? 800, Weather.data?.night)
+                                iconSize: 11
+                                fill: 1
+                                color: anchor.tone
+                            }
+                            StyledText {
+                                text: `${parseInt(Weather.data?.temp ?? "0") || 0}°`
+                                font.family: anchorText.font.family
+                                font.pixelSize: Appearance.font.pixelSize.smallest
+                                font.features: { "tnum": 1 }
+                                color: anchor.tone
+                            }
+                        }
                     }
 
                 Item {
@@ -2692,8 +2732,7 @@ Item {
                     StyledText {
                         id: anchorText
                         y: 0
-                        text: anchorHover.hovered && root.anchorInfo.tone === "plain"
-                            ? DateTime.shortDate : root.anchorInfo.text
+                        text: root.anchorInfo.text
                         font.family: {
                             switch (root.cfg.anchorFont ?? "expressive") {
                                 case "numbers":   return Appearance.font.family.numbers
