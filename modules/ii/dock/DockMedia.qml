@@ -50,7 +50,6 @@ Item {
 
     onArtFilePathChanged: {
         if (!root.artUrl || root.artUrl.length === 0) {
-            root.artDominantColor = Appearance.m3colors.m3secondaryContainer
             root.artDownloaded = false
             return
         }

@@ -49,7 +49,7 @@ Item {
 
     onArtFilePathChanged: {
         if (!root.artUrl || root.artUrl.length == 0) {
-            root.artDominantColor = Appearance.m3colors.m3secondaryContainer
+            // no art: leave artDominantColor bound — assigning here would break the binding forever
             return
         }
         coverArtDownloader.targetFile = root.artUrl
@@ -293,6 +293,7 @@ Item {
                         dotSize: 5
                         dotSpacing: 6
                         maxBarHeight: parent.height * 0.8
+                        barColor: blendedColors.colPrimary
                     }
                 }
             }
@@ -612,6 +613,9 @@ Item {
                 visible: Mpris.players.values.length > 1
                 Layout.fillWidth: true
                 Layout.topMargin: 12
+                colBackground: blendedColors.colSecondaryContainer
+                colBackgroundHover: blendedColors.colSecondaryContainerHover
+                colBackgroundActive: blendedColors.colSecondaryContainerActive
                 model: Mpris.players.values.map(p => p.identity ?? p.desktopEntry ?? "Unknown")
                 currentIndex: 0
             }

@@ -94,9 +94,9 @@ ComboBox {
         required property int index
         property color color: {
             if (root.currentIndex === itemDelegate.index) {
-                if (itemDelegate.down) return Appearance.colors.colSecondaryContainerActive;
-                if (itemDelegate.hovered) return Appearance.colors.colSecondaryContainerHover;
-                return Appearance.colors.colSecondaryContainer;
+                if (itemDelegate.down) return root.colBackgroundActive;
+                if (itemDelegate.hovered) return root.colBackgroundHover;
+                return root.colBackground;
             } else {
                 if (itemDelegate.down) return Appearance.colors.colLayer3Active;
                 if (itemDelegate.hovered) return Appearance.colors.colLayer3Hover;
