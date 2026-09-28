@@ -93,7 +93,7 @@ Singleton {
                 case "kali":        distroIcon = "debian-symbolic"; break
                 case "funtoo":
                 case "gentoo":      distroIcon = "gentoo-symbolic"; break
-                default:            distroIcon = "arch-symbolic"; break
+                default:            distroIcon = "google-gemini-symbolic"; break
             }
             if (textOsRelease.toLowerCase().includes("nyarch"))
                 distroIcon = "nyarch-symbolic"

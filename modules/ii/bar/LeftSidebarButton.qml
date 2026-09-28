@@ -59,7 +59,7 @@ RippleButton {
         anchors.centerIn: parent
         width: root.isMaterial ? (root.vertical ? 24 : 22) : 19.5
         height: root.isMaterial ? (root.vertical ? 24 : 22) : 19.5
-        source: Config.options.custom.distroIcon
+        source: Config.options.custom.distroIcon || SystemInfo.distroIcon
         colorize: Config.options.custom.colorizeIcon
         color: Appearance.colors.colPrimary
 
