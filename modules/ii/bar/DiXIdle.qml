@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Layouts
-import Qt5Compat.GraphicalEffects
 import Quickshell
 import qs
 import qs.services
@@ -8,18 +7,16 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// Home. It is a place, not a dashboard: the compact already told you what is happening now, so this only
-// answers "what time/day is it, and where do I want to go" — clock, weather, and the Tool Dock. Anything that
-// used to live here permanently (battery, network, updates, notifications, agents, F1, privacy) has its own
-// Live/Peek surface now and only shows up on the island when it is actually true.
+// Home, the island's main widget. Left: the time and day, the weather for the next hours and the toggles you
+// reach for most (do not disturb, stay awake, focus). Right: everything going on now, in one list — what is
+// playing, live activities, the next F1 session and islands you silenced. Across the bottom, the shortcuts.
+// Always two columns at the standard height, so nothing here pushes the island taller.
 ColumnLayout {
     id: xi
     required property Item di
-    spacing: 14
-    implicitWidth: 360
-    readonly property real wantedWidth: xi.nowIds.length > 0 ? 560 : 380
-
-    property bool moreOpen: false
+    spacing: 10
+    implicitWidth: xi.wantedWidth
+    readonly property real wantedWidth: 532
 
     Component.onCompleted: Weather.requestForecast()
 
@@ -54,72 +51,95 @@ ColumnLayout {
         }
     }
 
-    component Chip: Rectangle {
-        id: chip
+    readonly property var nowIds: {
+        const ids = xi.di.persistentIds.filter(id => !["idle", "media"].includes(id))
+        if (WatchRating.active && WatchRating.playing && !ids.includes("watchRating")) ids.push("watchRating")
+        if (F1.enabled && !ids.includes("f1") && F1.nextSession !== null && F1.secondsToNext > 0 && F1.secondsToNext < 3 * 86400)
+            ids.push("f1")
+        return ids
+    }
+
+    // One list for the right column: { kind: "media" | "live" | "f1Next" | "silenced", id }
+    readonly property var nowRows: {
+        const rows = []
+        if (xi.di.hasMedia) rows.push({ kind: "media", id: "media" })
+        for (const id of xi.nowIds) rows.push({ kind: "live", id: id })
+        // Further than the live countdown reaches: still worth a line as what comes next
+        if (F1.enabled && !xi.nowIds.includes("f1") && F1.nextSession !== null && F1.secondsToNext > 0)
+            rows.push({ kind: "f1Next", id: "f1" })
+        for (const id of IslandEvents.silencedIslands) rows.push({ kind: "silenced", id: id })
+        return rows
+    }
+
+    component SectionLabel: StyledText {
+        font.pixelSize: Appearance.font.pixelSize.smallest
+        font.weight: Font.DemiBold
+        color: Appearance.colors.colOnLayer0
+        opacity: 0.6
+    }
+
+    component Toggle: Rectangle {
+        id: toggle
         property string icon
         property string label
-        property color accent: Appearance.colors.colOnLayer1
         property bool active: false
         property var onTap: null
-        implicitWidth: chipRow.implicitWidth + 22
+        implicitWidth: toggleRow.implicitWidth + 20
         implicitHeight: 32
         radius: 16
-        color: chip.active ? Appearance.colors.colPrimaryContainer
-            : (chipMouse.containsMouse && chip.onTap ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1)
-        scale: chipMouse.pressed ? 0.94 : 1
+        color: toggle.active ? Appearance.colors.colPrimaryContainer
+            : (toggleMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1)
+        scale: toggleMouse.pressed ? 0.95 : 1
 
         Behavior on color {
-            ColorAnimation { duration: IslandMotion.micro }
+            ColorAnimation { duration: IslandMotion.short }
         }
         Behavior on scale {
             NumberAnimation { duration: IslandMotion.micro; easing.type: Easing.OutBack }
         }
 
         RowLayout {
-            id: chipRow
+            id: toggleRow
             anchors.centerIn: parent
             spacing: 5
             MaterialSymbol {
-                text: chip.icon
+                text: toggle.icon
                 iconSize: 16
-                fill: 1
-                color: chip.active ? Appearance.colors.colOnPrimaryContainer : chip.accent
+                fill: toggle.active ? 1 : 0
+                color: toggle.active ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colOnLayer1
             }
             StyledText {
-                text: chip.label
+                text: toggle.label
                 font.pixelSize: Appearance.font.pixelSize.smaller
                 font.features: { "tnum": 1 }
-                color: chip.active ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colOnLayer1
+                color: toggle.active ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colOnLayer1
             }
         }
 
         MouseArea {
-            id: chipMouse
+            id: toggleMouse
             anchors.fill: parent
             hoverEnabled: true
-            cursorShape: chip.onTap ? Qt.PointingHandCursor : Qt.ArrowCursor
-            onClicked: if (chip.onTap) chip.onTap()
+            cursorShape: Qt.PointingHandCursor
+            onClicked: if (toggle.onTap) toggle.onTap()
         }
     }
 
-    component DockButton: ColumnLayout {
-        id: dock
+    component Shortcut: ColumnLayout {
+        id: shortcut
         property string icon
         property string label
         property var onTap: null
         Layout.fillWidth: true
         Layout.preferredWidth: 1
-        Layout.minimumWidth: 0
-        Layout.maximumWidth: 10000
-        spacing: 4
+        spacing: 3
 
         Rectangle {
-            Layout.alignment: Qt.AlignHCenter
-            implicitWidth: 44
-            implicitHeight: 44
-            radius: 14
-            color: dockMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1
-            scale: dockMouse.pressed ? 0.94 : 1
+            Layout.fillWidth: true
+            implicitHeight: 34
+            radius: 12
+            color: shortcutMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1
+            scale: shortcutMouse.pressed ? 0.95 : 1
 
             Behavior on color {
                 ColorAnimation { duration: IslandMotion.micro }
@@ -130,434 +150,499 @@ ColumnLayout {
 
             MaterialSymbol {
                 anchors.centerIn: parent
-                text: dock.icon
-                iconSize: 20
+                text: shortcut.icon
+                iconSize: 19
                 fill: 1
                 color: Appearance.colors.colOnLayer1
             }
 
             MouseArea {
-                id: dockMouse
+                id: shortcutMouse
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: if (dock.onTap) dock.onTap()
+                onClicked: if (shortcut.onTap) shortcut.onTap()
             }
         }
 
         StyledText {
-            Layout.alignment: Qt.AlignHCenter
-            Layout.maximumWidth: 72
+            Layout.fillWidth: true
+            horizontalAlignment: Text.AlignHCenter
             elide: Text.ElideRight
-            text: dock.label
+            text: shortcut.label
             font.pixelSize: Appearance.font.pixelSize.smallest
-            color: Appearance.colors.colOnLayer1
-            opacity: 0.7
+            color: Appearance.colors.colOnLayer0
+            opacity: shortcutMouse.containsMouse ? 0.9 : 0.6
+            Behavior on opacity { NumberAnimation { duration: IslandMotion.micro } }
         }
     }
 
-    readonly property var nowIds: {
-        const ids = xi.di.persistentIds.filter(id => !["idle", "media"].includes(id))
-        if (WatchRating.active && WatchRating.playing && !ids.includes("watchRating")) ids.push("watchRating")
-        if (F1.enabled && !ids.includes("f1") && F1.nextSession !== null && F1.secondsToNext > 0 && F1.secondsToNext < 3 * 86400)
-            ids.push("f1")
-        return ids
-    }
-
-    // The day, what's playing and the shortcuts on the left; what is going on right now on the right. Side by side,
-    // every new activity no longer pushes the home view taller.
     RowLayout {
         Layout.fillWidth: true
-        spacing: 16
+        Layout.fillHeight: true
+        spacing: 18
 
+        // Left: the day
         ColumnLayout {
-            Layout.fillWidth: true
-            Layout.preferredWidth: 1
+            Layout.fillWidth: false
+            Layout.preferredWidth: 272
+            Layout.maximumWidth: 272
             Layout.alignment: Qt.AlignTop
-            spacing: 12
+            spacing: 0
 
-            ColumnLayout {
-                Layout.fillWidth: true
-                Layout.preferredWidth: 340
-                Layout.topMargin: 4
-                spacing: 0
+            StyledText {
+                id: clock
+                Layout.topMargin: -4
+                text: DateTime.time
+                font.family: xi.displayFont
+                font.pixelSize: 48
+                font.weight: Font.DemiBold
+                font.features: { "tnum": 1 }
+                color: Appearance.colors.colOnLayer0
+                DiCascade { target: clock; index: 0 }
+            }
 
-                StyledText {
-                    text: `${Qt.locale().toString(new Date(), "dddd")}, ${DateTime.time}`
-                    font.family: xi.displayFont
-                    font.pixelSize: 22
-                    font.weight: Font.Medium
-                    font.features: { "tnum": 1 }
-                    color: Appearance.colors.colOnLayer0
-                }
+            Item {
+                id: dateRow
+                Layout.topMargin: -2
+                implicitWidth: dateContent.implicitWidth
+                implicitHeight: dateContent.implicitHeight
+                DiCascade { target: dateRow; index: 1 }
 
                 RowLayout {
-                    Layout.topMargin: 2
-                    spacing: 5
+                    id: dateContent
+                    spacing: 2
 
                     StyledText {
-                        text: DateTime.longDate
-                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        // Weekday and date spelled out, without the year
+                        text: DateTime.clock.date.toLocaleDateString(Qt.locale(), Locale.LongFormat).replace(/,?\s*(de\s)?\d{4}$/, "")
+                        font.pixelSize: Appearance.font.pixelSize.small
                         color: Appearance.colors.colOnLayer0
-                        opacity: dateArea.containsMouse ? 0.95 : 0.65
+                        opacity: dateArea.containsMouse ? 0.95 : 0.7
                         Behavior on opacity { NumberAnimation { duration: IslandMotion.micro } }
-
-                        MouseArea {
-                            id: dateArea
-                            anchors.fill: parent
-                            anchors.margins: -6
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: xi.di.expand("calendar")
-                        }
                     }
-
-                    StyledText {
-                        visible: (Weather.data?.temp ?? "") !== ""
-                        text: "·"
-                        font.pixelSize: Appearance.font.pixelSize.smaller
-                        color: Appearance.colors.colOnLayer0
-                        opacity: 0.5
-                    }
-
                     MaterialSymbol {
-                        visible: (Weather.data?.temp ?? "") !== ""
-                        text: IslandEvents.weatherSymbol(Weather.data?.wCode ?? 800, Weather.data?.night)
-                        iconSize: 14
-                        fill: 1
+                        text: "chevron_right"
+                        iconSize: 16
                         color: Appearance.colors.colOnLayer0
-                        opacity: 0.65
+                        opacity: dateArea.containsMouse ? 0.8 : 0.35
+                        Behavior on opacity { NumberAnimation { duration: IslandMotion.micro } }
                     }
+                }
 
-                    StyledText {
-                        visible: (Weather.data?.temp ?? "") !== ""
-                        text: Weather.data?.temp ?? ""
-                        font.pixelSize: Appearance.font.pixelSize.smaller
-                        font.features: { "tnum": 1 }
-                        color: Appearance.colors.colOnLayer0
-                        opacity: 0.65
-
-                        MouseArea {
-                            anchors.fill: parent
-                            anchors.margins: -4
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: xi.di.expand("weather")
-                        }
-                    }
+                MouseArea {
+                    id: dateArea
+                    anchors.fill: parent
+                    anchors.margins: -6
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: xi.di.expand("calendar")
                 }
             }
 
+            // Weather now and the next four steps; the whole card opens the weather view
             Rectangle {
+                id: weatherCard
                 Layout.fillWidth: true
-                visible: xi.di.hasMedia
-                implicitHeight: 52
-                radius: 16
-                color: ColorUtils.mix(Appearance.colors.colLayer1, xi.di.mediaArtColor, 0.82)
+                Layout.topMargin: 10
+                visible: (Weather.data?.temp ?? "") !== ""
+                implicitHeight: 50
+                radius: 14
+                color: weatherMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1
+                DiCascade { target: weatherCard; index: 2 }
+
+                Behavior on color {
+                    ColorAnimation { duration: IslandMotion.micro }
+                }
 
                 RowLayout {
                     anchors {
                         fill: parent
-                        leftMargin: 6
+                        leftMargin: 10
                         rightMargin: 8
                     }
-                    spacing: 10
+                    spacing: 6
 
-                    Rectangle {
-                        implicitWidth: 40
-                        implicitHeight: 40
-                        radius: 10
-                        clip: true
-                        color: Appearance.colors.colLayer2
-
-                        StyledImage {
-                            anchors.fill: parent
-                            source: xi.di.activePlayer?.trackArtUrl ?? ""
-                            fillMode: Image.PreserveAspectCrop
-                            sourceSize.width: 80
-                            sourceSize.height: 80
-                        }
+                    MaterialSymbol {
+                        text: IslandEvents.weatherSymbol(Weather.data?.wCode ?? 800, Weather.data?.night)
+                        iconSize: 26
+                        fill: 1
+                        color: Appearance.colors.colPrimary
                     }
-
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: -2
-                        StyledText {
-                            Layout.fillWidth: true
-                            text: xi.di.activePlayer?.trackTitle ?? ""
-                            font.pixelSize: Appearance.font.pixelSize.smaller
-                            font.weight: Font.DemiBold
-                            color: Appearance.colors.colOnLayer1
-                            elide: Text.ElideRight
-                        }
-                        StyledText {
-                            Layout.fillWidth: true
-                            text: xi.di.activePlayer?.trackArtist ?? ""
-                            font.pixelSize: Appearance.font.pixelSize.smallest
-                            color: Appearance.colors.colOnLayer1
-                            opacity: 0.7
-                            elide: Text.ElideRight
-                        }
+                    StyledText {
+                        text: `${parseInt(Weather.data?.temp ?? "0") || 0}°`
+                        font.pixelSize: Appearance.font.pixelSize.larger
+                        font.weight: Font.DemiBold
+                        font.features: { "tnum": 1 }
+                        color: Appearance.colors.colOnLayer1
                     }
+                    Item { Layout.fillWidth: true }
 
                     Repeater {
-                        model: [
-                            { icon: "skip_previous", action: () => xi.di.activePlayer?.previous() },
-                            { icon: xi.di.activePlayer?.isPlaying ? "pause" : "play_arrow", action: () => xi.di.activePlayer?.togglePlaying() },
-                            { icon: "skip_next", action: () => xi.di.activePlayer?.next() }
-                        ]
-                        delegate: MaterialSymbol {
-                            required property var modelData
-                            text: modelData.icon
-                            iconSize: 22
-                            fill: 1
-                            color: Appearance.colors.colOnLayer1
+                        model: Math.min(4, (Weather.forecast ?? []).length)
 
-                            MouseArea {
-                                anchors.fill: parent
-                                anchors.margins: -4
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: modelData.action()
+                        ColumnLayout {
+                            id: nextHour
+                            required property int index
+                            readonly property var step: Weather.forecast[nextHour.index] ?? ({})
+                            Layout.preferredWidth: 38
+                            spacing: 0
+
+                            StyledText {
+                                Layout.alignment: Qt.AlignHCenter
+                                text: Qt.locale().toString(new Date((nextHour.step.dt ?? 0) * 1000), DateTime.use12HourFormat ? "h AP" : "HH'h'")
+                                font.pixelSize: Appearance.font.pixelSize.smallest
+                                font.features: { "tnum": 1 }
+                                color: Appearance.colors.colOnLayer1
+                                opacity: 0.55
+                            }
+                            RowLayout {
+                                Layout.alignment: Qt.AlignHCenter
+                                spacing: 1
+                                MaterialSymbol {
+                                    text: IslandEvents.weatherSymbol(nextHour.step.wCode, nextHour.step.night)
+                                    iconSize: 14
+                                    fill: 1
+                                    color: Appearance.colors.colOnLayer1
+                                    opacity: 0.8
+                                }
+                                StyledText {
+                                    text: `${nextHour.step.temp ?? ""}°`
+                                    font.pixelSize: Appearance.font.pixelSize.smallest
+                                    font.weight: Font.DemiBold
+                                    font.features: { "tnum": 1 }
+                                    color: Appearance.colors.colOnLayer1
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            Flow {
-                Layout.fillWidth: true
-                spacing: 6
-                visible: IslandEvents.silencedIslands.length > 0
-
-                Repeater {
-                    model: IslandEvents.silencedIslands
-
-                    delegate: Chip {
-                        required property string modelData
-                        icon: "notifications_paused"
-                        label: `${xi.pinLabels[modelData]?.[0] ?? xi.di.nameForId(modelData)} · ${Translation.tr("bring back")}`
-                        accent: IslandEvents.colorAttention
-                        onTap: () => IslandEvents.restoreIsland(modelData)
-                    }
+                MouseArea {
+                    id: weatherMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: xi.di.expand("weather")
                 }
             }
 
             RowLayout {
-                Layout.fillWidth: true
-                Layout.topMargin: 4
-                spacing: 4
-
-                DockButton {
-                    icon: "apps"
-                    label: Translation.tr("Now")
-                    onTap: () => xi.di.expand("overview")
-                }
-                DockButton {
-                    icon: "inventory_2"
-                    label: Translation.tr("Drawer")
-                    onTap: () => xi.di.expand("shelf")
-                }
-                DockButton {
-                    icon: "content_paste"
-                    label: Translation.tr("Clips")
-                    onTap: () => xi.di.expand("clipboard")
-                }
-                DockButton {
-                    icon: "smart_toy"
-                    label: Translation.tr("Agents")
-                    onTap: () => xi.di.expand("agents")
-                }
-                DockButton {
-                    icon: xi.moreOpen ? "expand_less" : "more_horiz"
-                    label: Translation.tr("More")
-                    onTap: () => xi.moreOpen = !xi.moreOpen
-                }
-            }
-
-            Flow {
-                Layout.fillWidth: true
+                id: toggles
+                Layout.topMargin: 8
                 spacing: 6
-                visible: xi.moreOpen
+                DiCascade { target: toggles; index: 3 }
 
-                Chip {
-                    icon: "partly_cloudy_day"
-                    label: Translation.tr("Weather")
-                    onTap: () => xi.di.expand("weather")
-                }
-                Chip {
-                    icon: "monitoring"
-                    label: Translation.tr("System")
-                    onTap: () => xi.di.expand("system")
-                }
-                Chip {
-                    icon: "vpn_lock"
-                    label: "ZeroTier"
-                    onTap: () => xi.di.expand("zerotier")
-                }
-                Chip {
-                    icon: "history"
-                    label: Translation.tr("History")
-                    onTap: () => xi.di.expand("history")
-                }
-                Chip {
-                    icon: IslandEvents.caffeineOn ? "local_cafe" : "bedtime"
-                    label: IslandEvents.caffeineOn
-                        ? (IslandEvents.caffeineMinutesLeft >= 0 ? Translation.tr("Awake · %1 min").arg(IslandEvents.caffeineMinutesLeft) : Translation.tr("Awake"))
-                        : Translation.tr("Stay awake")
-                    active: IslandEvents.caffeineOn
-                    accent: IslandEvents.caffeineOn ? IslandEvents.colorAttention : Appearance.colors.colOnLayer1
-                    onTap: () => IslandEvents.toggleCaffeine(60)
-                }
-                Chip {
-                    icon: Notifications.silent ? "notifications_off" : "notifications_active"
-                    label: Notifications.silent ? Translation.tr("Do not disturb") : Translation.tr("Mute notifications")
+                Toggle {
+                    icon: Notifications.silent ? "notifications_off" : "notifications"
+                    label: Translation.tr("Do not disturb")
                     active: Notifications.silent
-                    accent: Notifications.silent ? IslandEvents.colorAttention : Appearance.colors.colOnLayer1
                     onTap: () => Notifications.silent = !Notifications.silent
                 }
-                Chip {
-                    icon: "psychology"
-                    label: IslandEvents.focusOn ? Translation.tr("Focus · %1 min").arg(IslandEvents.focusMinutes) : Translation.tr("Focus")
-                    active: IslandEvents.focusOn
-                    accent: IslandEvents.focusOn ? IslandEvents.colorAttention : Appearance.colors.colOnLayer1
-                    onTap: () => IslandEvents.toggleFocus()
+                Toggle {
+                    icon: "local_cafe"
+                    label: IslandEvents.caffeineOn && IslandEvents.caffeineMinutesLeft >= 0
+                        ? `${IslandEvents.caffeineMinutesLeft} min` : Translation.tr("Caffeine")
+                    active: IslandEvents.caffeineOn
+                    onTap: () => IslandEvents.toggleCaffeine(60)
                 }
-                Chip {
-                    icon: "tune"
-                    label: Translation.tr("Island settings")
-                    onTap: () => {
-                        xi.di.collapse()
-                        GlobalStates.settingsPage = "Bar"
-                        GlobalStates.settingsOpen = true
-                    }
+                Toggle {
+                    icon: "psychology"
+                    label: IslandEvents.focusOn ? `${IslandEvents.focusMinutes} min` : Translation.tr("Focus")
+                    active: IslandEvents.focusOn
+                    onTap: () => IslandEvents.toggleFocus()
                 }
             }
         }
 
+        // Right: now
         ColumnLayout {
             Layout.fillWidth: true
-            Layout.preferredWidth: 1
-            Layout.alignment: Qt.AlignTop
-            visible: xi.nowIds.length > 0
-            spacing: 4
+            Layout.fillHeight: true
+            spacing: 6
 
-            StyledText {
-                Layout.leftMargin: 2
-                text: Translation.tr("Now").toUpperCase()
-                font.pixelSize: Appearance.font.pixelSize.smallest
-                font.weight: Font.DemiBold
-                font.letterSpacing: 1.2
-                color: Appearance.colors.colOnLayer0
-                opacity: 0.45
+            RowLayout {
+                id: nowHeader
+                Layout.fillWidth: true
+                DiCascade { target: nowHeader; index: 0 }
+
+                SectionLabel {
+                    Layout.fillWidth: true
+                    text: Translation.tr("Now")
+                }
+                SectionLabel {
+                    visible: xi.nowRows.length > 0
+                    text: xi.nowRows.length
+                    font.features: { "tnum": 1 }
+                    opacity: 0.4
+                }
             }
 
-            Repeater {
-                model: xi.nowIds
-                delegate: Rectangle {
-                    id: nowRow
-                    required property string modelData
-                    required property int index
-                    readonly property bool agentMark: ["claude", "codex", "gemini"].includes(xi.di.iconForId(nowRow.modelData))
-                    Layout.fillWidth: true
-                    implicitHeight: 42
-                    radius: 13
-                    color: nowMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1
-                    opacity: 0
-                    transform: Translate { id: nowShift; x: -14 }
+            Item {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
 
-                    Behavior on color {
-                        ColorAnimation { duration: IslandMotion.micro }
+                // Nothing going on: say so, instead of leaving a hole
+                ColumnLayout {
+                    id: emptyState
+                    anchors.centerIn: parent
+                    visible: xi.nowRows.length === 0
+                    spacing: 2
+                    DiCascade { target: emptyState; index: 2 }
+
+                    MaterialSymbol {
+                        Layout.alignment: Qt.AlignHCenter
+                        text: "self_improvement"
+                        iconSize: 30
+                        color: Appearance.colors.colOnLayer0
+                        opacity: 0.35
                     }
-
-                    SequentialAnimation {
-                        running: true
-                        PauseAnimation { duration: 60 + nowRow.index * 45 }
-                        ParallelAnimation {
-                            NumberAnimation { target: nowRow; property: "opacity"; to: 1; duration: IslandMotion.short; easing.type: Easing.OutCubic }
-                            NumberAnimation { target: nowShift; property: "x"; to: 0; duration: IslandMotion.medium; easing.type: Easing.OutBack; easing.overshoot: 1.2 }
-                        }
+                    StyledText {
+                        Layout.alignment: Qt.AlignHCenter
+                        text: Translation.tr("All quiet")
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        font.weight: Font.DemiBold
+                        color: Appearance.colors.colOnLayer0
+                        opacity: 0.6
                     }
-
-                    DiCapsule {
-                        id: nowValue
-                        visible: false
-                        di: xi.di
-                        providerId: nowRow.modelData
+                    StyledText {
+                        Layout.alignment: Qt.AlignHCenter
+                        text: Translation.tr("Nothing running right now")
+                        font.pixelSize: Appearance.font.pixelSize.smallest
+                        color: Appearance.colors.colOnLayer0
+                        opacity: 0.45
                     }
+                }
 
-                    RowLayout {
-                        anchors {
-                            fill: parent
-                            leftMargin: 12
-                            rightMargin: 10
-                        }
-                        spacing: 10
+                Flickable {
+                    id: nowList
+                    anchors.fill: parent
+                    clip: true
+                    contentHeight: nowColumn.implicitHeight
+                    boundsBehavior: Flickable.StopAtBounds
+                    interactive: nowList.contentHeight > nowList.height
 
-                        Item {
-                            implicitWidth: 20
-                            implicitHeight: 20
+                    ColumnLayout {
+                        id: nowColumn
+                        width: nowList.width
+                        spacing: 4
 
-                            DiClaudeIcon {
-                                anchors.centerIn: parent
-                                visible: nowRow.agentMark
-                                agent: xi.di.iconForId(nowRow.modelData)
-                                size: 16
+                        Repeater {
+                            model: xi.nowRows
+
+                            delegate: Rectangle {
+                                id: nowRow
+                                required property var modelData
+                                required property int index
+                                readonly property string kind: nowRow.modelData.kind
+                                readonly property string rowId: nowRow.modelData.id
+                                readonly property bool agentMark: nowRow.kind === "live"
+                                    && ["claude", "codex", "gemini"].includes(xi.di.iconForId(nowRow.rowId))
+                                Layout.fillWidth: true
+                                implicitHeight: 38
+                                radius: 12
+                                color: nowMouse.containsMouse ? Appearance.colors.colLayer2
+                                    : nowRow.kind === "media" ? ColorUtils.mix(Appearance.colors.colLayer1, xi.di.mediaArtColor, 0.82)
+                                    : Appearance.colors.colLayer1
+                                DiCascade { target: nowRow; index: nowRow.index + 1 }
+
+                                Behavior on color {
+                                    ColorAnimation { duration: IslandMotion.micro }
+                                }
+
+                                Loader {
+                                    id: capsule
+                                    active: nowRow.kind === "live"
+                                    visible: false
+                                    sourceComponent: DiCapsule {
+                                        di: xi.di
+                                        providerId: nowRow.rowId
+                                    }
+                                }
+
+                                RowLayout {
+                                    anchors {
+                                        fill: parent
+                                        leftMargin: nowRow.kind === "media" ? 5 : 10
+                                        rightMargin: 8
+                                    }
+                                    spacing: 9
+
+                                    Item {
+                                        implicitWidth: nowRow.kind === "media" ? 28 : 20
+                                        implicitHeight: implicitWidth
+
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            visible: nowRow.kind === "media"
+                                            radius: 8
+                                            clip: true
+                                            color: Appearance.colors.colLayer2
+
+                                            StyledImage {
+                                                anchors.fill: parent
+                                                source: nowRow.kind === "media" ? (xi.di.activePlayer?.trackArtUrl ?? "") : ""
+                                                fillMode: Image.PreserveAspectCrop
+                                                sourceSize.width: 56
+                                                sourceSize.height: 56
+                                            }
+                                        }
+                                        DiClaudeIcon {
+                                            anchors.centerIn: parent
+                                            visible: nowRow.agentMark
+                                            agent: nowRow.agentMark ? xi.di.iconForId(nowRow.rowId) : "claude"
+                                            size: 16
+                                        }
+                                        MaterialSymbol {
+                                            anchors.centerIn: parent
+                                            visible: nowRow.kind !== "media" && !nowRow.agentMark
+                                            text: nowRow.kind === "silenced" ? "notifications_paused"
+                                                : nowRow.kind === "f1Next" ? "sports_motorsports"
+                                                : xi.di.iconForId(nowRow.rowId)
+                                            iconSize: 17
+                                            fill: 1
+                                            color: nowRow.kind === "silenced" ? IslandEvents.colorAttention
+                                                : (capsule.item?.accent ?? Appearance.colors.colOnLayer1)
+                                        }
+                                    }
+
+                                    StyledText {
+                                        Layout.fillWidth: true
+                                        Layout.minimumWidth: 0
+                                        text: {
+                                            switch (nowRow.kind) {
+                                                case "media": return xi.di.activePlayer?.trackTitle ?? ""
+                                                case "f1Next": return `F1 · ${F1.nextSession?.name ?? ""}`
+                                                case "silenced": return xi.pinLabels[nowRow.rowId]?.[0] ?? xi.di.nameForId(nowRow.rowId)
+                                                default: return xi.di.longNameForId(nowRow.rowId)
+                                            }
+                                        }
+                                        font.pixelSize: Appearance.font.pixelSize.smaller
+                                        font.weight: Font.DemiBold
+                                        color: Appearance.colors.colOnLayer1
+                                        elide: Text.ElideRight
+                                    }
+
+                                    StyledText {
+                                        id: rowValue
+                                        Layout.maximumWidth: 110
+                                        visible: text !== "" && text !== xi.di.longNameForId(nowRow.rowId)
+                                        text: {
+                                            switch (nowRow.kind) {
+                                                case "media": return xi.di.activePlayer?.trackArtist ?? ""
+                                                case "f1Next": return xi.humanCountdown(F1.secondsToNext)
+                                                case "silenced": return Translation.tr("bring back")
+                                                default: return nowRow.rowId === "f1" && !F1.sessionLive
+                                                    ? xi.humanCountdown(F1.secondsToNext) : (capsule.item?.label ?? "")
+                                            }
+                                        }
+                                        font.pixelSize: Appearance.font.pixelSize.smallest
+                                        font.features: { "tnum": 1 }
+                                        color: nowRow.kind === "silenced" ? IslandEvents.colorAttention : Appearance.colors.colOnLayer1
+                                        opacity: nowRow.kind === "silenced" ? 1 : 0.65
+                                        elide: Text.ElideRight
+                                    }
+
+                                    MaterialSymbol {
+                                        text: nowRow.kind !== "media" ? "chevron_right"
+                                            : (xi.di.activePlayer?.isPlaying ? "pause" : "play_arrow")
+                                        iconSize: nowRow.kind === "media" ? 20 : 16
+                                        fill: 1
+                                        color: Appearance.colors.colOnLayer1
+                                        opacity: nowRow.kind === "media" ? 0.9 : (nowMouse.containsMouse ? 0.8 : 0.35)
+                                        Behavior on opacity { NumberAnimation { duration: IslandMotion.micro } }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            anchors.margins: -6
+                                            enabled: nowRow.kind === "media"
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: xi.di.activePlayer?.togglePlaying()
+                                        }
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: nowMouse
+                                    anchors.fill: parent
+                                    z: -1
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        switch (nowRow.kind) {
+                                            case "silenced":
+                                                IslandEvents.restoreIsland(nowRow.rowId)
+                                                return
+                                            case "media":
+                                            case "f1Next":
+                                                xi.di.expand(nowRow.rowId)
+                                                return
+                                        }
+                                        if (xi.di.hasDetails(nowRow.rowId)) {
+                                            xi.di.expand(nowRow.rowId)
+                                            return
+                                        }
+                                        xi.di.focusIsland(nowRow.rowId)
+                                        xi.di.collapse()
+                                    }
+                                }
                             }
-                            MaterialSymbol {
-                                anchors.centerIn: parent
-                                visible: !nowRow.agentMark
-                                text: xi.di.iconForId(nowRow.modelData)
-                                iconSize: 18
-                                fill: 1
-                                color: nowValue.accent
-                            }
-                        }
-
-                        StyledText {
-                            Layout.fillWidth: true
-                            Layout.minimumWidth: 0
-                            text: xi.di.longNameForId(nowRow.modelData)
-                            font.pixelSize: Appearance.font.pixelSize.smaller
-                            font.weight: Font.DemiBold
-                            color: Appearance.colors.colOnLayer1
-                            elide: Text.ElideRight
-                        }
-
-                        StyledText {
-                            Layout.maximumWidth: 130
-                            visible: text !== "" && text !== xi.di.longNameForId(nowRow.modelData)
-                            text: nowRow.modelData === "f1" && !F1.sessionLive
-                                ? xi.humanCountdown(F1.secondsToNext) : nowValue.label
-                            font.pixelSize: Appearance.font.pixelSize.smallest
-                            font.features: { "tnum": 1 }
-                            color: Appearance.colors.colOnLayer1
-                            opacity: 0.65
-                            elide: Text.ElideRight
-                        }
-
-                        MaterialSymbol {
-                            text: "chevron_right"
-                            iconSize: 16
-                            color: Appearance.colors.colOnLayer1
-                            opacity: nowMouse.containsMouse ? 0.8 : 0.35
-                            Behavior on opacity { NumberAnimation { duration: IslandMotion.micro } }
-                        }
-                    }
-
-                    MouseArea {
-                        id: nowMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            if (xi.di.hasDetails(nowRow.modelData)) {
-                                xi.di.expand(nowRow.modelData)
-                                return
-                            }
-                            xi.di.focusIsland(nowRow.modelData)
-                            xi.di.collapse()
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // Shortcuts to the other views
+    RowLayout {
+        id: shortcuts
+        Layout.fillWidth: true
+        spacing: 6
+        DiCascade { target: shortcuts; index: 5 }
+
+        Shortcut {
+            icon: "apps"
+            label: Translation.tr("Overview")
+            onTap: () => xi.di.expand("overview")
+        }
+        Shortcut {
+            icon: "inventory_2"
+            label: Translation.tr("Drawer")
+            onTap: () => xi.di.expand("shelf")
+        }
+        Shortcut {
+            icon: "content_paste"
+            label: Translation.tr("Clips")
+            onTap: () => xi.di.expand("clipboard")
+        }
+        Shortcut {
+            icon: "smart_toy"
+            label: Translation.tr("Agents")
+            onTap: () => xi.di.expand("agents")
+        }
+        Shortcut {
+            icon: "monitoring"
+            label: Translation.tr("System")
+            onTap: () => xi.di.expand("system")
+        }
+        Shortcut {
+            icon: "history"
+            label: Translation.tr("History")
+            onTap: () => xi.di.expand("history")
+        }
+        Shortcut {
+            icon: "vpn_lock"
+            label: "ZeroTier"
+            onTap: () => xi.di.expand("zerotier")
+        }
+        Shortcut {
+            icon: "tune"
+            label: Translation.tr("Tweaks")
+            onTap: () => {
+                xi.di.collapse()
+                GlobalStates.settingsPage = "Bar"
+                GlobalStates.settingsOpen = true
             }
         }
     }
