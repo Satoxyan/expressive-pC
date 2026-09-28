@@ -30,6 +30,9 @@ Singleton {
     // Only fetched on demand (requestForecast) by views that show it, and kept for 30 min.
     property var forecast: []
     property real forecastFetchedAt: 0
+    // UV index now and today's peak (Open-Meteo, keyless), fetched together with the forecast; -1 = unknown
+    property real uvNow: -1
+    property real uvMax: -1
     readonly property int forecastCacheMs: 30 * 60 * 1000
 
     property var location: ({
@@ -75,8 +78,14 @@ Singleton {
 
         temp.sunrise = data?.sys?.sunrise ? fmt(data.sys.sunrise) : "0"
         temp.sunset  = data?.sys?.sunset  ? fmt(data.sys.sunset)  : "0"
+        temp.sunriseTs = data?.sys?.sunrise ?? 0
+        temp.sunsetTs = data?.sys?.sunset ?? 0
+        temp.night = (data?.weather?.[0]?.icon ?? "").endsWith("n")
+        temp.lat = data?.coord?.lat ?? 0
+        temp.lon = data?.coord?.lon ?? 0
 
         temp.windDir = data?.wind?.deg || 0
+        temp.windSpeed = data?.wind?.speed || 0
         temp.wCode = data?.weather?.[0]?.id || 0
         temp.city = data?.name || "City"
 
@@ -117,6 +126,7 @@ Singleton {
         let url = "https://api.openweathermap.org/data/2.5/weather?" + root.locationQuery()
 
         url += `&units=${units}`
+        url += `&lang=${root.apiLanguage()}`
         url += `&appid=${apiKey}`
 
         let command = `curl -s "${url}"`
@@ -131,7 +141,25 @@ Singleton {
         return `q=${formatCityName(root.city)}`
     }
 
+    // OpenWeather wants "pt_br" / "zh_cn" for a few languages and the bare code ("de") for the rest
+    function apiLanguage() {
+        const code = (Translation.languageCode ?? "en").toLowerCase()
+        if (["pt_br", "zh_cn", "zh_tw"].includes(code)) return code
+        return code.split(/[_-]/)[0] || "en"
+    }
+
+    function requestUv() {
+        if (uvFetcher.running) return
+        const lat = root.gpsActive && root.location.valid ? root.location.lat : root.data?.lat
+        const lon = root.gpsActive && root.location.valid ? root.location.lon : root.data?.lon
+        if (lat === undefined || lon === undefined || (lat === 0 && lon === 0)) return
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=uv_index&daily=uv_index_max&forecast_days=1&timezone=auto`
+        uvFetcher.command[2] = `curl -s "${url}"`
+        uvFetcher.running = true
+    }
+
     function requestForecast() {
+        if (root.uvNow < 0) root.requestUv()
         if (forecastFetcher.running) return
         if (root.forecast.length > 0 && Date.now() - root.forecastFetchedAt < root.forecastCacheMs) return
 
@@ -142,6 +170,7 @@ Singleton {
 
         forecastFetcher.command[2] = `curl -s "${url}"`
         forecastFetcher.running = true
+        if (root.uvNow >= 0) root.requestUv()
     }
 
     function refineForecast(data) {
@@ -208,6 +237,25 @@ Singleton {
                     root.refineForecast(parsedData)
                 } catch (e) {
                     console.error("[WeatherService] Forecast JSON parse error:", e.message)
+                }
+            }
+        }
+    }
+
+    Process {
+        id: uvFetcher
+        command: ["bash", "-c", ""]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (text.length === 0)
+                    return
+
+                try {
+                    const parsedData = JSON.parse(text)
+                    root.uvNow = parsedData?.current?.uv_index ?? -1
+                    root.uvMax = parsedData?.daily?.uv_index_max?.[0] ?? -1
+                } catch (e) {
+                    console.error("[WeatherService] UV JSON parse error:", e.message)
                 }
             }
         }

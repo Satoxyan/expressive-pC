@@ -2191,7 +2191,7 @@ Item {
             case "bluetooth":  return "bluetooth"
             case "clipboard":  return "content_paste"
             case "screenshot": return "screenshot_monitor"
-            case "weather":    return IslandEvents.weatherSymbol(Weather.data?.wCode ?? 800)
+            case "weather":    return IslandEvents.weatherSymbol(Weather.data?.wCode ?? 800, Weather.data?.night)
             case "privacy":    return "privacy_tip"
             case "watchRating": return "movie"
             case "hardware":   return IslandHardware.payload.icon ?? "memory"

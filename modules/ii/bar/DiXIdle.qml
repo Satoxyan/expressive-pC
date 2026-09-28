@@ -222,7 +222,7 @@ ColumnLayout {
 
                     MaterialSymbol {
                         visible: (Weather.data?.temp ?? "") !== ""
-                        text: IslandEvents.weatherSymbol(Weather.data?.wCode ?? 800)
+                        text: IslandEvents.weatherSymbol(Weather.data?.wCode ?? 800, Weather.data?.night)
                         iconSize: 14
                         fill: 1
                         color: Appearance.colors.colOnLayer0

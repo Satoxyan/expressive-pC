@@ -71,7 +71,12 @@ Singleton {
         }
     }
 
-    function weatherSymbol(code) {
+    // `night` comes from the API when known (icon "..n"); otherwise it is guessed from the clock
+    function weatherSymbol(code, night) {
+        const isNight = night ?? (() => {
+            const hour = new Date().getHours()
+            return hour >= 18 || hour < 6
+        })()
         switch (Math.floor((code ?? 800) / 100)) {
             case 2: return "thunderstorm"
             case 3: return "rainy_light"
@@ -79,9 +84,9 @@ Singleton {
             case 6: return "weather_snowy"
             case 7: return "foggy"
             default:
+                if (code === 801 || code === 802) return isNight ? "partly_cloudy_night" : "partly_cloudy_day"
                 if (code !== 800) return "cloud"
-                const hour = new Date().getHours()
-                return hour >= 18 || hour < 6 ? "clear_night" : "clear_day"
+                return isNight ? "clear_night" : "clear_day"
         }
     }
 
