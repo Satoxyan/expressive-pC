@@ -20,6 +20,8 @@ Singleton {
     property var responses: []
     property int runningRequests: 0
     property var defaultUserAgent: Config.options?.networking?.userAgent || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+    // e621 rejects requests without a User-Agent (403) and bans browser-impersonating ones.
+    property string e621UserAgent: "expressive-pC/1.0 (quickshell sidebar booru viewer)"
     property var providerList: Object.keys(providers).filter(provider => provider !== "system" && providers[provider].api)
     property var providers: {
         "system": { "name": Translation.tr("System") },
@@ -147,6 +149,45 @@ Singleton {
                 })
             },
             "tagSearchTemplate": "https://danbooru.donmai.us/tags.json?limit=10&search[name_matches]={{query}}*",
+            "tagMapFunc": (response) => {
+                return response.map(item => {
+                    return {
+                        "name": item.name,
+                        "count": item.post_count
+                    }
+                })
+            }
+        },
+        "e621": {
+            "name": "e621",
+            "url": "https://e621.net",
+            "api": "https://e621.net/posts.json",
+            "defaultLimit": 40,
+            "description": Translation.tr("The furry one | Huge quantity, best tag filtering around"),
+            // e621 returns {posts: [...]}, dimensions/tags/sources are nested objects.
+            "mapFunc": (response) => {
+                return (response.posts || []).map(item => {
+                    const file = item.file || {}
+                    const tags = item.tags || {}
+                    return {
+                        "id": item.id,
+                        "width": file.width,
+                        "height": file.height,
+                        "aspect_ratio": file.width / file.height,
+                        "tags": [...(tags.general || []), ...(tags.artist || []), ...(tags.copyright || []), ...(tags.character || [])].join(" "),
+                        "rating": item.rating,
+                        "is_nsfw": (item.rating != 's'),
+                        "md5": file.md5,
+                        "preview_url": (item.preview || {}).url || "",
+                        "sample_url": (item.sample || {}).url || file.url || "",
+                        "file_url": file.url || "",
+                        "file_ext": file.ext || "",
+                        "source": getWorkingImageSource((item.sources || [])[0]) || file.url,
+                    }
+                    // Deleted/blocked posts have no file.url; they'd render as broken tiles.
+                }).filter(item => item.file_url)
+            },
+            "tagSearchTemplate": "https://e621.net/tags.json?limit=10&search[name_matches]={{query}}*",
             "tagMapFunc": (response) => {
                 return response.map(item => {
                     return {
@@ -506,6 +547,9 @@ Singleton {
                 const userAgent = Config.options?.sidebar?.booru?.zerochan?.username ? `Desktop sidebar booru viewer - username: ${Config.options.sidebar.booru.zerochan.username}` : defaultUserAgent
                 xhr.setRequestHeader("User-Agent", userAgent)
             }
+            else if (currentProvider === "e621") {
+                xhr.setRequestHeader("User-Agent", e621UserAgent)
+            }
             root.runningRequests++;
             xhr.send()
         } catch (error) {
@@ -576,6 +620,8 @@ Singleton {
                 xhr.setRequestHeader("User-Agent", "Qt/6.0")
             } else if (["konachan", "gelbooru", "rule34"].includes(currentProvider)) {
                 xhr.setRequestHeader("User-Agent", defaultUserAgent)
+            } else if (currentProvider === "e621") {
+                xhr.setRequestHeader("User-Agent", e621UserAgent)
             }
             xhr.send()
         } catch (error) {
