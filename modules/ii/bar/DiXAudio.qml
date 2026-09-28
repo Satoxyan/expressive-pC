@@ -11,8 +11,9 @@ ColumnLayout {
     id: xa
     required property Item di
     spacing: 10
-    implicitWidth: 340
-    readonly property real wantedWidth: 340
+    implicitWidth: xa.wantedWidth
+    // Two columns (outputs · apps) when there are apps playing; just the slider for brightness
+    readonly property real wantedWidth: xa.brightnessMode ? 340 : (IslandEvents.audioStreams.length > 0 ? 540 : 360)
 
     readonly property bool brightnessMode: xa.di.expandedId === "osd" && GlobalStates.osdIndicatorType === "brightness"
     readonly property var focusedScreen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name)
@@ -77,183 +78,208 @@ ColumnLayout {
         }
     }
 
-    StyledText {
+    // Where the sound goes on the left, how loud each app is on the right: side by side, the view keeps the
+    // island's standard height instead of stacking into a tall list
+    RowLayout {
         visible: !xa.brightnessMode
-        text: Translation.tr("Output")
-        font.pixelSize: Appearance.font.pixelSize.smallest
-        color: Appearance.colors.colOnLayer0
-        opacity: 0.6
-    }
+        Layout.fillWidth: true
+        Layout.topMargin: 2
+        spacing: 14
 
-    Repeater {
-        model: xa.brightnessMode ? [] : Audio.outputDevices
-        delegate: Rectangle {
-            id: deviceRow
-            required property var modelData
-            readonly property bool current: deviceRow.modelData === Audio.sink
+        ColumnLayout {
             Layout.fillWidth: true
-            implicitHeight: 36
-            radius: 12
-            color: deviceRow.current ? Appearance.colors.colPrimaryContainer
-                : (deviceMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1)
+            Layout.preferredWidth: 1
+            Layout.alignment: Qt.AlignTop
+            spacing: 6
 
-            Behavior on color {
-                ColorAnimation { duration: IslandMotion.micro }
-            }
+            SectionLabel { text: Translation.tr("Output") }
 
-            RowLayout {
-                anchors {
-                    fill: parent
-                    leftMargin: 10
-                    rightMargin: 10
-                }
-                spacing: 8
-
-                MaterialSymbol {
-                    text: IslandEvents.sinkIcon(deviceRow.modelData)
-                    iconSize: 18
-                    fill: 1
-                    color: deviceRow.current ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colOnLayer1
-                }
-                StyledText {
+            Repeater {
+                model: xa.brightnessMode ? [] : Audio.outputDevices
+                delegate: Rectangle {
+                    id: deviceRow
+                    required property var modelData
+                    readonly property bool current: deviceRow.modelData === Audio.sink
                     Layout.fillWidth: true
-                    text: IslandEvents.shortName(Audio.friendlyDeviceName(deviceRow.modelData))
-                    font.pixelSize: Appearance.font.pixelSize.smaller
-                    color: deviceRow.current ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colOnLayer1
-                    elide: Text.ElideRight
-                }
-                MaterialSymbol {
-                    visible: deviceRow.current
-                    text: "check"
-                    iconSize: 18
-                    color: Appearance.colors.colOnPrimaryContainer
+                    implicitHeight: 32
+                    radius: 11
+                    color: deviceRow.current ? Appearance.colors.colPrimaryContainer
+                        : (deviceMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1)
+
+                    Behavior on color {
+                        ColorAnimation { duration: IslandMotion.micro }
+                    }
+
+                    RowLayout {
+                        anchors {
+                            fill: parent
+                            leftMargin: 10
+                            rightMargin: 10
+                        }
+                        spacing: 8
+
+                        MaterialSymbol {
+                            text: IslandEvents.sinkIcon(deviceRow.modelData)
+                            iconSize: 17
+                            fill: 1
+                            color: deviceRow.current ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colOnLayer1
+                        }
+                        StyledText {
+                            Layout.fillWidth: true
+                            Layout.minimumWidth: 0
+                            text: IslandEvents.shortName(Audio.friendlyDeviceName(deviceRow.modelData))
+                            font.pixelSize: Appearance.font.pixelSize.smaller
+                            color: deviceRow.current ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colOnLayer1
+                            elide: Text.ElideRight
+                        }
+                        MaterialSymbol {
+                            visible: deviceRow.current
+                            text: "check"
+                            iconSize: 17
+                            color: Appearance.colors.colOnPrimaryContainer
+                        }
+                    }
+
+                    MouseArea {
+                        id: deviceMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: Audio.setDefaultSink(deviceRow.modelData)
+                    }
                 }
             }
 
-            MouseArea {
-                id: deviceMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: Audio.setDefaultSink(deviceRow.modelData)
+            // Other profiles of the same card (HDMI, the laptop speakers) as small chips under the devices
+            Flow {
+                Layout.fillWidth: true
+                visible: profileRepeater.count > 0
+                spacing: 6
+
+                Repeater {
+                    id: profileRepeater
+                    model: xa.brightnessMode ? [] : IslandEvents.audioProfiles.filter(p => !p.active)
+
+                    delegate: Rectangle {
+                        id: profileChip
+                        required property var modelData
+                        implicitWidth: Math.min(xa.width / 2 - 14, profileContent.implicitWidth + 20)
+                        implicitHeight: 26
+                        radius: 13
+                        color: profileMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1
+
+                        Behavior on color {
+                            ColorAnimation { duration: IslandMotion.micro }
+                        }
+
+                        RowLayout {
+                            id: profileContent
+                            anchors {
+                                fill: parent
+                                leftMargin: 10
+                                rightMargin: 10
+                            }
+                            spacing: 5
+
+                            MaterialSymbol {
+                                text: profileChip.modelData.hdmi ? "tv" : "speaker"
+                                iconSize: 14
+                                fill: 1
+                                color: Appearance.colors.colOnLayer1
+                                opacity: 0.7
+                            }
+                            StyledText {
+                                Layout.fillWidth: true
+                                Layout.minimumWidth: 0
+                                text: profileChip.modelData.description
+                                font.pixelSize: Appearance.font.pixelSize.smallest
+                                color: Appearance.colors.colOnLayer1
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        MouseArea {
+                            id: profileMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: IslandEvents.setAudioProfile(profileChip.modelData)
+                        }
+                    }
+                }
+            }
+        }
+
+        ColumnLayout {
+            visible: IslandEvents.audioStreams.length > 0
+            Layout.fillWidth: true
+            Layout.preferredWidth: 1
+            Layout.alignment: Qt.AlignTop
+            spacing: 6
+
+            SectionLabel { text: Translation.tr("Apps") }
+
+            Repeater {
+                model: xa.brightnessMode ? [] : IslandEvents.audioStreams
+
+                delegate: RowLayout {
+                    id: streamRow
+                    required property var modelData
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 32
+                    spacing: 7
+
+                    MaterialSymbol {
+                        text: streamRow.modelData.muted ? "volume_off" : "graphic_eq"
+                        iconSize: 16
+                        fill: 1
+                        color: streamRow.modelData.muted ? Appearance.colors.colError : Appearance.colors.colOnLayer0
+                        opacity: streamRow.modelData.muted ? 1 : 0.8
+
+                        MouseArea {
+                            anchors.fill: parent
+                            anchors.margins: -4
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: IslandEvents.toggleStreamMute(streamRow.modelData.node)
+                        }
+                    }
+
+                    StyledText {
+                        Layout.preferredWidth: 72
+                        Layout.minimumWidth: 0
+                        text: streamRow.modelData.name
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        color: Appearance.colors.colOnLayer0
+                        opacity: streamRow.modelData.muted ? 0.5 : 1
+                        elide: Text.ElideRight
+                    }
+
+                    StyledSlider {
+                        Layout.fillWidth: true
+                        value: streamRow.modelData.volume
+                        from: 0
+                        to: 1
+                        onMoved: IslandEvents.setStreamVolume(streamRow.modelData.node, value)
+                    }
+
+                    StyledText {
+                        Layout.preferredWidth: 30
+                        horizontalAlignment: Text.AlignRight
+                        text: `${Math.round(streamRow.modelData.volume * 100)}%`
+                        font.pixelSize: Appearance.font.pixelSize.smallest
+                        font.features: { "tnum": 1 }
+                        color: Appearance.colors.colOnLayer0
+                        opacity: 0.7
+                    }
+                }
             }
         }
     }
 
-    Repeater {
-        model: xa.brightnessMode ? [] : IslandEvents.audioProfiles.filter(p => !p.active)
-
-        delegate: Rectangle {
-            id: profileRow
-            required property var modelData
-            Layout.fillWidth: true
-            implicitHeight: 38
-            radius: 12
-            color: profileMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1
-
-            Behavior on color {
-                ColorAnimation { duration: IslandMotion.micro }
-            }
-
-            RowLayout {
-                anchors {
-                    fill: parent
-                    leftMargin: 10
-                    rightMargin: 10
-                }
-                spacing: 8
-
-                MaterialSymbol {
-                    text: profileRow.modelData.hdmi ? "tv" : "speaker"
-                    iconSize: 18
-                    fill: 1
-                    color: Appearance.colors.colOnLayer1
-                    opacity: 0.7
-                }
-                StyledText {
-                    Layout.fillWidth: true
-                    Layout.minimumWidth: 0
-                    text: profileRow.modelData.description
-                    font.pixelSize: Appearance.font.pixelSize.smaller
-                    color: Appearance.colors.colOnLayer1
-                    opacity: 0.7
-                    elide: Text.ElideRight
-                }
-                StyledText {
-                    text: Translation.tr("switch")
-                    font.pixelSize: Appearance.font.pixelSize.smallest
-                    color: Appearance.colors.colPrimary
-                }
-            }
-
-            MouseArea {
-                id: profileMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: IslandEvents.setAudioProfile(profileRow.modelData)
-            }
-        }
-    }
-
-    StyledText {
-        visible: !xa.brightnessMode && IslandEvents.audioStreams.length > 0
-        text: Translation.tr("Apps")
+    component SectionLabel: StyledText {
         font.pixelSize: Appearance.font.pixelSize.smallest
         font.weight: Font.DemiBold
         color: Appearance.colors.colOnLayer0
         opacity: 0.6
-    }
-
-    Repeater {
-        model: xa.brightnessMode ? [] : IslandEvents.audioStreams
-
-        delegate: RowLayout {
-            id: streamRow
-            required property var modelData
-            Layout.fillWidth: true
-            spacing: 8
-
-            MaterialSymbol {
-                text: streamRow.modelData.muted ? "volume_off" : "graphic_eq"
-                iconSize: 16
-                fill: 1
-                color: streamRow.modelData.muted ? Appearance.colors.colError : Appearance.colors.colOnLayer0
-                opacity: streamRow.modelData.muted ? 1 : 0.8
-
-                MouseArea {
-                    anchors.fill: parent
-                    anchors.margins: -4
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: IslandEvents.toggleStreamMute(streamRow.modelData.node)
-                }
-            }
-
-            StyledText {
-                Layout.preferredWidth: 96
-                Layout.minimumWidth: 0
-                text: streamRow.modelData.name
-                font.pixelSize: Appearance.font.pixelSize.smaller
-                color: Appearance.colors.colOnLayer0
-                opacity: streamRow.modelData.muted ? 0.5 : 1
-                elide: Text.ElideRight
-            }
-
-            StyledSlider {
-                Layout.fillWidth: true
-                value: streamRow.modelData.volume
-                from: 0
-                to: 1
-                onMoved: IslandEvents.setStreamVolume(streamRow.modelData.node, value)
-            }
-
-            StyledText {
-                text: `${Math.round(streamRow.modelData.volume * 100)}%`
-                font.pixelSize: Appearance.font.pixelSize.smallest
-                font.features: { "tnum": 1 }
-                color: Appearance.colors.colOnLayer0
-                opacity: 0.7
-            }
-        }
     }
 }

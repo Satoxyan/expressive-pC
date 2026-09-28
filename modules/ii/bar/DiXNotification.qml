@@ -14,6 +14,7 @@ import qs.modules.common.functions
 // another when it opens; the quick replies pop in behind them.
 ColumnLayout {
     id: xn
+    readonly property real wantedWidth: 420
     required property Item di
     spacing: 10
 

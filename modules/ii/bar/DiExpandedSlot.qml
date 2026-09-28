@@ -13,7 +13,9 @@ Item {
     readonly property real padding: 14
 
     readonly property real naturalHeight: (loader.item?.implicitHeight ?? 60) + slot.padding * 2
-    readonly property real naturalWidth: Math.max(loader.item?.implicitWidth ?? 280, loader.item?.wantedWidth ?? 0) + slot.padding * 2
+    // A view's own wantedWidth wins: a root Layout reports whatever width it was last given as its implicitWidth,
+    // so after a wide view every following one would claim that width too
+    readonly property real naturalWidth: (loader.item?.wantedWidth ?? loader.item?.implicitWidth ?? 280) + slot.padding * 2
     readonly property bool scrollable: slot.naturalHeight > slot.host.maxHeight + 1
 
     // Entrance/exit, all small: a few px along the direction of travel, a hair of scale, and the fade

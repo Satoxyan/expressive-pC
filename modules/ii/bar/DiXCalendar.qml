@@ -13,8 +13,8 @@ ColumnLayout {
     id: xc
     required property Item di
     spacing: 10
-    implicitWidth: 360
-    readonly property real wantedWidth: 360
+    implicitWidth: 500
+    readonly property real wantedWidth: 500
 
     property int monthShift: 0
     readonly property var viewingDate: CalendarLayout.getDateInXMonthsTime(xc.monthShift)
@@ -28,38 +28,39 @@ ColumnLayout {
         }
     }
 
+    // Today on the left, the month on the right: laid out side by side, the calendar keeps the island's standard
+    // height instead of stacking a header over a tall grid
     RowLayout {
         Layout.fillWidth: true
-        spacing: 12
+        spacing: 18
 
         ColumnLayout {
-            spacing: -6
+            Layout.preferredWidth: 160
+            Layout.maximumWidth: 160
+            Layout.fillHeight: true
+            spacing: 2
 
             StyledText {
                 text: DateTime.time
                 font.family: xc.displayFont
-                font.pixelSize: 34
+                font.pixelSize: 40
                 font.weight: Font.Medium
                 font.letterSpacing: 0.5
                 font.features: { "tnum": 1 }
                 color: Appearance.colors.colOnLayer0
             }
             StyledText {
+                Layout.fillWidth: true
                 text: DateTime.longDate
                 font.pixelSize: Appearance.font.pixelSize.smaller
                 color: Appearance.colors.colOnLayer0
-                opacity: 0.7
+                opacity: 0.75
+                wrapMode: Text.WordWrap
             }
-        }
 
-        Item { Layout.fillWidth: true }
-
-        ColumnLayout {
-            Layout.alignment: Qt.AlignRight
-            spacing: -3
+            Item { Layout.preferredHeight: 8 }
 
             StyledText {
-                Layout.alignment: Qt.AlignRight
                 text: Translation.tr("Week %1").arg(xc.weekNumber(new Date()))
                 font.pixelSize: Appearance.font.pixelSize.smaller
                 font.features: { "tnum": 1 }
@@ -67,131 +68,184 @@ ColumnLayout {
                 opacity: 0.8
             }
             StyledText {
-                Layout.alignment: Qt.AlignRight
+                Layout.fillWidth: true
                 text: Translation.tr("%1 days left this year").arg(xc.daysLeftInYear())
                 font.pixelSize: Appearance.font.pixelSize.smallest
                 font.features: { "tnum": 1 }
                 color: Appearance.colors.colOnLayer0
                 opacity: 0.55
+                wrapMode: Text.WordWrap
             }
-        }
-    }
 
-    RowLayout {
-        Layout.fillWidth: true
-        spacing: 6
+            Item { Layout.fillHeight: true }
 
-        StyledText {
-            Layout.fillWidth: true
-            text: xc.viewingDate.toLocaleDateString(Qt.locale(), "MMMM yyyy")
-            font.family: xc.displayFont
-            font.pixelSize: Appearance.font.pixelSize.normal
-            font.weight: Font.Medium
-            color: xc.monthShift === 0 ? Appearance.colors.colOnLayer0 : Appearance.colors.colPrimary
-        }
+            // What else is on today: a running timer, the next F1 session
+            Rectangle {
+                Layout.fillWidth: true
+                visible: xc.upNext.length > 0
+                implicitHeight: upNextColumn.implicitHeight + 14
+                radius: 12
+                color: Appearance.colors.colLayer1
 
-        Repeater {
-            model: [
-                { icon: "chevron_left", step: -1 },
-                { icon: "today", step: 0 },
-                { icon: "chevron_right", step: 1 }
-            ]
-            delegate: Rectangle {
-                id: navButton
-                required property var modelData
-                visible: modelData.step !== 0 || xc.monthShift !== 0
-                implicitWidth: 26
-                implicitHeight: 26
-                radius: 13
-                color: navMouse.containsMouse ? Appearance.colors.colLayer2 : "transparent"
+                ColumnLayout {
+                    id: upNextColumn
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                        verticalCenter: parent.verticalCenter
+                        margins: 10
+                    }
+                    spacing: 2
 
-                Behavior on color {
-                    ColorAnimation { duration: IslandMotion.micro }
-                }
+                    Repeater {
+                        model: xc.upNext
+                        delegate: RowLayout {
+                            required property var modelData
+                            Layout.fillWidth: true
+                            spacing: 6
 
-                MaterialSymbol {
-                    anchors.centerIn: parent
-                    text: navButton.modelData.icon
-                    iconSize: 16
-                    color: Appearance.colors.colOnLayer1
-                }
-
-                MouseArea {
-                    id: navMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        if (navButton.modelData.step === 0) xc.monthShift = 0
-                        else xc.monthShift += navButton.modelData.step
+                            MaterialSymbol {
+                                text: modelData.icon
+                                iconSize: 14
+                                fill: 1
+                                color: Appearance.colors.colPrimary
+                            }
+                            StyledText {
+                                Layout.fillWidth: true
+                                Layout.minimumWidth: 0
+                                text: modelData.text
+                                font.pixelSize: Appearance.font.pixelSize.smallest
+                                color: Appearance.colors.colOnLayer1
+                                elide: Text.ElideRight
+                            }
+                        }
                     }
                 }
             }
-        }
-    }
-
-    Item {
-        Layout.fillWidth: true
-        Layout.preferredHeight: grid.implicitHeight
-
-        MouseArea {
-            anchors.fill: parent
-            onWheel: event => xc.monthShift += event.angleDelta.y > 0 ? -1 : 1
         }
 
         ColumnLayout {
-            id: grid
-            anchors.horizontalCenter: parent.horizontalCenter
-            spacing: 3
+            Layout.fillWidth: true
+            spacing: 6
 
             RowLayout {
-                Layout.alignment: Qt.AlignHCenter
-                spacing: 3
+                Layout.fillWidth: true
+                spacing: 4
+
+                StyledText {
+                    Layout.fillWidth: true
+                    text: xc.viewingDate.toLocaleDateString(Qt.locale(), "MMMM yyyy")
+                    font.family: xc.displayFont
+                    font.pixelSize: Appearance.font.pixelSize.normal
+                    font.weight: Font.Medium
+                    color: xc.monthShift === 0 ? Appearance.colors.colOnLayer0 : Appearance.colors.colPrimary
+                }
+
                 Repeater {
-                    model: CalendarLayout.weekDays
-                    delegate: StyledText {
+                    model: [
+                        { icon: "chevron_left", step: -1 },
+                        { icon: "today", step: 0 },
+                        { icon: "chevron_right", step: 1 }
+                    ]
+                    delegate: Rectangle {
+                        id: navButton
                         required property var modelData
-                        Layout.preferredWidth: 44
-                        horizontalAlignment: Text.AlignHCenter
-                        text: Translation.tr(modelData.day)
-                        font.pixelSize: Appearance.font.pixelSize.smallest
-                        font.weight: Font.DemiBold
-                        color: Appearance.colors.colOnLayer0
-                        opacity: 0.5
+                        visible: modelData.step !== 0 || xc.monthShift !== 0
+                        implicitWidth: 26
+                        implicitHeight: 26
+                        radius: 13
+                        color: navMouse.containsMouse ? Appearance.colors.colLayer2 : "transparent"
+
+                        Behavior on color {
+                            ColorAnimation { duration: IslandMotion.micro }
+                        }
+
+                        MaterialSymbol {
+                            anchors.centerIn: parent
+                            text: navButton.modelData.icon
+                            iconSize: 16
+                            color: Appearance.colors.colOnLayer1
+                        }
+
+                        MouseArea {
+                            id: navMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (navButton.modelData.step === 0) xc.monthShift = 0
+                                else xc.monthShift += navButton.modelData.step
+                            }
+                        }
                     }
                 }
             }
 
-            Repeater {
-                model: 6
-                delegate: RowLayout {
-                    required property int index
-                    readonly property int row: index
-                    Layout.alignment: Qt.AlignHCenter
-                    spacing: 3
+            Item {
+                Layout.fillWidth: true
+                Layout.preferredHeight: grid.implicitHeight
+                Layout.preferredWidth: grid.implicitWidth
+
+                MouseArea {
+                    anchors.fill: parent
+                    onWheel: event => xc.monthShift += event.angleDelta.y > 0 ? -1 : 1
+                }
+
+                ColumnLayout {
+                    id: grid
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: 2
+
+                    RowLayout {
+                        Layout.alignment: Qt.AlignHCenter
+                        spacing: 2
+                        Repeater {
+                            model: CalendarLayout.weekDays
+                            delegate: StyledText {
+                                required property var modelData
+                                Layout.preferredWidth: 40
+                                horizontalAlignment: Text.AlignHCenter
+                                text: Translation.tr(modelData.day)
+                                font.pixelSize: Appearance.font.pixelSize.smallest
+                                font.weight: Font.DemiBold
+                                color: Appearance.colors.colOnLayer0
+                                opacity: 0.5
+                            }
+                        }
+                    }
 
                     Repeater {
-                        model: 7
-                        delegate: Rectangle {
-                            id: dayCell
+                        model: 6
+                        delegate: RowLayout {
                             required property int index
-                            readonly property var cell: xc.layoutRows[parent.row][index]
-                            readonly property bool today: dayCell.cell.today === 1
-                            readonly property bool outside: dayCell.cell.today === -1
-                            Layout.preferredWidth: 44
-                            Layout.preferredHeight: 34
-                            radius: 10
-                            color: dayCell.today ? Appearance.colors.colPrimary : "transparent"
+                            readonly property int row: index
+                            Layout.alignment: Qt.AlignHCenter
+                            spacing: 2
 
-                            StyledText {
-                                anchors.centerIn: parent
-                                text: dayCell.cell.day
-                                font.family: xc.displayFont
-                                font.pixelSize: Appearance.font.pixelSize.smaller
-                                font.weight: dayCell.today ? Font.DemiBold : Font.Normal
-                                font.features: { "tnum": 1 }
-                                color: dayCell.today ? Appearance.colors.colOnPrimary : Appearance.colors.colOnLayer0
-                                opacity: dayCell.outside ? 0.3 : 1
+                            Repeater {
+                                model: 7
+                                delegate: Rectangle {
+                                    id: dayCell
+                                    required property int index
+                                    readonly property var cell: xc.layoutRows[parent.row][index]
+                                    readonly property bool today: dayCell.cell.today === 1
+                                    readonly property bool outside: dayCell.cell.today === -1
+                                    Layout.preferredWidth: 40
+                                    Layout.preferredHeight: 28
+                                    radius: 9
+                                    color: dayCell.today ? Appearance.colors.colPrimary : "transparent"
+
+                                    StyledText {
+                                        anchors.centerIn: parent
+                                        text: dayCell.cell.day
+                                        font.family: xc.displayFont
+                                        font.pixelSize: Appearance.font.pixelSize.smaller
+                                        font.weight: dayCell.today ? Font.DemiBold : Font.Normal
+                                        font.features: { "tnum": 1 }
+                                        color: dayCell.today ? Appearance.colors.colOnPrimary : Appearance.colors.colOnLayer0
+                                        opacity: dayCell.outside ? 0.3 : 1
+                                    }
+                                }
                             }
                         }
                     }
@@ -200,20 +254,12 @@ ColumnLayout {
         }
     }
 
-    StyledText {
-        Layout.fillWidth: true
-        visible: xc.di.hasActiveTimer || (F1.enabled && F1.nextSession !== null && F1.secondsToNext < 86400)
-        text: {
-            const parts = []
-            if (xc.di.hasActiveTimer) parts.push(`${Translation.tr("Timer")} ${xc.di.timerValueText()}`)
-            if (F1.enabled && F1.nextSession !== null && F1.secondsToNext < 86400)
-                parts.push(`F1 · ${F1.sessionLabel(F1.nextSession.name)} ${Translation.tr("in %1").arg(F1.humanCountdown(F1.secondsToNext))}`)
-            return parts.join("   ·   ")
-        }
-        font.pixelSize: Appearance.font.pixelSize.smallest
-        color: Appearance.colors.colOnLayer0
-        opacity: 0.7
-        elide: Text.ElideRight
+    readonly property var upNext: {
+        const items = []
+        if (xc.di.hasActiveTimer) items.push({ icon: "timer", text: `${Translation.tr("Timer")} ${xc.di.timerValueText()}` })
+        if (F1.enabled && F1.nextSession !== null && F1.secondsToNext < 86400)
+            items.push({ icon: "sports_motorsports", text: `${F1.sessionLabel(F1.nextSession.name)} ${Translation.tr("in %1").arg(F1.humanCountdown(F1.secondsToNext))}` })
+        return items
     }
 
     function weekNumber(date) {

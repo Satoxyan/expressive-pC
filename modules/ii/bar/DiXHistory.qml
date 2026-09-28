@@ -11,8 +11,8 @@ ColumnLayout {
     id: xh
     required property Item di
     spacing: 8
-    implicitWidth: 400
-    readonly property real wantedWidth: 400
+    implicitWidth: 560
+    readonly property real wantedWidth: 560
 
     property double now: Date.now()
 
@@ -90,82 +90,92 @@ ColumnLayout {
         opacity: 0.6
     }
 
-    Repeater {
-        model: IslandEvents.eventLog.slice(0, 12)
+    // The last eight, two per row: the island's standard height holds them without a scrolling list
+    GridLayout {
+        Layout.fillWidth: true
+        visible: IslandEvents.eventLog.length > 0
+        columns: 2
+        columnSpacing: 6
+        rowSpacing: 6
 
-        delegate: Rectangle {
-            id: entry
-            required property var modelData
-            readonly property bool actionable: entry.modelData.action !== null
-            Layout.fillWidth: true
-            implicitHeight: 46
-            radius: 12
-            color: entryMouse.containsMouse && entry.actionable ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1
+        Repeater {
+            model: IslandEvents.eventLog.slice(0, 8)
 
-            Behavior on color {
-                ColorAnimation { duration: IslandMotion.micro }
-            }
+            delegate: Rectangle {
+                id: entry
+                required property var modelData
+                readonly property bool actionable: entry.modelData.action !== null
+                Layout.fillWidth: true
+                Layout.preferredWidth: 1
+                implicitHeight: 44
+                radius: 12
+                color: entryMouse.containsMouse && entry.actionable ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1
 
-            RowLayout {
-                anchors {
-                    fill: parent
-                    leftMargin: 12
-                    rightMargin: 12
-                }
-                spacing: 9
-
-                MaterialSymbol {
-                    text: entry.modelData.icon
-                    iconSize: 17
-                    fill: 1
-                    color: entry.modelData.kind === "error" ? Appearance.colors.colError : Appearance.colors.colPrimary
+                Behavior on color {
+                    ColorAnimation { duration: IslandMotion.micro }
                 }
 
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    Layout.minimumWidth: 0
-                    spacing: -3
-
-                    StyledText {
-                        Layout.fillWidth: true
-                        text: entry.modelData.title
-                        font.pixelSize: Appearance.font.pixelSize.smaller
-                        font.weight: Font.DemiBold
-                        color: Appearance.colors.colOnLayer1
-                        elide: Text.ElideRight
+                RowLayout {
+                    anchors {
+                        fill: parent
+                        leftMargin: 12
+                        rightMargin: 12
                     }
-                    StyledText {
+                    spacing: 9
+
+                    MaterialSymbol {
+                        text: entry.modelData.icon
+                        iconSize: 17
+                        fill: 1
+                        color: entry.modelData.kind === "error" ? Appearance.colors.colError : Appearance.colors.colPrimary
+                    }
+
+                    ColumnLayout {
                         Layout.fillWidth: true
-                        visible: text !== ""
-                        text: entry.modelData.subtitle
+                        Layout.minimumWidth: 0
+                        spacing: -3
+
+                        StyledText {
+                            Layout.fillWidth: true
+                            text: entry.modelData.title
+                            font.pixelSize: Appearance.font.pixelSize.smaller
+                            font.weight: Font.DemiBold
+                            color: Appearance.colors.colOnLayer1
+                            elide: Text.ElideRight
+                        }
+                        StyledText {
+                            Layout.fillWidth: true
+                            visible: text !== ""
+                            text: entry.modelData.subtitle
+                            font.pixelSize: Appearance.font.pixelSize.smallest
+                            color: Appearance.colors.colOnLayer1
+                            opacity: 0.7
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    StyledText {
+                        text: xh.ago(entry.modelData.time)
                         font.pixelSize: Appearance.font.pixelSize.smallest
+                        font.features: { "tnum": 1 }
                         color: Appearance.colors.colOnLayer1
-                        opacity: 0.7
-                        elide: Text.ElideRight
+                        opacity: 0.55
                     }
                 }
 
-                StyledText {
-                    text: xh.ago(entry.modelData.time)
-                    font.pixelSize: Appearance.font.pixelSize.smallest
-                    font.features: { "tnum": 1 }
-                    color: Appearance.colors.colOnLayer1
-                    opacity: 0.55
-                }
-            }
-
-            MouseArea {
-                id: entryMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                enabled: entry.actionable
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    const action = entry.modelData.action
-                    if (action?.type === "file") IslandEvents.openDownload(action.path)
-                    else if (action?.type === "command") IslandEvents.rerunCommand(action.data)
-                    else if (action?.type === "notification") GlobalStates.sidebarRightOpen = true
-                    xh.di.collapse()
+                MouseArea {
+                    id: entryMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    enabled: entry.actionable
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        const action = entry.modelData.action
+                        if (action?.type === "file") IslandEvents.openDownload(action.path)
+                        else if (action?.type === "command") IslandEvents.rerunCommand(action.data)
+                        else if (action?.type === "notification") GlobalStates.sidebarRightOpen = true
+                        xh.di.collapse()
+                    }
                 }
             }
         }

@@ -221,9 +221,10 @@ Scope {
 
                     readonly property real bottomReserve: 18 + (scope.di.splitArmed ? splitPicker.implicitHeight + 10 : 0)
 
-                    // Height in steps: compact, standard (most live islands: media, home, downloads, IMDb), large and
-                    // tall. A view sits centred in its step; anything taller than the last one scrolls inside it.
-                    readonly property var heightSteps: [152, 280, 384, 464]
+                    // Height in three steps: compact (a single fact: weather, privacy, a device), standard (almost every
+                    // view, the tall ones laid out in two columns to fit it) and large (only what truly needs the room:
+                    // the clipboard with its history). A view sits centred in its step; taller still scrolls inside it.
+                    readonly property var heightSteps: [152, 280, 384]
                     readonly property real tallest: Math.min(island.maxH, island.heightSteps[island.heightSteps.length - 1])
                     function stepFor(need) {
                         for (const step of island.heightSteps)
@@ -234,9 +235,9 @@ Scope {
                         + island.bottomReserve
 
                     // Width follows the view, between a floor (never narrower than the pill it grew out of) and a ceiling
-                    // (only split view, two views side by side, may go past it)
+                    // (only split view, two views side by side, may go past it). Two-column views sit near the top of it.
                     readonly property real minW: Math.min(island.maxW, Math.max(island.startW, 340))
-                    readonly property real maxSingleW: Math.min(island.maxW, 520)
+                    readonly property real maxSingleW: Math.min(island.maxW, 600)
                     readonly property real wantedW: Math.max(island.minW, Math.min(island.splitActive ? island.maxW : island.maxSingleW,
                         detail.implicitWidth + (island.splitActive ? 12 + splitDetail.implicitWidth : 0)))
                     readonly property real wantedH: Math.max(island.startH, island.stepFor(island.contentNeed))

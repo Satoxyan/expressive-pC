@@ -11,6 +11,7 @@ Item {
     id: xm
     required property Item di
     implicitWidth: 400
+    readonly property real wantedWidth: 400
     implicitHeight: column.implicitHeight
 
     readonly property MprisPlayer player: xm.di.activePlayer

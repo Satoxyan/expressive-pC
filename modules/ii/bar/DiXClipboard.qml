@@ -11,8 +11,10 @@ ColumnLayout {
     id: xclip
     required property Item di
     spacing: 10
-    implicitWidth: 380
-    readonly property real wantedWidth: 380
+    implicitWidth: xclip.wantedWidth
+    // Two columns (the entry · its history) when browsing the history; one for the "just copied" peek
+    readonly property bool twoColumns: xclip.pinnedMode && Cliphist.entries.length > 1
+    readonly property real wantedWidth: xclip.twoColumns ? 590 : 380
 
     readonly property bool pinnedMode: !IslandEvents.clipboard.active
     readonly property var payload: xclip.pinnedMode ? IslandEvents.latestClipboard : (IslandEvents.clipboard.payload ?? ({}))
@@ -207,325 +209,536 @@ ColumnLayout {
         }
     }
 
-    Item {
-        id: preview
+    RowLayout {
         Layout.fillWidth: true
-        implicitHeight: xclip.isImage ? 190 : (xclip.hasFiles ? filesColumn.implicitHeight : textBox.implicitHeight)
-
-        Drag.active: previewMouse.drag.active
-
-        Binding {
-            target: xclip.di
-            property: "dragging"
-            value: true
-            when: previewMouse.drag.active
-            restoreMode: Binding.RestoreValue
-        }
-        Drag.dragType: Drag.Automatic
-        Drag.supportedActions: Qt.CopyAction
-        Drag.mimeData: {
-            if (xclip.hasFiles) return { "text/uri-list": xclip.files.map(f => `file://${f}`).join("\r\n") }
-            if (xclip.isImage && xclip.imagePath !== "") return { "text/uri-list": `file://${xclip.imagePath}` }
-            return { "text/plain": xclip.text }
-        }
-
-        Loader {
-            anchors.centerIn: parent
-            active: xclip.isImage
-            sourceComponent: CliphistImage {
-                entry: xclip.payload.entry ?? ""
-                maxWidth: 350
-                maxHeight: 190
-                radius: 12
-            }
-        }
+        spacing: 16
 
         ColumnLayout {
-            id: filesColumn
-            width: parent.width
-            visible: xclip.hasFiles
-            spacing: 4
+            Layout.fillWidth: true
+            Layout.alignment: Qt.AlignTop
+            spacing: 10
 
-            Repeater {
-                model: xclip.files.slice(0, 5)
-                delegate: Rectangle {
-                    required property string modelData
-                    Layout.fillWidth: true
-                    implicitHeight: 36
+            Item {
+                id: preview
+                Layout.fillWidth: true
+                implicitHeight: xclip.isImage ? (xclip.twoColumns ? 150 : 190) : (xclip.hasFiles ? filesColumn.implicitHeight : textBox.implicitHeight)
+
+                Drag.active: previewMouse.drag.active
+
+                Binding {
+                    target: xclip.di
+                    property: "dragging"
+                    value: true
+                    when: previewMouse.drag.active
+                    restoreMode: Binding.RestoreValue
+                }
+                Drag.dragType: Drag.Automatic
+                Drag.supportedActions: Qt.CopyAction
+                Drag.mimeData: {
+                    if (xclip.hasFiles) return { "text/uri-list": xclip.files.map(f => `file://${f}`).join("\r\n") }
+                    if (xclip.isImage && xclip.imagePath !== "") return { "text/uri-list": `file://${xclip.imagePath}` }
+                    return { "text/plain": xclip.text }
+                }
+
+                Loader {
+                    anchors.centerIn: parent
+                    active: xclip.isImage
+                    sourceComponent: CliphistImage {
+                        entry: xclip.payload.entry ?? ""
+                        maxWidth: Math.min(350, preview.width)
+                        maxHeight: xclip.twoColumns ? 150 : 190
+                        radius: 12
+                    }
+                }
+
+                ColumnLayout {
+                    id: filesColumn
+                    width: parent.width
+                    visible: xclip.hasFiles
+                    spacing: 4
+
+                    Repeater {
+                        model: xclip.files.slice(0, 5)
+                        delegate: Rectangle {
+                            required property string modelData
+                            Layout.fillWidth: true
+                            implicitHeight: 36
+                            radius: 10
+                            color: Appearance.colors.colLayer1
+
+                            RowLayout {
+                                anchors {
+                                    fill: parent
+                                    leftMargin: 10
+                                    rightMargin: 10
+                                }
+                                spacing: 8
+                                MaterialSymbol {
+                                    text: DropShelf.iconFor(modelData)
+                                    iconSize: 18
+                                    fill: 1
+                                    color: Appearance.colors.colPrimary
+                                }
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    text: DropShelf.fileName(modelData)
+                                    font.pixelSize: Appearance.font.pixelSize.smaller
+                                    color: Appearance.colors.colOnLayer1
+                                    elide: Text.ElideMiddle
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    id: textBox
+                    width: parent.width
+                    visible: !xclip.isImage && !xclip.hasFiles
+                    implicitHeight: clipText.implicitHeight + 20
+                    radius: 12
+                    color: Appearance.colors.colLayer1
+
+                    StyledText {
+                        id: clipText
+                        anchors {
+                            left: parent.left
+                            right: parent.right
+                            verticalCenter: parent.verticalCenter
+                            margins: 10
+                        }
+                        text: xclip.text
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        font.family: /^\s*[{<\[]|;\s*$|\bfunction\b|=>/.test(xclip.text) ? Appearance.font.family.monospace : Appearance.font.family.main
+                        color: Appearance.colors.colOnLayer1
+                        wrapMode: Text.WrapAnywhere
+                        maximumLineCount: 6
+                        elide: Text.ElideRight
+                    }
+                }
+
+                Item { id: previewDragProxy }
+
+                MouseArea {
+                    id: previewMouse
+                    anchors.fill: parent
+                    cursorShape: drag.active ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                    drag.target: previewDragProxy
+                    onReleased: {
+                        previewDragProxy.x = 0
+                        previewDragProxy.y = 0
+                    }
+                }
+            }
+
+            Flow {
+                Layout.fillWidth: true
+                spacing: 6
+
+                ActionChip {
+                    visible: !xclip.isImage && !xclip.hasFiles && xclip.text.trim() !== ""
+                    primary: true
+                    agent: "gemini"
+                    label: Translation.tr("Ask Gemini")
+                    onTap: () => {
+                        IslandEvents.sendToGemini(xclip.text, true)
+                        xclip.di.collapse()
+                    }
+                }
+                ActionChip {
+                    visible: !xclip.isImage && !xclip.hasFiles && !xclip.isUrl && xclip.text.trim() !== "" && xclip.text.length < 300
+                    primary: true
+                    icon: "search"
+                    label: Translation.tr("Search")
+                    onTap: () => {
+                        Qt.openUrlExternally(`https://www.google.com/search?q=${encodeURIComponent(xclip.text.trim())}`)
+                        xclip.di.collapse()
+                    }
+                }
+
+                ActionChip {
+                    visible: xclip.isImage
+                    icon: "save"
+                    label: Translation.tr("Save")
+                    onTap: () => xclip.exportImage("png", false)
+                }
+                ActionChip {
+                    visible: xclip.isImage
+                    icon: "photo"
+                    label: "JPG"
+                    onTap: () => xclip.exportImage("jpg", false)
+                }
+                ActionChip {
+                    visible: xclip.isImage
+                    icon: "image"
+                    label: "WEBP"
+                    onTap: () => xclip.exportImage("webp", false)
+                }
+                ActionChip {
+                    visible: xclip.isImage
+                    icon: "folder_open"
+                    label: Translation.tr("Show in folder")
+                    onTap: () => {
+                        if (xclip.savedPath !== "") Quickshell.execDetached(["dolphin", "--select", xclip.savedPath])
+                        else xclip.exportImage("png", true)
+                    }
+                }
+
+                ActionChip {
+                    visible: xclip.hasFiles
+                    icon: "open_in_new"
+                    label: Translation.tr("Open")
+                    onTap: () => Qt.openUrlExternally(`file://${xclip.files[0]}`)
+                }
+                ActionChip {
+                    visible: xclip.hasFiles
+                    icon: "folder_open"
+                    label: Translation.tr("Show in folder")
+                    onTap: () => Quickshell.execDetached(["dolphin", "--select", xclip.files[0]])
+                }
+                ActionChip {
+                    visible: xclip.imageFiles.length > 0
+                    icon: "photo"
+                    label: `${Translation.tr("Convert to")} JPG`
+                    onTap: () => xclip.convertFiles("jpg")
+                }
+                ActionChip {
+                    visible: xclip.imageFiles.length > 0
+                    icon: "image"
+                    label: `${Translation.tr("Convert to")} WEBP`
+                    onTap: () => xclip.convertFiles("webp")
+                }
+                ActionChip {
+                    visible: xclip.imageFiles.length > 0
+                    icon: "image"
+                    label: `${Translation.tr("Convert to")} PNG`
+                    onTap: () => xclip.convertFiles("png")
+                }
+
+                ActionChip {
+                    visible: (xclip.isImage && xclip.imagePath !== "") || xclip.imageFiles.length > 0
+                    icon: "document_scanner"
+                    label: Translation.tr("Copy text")
+                    onTap: () => IslandEvents.ocrImage(xclip.isImage ? xclip.imagePath : xclip.imageFiles[0])
+                }
+                ActionChip {
+                    visible: (xclip.isImage && xclip.imagePath !== "") || xclip.imageFiles.length > 0
+                    icon: "image_search"
+                    label: "Google Lens"
+                    onTap: () => IslandEvents.lensSearch(xclip.isImage ? xclip.imagePath : xclip.imageFiles[0])
+                }
+
+                ActionChip {
+                    visible: xclip.isUrl
+                    icon: "link"
+                    label: Translation.tr("Open link")
+                    onTap: () => Qt.openUrlExternally(xclip.text)
+                }
+                ActionChip {
+                    visible: xclip.isYoutube
+                    icon: "movie"
+                    label: Translation.tr("Download video")
+                    onTap: () => {
+                        IslandEvents.downloadMedia(xclip.text, false)
+                        xclip.status = Translation.tr("Downloading to the drawer…")
+                    }
+                }
+                ActionChip {
+                    visible: xclip.isYoutube
+                    icon: "music_note"
+                    label: Translation.tr("Download audio")
+                    onTap: () => {
+                        IslandEvents.downloadMedia(xclip.text, true)
+                        xclip.status = Translation.tr("Downloading to the drawer…")
+                    }
+                }
+                ActionChip {
+                    visible: xclip.isPdfUrl
+                    icon: "picture_as_pdf"
+                    label: Translation.tr("Open PDF")
+                    onTap: () => Qt.openUrlExternally(xclip.text)
+                }
+                ActionChip {
+                    visible: xclip.isPdfUrl
+                    icon: "download"
+                    label: Translation.tr("Save to drawer")
+                    onTap: () => {
+                        DropShelf.addItems([xclip.text])
+                        xclip.status = Translation.tr("Saving to the drawer…")
+                    }
+                }
+                ActionChip {
+                    visible: xclip.isAddress
+                    icon: "map"
+                    label: Translation.tr("Open in Maps")
+                    onTap: () => Qt.openUrlExternally(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(xclip.text.replace(/\s+/g, " "))}`)
+                }
+                ActionChip {
+                    visible: xclip.isForeign
+                    icon: "translate"
+                    label: Translation.tr("Translate")
+                    onTap: () => IslandEvents.translateText(xclip.text)
+                }
+
+                Rectangle {
+                    visible: xclip.colorValue !== null
+                    implicitWidth: 30
+                    implicitHeight: 30
+                    radius: 15
+                    color: xclip.colorValue?.color ?? "transparent"
+                    border.width: 1
+                    border.color: ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.7)
+                }
+                ActionChip {
+                    visible: xclip.colorValue !== null
+                    icon: "tag"
+                    label: xclip.colorValue?.hex ?? ""
+                    onTap: () => xclip.copyText(xclip.colorValue.hex)
+                }
+                ActionChip {
+                    visible: xclip.colorValue !== null
+                    icon: "palette"
+                    label: xclip.colorValue?.rgb ?? ""
+                    onTap: () => xclip.copyText(xclip.colorValue.rgb)
+                }
+                ActionChip {
+                    visible: xclip.colorValue !== null
+                    icon: "palette"
+                    label: xclip.colorValue?.hsl ?? ""
+                    onTap: () => xclip.copyText(xclip.colorValue.hsl)
+                }
+
+                ActionChip {
+                    visible: xclip.jsonValue !== null
+                    icon: "data_object"
+                    label: Translation.tr("Format JSON")
+                    onTap: () => xclip.copyText(JSON.stringify(xclip.jsonValue, null, 2))
+                }
+                ActionChip {
+                    visible: xclip.jsonValue !== null
+                    icon: "compress"
+                    label: Translation.tr("Minify JSON")
+                    onTap: () => xclip.copyText(JSON.stringify(xclip.jsonValue))
+                }
+                ActionChip {
+                    visible: xclip.trackingCode !== ""
+                    icon: "local_shipping"
+                    label: Translation.tr("Track package")
+                    onTap: () => Qt.openUrlExternally(`https://www.linkcorreios.com.br/?id=${xclip.trackingCode}`)
+                }
+                ActionChip {
+                    visible: xclip.phoneDigits !== ""
+                    icon: "chat"
+                    label: Translation.tr("Open in WhatsApp")
+                    onTap: () => Qt.openUrlExternally(`https://wa.me/${xclip.phoneDigits}`)
+                }
+                ActionChip {
+                    visible: xclip.isEmail
+                    icon: "mail"
+                    label: Translation.tr("Write email")
+                    onTap: () => Qt.openUrlExternally(`mailto:${xclip.text.trim()}`)
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
+
+                Rectangle {
+                    visible: !xclip.isImage && !xclip.hasFiles && xclip.text.trim() !== ""
+                    implicitWidth: textTools.implicitWidth + 8
+                    implicitHeight: 32
                     radius: 10
                     color: Appearance.colors.colLayer1
 
                     RowLayout {
-                        anchors {
-                            fill: parent
-                            leftMargin: 10
-                            rightMargin: 10
+                        id: textTools
+                        anchors.centerIn: parent
+                        spacing: 0
+
+                        ToolSegment {
+                            label: "ABC"
+                            tip: Translation.tr("Copy in uppercase")
+                            onTap: () => xclip.copyText(xclip.text.toUpperCase())
                         }
-                        spacing: 8
+                        ToolSegment {
+                            label: "abc"
+                            tip: Translation.tr("Copy in lowercase")
+                            onTap: () => xclip.copyText(xclip.text.toLowerCase())
+                        }
+                        ToolSegment {
+                            icon: "format_clear"
+                            tip: Translation.tr("Clean up spaces")
+                            onTap: () => xclip.copyText(xclip.text.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim())
+                        }
+                    }
+                }
+
+                Item { Layout.fillWidth: true }
+
+                ToolSegment {
+                    icon: "inventory_2"
+                    tip: Translation.tr("Keep in drawer")
+                    onTap: () => xclip.keepInDrawer()
+                }
+                ToolSegment {
+                    icon: "delete"
+                    tip: Translation.tr("Remove from history")
+                    onTap: () => {
+                        Cliphist.deleteEntry(xclip.payload.entry ?? "")
+                        IslandEvents.clipboard.dismiss()
+                        xclip.di.collapse()
+                    }
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                visible: xclip.showTranslation
+                implicitHeight: translationColumn.implicitHeight + 20
+                radius: 12
+                color: ColorUtils.transparentize(Appearance.colors.colPrimary, 0.88)
+
+                ColumnLayout {
+                    id: translationColumn
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                        verticalCenter: parent.verticalCenter
+                        margins: 10
+                    }
+                    spacing: 6
+
+                    RowLayout {
+                        spacing: 5
                         MaterialSymbol {
-                            text: DropShelf.iconFor(modelData)
-                            iconSize: 18
-                            fill: 1
+                            text: "translate"
+                            iconSize: 15
                             color: Appearance.colors.colPrimary
                         }
                         StyledText {
-                            Layout.fillWidth: true
-                            text: DropShelf.fileName(modelData)
-                            font.pixelSize: Appearance.font.pixelSize.smaller
-                            color: Appearance.colors.colOnLayer1
-                            elide: Text.ElideMiddle
+                            text: Translation.tr("Translation")
+                            font.pixelSize: Appearance.font.pixelSize.smallest
+                            color: Appearance.colors.colOnLayer0
+                            opacity: 0.7
                         }
+                    }
+                    StyledText {
+                        Layout.fillWidth: true
+                        text: IslandEvents.translation.busy ? Translation.tr("Translating…")
+                            : (IslandEvents.translation.result || Translation.tr("Couldn't translate"))
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        color: Appearance.colors.colOnLayer0
+                        wrapMode: Text.Wrap
+                        maximumLineCount: 8
+                        elide: Text.ElideRight
+                    }
+                    ActionChip {
+                        visible: !IslandEvents.translation.busy && IslandEvents.translation.result !== ""
+                        icon: "content_copy"
+                        label: Translation.tr("Copy translation")
+                        onTap: () => xclip.copyText(IslandEvents.translation.result)
                     }
                 }
             }
         }
 
-        Rectangle {
-            id: textBox
-            width: parent.width
-            visible: !xclip.isImage && !xclip.hasFiles
-            implicitHeight: clipText.implicitHeight + 20
-            radius: 12
-            color: Appearance.colors.colLayer1
+        // History beside the current entry, in a list of its own that scrolls inside the height the left column
+        // sets — it no longer stacks a dozen rows under everything else
+        ColumnLayout {
+            visible: xclip.twoColumns
+            Layout.preferredWidth: 220
+            Layout.maximumWidth: 220
+            Layout.fillHeight: true
+            Layout.alignment: Qt.AlignTop
+            spacing: 6
 
-            StyledText {
-                id: clipText
-                anchors {
-                    left: parent.left
-                    right: parent.right
-                    verticalCenter: parent.verticalCenter
-                    margins: 10
+        StyledText {
+            visible: true
+            text: Translation.tr("History")
+            font.pixelSize: Appearance.font.pixelSize.smaller
+            font.weight: Font.DemiBold
+            color: Appearance.colors.colOnLayer0
+            opacity: 0.8
+        }
+
+            Flickable {
+                id: historyFlick
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.minimumHeight: 120
+                clip: true
+                contentWidth: width
+                contentHeight: historyList.implicitHeight
+                boundsBehavior: Flickable.StopAtBounds
+
+                ColumnLayout {
+                    id: historyList
+                    width: historyFlick.width
+                    spacing: 4
+
+                    Repeater {
+                        model: xclip.pinnedMode ? Cliphist.entries.slice(1, 13) : []
+                        delegate: Rectangle {
+                            id: historyItem
+                            required property string modelData
+                            readonly property bool image: Cliphist.entryIsImage(historyItem.modelData)
+                            Layout.fillWidth: true
+                            implicitHeight: historyItem.image ? 60 : 34
+                            radius: 10
+                            color: historyMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1
+
+                            Behavior on color {
+                                ColorAnimation { duration: IslandMotion.micro }
+                            }
+
+                            RowLayout {
+                                anchors {
+                                    fill: parent
+                                    leftMargin: 10
+                                    rightMargin: 10
+                                }
+                                spacing: 8
+
+                                Loader {
+                                    active: historyItem.image
+                                    visible: active
+                                    sourceComponent: CliphistImage {
+                                        entry: historyItem.modelData
+                                        maxWidth: 76
+                                        maxHeight: 46
+                                        radius: 6
+                                    }
+                                }
+                                DiClipIcon {
+                                    visible: !historyItem.image
+                                    kind: historyItem.image ? ({}) : IslandEvents.clipKind(IslandEvents.payloadFor(historyItem.modelData))
+                                    size: 20
+                                    tinted: false
+                                }
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    text: historyItem.image ? Translation.tr("Image") : historyItem.modelData.replace(/^\d+\t/, "").replace(/\s+/g, " ")
+                                    font.pixelSize: Appearance.font.pixelSize.smaller
+                                    color: Appearance.colors.colOnLayer1
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            MouseArea {
+                                id: historyMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    Cliphist.copy(historyItem.modelData)
+                                    xclip.status = Translation.tr("Copied")
+                                }
+                            }
+                        }
+                    }
                 }
-                text: xclip.text
-                font.pixelSize: Appearance.font.pixelSize.smaller
-                font.family: /^\s*[{<\[]|;\s*$|\bfunction\b|=>/.test(xclip.text) ? Appearance.font.family.monospace : Appearance.font.family.main
-                color: Appearance.colors.colOnLayer1
-                wrapMode: Text.WrapAnywhere
-                maximumLineCount: 6
-                elide: Text.ElideRight
             }
-        }
-
-        Item { id: previewDragProxy }
-
-        MouseArea {
-            id: previewMouse
-            anchors.fill: parent
-            cursorShape: drag.active ? Qt.ClosedHandCursor : Qt.OpenHandCursor
-            drag.target: previewDragProxy
-            onReleased: {
-                previewDragProxy.x = 0
-                previewDragProxy.y = 0
-            }
-        }
-    }
-
-    Flow {
-        Layout.fillWidth: true
-        spacing: 6
-
-        ActionChip {
-            visible: !xclip.isImage && !xclip.hasFiles && xclip.text.trim() !== ""
-            primary: true
-            agent: "gemini"
-            label: Translation.tr("Ask Gemini")
-            onTap: () => {
-                IslandEvents.sendToGemini(xclip.text, true)
-                xclip.di.collapse()
-            }
-        }
-        ActionChip {
-            visible: !xclip.isImage && !xclip.hasFiles && !xclip.isUrl && xclip.text.trim() !== "" && xclip.text.length < 300
-            primary: true
-            icon: "search"
-            label: Translation.tr("Search")
-            onTap: () => {
-                Qt.openUrlExternally(`https://www.google.com/search?q=${encodeURIComponent(xclip.text.trim())}`)
-                xclip.di.collapse()
-            }
-        }
-
-        ActionChip {
-            visible: xclip.isImage
-            icon: "save"
-            label: Translation.tr("Save")
-            onTap: () => xclip.exportImage("png", false)
-        }
-        ActionChip {
-            visible: xclip.isImage
-            icon: "photo"
-            label: "JPG"
-            onTap: () => xclip.exportImage("jpg", false)
-        }
-        ActionChip {
-            visible: xclip.isImage
-            icon: "image"
-            label: "WEBP"
-            onTap: () => xclip.exportImage("webp", false)
-        }
-        ActionChip {
-            visible: xclip.isImage
-            icon: "folder_open"
-            label: Translation.tr("Show in folder")
-            onTap: () => {
-                if (xclip.savedPath !== "") Quickshell.execDetached(["dolphin", "--select", xclip.savedPath])
-                else xclip.exportImage("png", true)
-            }
-        }
-
-        ActionChip {
-            visible: xclip.hasFiles
-            icon: "open_in_new"
-            label: Translation.tr("Open")
-            onTap: () => Qt.openUrlExternally(`file://${xclip.files[0]}`)
-        }
-        ActionChip {
-            visible: xclip.hasFiles
-            icon: "folder_open"
-            label: Translation.tr("Show in folder")
-            onTap: () => Quickshell.execDetached(["dolphin", "--select", xclip.files[0]])
-        }
-        ActionChip {
-            visible: xclip.imageFiles.length > 0
-            icon: "photo"
-            label: `${Translation.tr("Convert to")} JPG`
-            onTap: () => xclip.convertFiles("jpg")
-        }
-        ActionChip {
-            visible: xclip.imageFiles.length > 0
-            icon: "image"
-            label: `${Translation.tr("Convert to")} WEBP`
-            onTap: () => xclip.convertFiles("webp")
-        }
-        ActionChip {
-            visible: xclip.imageFiles.length > 0
-            icon: "image"
-            label: `${Translation.tr("Convert to")} PNG`
-            onTap: () => xclip.convertFiles("png")
-        }
-
-        ActionChip {
-            visible: (xclip.isImage && xclip.imagePath !== "") || xclip.imageFiles.length > 0
-            icon: "document_scanner"
-            label: Translation.tr("Copy text")
-            onTap: () => IslandEvents.ocrImage(xclip.isImage ? xclip.imagePath : xclip.imageFiles[0])
-        }
-        ActionChip {
-            visible: (xclip.isImage && xclip.imagePath !== "") || xclip.imageFiles.length > 0
-            icon: "image_search"
-            label: "Google Lens"
-            onTap: () => IslandEvents.lensSearch(xclip.isImage ? xclip.imagePath : xclip.imageFiles[0])
-        }
-
-        ActionChip {
-            visible: xclip.isUrl
-            icon: "link"
-            label: Translation.tr("Open link")
-            onTap: () => Qt.openUrlExternally(xclip.text)
-        }
-        ActionChip {
-            visible: xclip.isYoutube
-            icon: "movie"
-            label: Translation.tr("Download video")
-            onTap: () => {
-                IslandEvents.downloadMedia(xclip.text, false)
-                xclip.status = Translation.tr("Downloading to the drawer…")
-            }
-        }
-        ActionChip {
-            visible: xclip.isYoutube
-            icon: "music_note"
-            label: Translation.tr("Download audio")
-            onTap: () => {
-                IslandEvents.downloadMedia(xclip.text, true)
-                xclip.status = Translation.tr("Downloading to the drawer…")
-            }
-        }
-        ActionChip {
-            visible: xclip.isPdfUrl
-            icon: "picture_as_pdf"
-            label: Translation.tr("Open PDF")
-            onTap: () => Qt.openUrlExternally(xclip.text)
-        }
-        ActionChip {
-            visible: xclip.isPdfUrl
-            icon: "download"
-            label: Translation.tr("Save to drawer")
-            onTap: () => {
-                DropShelf.addItems([xclip.text])
-                xclip.status = Translation.tr("Saving to the drawer…")
-            }
-        }
-        ActionChip {
-            visible: xclip.isAddress
-            icon: "map"
-            label: Translation.tr("Open in Maps")
-            onTap: () => Qt.openUrlExternally(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(xclip.text.replace(/\s+/g, " "))}`)
-        }
-        ActionChip {
-            visible: xclip.isForeign
-            icon: "translate"
-            label: Translation.tr("Translate")
-            onTap: () => IslandEvents.translateText(xclip.text)
-        }
-
-        Rectangle {
-            visible: xclip.colorValue !== null
-            implicitWidth: 30
-            implicitHeight: 30
-            radius: 15
-            color: xclip.colorValue?.color ?? "transparent"
-            border.width: 1
-            border.color: ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.7)
-        }
-        ActionChip {
-            visible: xclip.colorValue !== null
-            icon: "tag"
-            label: xclip.colorValue?.hex ?? ""
-            onTap: () => xclip.copyText(xclip.colorValue.hex)
-        }
-        ActionChip {
-            visible: xclip.colorValue !== null
-            icon: "palette"
-            label: xclip.colorValue?.rgb ?? ""
-            onTap: () => xclip.copyText(xclip.colorValue.rgb)
-        }
-        ActionChip {
-            visible: xclip.colorValue !== null
-            icon: "palette"
-            label: xclip.colorValue?.hsl ?? ""
-            onTap: () => xclip.copyText(xclip.colorValue.hsl)
-        }
-
-        ActionChip {
-            visible: xclip.jsonValue !== null
-            icon: "data_object"
-            label: Translation.tr("Format JSON")
-            onTap: () => xclip.copyText(JSON.stringify(xclip.jsonValue, null, 2))
-        }
-        ActionChip {
-            visible: xclip.jsonValue !== null
-            icon: "compress"
-            label: Translation.tr("Minify JSON")
-            onTap: () => xclip.copyText(JSON.stringify(xclip.jsonValue))
-        }
-        ActionChip {
-            visible: xclip.trackingCode !== ""
-            icon: "local_shipping"
-            label: Translation.tr("Track package")
-            onTap: () => Qt.openUrlExternally(`https://www.linkcorreios.com.br/?id=${xclip.trackingCode}`)
-        }
-        ActionChip {
-            visible: xclip.phoneDigits !== ""
-            icon: "chat"
-            label: Translation.tr("Open in WhatsApp")
-            onTap: () => Qt.openUrlExternally(`https://wa.me/${xclip.phoneDigits}`)
-        }
-        ActionChip {
-            visible: xclip.isEmail
-            icon: "mail"
-            label: Translation.tr("Write email")
-            onTap: () => Qt.openUrlExternally(`mailto:${xclip.text.trim()}`)
         }
     }
 
@@ -573,184 +786,6 @@ ColumnLayout {
             text: seg.tip
             extraVisibleCondition: false
             alternativeVisibleCondition: segArea.containsMouse && seg.tip !== ""
-        }
-    }
-
-    RowLayout {
-        Layout.fillWidth: true
-        spacing: 6
-
-        Rectangle {
-            visible: !xclip.isImage && !xclip.hasFiles && xclip.text.trim() !== ""
-            implicitWidth: textTools.implicitWidth + 8
-            implicitHeight: 32
-            radius: 10
-            color: Appearance.colors.colLayer1
-
-            RowLayout {
-                id: textTools
-                anchors.centerIn: parent
-                spacing: 0
-
-                ToolSegment {
-                    label: "ABC"
-                    tip: Translation.tr("Copy in uppercase")
-                    onTap: () => xclip.copyText(xclip.text.toUpperCase())
-                }
-                ToolSegment {
-                    label: "abc"
-                    tip: Translation.tr("Copy in lowercase")
-                    onTap: () => xclip.copyText(xclip.text.toLowerCase())
-                }
-                ToolSegment {
-                    icon: "format_clear"
-                    tip: Translation.tr("Clean up spaces")
-                    onTap: () => xclip.copyText(xclip.text.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim())
-                }
-            }
-        }
-
-        Item { Layout.fillWidth: true }
-
-        ToolSegment {
-            icon: "inventory_2"
-            tip: Translation.tr("Keep in drawer")
-            onTap: () => xclip.keepInDrawer()
-        }
-        ToolSegment {
-            icon: "delete"
-            tip: Translation.tr("Remove from history")
-            onTap: () => {
-                Cliphist.deleteEntry(xclip.payload.entry ?? "")
-                IslandEvents.clipboard.dismiss()
-                xclip.di.collapse()
-            }
-        }
-    }
-
-    Rectangle {
-        Layout.fillWidth: true
-        visible: xclip.showTranslation
-        implicitHeight: translationColumn.implicitHeight + 20
-        radius: 12
-        color: ColorUtils.transparentize(Appearance.colors.colPrimary, 0.88)
-
-        ColumnLayout {
-            id: translationColumn
-            anchors {
-                left: parent.left
-                right: parent.right
-                verticalCenter: parent.verticalCenter
-                margins: 10
-            }
-            spacing: 6
-
-            RowLayout {
-                spacing: 5
-                MaterialSymbol {
-                    text: "translate"
-                    iconSize: 15
-                    color: Appearance.colors.colPrimary
-                }
-                StyledText {
-                    text: Translation.tr("Translation")
-                    font.pixelSize: Appearance.font.pixelSize.smallest
-                    color: Appearance.colors.colOnLayer0
-                    opacity: 0.7
-                }
-            }
-            StyledText {
-                Layout.fillWidth: true
-                text: IslandEvents.translation.busy ? Translation.tr("Translating…")
-                    : (IslandEvents.translation.result || Translation.tr("Couldn't translate"))
-                font.pixelSize: Appearance.font.pixelSize.smaller
-                color: Appearance.colors.colOnLayer0
-                wrapMode: Text.Wrap
-                maximumLineCount: 8
-                elide: Text.ElideRight
-            }
-            ActionChip {
-                visible: !IslandEvents.translation.busy && IslandEvents.translation.result !== ""
-                icon: "content_copy"
-                label: Translation.tr("Copy translation")
-                onTap: () => xclip.copyText(IslandEvents.translation.result)
-            }
-        }
-    }
-
-    StyledText {
-        visible: xclip.pinnedMode && Cliphist.entries.length > 1
-        text: Translation.tr("History")
-        font.pixelSize: Appearance.font.pixelSize.smaller
-        font.weight: Font.DemiBold
-        color: Appearance.colors.colOnLayer0
-        opacity: 0.8
-    }
-
-    ColumnLayout {
-        Layout.fillWidth: true
-        visible: xclip.pinnedMode
-        spacing: 4
-
-        Repeater {
-            model: xclip.pinnedMode ? Cliphist.entries.slice(1, 13) : []
-            delegate: Rectangle {
-                id: historyItem
-                required property string modelData
-                readonly property bool image: Cliphist.entryIsImage(historyItem.modelData)
-                Layout.fillWidth: true
-                implicitHeight: historyItem.image ? 60 : 34
-                radius: 10
-                color: historyMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1
-
-                Behavior on color {
-                    ColorAnimation { duration: IslandMotion.micro }
-                }
-
-                RowLayout {
-                    anchors {
-                        fill: parent
-                        leftMargin: 10
-                        rightMargin: 10
-                    }
-                    spacing: 8
-
-                    Loader {
-                        active: historyItem.image
-                        visible: active
-                        sourceComponent: CliphistImage {
-                            entry: historyItem.modelData
-                            maxWidth: 76
-                            maxHeight: 46
-                            radius: 6
-                        }
-                    }
-                    DiClipIcon {
-                        visible: !historyItem.image
-                        kind: historyItem.image ? ({}) : IslandEvents.clipKind(IslandEvents.payloadFor(historyItem.modelData))
-                        size: 20
-                        tinted: false
-                    }
-                    StyledText {
-                        Layout.fillWidth: true
-                        text: historyItem.image ? Translation.tr("Image") : historyItem.modelData.replace(/^\d+\t/, "").replace(/\s+/g, " ")
-                        font.pixelSize: Appearance.font.pixelSize.smaller
-                        color: Appearance.colors.colOnLayer1
-                        elide: Text.ElideRight
-                    }
-                }
-
-                MouseArea {
-                    id: historyMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        Cliphist.copy(historyItem.modelData)
-                        xclip.status = Translation.tr("Copied")
-                    }
-                }
-            }
         }
     }
 }
