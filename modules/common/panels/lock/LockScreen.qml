@@ -204,6 +204,11 @@ Scope {
         function focus(): void {
             lockContext.shouldReFocus();
         }
+        // "yes" while the session is locked. Scripts that edit the shell's files check this first: a hot reload
+        // while locked destroys the lock surface and leaves the compositor on its crashed-lockscreen fallback.
+        function isLocked(): string {
+            return GlobalStates.screenLocked ? "yes" : "no";
+        }
     }
 
     CompositorGlobalShortcut {
