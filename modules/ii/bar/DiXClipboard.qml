@@ -10,11 +10,11 @@ import qs.modules.common.functions
 ColumnLayout {
     id: xclip
     required property Item di
-    spacing: 10
+    spacing: 8
     implicitWidth: xclip.wantedWidth
     // Two columns (the entry · its history) when browsing the history; one for the "just copied" peek
     readonly property bool twoColumns: xclip.pinnedMode && Cliphist.entries.length > 1
-    readonly property real wantedWidth: xclip.twoColumns ? 590 : 380
+    readonly property real wantedWidth: xclip.twoColumns ? 532 : 372
 
     readonly property bool pinnedMode: !IslandEvents.clipboard.active
     readonly property var payload: xclip.pinnedMode ? IslandEvents.latestClipboard : (IslandEvents.clipboard.payload ?? ({}))
@@ -171,8 +171,11 @@ ColumnLayout {
     }
 
     RowLayout {
+        id: header
         Layout.fillWidth: true
         spacing: 8
+        DiCascade { target: header; index: 0 }
+
         DiClipIcon {
             kind: xclip.kind
             size: 24
@@ -216,12 +219,14 @@ ColumnLayout {
         ColumnLayout {
             Layout.fillWidth: true
             Layout.alignment: Qt.AlignTop
-            spacing: 10
+            spacing: 8
 
             Item {
                 id: preview
                 Layout.fillWidth: true
-                implicitHeight: xclip.isImage ? (xclip.twoColumns ? 150 : 190) : (xclip.hasFiles ? filesColumn.implicitHeight : textBox.implicitHeight)
+                // Capped so the current-item column never pushes the view past the standard height
+                implicitHeight: (xclip.isImage || xclip.hasFiles) ? 120 : Math.min(120, textBox.implicitHeight)
+                DiCascade { target: preview; index: 1 }
 
                 Drag.active: previewMouse.drag.active
 
@@ -246,45 +251,56 @@ ColumnLayout {
                     sourceComponent: CliphistImage {
                         entry: xclip.payload.entry ?? ""
                         maxWidth: Math.min(350, preview.width)
-                        maxHeight: xclip.twoColumns ? 150 : 190
+                        maxHeight: 112
                         radius: 12
                     }
                 }
 
-                ColumnLayout {
-                    id: filesColumn
-                    width: parent.width
+                // Scrolls inside its own 120 px budget instead of growing with the file count
+                Flickable {
+                    id: filesFlick
+                    anchors.fill: parent
                     visible: xclip.hasFiles
-                    spacing: 4
+                    clip: true
+                    contentWidth: width
+                    contentHeight: filesColumn.implicitHeight
+                    boundsBehavior: Flickable.StopAtBounds
+                    interactive: filesFlick.contentHeight > filesFlick.height
 
-                    Repeater {
-                        model: xclip.files.slice(0, 5)
-                        delegate: Rectangle {
-                            required property string modelData
-                            Layout.fillWidth: true
-                            implicitHeight: 36
-                            radius: 10
-                            color: Appearance.colors.colLayer1
+                    ColumnLayout {
+                        id: filesColumn
+                        width: filesFlick.width
+                        spacing: 4
 
-                            RowLayout {
-                                anchors {
-                                    fill: parent
-                                    leftMargin: 10
-                                    rightMargin: 10
-                                }
-                                spacing: 8
-                                MaterialSymbol {
-                                    text: DropShelf.iconFor(modelData)
-                                    iconSize: 18
-                                    fill: 1
-                                    color: Appearance.colors.colPrimary
-                                }
-                                StyledText {
-                                    Layout.fillWidth: true
-                                    text: DropShelf.fileName(modelData)
-                                    font.pixelSize: Appearance.font.pixelSize.smaller
-                                    color: Appearance.colors.colOnLayer1
-                                    elide: Text.ElideMiddle
+                        Repeater {
+                            model: xclip.files
+                            delegate: Rectangle {
+                                required property string modelData
+                                Layout.fillWidth: true
+                                implicitHeight: 34
+                                radius: 10
+                                color: Appearance.colors.colLayer1
+
+                                RowLayout {
+                                    anchors {
+                                        fill: parent
+                                        leftMargin: 10
+                                        rightMargin: 10
+                                    }
+                                    spacing: 8
+                                    MaterialSymbol {
+                                        text: DropShelf.iconFor(modelData)
+                                        iconSize: 18
+                                        fill: 1
+                                        color: Appearance.colors.colPrimary
+                                    }
+                                    StyledText {
+                                        Layout.fillWidth: true
+                                        text: DropShelf.fileName(modelData)
+                                        font.pixelSize: Appearance.font.pixelSize.smaller
+                                        color: Appearance.colors.colOnLayer1
+                                        elide: Text.ElideMiddle
+                                    }
                                 }
                             }
                         }
@@ -312,7 +328,7 @@ ColumnLayout {
                         font.family: /^\s*[{<\[]|;\s*$|\bfunction\b|=>/.test(xclip.text) ? Appearance.font.family.monospace : Appearance.font.family.main
                         color: Appearance.colors.colOnLayer1
                         wrapMode: Text.WrapAnywhere
-                        maximumLineCount: 6
+                        maximumLineCount: 5
                         elide: Text.ElideRight
                     }
                 }
@@ -331,8 +347,22 @@ ColumnLayout {
                 }
             }
 
-            Flow {
+            // Every action in one scrollable line, instead of wrapping and pushing the view taller
+            Flickable {
+                id: actionsFlick
                 Layout.fillWidth: true
+                implicitHeight: 32
+                contentWidth: actionsRow.implicitWidth
+                contentHeight: 32
+                clip: true
+                flickableDirection: Flickable.HorizontalFlick
+                boundsBehavior: Flickable.StopAtBounds
+                interactive: actionsFlick.contentWidth > actionsFlick.width
+                DiCascade { target: actionsFlick; index: 2 }
+
+            Row {
+                id: actionsRow
+                height: 32
                 spacing: 6
 
                 ActionChip {
@@ -538,16 +568,12 @@ ColumnLayout {
                     label: Translation.tr("Write email")
                     onTap: () => Qt.openUrlExternally(`mailto:${xclip.text.trim()}`)
                 }
-            }
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 6
-
+                // Utility tools, tucked at the end of the same line: case/whitespace, keep, remove
                 Rectangle {
                     visible: !xclip.isImage && !xclip.hasFiles && xclip.text.trim() !== ""
-                    implicitWidth: textTools.implicitWidth + 8
-                    implicitHeight: 32
+                    width: textTools.implicitWidth + 8
+                    height: 32
                     radius: 10
                     color: Appearance.colors.colLayer1
 
@@ -573,15 +599,14 @@ ColumnLayout {
                         }
                     }
                 }
-
-                Item { Layout.fillWidth: true }
-
                 ToolSegment {
+                    height: 32
                     icon: "inventory_2"
                     tip: Translation.tr("Keep in drawer")
                     onTap: () => xclip.keepInDrawer()
                 }
                 ToolSegment {
+                    height: 32
                     icon: "delete"
                     tip: Translation.tr("Remove from history")
                     onTap: () => {
@@ -589,6 +614,7 @@ ColumnLayout {
                         IslandEvents.clipboard.dismiss()
                         xclip.di.collapse()
                     }
+                }
                 }
             }
 
@@ -646,22 +672,24 @@ ColumnLayout {
         // History beside the current entry, in a list of its own that scrolls inside the height the left column
         // sets — it no longer stacks a dozen rows under everything else
         ColumnLayout {
+            id: historyCol
             visible: xclip.twoColumns
-            Layout.preferredWidth: 220
-            Layout.maximumWidth: 220
+            Layout.preferredWidth: 200
+            Layout.maximumWidth: 200
             Layout.fillHeight: true
             Layout.alignment: Qt.AlignTop
             spacing: 6
+            DiCascade { target: historyCol; index: 1 }
 
-        StyledText {
-            visible: true
-            text: Translation.tr("History")
-            font.pixelSize: Appearance.font.pixelSize.smaller
-            font.weight: Font.DemiBold
-            color: Appearance.colors.colOnLayer0
-            opacity: 0.8
-        }
+            StyledText {
+                text: Translation.tr("History")
+                font.pixelSize: Appearance.font.pixelSize.smaller
+                font.weight: Font.DemiBold
+                color: Appearance.colors.colOnLayer0
+                opacity: 0.8
+            }
 
+            // Compact rows that scroll inside their own list, never inside the whole view
             Flickable {
                 id: historyFlick
                 Layout.fillWidth: true
@@ -671,6 +699,7 @@ ColumnLayout {
                 contentWidth: width
                 contentHeight: historyList.implicitHeight
                 boundsBehavior: Flickable.StopAtBounds
+                interactive: historyFlick.contentHeight > historyFlick.height
 
                 ColumnLayout {
                     id: historyList
@@ -682,11 +711,13 @@ ColumnLayout {
                         delegate: Rectangle {
                             id: historyItem
                             required property string modelData
+                            required property int index
                             readonly property bool image: Cliphist.entryIsImage(historyItem.modelData)
                             Layout.fillWidth: true
-                            implicitHeight: historyItem.image ? 60 : 34
+                            implicitHeight: 34
                             radius: 10
                             color: historyMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1
+                            DiCascade { target: historyItem; index: historyItem.index + 1; step: 22; pressed: historyMouse.pressed }
 
                             Behavior on color {
                                 ColorAnimation { duration: IslandMotion.micro }
@@ -695,8 +726,8 @@ ColumnLayout {
                             RowLayout {
                                 anchors {
                                     fill: parent
-                                    leftMargin: 10
-                                    rightMargin: 10
+                                    leftMargin: 8
+                                    rightMargin: 8
                                 }
                                 spacing: 8
 
@@ -705,15 +736,15 @@ ColumnLayout {
                                     visible: active
                                     sourceComponent: CliphistImage {
                                         entry: historyItem.modelData
-                                        maxWidth: 76
-                                        maxHeight: 46
-                                        radius: 6
+                                        maxWidth: 44
+                                        maxHeight: 24
+                                        radius: 5
                                     }
                                 }
                                 DiClipIcon {
                                     visible: !historyItem.image
                                     kind: historyItem.image ? ({}) : IslandEvents.clipKind(IslandEvents.payloadFor(historyItem.modelData))
-                                    size: 20
+                                    size: 18
                                     tinted: false
                                 }
                                 StyledText {
