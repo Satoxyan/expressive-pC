@@ -425,7 +425,11 @@ Singleton {
             const track = SongRec.recognizedTrack
             if (!track?.title || track.title === root.lastSongTitle) return
             root.lastSongTitle = track.title
-            root.songRecResult.show({ title: track.title, subtitle: track.subtitle, url: track.url })
+            root.songRecResult.show({
+                title: track.title, subtitle: track.subtitle, url: track.url,
+                cover: track.cover, album: track.album, year: track.year,
+                spotifyUrl: track.spotifyUrl, youtubeUrl: track.youtubeUrl, shazamUrl: track.shazamUrl
+            })
         }
     }
 
@@ -1956,7 +1960,18 @@ Singleton {
                 Pressure.simulate("gpu")
                 break
             case "songRec":
-                root.songRecResult.show({ title: "Blinding Lights", subtitle: "The Weeknd", url: "https://www.shazam.com" })
+                if (SongRec.history.length === 0) {
+                    SongRec.history = [
+                        { title: "Starboy", subtitle: "The Weeknd, Daft Punk", url: "https://www.shazam.com", cover: "", album: "Starboy", year: "2016", spotifyUrl: "https://open.spotify.com", youtubeUrl: "https://www.youtube.com", shazamUrl: "https://www.shazam.com" },
+                        { title: "Save Your Tears", subtitle: "The Weeknd", url: "https://www.shazam.com", cover: "", album: "After Hours", year: "2020", spotifyUrl: "https://open.spotify.com", youtubeUrl: "https://www.youtube.com", shazamUrl: "https://www.shazam.com" }
+                    ]
+                }
+                root.songRecResult.show({
+                    title: "Blinding Lights", subtitle: "The Weeknd", url: "https://www.shazam.com",
+                    cover: "https://upload.wikimedia.org/wikipedia/en/1/1f/The_Weeknd_-_Blinding_Lights.png",
+                    album: "After Hours", year: "2020",
+                    spotifyUrl: "https://open.spotify.com", youtubeUrl: "https://www.youtube.com", shazamUrl: "https://www.shazam.com"
+                })
                 break
             case "privacy":
                 root.fakePrivacy = true
