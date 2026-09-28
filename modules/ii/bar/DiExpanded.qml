@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Hyprland
@@ -301,6 +302,48 @@ Scope {
                     TapHandler {
                         acceptedButtons: Qt.MiddleButton
                         onTapped: scope.di.collapse()
+                    }
+
+                    // The card's own surface, which a view can colour (Material You: the card takes the tone
+                    // of what it shows). A view may declare `tint` (a colour for the whole card) and `backdrop`
+                    // (an image, e.g. the album art, blurred behind the tint). Painted here, under the content
+                    // and inside the island's own rounded clip, so it fills edge to edge, pager strip included,
+                    // and can never poke past the corners.
+                    Item {
+                        id: surfaceTint
+                        anchors.fill: parent
+                        readonly property color tint: detail.viewItem?.tint ?? "transparent"
+                        readonly property string backdrop: detail.viewItem?.backdrop ?? ""
+                        opacity: island.pc
+                        visible: surfaceTint.opacity > 0.01 && (surfaceTint.tint.a > 0 || surfaceTint.backdrop !== "")
+
+                        Image {
+                            id: backdropImage
+                            anchors.fill: parent
+                            source: surfaceTint.backdrop
+                            // Tiny on purpose: it is blurred to nothing anyway, and this keeps the blur cheap
+                            sourceSize.width: 64
+                            sourceSize.height: 64
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                            visible: false
+                        }
+                        MultiEffect {
+                            anchors.fill: parent
+                            source: backdropImage
+                            visible: surfaceTint.backdrop !== ""
+                            blurEnabled: true
+                            blur: 1
+                            blurMax: 64
+                            saturation: 0.15
+                            opacity: backdropImage.status === Image.Ready ? 0.7 : 0
+                            Behavior on opacity { NumberAnimation { duration: IslandMotion.long } }
+                        }
+                        Rectangle {
+                            anchors.fill: parent
+                            color: surfaceTint.tint
+                            Behavior on color { ColorAnimation { duration: IslandMotion.long } }
+                        }
                     }
 
                     Item {
