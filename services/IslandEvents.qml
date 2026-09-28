@@ -475,6 +475,35 @@ Singleton {
     readonly property bool screenInUse: root.privacy.screen.length > 0
     readonly property bool anyPrivacy: root.micInUse || root.cameraInUse || root.screenInUse
 
+    // When each resource went live and who held it last, for the privacy view. Updated only when the links change.
+    property var privacySince: ({ mic: 0, camera: 0, screen: 0 })
+    property var privacyLastUse: ({ mic: null, camera: null, screen: null })
+    property var privacyHeld: ({ mic: [], camera: [], screen: [] })
+    onPrivacyChanged: {
+        const now = Date.now()
+        const since = Object.assign({}, root.privacySince)
+        const last = Object.assign({}, root.privacyLastUse)
+        const held = Object.assign({}, root.privacyHeld)
+        let changed = false
+        for (const key of ["mic", "camera", "screen"]) {
+            const apps = root.privacy[key]
+            if (apps.length > 0) {
+                if (!since[key]) { since[key] = now; held[key] = []; changed = true }
+                const merged = held[key].concat(apps.filter(app => !held[key].includes(app)))
+                if (merged.length !== held[key].length) { held[key] = merged; changed = true }
+            } else if (since[key]) {
+                if (held[key].length > 0) last[key] = { time: now, since: since[key], apps: held[key] }
+                since[key] = 0
+                held[key] = []
+                changed = true
+            }
+        }
+        if (!changed) return
+        root.privacySince = since
+        root.privacyLastUse = last
+        root.privacyHeld = held
+    }
+
     property bool pausedByHeadphones: false
 
     function headphonesChanged(phase) {
