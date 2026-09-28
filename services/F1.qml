@@ -34,6 +34,80 @@ Singleton {
     readonly property bool autoPlayRadio: Config.options.bar.dynamicIsland.f1.autoPlayRadio ?? false
     readonly property bool radioPlaying: radioPlayer.running
 
+    // Passive, on-demand data for the off-session view: fetched only when a view asks (Component.onCompleted)
+    // and cached for hours, never polled.
+    property var weekend: []
+    property real weekendFetchedAt: 0
+    readonly property int weekendCacheMs: 6 * 3600 * 1000
+    property var standings: []
+    property real standingsFetchedAt: 0
+    readonly property int standingsCacheMs: 6 * 3600 * 1000
+
+    function requestWeekend() {
+        if (weekendFetcher.running) return
+        if (root.weekend.length > 0 && Date.now() - root.weekendFetchedAt < root.weekendCacheMs) return
+        const since = new Date(Date.now() - 86400000).toISOString().split(".")[0]
+        const until = new Date(Date.now() + 8 * 86400000).toISOString().split(".")[0]
+        const url = `https://api.openf1.org/v1/sessions?date_end%3E${since}&date_start%3C${until}`
+        weekendFetcher.command[2] = `curl -s "${url}"`
+        weekendFetcher.running = true
+    }
+
+    function requestStandings() {
+        if (standingsFetcher.running) return
+        if (root.standings.length > 0 && Date.now() - root.standingsFetchedAt < root.standingsCacheMs) return
+        standingsFetcher.command[2] = `curl -s "https://api.jolpi.ca/ergast/f1/current/driverStandings.json"`
+        standingsFetcher.running = true
+    }
+
+    Process {
+        id: weekendFetcher
+        command: ["bash", "-c", ""]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (text.length === 0) return
+                try {
+                    const rows = JSON.parse(text)
+                    if (!Array.isArray(rows) || rows.length === 0) return
+                    const now = Date.now()
+                    const upcoming = rows.filter(r => Date.parse(r.date_end) > now)
+                        .sort((a, b) => Date.parse(a.date_start) - Date.parse(b.date_start))
+                    if (upcoming.length === 0) return
+                    const key = upcoming[0].meeting_key
+                    root.weekend = rows.filter(r => r.meeting_key === key)
+                        .sort((a, b) => Date.parse(a.date_start) - Date.parse(b.date_start))
+                        .map(r => ({ name: r.session_name, type: r.session_type, start: r.date_start, end: r.date_end }))
+                    root.weekendFetchedAt = now
+                } catch (e) {
+                    console.warn("[F1] weekend parse error:", e)
+                }
+            }
+        }
+    }
+
+    Process {
+        id: standingsFetcher
+        command: ["bash", "-c", ""]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (text.length === 0) return
+                try {
+                    const parsed = JSON.parse(text)
+                    const list = parsed?.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings ?? []
+                    root.standings = list.slice(0, 5).map(d => ({
+                        pos: d.position ?? "",
+                        code: d.Driver?.code || (d.Driver?.familyName ?? "").slice(0, 3).toUpperCase(),
+                        points: d.points ?? "",
+                        team: d.Constructors?.[0]?.name ?? ""
+                    }))
+                    root.standingsFetchedAt = Date.now()
+                } catch (e) {
+                    console.warn("[F1] standings parse error:", e)
+                }
+            }
+        }
+    }
+
     readonly property bool sessionLive: root.connected && ["Inactive", "Started", "Aborted", "Finished"].includes(root.sessionStatus)
     readonly property bool racing: root.connected && root.sessionStatus === "Started"
     readonly property bool isRace: (root.session?.type ?? "") === "Race"
