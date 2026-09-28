@@ -459,7 +459,7 @@ Singleton {
             const watts = Math.round(Battery.energyRate)
             if (!Battery.isCharging || watts <= 0 || Battery.percentage >= 0.95 || watts >= root.slowChargerWatts) return
             root.show({ kind: "charger", icon: "battery_charging_20", tone: "attention", title: Translation.tr("Slow charger"),
-                subtitle: Translation.tr("Charging at %1 W · it will take longer").arg(watts), value: `${watts} W`, actions: [] }, 8000)
+                subtitle: Translation.tr("It will take longer to charge"), value: `${watts} W`, actions: [] }, 8000)
         }
     }
 
@@ -858,7 +858,7 @@ Singleton {
         root.show({
             kind: "diskLow", icon: critical ? "hard_drive" : "storage", tone: critical ? "error" : "attention", urgent: critical,
             title: critical ? Translation.tr("Disk full") : Translation.tr("Disk almost full"),
-            subtitle: Translation.tr("%1 free · %2% used").arg(free).arg(Math.round(ResourceUsage.diskUsedPercentage * 100)),
+            subtitle: Translation.tr("%1% used").arg(Math.round(ResourceUsage.diskUsedPercentage * 100)),
             value: free, actions: actions
         }, critical ? 20000 : 12000)
     }
@@ -940,7 +940,7 @@ Singleton {
                 break
             case "charger":
                 root.show({ kind: "charger", icon: "battery_charging_20", tone: "attention", title: Translation.tr("Slow charger"),
-                    subtitle: Translation.tr("Charging at %1 W · it will take longer").arg(15), value: "15 W", actions: [] }, 8000)
+                    subtitle: Translation.tr("It will take longer to charge"), value: "15 W", actions: [] }, 8000)
                 break
             case "peripheral":
                 root.show({ kind: "peripheral", icon: "mouse", tone: "error", title: Translation.tr("Mouse battery low"), subtitle: "MX Master 3S", value: "12%", actions: [] }, 8000)

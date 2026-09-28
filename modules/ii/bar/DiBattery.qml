@@ -74,7 +74,12 @@ Item {
                 visible: text !== ""
                 text: batt.hibernate ? Translation.tr("Plug in the charger or cancel")
                     : batt.kind === "critical" ? Translation.tr("Charge now")
-                    : batt.kind === "charging" && Battery.energyRate > 0.5 ? Translation.tr("Charging at %1 W").arg(Math.round(Battery.energyRate)) : ""
+                    // The title already says charging: the rate and when it will be full
+                    : batt.kind === "charging" && Battery.energyRate > 0.5
+                        ? (Battery.timeToFull > 60
+                            ? `${Math.round(Battery.energyRate)} W · ${Translation.tr("full in")} ${batt.di.formatDuration(Battery.timeToFull)}`
+                            : `${Math.round(Battery.energyRate)} W`)
+                    : ""
                 font.features: { "tnum": 1 }
                 font.pixelSize: Appearance.font.pixelSize.smallest
                 color: Appearance.colors.colOnLayer0

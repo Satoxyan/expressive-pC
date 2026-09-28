@@ -970,21 +970,25 @@ Item {
         if (!root.anchorAlwaysTime || (info.text === DateTime.time)) return info
         return { text: DateTime.time, icon: info.icon, tone: info.tone === "error" ? "error" : "plain" }
     }
+    // The anchor never repeats what one of the islands is already showing
+    function shownOnIsland(id) {
+        return root.primaryId === id || root.splitShownId === id
+    }
     readonly property var anchorFact: {
         if (Battery.available && !Battery.isCharging && Battery.percentage <= 0.15)
             return { text: `${Math.round(Battery.percentage * 100)}%`, icon: "battery_alert", tone: "error" }
-        if (root.isRecording)
+        if (root.isRecording && !root.shownOnIsland("recording"))
             return { text: root.formatRecordingTime(root.recordingElapsedSeconds), icon: "fiber_manual_record", tone: "error" }
-        if (root.hasActiveTimer)
+        if (root.hasActiveTimer && !root.shownOnIsland("timer"))
             return { text: root.timerValueText(), icon: root.timerIcon(), tone: "attention" }
-        if (IslandEvents.voiceCallActive && root.primaryId !== "call")
+        if (IslandEvents.voiceCallActive && !root.shownOnIsland("call"))
             return { text: IslandEvents.voiceCallMinutes < 1 ? DateTime.time : `${IslandEvents.voiceCallMinutes} min`,
                 icon: "call", tone: "plain" }
         if ((root.cfg.claudeCode ?? true) && root.worstAgentLimit >= 85)
             return { text: `${Math.round(root.worstAgentLimit)}%`, icon: "bolt", tone: root.worstAgentLimit >= 95 ? "error" : "attention" }
         if (IslandEvents.caffeineOn && IslandEvents.caffeineMinutesLeft >= 0)
             return { text: `${IslandEvents.caffeineMinutesLeft} min`, icon: "local_cafe", tone: "attention" }
-        if (F1.enabled && F1.sessionLive && F1.totalLaps > 0 && root.primaryId !== "f1")
+        if (F1.enabled && F1.sessionLive && F1.totalLaps > 0 && !root.shownOnIsland("f1"))
             return { text: `L${F1.lap}/${F1.totalLaps}`, icon: "sports_motorsports", tone: "plain" }
         if (Notifications.silent)
             return { text: DateTime.time, icon: "notifications_off", tone: "attention" }
@@ -1483,6 +1487,8 @@ Item {
             case "f1":     return F1.sessionLive
             case "media":  return root.activePlayer?.isPlaying ?? false
             case "agents": return ClaudeCode.anyWorking
+            // A finished timer waits to be dismissed, but it is no longer live
+            case "timer":  return TimerService.pomodoroRunning || TimerService.countdownRunning || TimerService.stopwatchRunning
             default:       return true
         }
     }
@@ -2597,7 +2603,7 @@ Item {
     Rectangle {
         id: pill
         anchors.left: parent.left
-        width: root.compactWidth(root.primaryId)
+        width: pillWidth.value
         height: root.pillHeight
         radius: height / 2
         color: root.pillColor
@@ -2614,12 +2620,15 @@ Item {
             }
         ]
 
-        Behavior on width {
-            NumberAnimation {
-                duration: 440
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial
-            }
+        // On a spring: a new width mid-flight bends the motion instead of restarting it (text changing while the
+        // pill is still growing used to read as a jump)
+        DiSpring {
+            id: pillWidth
+            target: root.compactWidth(root.primaryId)
+            stiffness: IslandMotion.springResize.stiffness
+            dampingRatio: IslandMotion.springResize.dampingRatio
+            epsilon: 0.3
+            animated: pill.visible && !root.vertical
         }
 
         Item {

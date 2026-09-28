@@ -6,7 +6,8 @@ import qs.modules.common.widgets
 import qs.modules.common.functions
 
 // Where the sound is going. When headphones connect, the island shows the hand-off itself: the old device fades
-// out on the left, an arc of sound travels across, and the new one lands on the right.
+// out on the left, an arc of sound travels across, and the new one lands on the right; then the old one and the
+// trail clear away, so the pill does not sit on a half-finished hand-off.
 RowLayout {
     id: output
     required property Item di
@@ -20,9 +21,12 @@ RowLayout {
     readonly property var payload: IslandEvents.audioOutput.payload ?? ({})
     readonly property bool switching: output.payload.switching ?? false
     property bool handedOver: false
+    property bool settled: false
+    readonly property bool handingOff: output.switching && !output.settled
 
     onSwitchingChanged: {
         output.handedOver = false
+        output.settled = false
         if (output.switching) handOverDelay.restart()
     }
 
@@ -31,12 +35,21 @@ RowLayout {
     Timer {
         id: handOverDelay
         interval: 260
-        onTriggered: output.handedOver = true
+        onTriggered: {
+            output.handedOver = true
+            settleDelay.restart()
+        }
+    }
+
+    Timer {
+        id: settleDelay
+        interval: 900
+        onTriggered: output.settled = true
     }
 
     Item {
         Layout.alignment: Qt.AlignVCenter
-        implicitWidth: output.switching ? 52 : 26
+        implicitWidth: output.handingOff ? 52 : 26
         implicitHeight: 26
 
         Behavior on implicitWidth {
@@ -52,7 +65,7 @@ RowLayout {
             iconSize: 15
             fill: 1
             color: Appearance.colors.colOnLayer0
-            opacity: output.handedOver ? 0.25 : 0.7
+            opacity: output.settled ? 0 : (output.handedOver ? 0.25 : 0.7)
             scale: output.handedOver ? 0.85 : 1
 
             Behavior on opacity {
@@ -71,7 +84,7 @@ RowLayout {
             radius: 1
             width: output.handedOver ? 14 : 0
             color: Appearance.colors.colPrimary
-            opacity: output.switching ? (output.handedOver ? 0.5 : 0) : 0
+            opacity: output.handingOff && output.handedOver ? 0.5 : 0
             visible: output.switching
 
             Behavior on width {
@@ -85,7 +98,7 @@ RowLayout {
         MaterialShapeWrappedMaterialSymbol {
             id: toIcon
             anchors.verticalCenter: parent.verticalCenter
-            x: output.switching ? (output.handedOver ? 26 : 12) : 0
+            x: output.handingOff ? (output.handedOver ? 26 : 12) : 0
             wrappedShape: MaterialShape.Shape.Cookie9Sided
             color: Appearance.colors.colPrimaryContainer
             colSymbol: Appearance.colors.colOnPrimaryContainer
