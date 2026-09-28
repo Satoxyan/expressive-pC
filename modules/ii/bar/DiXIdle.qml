@@ -21,6 +21,8 @@ ColumnLayout {
 
     property bool moreOpen: false
 
+    Component.onCompleted: Weather.requestForecast()
+
     function humanCountdown(seconds) {
         if (seconds <= 0) return ""
         const d = Math.floor(seconds / 86400)

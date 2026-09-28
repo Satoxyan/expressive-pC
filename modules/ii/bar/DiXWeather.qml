@@ -11,6 +11,8 @@ RowLayout {
     implicitWidth: 320
     readonly property real wantedWidth: 320
 
+    Component.onCompleted: Weather.requestForecast()
+
     readonly property int group: Math.floor((Weather.data?.wCode ?? 800) / 100)
 
     MaterialSymbol {

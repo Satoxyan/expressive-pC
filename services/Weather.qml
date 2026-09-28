@@ -17,8 +17,20 @@ Singleton {
     readonly property bool useUSCS: Config.options.bar.weather.useUSCS
     property bool gpsActive: Config.options.bar.weather.enableGPS
 
-    onUseUSCSChanged: root.getData()
-    onCityChanged: root.getData()
+    onUseUSCSChanged: {
+        root.forecastFetchedAt = 0
+        root.getData()
+    }
+    onCityChanged: {
+        root.forecastFetchedAt = 0
+        root.getData()
+    }
+
+    // Next ~24 h in 3 h steps: [{ dt, temp, wCode, night, pop }], temp in the configured unit, pop 0..1.
+    // Only fetched on demand (requestForecast) by views that show it, and kept for 30 min.
+    property var forecast: []
+    property real forecastFetchedAt: 0
+    readonly property int forecastCacheMs: 30 * 60 * 1000
 
     property var location: ({
         valid: false,
@@ -102,13 +114,7 @@ Singleton {
         }
 
         let units = root.useUSCS ? "imperial" : "metric"
-        let url = "https://api.openweathermap.org/data/2.5/weather?"
-
-        if (root.gpsActive && root.location.valid) {
-            url += `lat=${root.location.lat}&lon=${root.location.lon}`
-        } else {
-            url += `q=${formatCityName(root.city)}`
-        }
+        let url = "https://api.openweathermap.org/data/2.5/weather?" + root.locationQuery()
 
         url += `&units=${units}`
         url += `&appid=${apiKey}`
@@ -117,6 +123,36 @@ Singleton {
 
         fetcher.command[2] = command
         fetcher.running = true
+    }
+
+    function locationQuery() {
+        if (root.gpsActive && root.location.valid)
+            return `lat=${root.location.lat}&lon=${root.location.lon}`
+        return `q=${formatCityName(root.city)}`
+    }
+
+    function requestForecast() {
+        if (forecastFetcher.running) return
+        if (root.forecast.length > 0 && Date.now() - root.forecastFetchedAt < root.forecastCacheMs) return
+
+        const defaultApiKey = "8b05d62206f459e1d298cbe5844d7d87"
+        const apiKey = KeyringStorage.keyringData?.apiKeys?.openweather || defaultApiKey
+        const units = root.useUSCS ? "imperial" : "metric"
+        const url = `https://api.openweathermap.org/data/2.5/forecast?${root.locationQuery()}&cnt=8&units=${units}&appid=${apiKey}`
+
+        forecastFetcher.command[2] = `curl -s "${url}"`
+        forecastFetcher.running = true
+    }
+
+    function refineForecast(data) {
+        root.forecast = (data?.list ?? []).map(step => ({
+            dt: step.dt,
+            temp: Math.round(step?.main?.temp ?? 0),
+            wCode: step?.weather?.[0]?.id ?? 800,
+            night: (step?.weather?.[0]?.icon ?? "").endsWith("n"),
+            pop: step?.pop ?? 0
+        }))
+        root.forecastFetchedAt = Date.now()
     }
 
     function formatCityName(cityName) {
@@ -148,6 +184,30 @@ Singleton {
                     root.refineData(parsedData)
                 } catch (e) {
                     console.error("[WeatherService] JSON parse error:", e.message)
+                }
+            }
+        }
+    }
+
+    Process {
+        id: forecastFetcher
+        command: ["bash", "-c", ""]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (text.length === 0)
+                    return
+
+                try {
+                    const parsedData = JSON.parse(text)
+
+                    if (parsedData.cod && String(parsedData.cod) !== "200") {
+                        console.error("[WeatherService] Forecast API error:", parsedData.message)
+                        return
+                    }
+
+                    root.refineForecast(parsedData)
+                } catch (e) {
+                    console.error("[WeatherService] Forecast JSON parse error:", e.message)
                 }
             }
         }
