@@ -43,6 +43,18 @@ Singleton {
     property real standingsFetchedAt: 0
     readonly property int standingsCacheMs: 6 * 3600 * 1000
 
+    // The whole season, past and future rounds, so the off-session view can page through other race
+    // weekends instead of only the next one. One source (Jolpica/Ergast) for the full weekend agenda
+    // (practice/quali/sprint/race) of every round, fetched once and cached for a day.
+    property var calendar: []
+    property real calendarFetchedAt: 0
+    readonly property int calendarCacheMs: 24 * 3600 * 1000
+
+    // Final classification per round, fetched only for a round someone actually opened, kept in memory.
+    property var resultsByRound: ({})
+    property var resultsRequestedAt: ({})
+    readonly property int resultsCacheMs: 24 * 3600 * 1000
+
     function requestWeekend() {
         if (weekendFetcher.running) return
         if (root.weekend.length > 0 && Date.now() - root.weekendFetchedAt < root.weekendCacheMs) return
@@ -58,6 +70,23 @@ Singleton {
         if (root.standings.length > 0 && Date.now() - root.standingsFetchedAt < root.standingsCacheMs) return
         standingsFetcher.command[2] = `curl -s "https://api.jolpi.ca/ergast/f1/current/driverStandings.json"`
         standingsFetcher.running = true
+    }
+
+    function requestCalendar() {
+        if (calendarFetcher.running) return
+        if (root.calendar.length > 0 && Date.now() - root.calendarFetchedAt < root.calendarCacheMs) return
+        calendarFetcher.command[2] = `curl -s "https://api.jolpi.ca/ergast/f1/current.json"`
+        calendarFetcher.running = true
+    }
+
+    function requestResults(round) {
+        if (!round || resultsFetcher.running) return
+        const key = String(round)
+        if (root.resultsByRound[key] && Date.now() - (root.resultsRequestedAt[key] ?? 0) < root.resultsCacheMs) return
+        root.resultsRequestedAt = Object.assign({}, root.resultsRequestedAt, { [key]: Date.now() })
+        resultsFetcher.round = key
+        resultsFetcher.command[2] = `curl -s "https://api.jolpi.ca/ergast/f1/current/${key}/results.json"`
+        resultsFetcher.running = true
     }
 
     Process {
@@ -103,6 +132,69 @@ Singleton {
                     root.standingsFetchedAt = Date.now()
                 } catch (e) {
                     console.warn("[F1] standings parse error:", e)
+                }
+            }
+        }
+    }
+
+    Process {
+        id: calendarFetcher
+        command: ["bash", "-c", ""]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (text.length === 0) return
+                try {
+                    const races = JSON.parse(text)?.MRData?.RaceTable?.Races ?? []
+                    // Ergast's session keys, in weekend order; already the labels weekendShortLabel() expects
+                    const sessionFields = [
+                        ["FirstPractice", "Practice 1"], ["SecondPractice", "Practice 2"], ["ThirdPractice", "Practice 3"],
+                        ["SprintQualifying", "Sprint Qualifying"], ["SprintShootout", "Sprint Qualifying"], ["Sprint", "Sprint"],
+                        ["Qualifying", "Qualifying"]
+                    ]
+                    root.calendar = races.map(r => {
+                        const sessions = []
+                        for (const [key, label] of sessionFields) {
+                            const s = r[key]
+                            if (s?.date) sessions.push({ name: label, start: `${s.date}T${s.time ?? "00:00:00Z"}` })
+                        }
+                        sessions.push({ name: "Race", start: `${r.date}T${r.time ?? "00:00:00Z"}` })
+                        sessions.sort((a, b) => Date.parse(a.start) - Date.parse(b.start))
+                        return {
+                            round: r.round, name: r.raceName,
+                            circuit: r.Circuit?.Location?.locality ?? r.Circuit?.circuitName ?? "",
+                            country: r.Circuit?.Location?.country ?? "",
+                            raceDate: `${r.date}T${r.time ?? "00:00:00Z"}`,
+                            sessions: sessions
+                        }
+                    })
+                    root.calendarFetchedAt = Date.now()
+                } catch (e) {
+                    console.warn("[F1] calendar parse error:", e)
+                }
+            }
+        }
+    }
+
+    Process {
+        id: resultsFetcher
+        property string round: ""
+        command: ["bash", "-c", ""]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (text.length === 0) return
+                try {
+                    const race = JSON.parse(text)?.MRData?.RaceTable?.Races?.[0]
+                    const rows = (race?.Results ?? []).map(res => ({
+                        pos: res.position ?? "",
+                        code: res.Driver?.code || (res.Driver?.familyName ?? "").slice(0, 3).toUpperCase(),
+                        team: res.Constructor?.name ?? "",
+                        points: res.points ?? "0",
+                        gap: res.Time?.time ?? (res.status ?? ""),
+                        winner: res.position === "1"
+                    }))
+                    root.resultsByRound = Object.assign({}, root.resultsByRound, { [resultsFetcher.round]: rows })
+                } catch (e) {
+                    console.warn("[F1] results parse error:", e)
                 }
             }
         }

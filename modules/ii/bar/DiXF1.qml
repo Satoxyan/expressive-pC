@@ -20,6 +20,7 @@ ColumnLayout {
         if (!F1.sessionLive) {
             F1.requestWeekend()
             F1.requestStandings()
+            F1.requestCalendar()
         }
     }
     Connections {
@@ -28,9 +29,42 @@ ColumnLayout {
             if (!F1.sessionLive) {
                 F1.requestWeekend()
                 F1.requestStandings()
+                F1.requestCalendar()
             }
         }
     }
+
+    // Browsing other race weekends: -1 follows the next one automatically (today's behaviour); the
+    // chevrons in the pager step through the season either way, past or future.
+    property int viewIndex: -1
+    readonly property var calendar: F1.calendar
+    readonly property int autoIndex: {
+        for (let i = 0; i < xf.calendar.length; i++)
+            if (Date.parse(xf.calendar[i].raceDate) >= xf.localNow) return i
+        return Math.max(0, xf.calendar.length - 1)
+    }
+    readonly property int effectiveIndex: xf.viewIndex >= 0 ? Math.min(xf.viewIndex, xf.calendar.length - 1) : xf.autoIndex
+    readonly property var race: xf.calendar[xf.effectiveIndex] ?? null
+    readonly property bool browsing: xf.viewIndex >= 0 && xf.viewIndex !== xf.autoIndex
+    readonly property bool racePast: xf.race !== null && Date.parse(xf.race.raceDate) < xf.localNow
+    // A local clock for the countdown to whatever race is being browsed, ticking only while open
+    property real localNow: Date.now()
+    Timer {
+        interval: 1000
+        repeat: true
+        running: xf.visible && !F1.sessionLive
+        triggeredOnStart: true
+        onTriggered: xf.localNow = Date.now()
+    }
+
+    function browseBy(delta) {
+        if (xf.calendar.length === 0) return
+        const base = xf.viewIndex >= 0 ? xf.viewIndex : xf.autoIndex
+        xf.viewIndex = Math.max(0, Math.min(xf.calendar.length - 1, base + delta))
+    }
+    function browseToNext() { xf.viewIndex = -1 }
+
+    onRaceChanged: if (xf.racePast && xf.race) F1.requestResults(xf.race.round)
 
     function formatLongCountdown(seconds) {
         if (seconds < 0) return ""
@@ -100,9 +134,12 @@ ColumnLayout {
         opacity: 0.6
     }
 
+    // Only while a session is actually live: off-session the pager below already carries the round,
+    // circuit and race name, so this would just repeat it.
     RowLayout {
         Layout.fillWidth: true
         spacing: 8
+        visible: F1.sessionLive
 
         Rectangle {
             implicitWidth: 34
@@ -489,21 +526,22 @@ ColumnLayout {
         }
     }
 
-    // Off-session: a countdown to the next session, the whole weekend's agenda, and the top of the
-    // drivers' championship. Two columns, only shown between race weekends.
+    // Off-session: page through the season's race weekends — a countdown to whatever is next in the
+    // one being viewed, or its final classification once it is past — plus who leads the championship
+    // right now. The pager (chevrons) browses the whole calendar; it always starts on the next race.
     Item {
         id: offSessionWrap
         Layout.fillWidth: true
         implicitHeight: offSession.implicitHeight
         visible: !F1.sessionLive
 
-        // The upcoming circuit's real layout, faint behind the countdown and agenda — the actual track,
-        // not an abstract shape, the same "load once, cache in Qt's image cache" pattern as album art.
+        // The circuit's real layout, faint behind everything — the actual track, not an abstract shape,
+        // loaded like any other network image (Qt's own cache keeps it from being re-fetched).
         Image {
             id: trackWatermark
             anchors.fill: parent
             anchors.margins: -4
-            source: xf.trackSvgUrl(offSession.next?.circuit ?? "")
+            source: xf.trackSvgUrl(xf.race?.circuit ?? "")
             visible: false
             asynchronous: true
             fillMode: Image.PreserveAspectFit
@@ -518,211 +556,384 @@ ColumnLayout {
             Behavior on opacity { NumberAnimation { duration: IslandMotion.long } }
         }
 
-        RowLayout {
+        ColumnLayout {
             id: offSession
             width: parent.width
-            spacing: 20
+            spacing: 6
 
-            readonly property var next: F1.nextSession
-            readonly property var upcomingWeekend: (F1.weekend ?? []).filter(s => Date.parse(s.end) > Date.now())
-            readonly property string nextStart: offSession.upcomingWeekend.length > 0 ? offSession.upcomingWeekend[0].start : ""
+            // Which weekend is on screen
+            RowLayout {
+                id: pager
+                Layout.fillWidth: true
+                spacing: 2
+                DiCascade { target: pager; index: 0 }
 
-            ColumnLayout {
-                id: countdownCol
-                Layout.fillWidth: false
-                Layout.preferredWidth: 246
-                Layout.maximumWidth: 246
-                Layout.alignment: Qt.AlignTop
-                spacing: 4
+                MaterialSymbol {
+                    text: "chevron_left"
+                    iconSize: 18
+                    color: Appearance.colors.colOnLayer0
+                    opacity: xf.effectiveIndex > 0 ? 0.8 : 0.25
 
-                RowLayout {
-                    id: countdownHeader
-                    Layout.fillWidth: true
-                    spacing: 4
-                    DiCascade { target: countdownHeader; index: 0 }
-
-                    MaterialSymbol {
-                        text: "location_on"
-                        iconSize: 14
-                        fill: 1
-                        color: Appearance.colors.colOnLayer0
-                        opacity: 0.6
+                    MouseArea {
+                        anchors { fill: parent; margins: -5 }
+                        cursorShape: Qt.PointingHandCursor
+                        enabled: xf.effectiveIndex > 0
+                        onClicked: xf.browseBy(-1)
                     }
-                    StyledText {
-                        Layout.fillWidth: true
-                        text: offSession.next?.circuit ?? ""
-                        font.pixelSize: Appearance.font.pixelSize.smaller
-                        font.weight: Font.DemiBold
-                        color: Appearance.colors.colOnLayer0
-                        opacity: 0.75
-                        elide: Text.ElideRight
-                    }
-                }
-
-                StyledText {
-                    id: countdownNum
-                    Layout.fillWidth: true
-                    Layout.topMargin: 4
-                    DiCascade { target: countdownNum; index: 1 }
-                    text: offSession.next ? xf.formatLongCountdown(F1.secondsToNext) : "–"
-                    font.pixelSize: 40
-                    font.weight: Font.DemiBold
-                    font.features: { "tnum": 1 }
-                    color: Appearance.colors.colPrimary
-                    elide: Text.ElideRight
                 }
 
                 ColumnLayout {
-                    id: countdownCaption
                     Layout.fillWidth: true
-                    Layout.topMargin: 2
-                    spacing: 0
-                    DiCascade { target: countdownCaption; index: 2 }
-                    visible: offSession.next !== null
+                    spacing: -2
 
                     StyledText {
                         Layout.fillWidth: true
-                        text: Translation.tr("until %1").arg(offSession.next ? F1.sessionLabel(offSession.next.name) : "")
-                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        horizontalAlignment: Text.AlignHCenter
+                        text: xf.race ? `${Translation.tr("Round %1").arg(xf.race.round)} · ${xf.race.circuit}` : ""
+                        font.pixelSize: Appearance.font.pixelSize.smallest
                         color: Appearance.colors.colOnLayer0
-                        opacity: 0.75
+                        opacity: 0.55
                         elide: Text.ElideRight
                     }
                     StyledText {
                         Layout.fillWidth: true
-                        text: offSession.next ? Qt.locale().toString(new Date(offSession.next.start), "dddd, dd/MM · " + xf.hourFormat) : ""
+                        horizontalAlignment: Text.AlignHCenter
+                        text: xf.race?.name ?? ""
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        font.weight: Font.DemiBold
+                        color: Appearance.colors.colOnLayer0
+                        elide: Text.ElideRight
+                    }
+                }
+
+                MaterialSymbol {
+                    text: "chevron_right"
+                    iconSize: 18
+                    color: Appearance.colors.colOnLayer0
+                    opacity: xf.effectiveIndex < xf.calendar.length - 1 ? 0.8 : 0.25
+
+                    MouseArea {
+                        anchors { fill: parent; margins: -5 }
+                        cursorShape: Qt.PointingHandCursor
+                        enabled: xf.effectiveIndex < xf.calendar.length - 1
+                        onClicked: xf.browseBy(1)
+                    }
+                }
+
+                Item {
+                    implicitWidth: 20
+                    implicitHeight: 20
+                    visible: xf.browsing
+
+                    MaterialSymbol {
+                        anchors.centerIn: parent
+                        text: "restart_alt"
+                        iconSize: 15
+                        color: Appearance.colors.colPrimary
+                    }
+                    MouseArea {
+                        id: resetArea
+                        anchors { fill: parent; margins: -3 }
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: xf.browseToNext()
+                    }
+                    StyledToolTip {
+                        text: Translation.tr("Back to the next race")
+                        extraVisibleCondition: false
+                        alternativeVisibleCondition: resetArea.containsMouse
+                    }
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 2
+                spacing: 20
+
+                ColumnLayout {
+                    id: leftCol
+                    Layout.fillWidth: false
+                    Layout.preferredWidth: 246
+                    Layout.maximumWidth: 246
+                    Layout.alignment: Qt.AlignTop
+                    spacing: 4
+
+                    readonly property var upcomingSessions: xf.race ? xf.race.sessions.filter(s => Date.parse(s.start) > xf.localNow) : []
+                    readonly property var results: xf.race ? (F1.resultsByRound[xf.race.round] ?? null) : null
+
+                    // Upcoming weekend: a big countdown to whichever of its sessions hasn't happened yet
+                    StyledText {
+                        id: countdownNum
+                        Layout.fillWidth: true
+                        visible: !xf.racePast
+                        DiCascade { target: countdownNum; index: 1 }
+                        text: leftCol.upcomingSessions.length > 0
+                            ? xf.formatLongCountdown(Math.round((Date.parse(leftCol.upcomingSessions[0].start) - xf.localNow) / 1000))
+                            : "–"
+                        font.pixelSize: 40
+                        font.weight: Font.DemiBold
+                        font.features: { "tnum": 1 }
+                        color: Appearance.colors.colPrimary
+                        elide: Text.ElideRight
+                    }
+
+                    ColumnLayout {
+                        id: countdownCaption
+                        Layout.fillWidth: true
+                        Layout.topMargin: 2
+                        spacing: 0
+                        visible: !xf.racePast && leftCol.upcomingSessions.length > 0
+                        DiCascade { target: countdownCaption; index: 2 }
+
+                        StyledText {
+                            Layout.fillWidth: true
+                            text: leftCol.upcomingSessions.length > 0
+                                ? Translation.tr("until %1").arg(xf.weekendShortLabel(leftCol.upcomingSessions[0].name)) : ""
+                            font.pixelSize: Appearance.font.pixelSize.smaller
+                            color: Appearance.colors.colOnLayer0
+                            opacity: 0.75
+                            elide: Text.ElideRight
+                        }
+                        StyledText {
+                            Layout.fillWidth: true
+                            text: leftCol.upcomingSessions.length > 0
+                                ? Qt.locale().toString(new Date(leftCol.upcomingSessions[0].start), "dddd, dd/MM · " + xf.hourFormat) : ""
+                            font.pixelSize: Appearance.font.pixelSize.smallest
+                            font.features: { "tnum": 1 }
+                            color: Appearance.colors.colOnLayer0
+                            opacity: 0.6
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    // Past weekend: who won, in the same rhythm as the countdown above
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.topMargin: 4
+                        spacing: -2
+                        visible: xf.racePast
+                        DiCascade { target: parent; index: 1 }
+
+                        StyledText {
+                            text: Translation.tr("Winner")
+                            font.pixelSize: Appearance.font.pixelSize.smallest
+                            color: Appearance.colors.colOnLayer0
+                            opacity: 0.5
+                        }
+                        StyledText {
+                            Layout.fillWidth: true
+                            text: leftCol.results === null ? Translation.tr("Loading…")
+                                : leftCol.results.length > 0 ? leftCol.results[0].code : "–"
+                            font.pixelSize: 34
+                            font.weight: Font.DemiBold
+                            color: Appearance.colors.colPrimary
+                            elide: Text.ElideRight
+                        }
+                        StyledText {
+                            Layout.fillWidth: true
+                            Layout.topMargin: 2
+                            visible: (leftCol.results?.length ?? 0) > 0
+                            text: leftCol.results && leftCol.results.length > 0
+                                ? `${leftCol.results[0].team} · ${Qt.locale().toString(new Date(xf.race?.raceDate ?? Date.now()), "dd/MM/yyyy")}` : ""
+                            font.pixelSize: Appearance.font.pixelSize.smallest
+                            color: Appearance.colors.colOnLayer0
+                            opacity: 0.6
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    Item { Layout.fillHeight: true }
+
+                    SectionLabel {
+                        id: standingsLabel
+                        text: Translation.tr("Championship")
+                        visible: F1.standings.length > 0
+                        DiCascade { target: standingsLabel; index: 3 }
+                    }
+
+                    // Who's leading, and by how much — the season standings summarised in one line
+                    StyledText {
+                        id: leaderLine
+                        Layout.fillWidth: true
+                        visible: F1.standings.length > 0
+                        DiCascade { target: leaderLine; index: 4 }
+                        text: F1.standings.length > 1
+                            ? Translation.tr("%1 leads by %2 pts").arg(F1.standings[0].code).arg(Math.max(0, F1.standings[0].points - F1.standings[1].points))
+                            : (F1.standings.length > 0 ? Translation.tr("%1 leads").arg(F1.standings[0].code) : "")
                         font.pixelSize: Appearance.font.pixelSize.smallest
                         font.features: { "tnum": 1 }
                         color: Appearance.colors.colOnLayer0
-                        opacity: 0.6
+                        opacity: 0.7
                         elide: Text.ElideRight
                     }
-                }
 
-                StyledText {
-                    Layout.fillWidth: true
-                    Layout.topMargin: 2
-                    visible: offSession.next === null
-                    text: Translation.tr("No upcoming session")
-                    font.pixelSize: Appearance.font.pixelSize.smaller
-                    color: Appearance.colors.colOnLayer0
-                    opacity: 0.55
-                }
+                    RowLayout {
+                        id: standingsRow
+                        Layout.fillWidth: true
+                        Layout.topMargin: 2
+                        spacing: 4
+                        visible: F1.standings.length > 0
+                        DiCascade { target: standingsRow; index: 5 }
 
+                        Repeater {
+                            model: F1.standings
 
-                Item { Layout.fillHeight: true }
+                            delegate: Rectangle {
+                                id: chip
+                                required property var modelData
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 1
+                                implicitHeight: 34
+                                radius: 10
+                                color: chip.modelData.code === (leftCol.results?.[0]?.code ?? "") && xf.racePast
+                                    ? ColorUtils.transparentize(Appearance.colors.colPrimary, 0.8) : Appearance.colors.colLayer1
 
-                SectionLabel {
-                    id: standingsLabel
-                    text: Translation.tr("Championship")
-                    visible: F1.standings.length > 0
-                    DiCascade { target: standingsLabel; index: 3 }
-                }
-
-                RowLayout {
-                    id: standingsRow
-                    Layout.fillWidth: true
-                    Layout.topMargin: 2
-                    spacing: 4
-                    visible: F1.standings.length > 0
-                    DiCascade { target: standingsRow; index: 4 }
-
-                    Repeater {
-                        model: F1.standings
-
-                        delegate: Rectangle {
-                            id: chip
-                            required property var modelData
-                            Layout.fillWidth: true
-                            Layout.preferredWidth: 1
-                            implicitHeight: 34
-                            radius: 10
-                            color: Appearance.colors.colLayer1
-
-                            ColumnLayout {
-                                anchors.centerIn: parent
-                                spacing: -1
-                                StyledText {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    text: chip.modelData.code
-                                    font.pixelSize: Appearance.font.pixelSize.smallest
-                                    font.weight: Font.DemiBold
-                                    color: Appearance.colors.colOnLayer1
-                                }
-                                StyledText {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    text: chip.modelData.points
-                                    font.pixelSize: 9
-                                    font.features: { "tnum": 1 }
-                                    color: Appearance.colors.colOnLayer1
-                                    opacity: 0.6
+                                ColumnLayout {
+                                    anchors.centerIn: parent
+                                    spacing: -1
+                                    StyledText {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        text: chip.modelData.code
+                                        font.pixelSize: Appearance.font.pixelSize.smallest
+                                        font.weight: Font.DemiBold
+                                        color: Appearance.colors.colOnLayer1
+                                    }
+                                    StyledText {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        text: chip.modelData.points
+                                        font.pixelSize: 9
+                                        font.features: { "tnum": 1 }
+                                        color: Appearance.colors.colOnLayer1
+                                        opacity: 0.6
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            ColumnLayout {
-                id: agendaCol
-                Layout.fillWidth: true
-                Layout.alignment: Qt.AlignTop
-                spacing: 4
+                // Right: the weekend's whole agenda (past sessions dimmed, the next one lit up), or —
+                // once the race itself is done — the classification down the order.
+                ColumnLayout {
+                    id: agendaCol
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignTop
+                    spacing: 4
 
-                SectionLabel {
-                    id: agendaLabel
-                    text: Translation.tr("Weekend")
-                    DiCascade { target: agendaLabel; index: 0 }
-                }
+                    SectionLabel {
+                        id: agendaLabel
+                        text: xf.racePast ? Translation.tr("Classification") : Translation.tr("Weekend")
+                        DiCascade { target: agendaLabel; index: 0 }
+                    }
 
-                StyledText {
-                    visible: offSession.upcomingWeekend.length === 0
-                    text: Translation.tr("Loading schedule…")
-                    font.pixelSize: Appearance.font.pixelSize.smallest
-                    color: Appearance.colors.colOnLayer0
-                    opacity: 0.5
-                }
+                    StyledText {
+                        visible: xf.race === null
+                        text: Translation.tr("Loading schedule…")
+                        font.pixelSize: Appearance.font.pixelSize.smallest
+                        color: Appearance.colors.colOnLayer0
+                        opacity: 0.5
+                    }
 
-                Repeater {
-                    model: offSession.upcomingWeekend
+                    Repeater {
+                        model: xf.racePast ? [] : (xf.race?.sessions ?? [])
 
-                    delegate: Rectangle {
-                        id: agendaRow
-                        required property var modelData
-                        required property int index
-                        Layout.fillWidth: true
-                        implicitHeight: 24
-                        radius: 8
-                        readonly property bool isNext: agendaRow.index === 0
-                        color: agendaRow.isNext ? ColorUtils.transparentize(Appearance.colors.colPrimary, 0.85) : "transparent"
-                        DiCascade { target: agendaRow; index: agendaRow.index + 1; step: 24 }
+                        delegate: Rectangle {
+                            id: agendaRow
+                            required property var modelData
+                            required property int index
+                            Layout.fillWidth: true
+                            implicitHeight: 24
+                            radius: 8
+                            readonly property bool isNext: agendaRow.modelData === leftCol.upcomingSessions[0]
+                            readonly property bool isPast: Date.parse(agendaRow.modelData.start) < xf.localNow
+                            color: agendaRow.isNext ? ColorUtils.transparentize(Appearance.colors.colPrimary, 0.85) : "transparent"
+                            DiCascade { target: agendaRow; index: agendaRow.index + 1; step: 24 }
 
-                        RowLayout {
-                            anchors {
-                                fill: parent
-                                leftMargin: 8
-                                rightMargin: 8
+                            RowLayout {
+                                anchors { fill: parent; leftMargin: 8; rightMargin: 8 }
+                                spacing: 6
+
+                                StyledText {
+                                    Layout.preferredWidth: 42
+                                    text: xf.weekendShortLabel(agendaRow.modelData.name)
+                                    font.pixelSize: Appearance.font.pixelSize.smallest
+                                    font.weight: agendaRow.isNext ? Font.DemiBold : Font.Medium
+                                    color: agendaRow.isNext ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer0
+                                    opacity: agendaRow.isNext ? 1 : (agendaRow.isPast ? 0.35 : 0.75)
+                                    elide: Text.ElideRight
+                                }
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    horizontalAlignment: Text.AlignRight
+                                    text: Qt.locale().toString(new Date(agendaRow.modelData.start), "ddd · " + xf.hourFormat)
+                                    font.pixelSize: Appearance.font.pixelSize.smallest
+                                    font.features: { "tnum": 1 }
+                                    color: agendaRow.isNext ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer0
+                                    opacity: agendaRow.isNext ? 1 : (agendaRow.isPast ? 0.35 : 0.6)
+                                    elide: Text.ElideRight
+                                }
                             }
-                            spacing: 6
+                        }
+                    }
 
-                            StyledText {
-                                Layout.preferredWidth: 42
-                                text: xf.weekendShortLabel(agendaRow.modelData.name)
-                                font.pixelSize: Appearance.font.pixelSize.smallest
-                                font.weight: agendaRow.isNext ? Font.DemiBold : Font.Medium
-                                color: agendaRow.isNext ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer0
-                                opacity: agendaRow.isNext ? 1 : 0.75
-                                elide: Text.ElideRight
-                            }
-                            StyledText {
-                                Layout.fillWidth: true
-                                horizontalAlignment: Text.AlignRight
-                                text: Qt.locale().toString(new Date(agendaRow.modelData.start), "ddd · " + xf.hourFormat)
-                                font.pixelSize: Appearance.font.pixelSize.smallest
-                                font.features: { "tnum": 1 }
-                                color: agendaRow.isNext ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer0
-                                opacity: agendaRow.isNext ? 1 : 0.6
-                                elide: Text.ElideRight
+                    StyledText {
+                        visible: xf.racePast && leftCol.results === null
+                        text: Translation.tr("Loading results…")
+                        font.pixelSize: Appearance.font.pixelSize.smallest
+                        color: Appearance.colors.colOnLayer0
+                        opacity: 0.5
+                    }
+
+                    Repeater {
+                        model: xf.racePast ? (leftCol.results ?? []).slice(0, 8) : []
+
+                        delegate: Rectangle {
+                            id: resultRow
+                            required property var modelData
+                            required property int index
+                            Layout.fillWidth: true
+                            implicitHeight: 24
+                            radius: 8
+                            color: resultRow.modelData.winner ? ColorUtils.transparentize(Appearance.colors.colPrimary, 0.85) : "transparent"
+                            DiCascade { target: resultRow; index: resultRow.index + 1; step: 24 }
+
+                            RowLayout {
+                                anchors { fill: parent; leftMargin: 8; rightMargin: 8 }
+                                spacing: 6
+
+                                StyledText {
+                                    Layout.preferredWidth: 20
+                                    text: `P${resultRow.modelData.pos}`
+                                    font.pixelSize: Appearance.font.pixelSize.smallest
+                                    font.weight: resultRow.modelData.winner ? Font.DemiBold : Font.Medium
+                                    font.features: { "tnum": 1 }
+                                    color: resultRow.modelData.winner ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer0
+                                    opacity: resultRow.modelData.winner ? 1 : 0.6
+                                }
+                                StyledText {
+                                    Layout.preferredWidth: 36
+                                    text: resultRow.modelData.code
+                                    font.pixelSize: Appearance.font.pixelSize.smallest
+                                    font.weight: Font.DemiBold
+                                    color: resultRow.modelData.winner ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer0
+                                }
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    text: resultRow.modelData.team
+                                    font.pixelSize: Appearance.font.pixelSize.smallest
+                                    color: Appearance.colors.colOnLayer0
+                                    opacity: 0.6
+                                    elide: Text.ElideRight
+                                }
+                                StyledText {
+                                    horizontalAlignment: Text.AlignRight
+                                    text: `${resultRow.modelData.points} ${Translation.tr("pts")}`
+                                    font.pixelSize: Appearance.font.pixelSize.smallest
+                                    font.features: { "tnum": 1 }
+                                    color: Appearance.colors.colOnLayer0
+                                    opacity: 0.6
+                                }
                             }
                         }
                     }
