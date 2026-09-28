@@ -14,8 +14,8 @@ import qs.modules.common.functions
 // While the pointer rests on it the island leans in a touch; when the pointer leaves it eases back and a thin fuse
 // shows how long until it closes by itself. Clicking anywhere else closes it right away.
 //
-// Size and motion: the height comes in a few fixed steps rather than following each view (so moving between
-// islands mostly keeps the same height), the width adapts between clear bounds, and every change of shape runs
+// Size and motion: every view opens at one standard height rather than following its content (so moving between
+// islands keeps the same height), the width adapts between clear bounds, and every change of shape runs
 // on a spring (DiSpring) that keeps its velocity when the target moves mid-flight. Input is separate from the
 // visuals: the window's input region is a hitbox that only shrinks once a gesture is over, so an island that
 // gets smaller while you scroll never slides out from under the pointer.
@@ -221,10 +221,9 @@ Scope {
 
                     readonly property real bottomReserve: 18 + (scope.di.splitArmed ? splitPicker.implicitHeight + 10 : 0)
 
-                    // Height in three steps: compact (a single fact: weather, privacy, a device), standard (almost every
-                    // view, the tall ones laid out in two columns to fit it) and large (only what truly needs the room:
-                    // the clipboard with its history). A view sits centred in its step; taller still scrolls inside it.
-                    readonly property var heightSteps: [152, 280, 384]
+                    // One standard height for every view: the tall ones are laid out in two columns to fit it, and a
+                    // view sits centred in it; anything taller still scrolls inside. Kept as a list so a step can return.
+                    readonly property var heightSteps: [280]
                     readonly property real tallest: Math.min(island.maxH, island.heightSteps[island.heightSteps.length - 1])
                     function stepFor(need) {
                         for (const step of island.heightSteps)
