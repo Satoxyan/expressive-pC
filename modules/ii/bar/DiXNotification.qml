@@ -8,10 +8,10 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// The full view of a notification. For chats it reads like a chat: the photo and the name, the message in a
-// bubble that wraps instead of stretching the overlay across the screen, the earlier messages of the same
-// conversation above it for context, one-tap replies and a reply field. The bubbles rise in one after
-// another when it opens; the quick replies pop in behind them.
+// The full view of a notification, sized to the standard height. For chats it reads like a chat: the photo and
+// the name, the message before this one for context and this one in a bubble, one-tap replies in a single row
+// that scrolls sideways, and the reply field sharing a row with the app's own actions. The bubbles rise in one
+// after another when it opens; the quick replies pop in behind them.
 ColumnLayout {
     id: xn
     readonly property real wantedWidth: 420
@@ -28,7 +28,7 @@ ColumnLayout {
     Binding {
         target: xn.di
         property: "replyReady"
-        value: replyRow.visible
+        value: xn.canReply
         restoreMode: Binding.RestoreValue
     }
     Binding {
@@ -39,7 +39,7 @@ ColumnLayout {
     }
 
     function focusReplyIfRequested() {
-        if (!xn.di.replyRequested || !replyRow.visible) return
+        if (!xn.di.replyRequested || !xn.canReply) return
         xn.di.replyRequested = false
         xn.di.wantsKeyboard = true
         Qt.callLater(() => replyField.forceActiveFocus())
@@ -53,9 +53,10 @@ ColumnLayout {
     readonly property int index: xn.lockedIndex >= 0 ? xn.lockedIndex : Math.max(0, xn.popups.length - 1)
     readonly property var notif: xn.popups[xn.index]
     property bool muteChoosing: false
-    onNotifChanged: xn.muteChoosing = false
-        ?? Notifications.list.find(n => n.notificationId === xn.lockedId)
-        ?? xn.di.shownNotification ?? xn.di.latestNotification
+    onNotifChanged: {
+        xn.muteChoosing = false
+        xn.replyHint = ""
+    }
     function lockOn(index) {
         const target = xn.popups[Math.max(0, Math.min(xn.popups.length - 1, index))]
         if (target) xn.lockedId = target.notificationId
@@ -77,6 +78,9 @@ ColumnLayout {
     readonly property bool bigImage: imageProbe.status === Image.Ready
         && (Math.max(imageProbe.implicitWidth, imageProbe.implicitHeight) >= 200 || xn.imageAspect < 0.8 || xn.imageAspect > 1.25)
 
+    readonly property bool canReply: (xn.notif?.hasInlineReply ?? false) || xn.messaging
+    readonly property var appActions: (xn.notif?.actions ?? []).filter(a => a.identifier !== "default")
+    readonly property real mediaMaxHeight: xn.canReply ? 84 : 130
     readonly property bool messaging: /whats|zap|telegram|discord|vesktop|signal|slack|teams|instagram|messenger/i.test(xn.parts.app)
     property string replyHint: ""
 
@@ -88,7 +92,7 @@ ColumnLayout {
             .filter(n => n.notificationId !== xn.notif.notificationId && IslandEvents.conversationKey(n) === key
                 && (n.time ?? 0) >= since && (n.time ?? 0) <= (xn.notif.time ?? Date.now()))
             .sort((a, b) => (a.time ?? 0) - (b.time ?? 0))
-            .slice(-30)
+            .slice(-1)
     }
 
     function escaped(text) {
@@ -146,19 +150,25 @@ ColumnLayout {
             sourceSize.width: 30
             sourceSize.height: 30
         }
+        // In a chat the sender leads and the app steps back beside the time, which frees a line for the thread
         StyledText {
-            text: xn.parts.app || Translation.tr("Notification")
-            font.pixelSize: Appearance.font.pixelSize.smaller
+            Layout.maximumWidth: 190
+            text: xn.messaging ? xn.parts.title : (xn.parts.app || Translation.tr("Notification"))
+            font.pixelSize: xn.messaging ? Appearance.font.pixelSize.normal : Appearance.font.pixelSize.smaller
             font.weight: Font.DemiBold
-            color: xn.accent
+            color: xn.messaging ? (xn.critical ? Appearance.colors.colError : Appearance.colors.colOnLayer0) : xn.accent
+            elide: Text.ElideRight
         }
         StyledText {
-            text: xn.notif ? "· " + Qt.formatTime(new Date(xn.notif.time), "hh:mm") : ""
+            Layout.fillWidth: true
+            text: !xn.notif ? ""
+                : xn.messaging ? `· ${xn.parts.app} · ${Qt.formatTime(new Date(xn.notif.time), "hh:mm")}`
+                : "· " + Qt.formatTime(new Date(xn.notif.time), "hh:mm")
             font.pixelSize: Appearance.font.pixelSize.smallest
             color: Appearance.colors.colOnLayer0
             opacity: 0.55
+            elide: Text.ElideRight
         }
-        Item { Layout.fillWidth: true }
 
         RowLayout {
             visible: xn.popups.length > 1
@@ -324,6 +334,7 @@ ColumnLayout {
             StyledText {
                 Layout.fillWidth: true
                 Layout.preferredWidth: 1
+                visible: !xn.messaging
                 text: xn.parts.title
                 font.pixelSize: Appearance.font.pixelSize.normal
                 font.weight: Font.DemiBold
@@ -338,7 +349,8 @@ ColumnLayout {
                 id: thread
                 Layout.fillWidth: true
                 Layout.preferredWidth: 1
-                Layout.preferredHeight: Math.min(threadColumn.implicitHeight, 250)
+                // What is left of the standard height once the replies and actions below have their rows
+                Layout.preferredHeight: Math.min(threadColumn.implicitHeight, xn.canReply ? 130 : (xn.appActions.length > 0 ? 146 : 176))
                 contentWidth: width
                 contentHeight: threadColumn.implicitHeight
                 clip: true
@@ -381,7 +393,7 @@ ColumnLayout {
                                 font.pixelSize: Appearance.font.pixelSize.smaller
                                 color: Appearance.colors.colOnLayer1
                                 wrapMode: Text.Wrap
-                                maximumLineCount: 2
+                                maximumLineCount: 1
                                 elide: Text.ElideRight
                             }
                         }
@@ -439,13 +451,15 @@ ColumnLayout {
                                     font.pixelSize: Appearance.font.pixelSize.small
                                     color: Appearance.colors.colOnLayer0
                                     wrapMode: Text.Wrap
-                                    maximumLineCount: 8
+                                    // Chats show the last two messages whole: the one before gets a line, this one the rest
+                                    maximumLineCount: xn.messaging ? (xn.earlier.length > 0 ? 3 : 5) : 100
                                     elide: Text.ElideRight
                                     lineHeight: 1.1
                                 }
                             }
                             StyledText {
                                 Layout.alignment: Qt.AlignRight
+                                visible: !xn.messaging
                                 text: xn.notif ? Qt.formatTime(new Date(xn.notif.time), "hh:mm") : ""
                                 font.pixelSize: Appearance.font.pixelSize.smallest
                                 font.features: { "tnum": 1 }
@@ -482,7 +496,7 @@ ColumnLayout {
         visible: xn.bigImage || xn.animatedImage
         Layout.alignment: Qt.AlignHCenter
         Layout.preferredWidth: Math.min(360, bigImageItem.paintedWidth || 200)
-        Layout.preferredHeight: Math.min(220, bigImageItem.paintedHeight || 200)
+        Layout.preferredHeight: Math.min(xn.mediaMaxHeight, bigImageItem.paintedHeight || xn.mediaMaxHeight)
         radius: 14
         color: "transparent"
         layer.enabled: true
@@ -497,7 +511,7 @@ ColumnLayout {
         AnimatedImage {
             id: bigImageItem
             width: 360
-            height: 220
+            height: xn.mediaMaxHeight
             anchors.centerIn: parent
             source: mediaFrame.visible ? xn.imageSource : ""
             fillMode: Image.PreserveAspectFit
@@ -513,32 +527,149 @@ ColumnLayout {
         }
     }
 
-    Flow {
+    // Quick replies in one row; past the width it scrolls sideways (the wheel scrolls it too)
+    Flickable {
+        id: quickRow
         Layout.fillWidth: true
-        visible: (xn.notif?.actions ?? []).some(a => a.identifier !== "default")
-        spacing: 6
+        Layout.preferredHeight: 28
+        visible: xn.canReply
+        contentWidth: quickContent.implicitWidth
+        contentHeight: height
+        flickableDirection: Flickable.HorizontalFlick
+        boundsBehavior: Flickable.StopAtBounds
+        interactive: contentWidth > width
+        clip: true
 
-        Repeater {
-            model: (xn.notif?.actions ?? []).filter(a => a.identifier !== "default")
-            delegate: Rectangle {
-                id: actionButton
-                required property var modelData
-                width: actionText.implicitWidth + 24
-                height: 30
-                radius: 15
-                color: actionMouse.containsMouse ? ColorUtils.transparentize(xn.accent, 0.65) : ColorUtils.transparentize(xn.accent, 0.82)
+        Row {
+            id: quickContent
+            spacing: 6
+
+            Rectangle {
+                id: geminiChip
+                width: geminiRow.implicitWidth + 20
+                height: 28
+                radius: 14
+                color: geminiArea.containsMouse ? ColorUtils.transparentize("#4796E3", 0.7) : Appearance.colors.colLayer1
+                scale: Math.max(0.01, xn.rise(xn.earlier.length + 2)) * (geminiArea.pressed ? 0.92 : 1)
 
                 Behavior on color {
                     ColorAnimation { duration: IslandMotion.micro }
                 }
 
+                RowLayout {
+                    id: geminiRow
+                    anchors.centerIn: parent
+                    spacing: 5
+                    DiClaudeIcon {
+                        agent: "gemini"
+                        size: 13
+                        color: "#4796E3"
+                    }
+                    StyledText {
+                        text: Translation.tr("Ask Gemini")
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        color: Appearance.colors.colOnLayer1
+                    }
+                }
+                MouseArea {
+                    id: geminiArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        IslandEvents.askGemini([...xn.earlier, xn.notif])
+                        xn.di.collapse()
+                    }
+                }
+            }
+
+            Repeater {
+                model: ["👍", "❤️", "😂", Translation.tr("Already looking"), Translation.tr("Ok!")]
+                delegate: Rectangle {
+                    id: quick
+                    required property string modelData
+                    required property int index
+                    width: quickText.implicitWidth + 22
+                    height: 28
+                    radius: 14
+                    color: quickArea.containsMouse ? ColorUtils.transparentize(xn.accent, 0.7) : Appearance.colors.colLayer1
+                    scale: Math.max(0.01, xn.rise(xn.earlier.length + 2 + quick.index * 0.35)) * (quickArea.pressed ? 0.92 : 1)
+
+                    Behavior on color {
+                        ColorAnimation { duration: IslandMotion.micro }
+                    }
+
+                    StyledText {
+                        id: quickText
+                        anchors.centerIn: parent
+                        text: quick.modelData
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        color: Appearance.colors.colOnLayer1
+                    }
+                    MouseArea {
+                        id: quickArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: xn.sendText(quick.modelData)
+                    }
+                }
+            }
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            z: 10
+            acceptedButtons: Qt.NoButton
+            enabled: quickRow.interactive
+            onWheel: wheel => {
+                const delta = wheel.angleDelta.x !== 0 ? wheel.angleDelta.x : wheel.angleDelta.y
+                quickRow.contentX = Math.max(0, Math.min(quickRow.contentWidth - quickRow.width, quickRow.contentX - delta / 120 * 60))
+                wheel.accepted = true
+            }
+        }
+    }
+
+    // The app's own actions and the reply field, side by side
+    RowLayout {
+        id: actionRow
+        Layout.fillWidth: true
+        visible: xn.appActions.length > 0 || xn.canReply
+        spacing: 6
+
+        Repeater {
+            model: xn.appActions
+            delegate: Rectangle {
+                id: actionButton
+                required property var modelData
+                Layout.preferredWidth: Math.min(actionText.implicitWidth + 24, xn.canReply ? 120 : 200)
+                Layout.preferredHeight: 34
+                radius: 17
+                color: actionMouse.containsMouse ? ColorUtils.transparentize(xn.accent, 0.65) : ColorUtils.transparentize(xn.accent, 0.82)
+                scale: actionMouse.pressed ? 0.95 : 1
+
+                Behavior on color {
+                    ColorAnimation { duration: IslandMotion.micro }
+                }
+                Behavior on scale {
+                    NumberAnimation { duration: IslandMotion.micro; easing.type: Easing.OutBack }
+                }
+
                 StyledText {
                     id: actionText
-                    anchors.centerIn: parent
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                        verticalCenter: parent.verticalCenter
+                        leftMargin: 12
+                        rightMargin: 12
+                    }
+                    horizontalAlignment: Text.AlignHCenter
                     text: actionButton.modelData.text || actionButton.modelData.identifier
                     font.pixelSize: Appearance.font.pixelSize.smaller
                     font.weight: Font.DemiBold
                     color: Appearance.colors.colOnLayer0
+                    elide: Text.ElideRight
                 }
 
                 MouseArea {
@@ -550,166 +681,86 @@ ColumnLayout {
                 }
             }
         }
-    }
 
-    Flow {
-        Layout.fillWidth: true
-        visible: replyRow.visible
-        spacing: 6
-
-        Rectangle {
-            id: geminiChip
-            implicitWidth: geminiRow.implicitWidth + 20
-            implicitHeight: 28
-            radius: 14
-            color: geminiArea.containsMouse ? ColorUtils.transparentize("#4796E3", 0.7) : Appearance.colors.colLayer1
-            scale: Math.max(0.01, xn.rise(xn.earlier.length + 2)) * (geminiArea.pressed ? 0.92 : 1)
-
-            Behavior on color {
-                ColorAnimation { duration: IslandMotion.micro }
-            }
-
-            RowLayout {
-                id: geminiRow
-                anchors.centerIn: parent
-                spacing: 5
-                DiClaudeIcon {
-                    agent: "gemini"
-                    size: 13
-                    color: "#4796E3"
-                }
-                StyledText {
-                    text: Translation.tr("Ask Gemini")
-                    font.pixelSize: Appearance.font.pixelSize.smaller
-                    color: Appearance.colors.colOnLayer1
-                }
-            }
-            MouseArea {
-                id: geminiArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    IslandEvents.askGemini([...xn.earlier, xn.notif])
-                    xn.di.collapse()
-                }
-            }
-        }
-
-        Repeater {
-            model: ["👍", "❤️", "😂", Translation.tr("Already looking"), Translation.tr("Ok!")]
-            delegate: Rectangle {
-                id: quick
-                required property string modelData
-                required property int index
-                implicitWidth: quickText.implicitWidth + 22
-                implicitHeight: 28
-                radius: 14
-                color: quickArea.containsMouse ? ColorUtils.transparentize(xn.accent, 0.7) : Appearance.colors.colLayer1
-                scale: Math.max(0.01, xn.rise(xn.earlier.length + 2 + quick.index * 0.35)) * (quickArea.pressed ? 0.92 : 1)
-
-                Behavior on color {
-                    ColorAnimation { duration: IslandMotion.micro }
-                }
-
-                StyledText {
-                    id: quickText
-                    anchors.centerIn: parent
-                    text: quick.modelData
-                    font.pixelSize: Appearance.font.pixelSize.smaller
-                    color: Appearance.colors.colOnLayer1
-                }
-                MouseArea {
-                    id: quickArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: xn.sendText(quick.modelData)
-                }
-            }
-        }
-    }
-
-    StyledText {
-        Layout.fillWidth: true
-        Layout.preferredWidth: 1
-        visible: xn.replyHint !== ""
-        text: xn.replyHint
-        font.pixelSize: Appearance.font.pixelSize.smallest
-        color: Appearance.m3colors.m3success
-        wrapMode: Text.Wrap
-    }
-
-    RowLayout {
-        id: replyRow
-        Layout.fillWidth: true
-        visible: (xn.notif?.hasInlineReply ?? false) || xn.messaging
-        spacing: 6
-
-        TextField {
-            id: replyField
+        Item {
             Layout.fillWidth: true
-            Layout.preferredHeight: 36
-            placeholderText: xn.notif?.inlineReplyPlaceholder || Translation.tr("Reply…")
-            color: Appearance.colors.colOnLayer0
-            placeholderTextColor: ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.5)
-            font.pixelSize: Appearance.font.pixelSize.small
-            leftPadding: 14
-            background: Rectangle {
-                radius: 18
-                color: Appearance.colors.colLayer2
-                border.width: replyField.activeFocus ? 1.5 : 0
-                border.color: xn.accent
-            }
-            onAccepted: {
-                xn.sendText(replyField.text)
-                replyField.text = ""
-            }
-            Keys.onEscapePressed: {
-                xn.di.wantsKeyboard = false
-                replyField.focus = false
-            }
-
-            MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.IBeamCursor
-                onPressed: mouse => {
-                    xn.di.wantsKeyboard = true
-                    Qt.callLater(() => replyField.forceActiveFocus())
-                    mouse.accepted = false
-                }
-            }
+            visible: !xn.canReply
         }
 
-        Rectangle {
-            Layout.preferredWidth: 36
-            Layout.preferredHeight: 36
-            radius: 18
-            color: xn.accent
-            scale: replyField.text !== "" ? 1.06 : 0.92
-            opacity: replyField.text !== "" ? 1 : 0.6
+        RowLayout {
+            id: replyRow
+            Layout.fillWidth: true
+            visible: xn.canReply
+            spacing: 6
 
-            Behavior on scale {
-                NumberAnimation { duration: IslandMotion.short; easing.type: Easing.OutBack; easing.overshoot: 2.2 }
-            }
-            Behavior on opacity {
-                NumberAnimation { duration: IslandMotion.micro }
-            }
-
-            MaterialSymbol {
-                anchors.centerIn: parent
-                text: "send"
-                iconSize: 17
-                fill: 1
-                color: ColorUtils.isDark(xn.accent) ? "white" : "black"
-            }
-
-            MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
+            TextField {
+                id: replyField
+                Layout.fillWidth: true
+                Layout.minimumWidth: 120
+                Layout.preferredHeight: 34
+                // After sending, the confirmation takes the placeholder's place instead of a line of its own
+                placeholderText: xn.replyHint || xn.notif?.inlineReplyPlaceholder || Translation.tr("Reply…")
+                color: Appearance.colors.colOnLayer0
+                placeholderTextColor: xn.replyHint !== "" ? Appearance.m3colors.m3success : ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.5)
+                font.pixelSize: Appearance.font.pixelSize.small
+                leftPadding: 14
+                background: Rectangle {
+                    radius: 17
+                    color: Appearance.colors.colLayer2
+                    border.width: replyField.activeFocus ? 1.5 : 0
+                    border.color: xn.accent
+                }
+                onTextChanged: if (replyField.text !== "") xn.replyHint = ""
+                onAccepted: {
                     xn.sendText(replyField.text)
                     replyField.text = ""
+                }
+                Keys.onEscapePressed: {
+                    xn.di.wantsKeyboard = false
+                    replyField.focus = false
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.IBeamCursor
+                    onPressed: mouse => {
+                        xn.di.wantsKeyboard = true
+                        Qt.callLater(() => replyField.forceActiveFocus())
+                        mouse.accepted = false
+                    }
+                }
+            }
+
+            Rectangle {
+                Layout.preferredWidth: 34
+                Layout.preferredHeight: 34
+                radius: 17
+                color: xn.accent
+                scale: replyField.text !== "" ? 1.06 : 0.92
+                opacity: replyField.text !== "" ? 1 : 0.6
+
+                Behavior on scale {
+                    NumberAnimation { duration: IslandMotion.short; easing.type: Easing.OutBack; easing.overshoot: 2.2 }
+                }
+                Behavior on opacity {
+                    NumberAnimation { duration: IslandMotion.micro }
+                }
+
+                MaterialSymbol {
+                    anchors.centerIn: parent
+                    text: "send"
+                    iconSize: 17
+                    fill: 1
+                    color: ColorUtils.isDark(xn.accent) ? "white" : "black"
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        xn.sendText(replyField.text)
+                        replyField.text = ""
+                    }
                 }
             }
         }
