@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
+import qs.modules.common.functions
 
 // Weather in two columns: now and the sun's path through the day on the left; the next 24 h as a temperature
 // curve and the conditions that matter (UV, humidity, wind, pressure) on the right. Everything cascades in.
@@ -65,11 +66,36 @@ RowLayout {
         property string icon: ""
         property string value: ""
         property string label: ""
+        // 0..1 fills the chip's background from the left as it comes in; -1 = no fill
+        property real meter: -1
         Layout.fillWidth: true
         Layout.preferredWidth: 1
         implicitHeight: 40
         radius: 12
         color: Appearance.colors.colLayer1
+        clip: true
+
+        DiSpring {
+            id: meterFill
+            stiffness: 70
+            dampingRatio: 0.9
+            epsilon: 0.002
+        }
+        Timer {
+            interval: 420
+            running: chip.meter >= 0
+            onTriggered: meterFill.target = 1
+        }
+        Rectangle {
+            visible: chip.meter >= 0
+            anchors {
+                left: parent.left
+                top: parent.top
+                bottom: parent.bottom
+            }
+            width: chip.width * Math.max(0, Math.min(1, chip.meter)) * meterFill.value
+            color: ColorUtils.transparentize(Appearance.colors.colPrimary, 0.86)
+        }
 
         RowLayout {
             anchors {
@@ -189,7 +215,8 @@ RowLayout {
 
         Item { Layout.fillHeight: true }
 
-        // The sun's path from sunrise to sunset, with where it is now
+        // The sun's path from sunrise to sunset (the moon's from sunset to sunrise at night), traced up to now
+        // when the view opens, with the sun or the moon riding the tip
         Item {
             id: sunArc
             Layout.fillWidth: true
@@ -198,92 +225,149 @@ RowLayout {
 
             readonly property real rise: Weather.data?.sunriseTs ?? 0
             readonly property real set: Weather.data?.sunsetTs ?? 0
+            readonly property bool known: sunArc.rise > 0 && sunArc.set > sunArc.rise
             readonly property bool isDay: xw.nowTs >= sunArc.rise && xw.nowTs < sunArc.set
-            readonly property real progress: sunArc.set > sunArc.rise
-                ? Math.max(0, Math.min(1, (xw.nowTs - sunArc.rise) / (sunArc.set - sunArc.rise))) : 0
-            // After sunset the next sunrise is about a day after today's
+            // After sunset the next sunrise is about a day after today's; before sunrise the last sunset was yesterday's
             readonly property real nextRise: xw.nowTs < sunArc.rise ? sunArc.rise : sunArc.rise + 86400
+            readonly property real lastSet: xw.nowTs < sunArc.rise ? sunArc.set - 86400 : sunArc.set
+            readonly property real phase: !sunArc.known ? 0
+                : sunArc.isDay ? (xw.nowTs - sunArc.rise) / (sunArc.set - sunArc.rise)
+                : Math.max(0, Math.min(1, (xw.nowTs - sunArc.lastSet) / (sunArc.nextRise - sunArc.lastSet)))
+            readonly property real shown: sunArc.phase * arcReveal.value
+            readonly property color tint: sunArc.isDay ? Appearance.colors.colPrimary : Appearance.colors.colTertiary
 
-            onProgressChanged: arcCanvas.requestPaint()
+            // The same geometry the canvas draws with
+            readonly property real cx: arcCanvas.width / 2
+            readonly property real cy: arcCanvas.height - 3
+            readonly property real rx: arcCanvas.width / 2 - 10
+            readonly property real ry: arcCanvas.height - 14
+            function pointAt(t) {
+                return Qt.point(sunArc.cx - sunArc.rx * Math.cos(t * Math.PI), sunArc.cy - sunArc.ry * Math.sin(t * Math.PI))
+            }
+
+            DiSpring {
+                id: arcReveal
+                stiffness: 55
+                dampingRatio: 1
+                epsilon: 0.002
+            }
+            Timer {
+                interval: 260
+                running: true
+                onTriggered: arcReveal.target = 1
+            }
+
+            onShownChanged: arcCanvas.requestPaint()
+            onTintChanged: arcCanvas.requestPaint()
 
             Canvas {
                 id: arcCanvas
                 width: parent.width
                 height: 58
                 readonly property color lineColor: Appearance.colors.colOnLayer0
-                readonly property color sunColor: Appearance.colors.colPrimary
                 onLineColorChanged: requestPaint()
-                onSunColorChanged: requestPaint()
                 onWidthChanged: requestPaint()
 
                 onPaint: {
                     const ctx = getContext("2d")
                     ctx.reset()
-                    const cx = width / 2, cy = height - 3
-                    const rx = width / 2 - 8, ry = height - 10
-                    const point = t => [cx - rx * Math.cos(t * Math.PI), cy - ry * Math.sin(t * Math.PI)]
                     const trace = (from, to) => {
                         ctx.beginPath()
                         for (let i = 0; i <= 48; i++) {
-                            const [x, y] = point(from + (to - from) * i / 48)
-                            if (i === 0) ctx.moveTo(x, y)
-                            else ctx.lineTo(x, y)
+                            const p = sunArc.pointAt(from + (to - from) * i / 48)
+                            if (i === 0) ctx.moveTo(p.x, p.y)
+                            else ctx.lineTo(p.x, p.y)
                         }
-                        ctx.stroke()
                     }
 
                     // Horizon
                     ctx.strokeStyle = Qt.rgba(lineColor.r, lineColor.g, lineColor.b, 0.15)
                     ctx.lineWidth = 1
                     ctx.beginPath()
-                    ctx.moveTo(0, cy)
-                    ctx.lineTo(width, cy)
+                    ctx.moveTo(0, sunArc.cy)
+                    ctx.lineTo(width, sunArc.cy)
                     ctx.stroke()
 
-                    // The whole day, dashed, then the part already travelled
+                    // The whole arc, dashed
                     ctx.setLineDash([3, 4])
                     ctx.strokeStyle = Qt.rgba(lineColor.r, lineColor.g, lineColor.b, 0.25)
                     ctx.lineWidth = 1.5
                     trace(0, 1)
+                    ctx.stroke()
                     ctx.setLineDash([])
-                    if (sunArc.isDay) {
-                        ctx.strokeStyle = sunColor
-                        ctx.lineWidth = 2
-                        ctx.lineCap = "round"
-                        trace(0, sunArc.progress)
+                    if (sunArc.shown <= 0.001) return
 
-                        const [sx, sy] = point(sunArc.progress)
-                        ctx.fillStyle = Qt.rgba(sunColor.r, sunColor.g, sunColor.b, 0.25)
-                        ctx.beginPath()
-                        ctx.arc(sx, sy, 8, 0, Math.PI * 2)
-                        ctx.fill()
-                        ctx.fillStyle = sunColor
-                        ctx.beginPath()
-                        ctx.arc(sx, sy, 4.5, 0, Math.PI * 2)
-                        ctx.fill()
-                    }
+                    // The part already travelled: a soft fill down to the horizon, then the line
+                    const tint = sunArc.tint
+                    trace(0, sunArc.shown)
+                    const tip = sunArc.pointAt(sunArc.shown)
+                    ctx.lineTo(tip.x, sunArc.cy)
+                    ctx.lineTo(sunArc.pointAt(0).x, sunArc.cy)
+                    ctx.closePath()
+                    const fill = ctx.createLinearGradient(0, sunArc.cy - sunArc.ry, 0, sunArc.cy)
+                    fill.addColorStop(0, Qt.rgba(tint.r, tint.g, tint.b, 0.22))
+                    fill.addColorStop(1, Qt.rgba(tint.r, tint.g, tint.b, 0.02))
+                    ctx.fillStyle = fill
+                    ctx.fill()
+
+                    trace(0, sunArc.shown)
+                    ctx.strokeStyle = tint
+                    ctx.lineWidth = 2
+                    ctx.lineCap = "round"
+                    ctx.stroke()
+                }
+            }
+
+            // The sun (or the moon) at the tip of the travelled part
+            Item {
+                id: body
+                readonly property point at: sunArc.pointAt(sunArc.shown)
+                visible: sunArc.known
+                x: body.at.x - width / 2
+                y: body.at.y - height / 2
+                width: 22
+                height: 22
+                scale: 0.4 + 0.6 * arcReveal.value
+                opacity: Math.min(1, arcReveal.value * 3)
+
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 22
+                    height: 22
+                    radius: 11
+                    color: xw.di.surfaceColor
+                }
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 22
+                    height: 22
+                    radius: 11
+                    color: ColorUtils.transparentize(sunArc.tint, 0.78)
+                }
+                MaterialSymbol {
+                    anchors.centerIn: parent
+                    text: sunArc.isDay ? "light_mode" : "dark_mode"
+                    iconSize: 15
+                    fill: 1
+                    color: sunArc.tint
+                    // A slow turn while it settles into place
+                    rotation: sunArc.isDay ? (1 - arcReveal.value) * -90 : 0
                 }
             }
 
             StyledText {
-                anchors.centerIn: arcCanvas
-                anchors.verticalCenterOffset: 8
-                visible: !sunArc.isDay && sunArc.rise > 0
-                text: Translation.tr("Sunrise in %1").arg(xw.di.formatDuration(sunArc.nextRise - xw.nowTs))
-                font.pixelSize: Appearance.font.pixelSize.smallest
-                color: Appearance.colors.colOnLayer0
-                opacity: 0.6
-            }
-            StyledText {
-                anchors.centerIn: arcCanvas
-                anchors.verticalCenterOffset: 8
-                visible: sunArc.isDay
-                text: Translation.tr("Sunset in %1").arg(xw.di.formatDuration(sunArc.set - xw.nowTs))
+                anchors.horizontalCenter: arcCanvas.horizontalCenter
+                y: arcCanvas.height - height - 4
+                visible: sunArc.known
+                text: sunArc.isDay
+                    ? Translation.tr("Sunset in %1").arg(xw.di.formatDuration(sunArc.set - xw.nowTs))
+                    : Translation.tr("Sunrise in %1").arg(xw.di.formatDuration(sunArc.nextRise - xw.nowTs))
                 font.pixelSize: Appearance.font.pixelSize.smallest
                 color: Appearance.colors.colOnLayer0
                 opacity: 0.6
             }
 
+            // Where the arc starts and ends: sunrise → sunset by day, sunset → sunrise at night
             RowLayout {
                 anchors {
                     left: parent.left
@@ -291,31 +375,31 @@ RowLayout {
                     bottom: parent.bottom
                 }
                 spacing: 4
-                visible: sunArc.rise > 0
+                visible: sunArc.known
 
                 MaterialSymbol {
-                    text: "wb_twilight"
+                    text: sunArc.isDay ? "wb_twilight" : "nights_stay"
                     iconSize: 14
                     color: Appearance.colors.colOnLayer0
                     opacity: 0.55
                 }
                 StyledText {
                     Layout.fillWidth: true
-                    text: xw.timeOf(sunArc.rise)
+                    text: xw.timeOf(sunArc.isDay ? sunArc.rise : sunArc.lastSet)
                     font.pixelSize: Appearance.font.pixelSize.smallest
                     font.features: { "tnum": 1 }
                     color: Appearance.colors.colOnLayer0
                     opacity: 0.7
                 }
                 StyledText {
-                    text: xw.timeOf(sunArc.set)
+                    text: xw.timeOf(sunArc.isDay ? sunArc.set : sunArc.nextRise)
                     font.pixelSize: Appearance.font.pixelSize.smallest
                     font.features: { "tnum": 1 }
                     color: Appearance.colors.colOnLayer0
                     opacity: 0.7
                 }
                 MaterialSymbol {
-                    text: "nights_stay"
+                    text: sunArc.isDay ? "nights_stay" : "wb_twilight"
                     iconSize: 14
                     color: Appearance.colors.colOnLayer0
                     opacity: 0.55
@@ -355,6 +439,21 @@ RowLayout {
             onStepsChanged: curve.requestPaint()
             onWidthChanged: curve.requestPaint()
 
+            // The curve is drawn from left to right as the columns cascade in; each dot pops as the line reaches it
+            readonly property real drawnX: curveReveal.value * strip.width
+            onDrawnXChanged: curve.requestPaint()
+            DiSpring {
+                id: curveReveal
+                stiffness: 38
+                dampingRatio: 1
+                epsilon: 0.001
+            }
+            Timer {
+                interval: 140
+                running: true
+                onTriggered: curveReveal.target = 1
+            }
+
             StyledText {
                 anchors.centerIn: parent
                 visible: (Weather.forecast ?? []).length === 0
@@ -370,13 +469,16 @@ RowLayout {
                 visible: strip.steps.length > 1
                 readonly property color lineColor: Appearance.colors.colPrimary
                 onLineColorChanged: requestPaint()
-                DiCascade { target: curve; index: 2; rise: 0 }
 
                 onPaint: {
                     const ctx = getContext("2d")
                     ctx.reset()
                     const pts = strip.steps.map((s, i) => [(i + 0.5) * strip.colW, strip.yFor(s.temp)])
-                    if (pts.length < 2) return
+                    if (pts.length < 2 || strip.drawnX <= 0) return
+                    ctx.save()
+                    ctx.beginPath()
+                    ctx.rect(0, 0, strip.drawnX, height)
+                    ctx.clip()
                     // Through the midpoints, so the line is smooth and still passes over every dot
                     const path = () => {
                         ctx.beginPath()
@@ -404,6 +506,7 @@ RowLayout {
                     ctx.lineWidth = 2
                     ctx.lineCap = "round"
                     ctx.stroke()
+                    ctx.restore()
                 }
             }
 
@@ -450,6 +553,7 @@ RowLayout {
                     Rectangle {
                         x: (parent.width - width) / 2
                         y: strip.yFor(hour.modelData.temp) - height / 2
+                        scale: Math.max(0, Math.min(1, (strip.drawnX - hour.x - hour.width / 2) / 14))
                         width: hour.modelData.isNow ? 8 : 6
                         height: width
                         radius: width / 2
@@ -483,6 +587,7 @@ RowLayout {
                 DiCascade { target: uvChip; index: 4 }
                 icon: "light_mode"
                 value: Weather.uvNow >= 0 ? `${Math.round(Weather.uvNow)} · ${xw.uvLevel(Weather.uvNow)}` : "–"
+                meter: Weather.uvNow >= 0 ? Weather.uvNow / 11 : -1
                 label: Weather.uvMax >= 0 ? Translation.tr("UV · peak %1").arg(Math.round(Weather.uvMax)) : Translation.tr("UV index")
             }
             Chip {
@@ -490,6 +595,7 @@ RowLayout {
                 DiCascade { target: humidityChip; index: 5 }
                 icon: "water_drop"
                 value: Weather.data?.humidity ?? "–"
+                meter: (parseInt(Weather.data?.humidity ?? "") || 0) / 100
                 label: Translation.tr("Humidity")
             }
             Chip {

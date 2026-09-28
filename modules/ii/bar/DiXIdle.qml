@@ -84,18 +84,15 @@ ColumnLayout {
         property string label
         property bool active: false
         property var onTap: null
+        property int order: 0
         implicitWidth: toggleRow.implicitWidth + 20
         implicitHeight: 32
         radius: 16
         color: toggle.active ? Appearance.colors.colPrimaryContainer
             : (toggleMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1)
-        scale: toggleMouse.pressed ? 0.95 : 1
 
         Behavior on color {
             ColorAnimation { duration: IslandMotion.short }
-        }
-        Behavior on scale {
-            NumberAnimation { duration: IslandMotion.micro; easing.type: Easing.OutBack }
         }
 
         RowLayout {
@@ -116,6 +113,8 @@ ColumnLayout {
             }
         }
 
+        DiCascade { target: toggle; index: toggle.order; pressed: toggleMouse.pressed }
+
         MouseArea {
             id: toggleMouse
             anchors.fill: parent
@@ -130,9 +129,11 @@ ColumnLayout {
         property string icon
         property string label
         property var onTap: null
+        property int order: 0
         Layout.fillWidth: true
         Layout.preferredWidth: 1
         spacing: 3
+        DiCascade { target: shortcut; index: shortcut.order; step: 25 }
 
         Rectangle {
             Layout.fillWidth: true
@@ -287,6 +288,7 @@ ColumnLayout {
                             readonly property var step: Weather.forecast[nextHour.index] ?? ({})
                             Layout.preferredWidth: 38
                             spacing: 0
+                            DiCascade { target: nextHour; index: 3 + nextHour.index; delay: 120 }
 
                             StyledText {
                                 Layout.alignment: Qt.AlignHCenter
@@ -331,15 +333,16 @@ ColumnLayout {
                 id: toggles
                 Layout.topMargin: 8
                 spacing: 6
-                DiCascade { target: toggles; index: 3 }
 
                 Toggle {
+                    order: 4
                     icon: Notifications.silent ? "notifications_off" : "notifications"
                     label: Translation.tr("Do not disturb")
                     active: Notifications.silent
                     onTap: () => Notifications.silent = !Notifications.silent
                 }
                 Toggle {
+                    order: 5
                     icon: "local_cafe"
                     label: IslandEvents.caffeineOn && IslandEvents.caffeineMinutesLeft >= 0
                         ? `${IslandEvents.caffeineMinutesLeft} min` : Translation.tr("Caffeine")
@@ -347,6 +350,7 @@ ColumnLayout {
                     onTap: () => IslandEvents.toggleCaffeine(60)
                 }
                 Toggle {
+                    order: 6
                     icon: "psychology"
                     label: IslandEvents.focusOn ? `${IslandEvents.focusMinutes} min` : Translation.tr("Focus")
                     active: IslandEvents.focusOn
@@ -599,44 +603,51 @@ ColumnLayout {
         id: shortcuts
         Layout.fillWidth: true
         spacing: 6
-        DiCascade { target: shortcuts; index: 5 }
 
         Shortcut {
+            order: 6
             icon: "apps"
             label: Translation.tr("Overview")
             onTap: () => xi.di.expand("overview")
         }
         Shortcut {
+            order: 7
             icon: "inventory_2"
             label: Translation.tr("Drawer")
             onTap: () => xi.di.expand("shelf")
         }
         Shortcut {
+            order: 8
             icon: "content_paste"
             label: Translation.tr("Clips")
             onTap: () => xi.di.expand("clipboard")
         }
         Shortcut {
+            order: 9
             icon: "smart_toy"
             label: Translation.tr("Agents")
             onTap: () => xi.di.expand("agents")
         }
         Shortcut {
+            order: 10
             icon: "monitoring"
             label: Translation.tr("System")
             onTap: () => xi.di.expand("system")
         }
         Shortcut {
+            order: 11
             icon: "history"
             label: Translation.tr("History")
             onTap: () => xi.di.expand("history")
         }
         Shortcut {
+            order: 12
             icon: "vpn_lock"
             label: "ZeroTier"
             onTap: () => xi.di.expand("zerotier")
         }
         Shortcut {
+            order: 13
             icon: "tune"
             label: Translation.tr("Tweaks")
             onTap: () => {
