@@ -853,7 +853,9 @@ Singleton {
                     property int hoverExpandDelay: 250
                     property bool autoExpand: true
                     property int autoExpandDuration: 4500
-                    property bool splitMode: false // false: active islands as a card stack
+                    property bool splitMode: false // classic side (secondIsland off): false = card stack, true = bubbles
+                    property bool secondIsland: true // beside the pill only a second island for a second live thing, and "+N" in the anchor
+                    property list<string> secondIslandKinds: ["call", "recording", "f1", "timer", "download", "agents", "media"] // what may take the second island
                     property list<string> pinned: ["weather", "shelf"]
                     property bool lyrics: true
                     property bool albumColors: true

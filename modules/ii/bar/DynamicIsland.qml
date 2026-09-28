@@ -1182,7 +1182,7 @@ Item {
         onTriggered: root.updateShownNotification()
     }
 
-    readonly property var secondaryIds: (root.cfg.splitMode ?? true) && !root.vertical
+    readonly property var secondaryIds: (root.cfg.splitMode ?? true) && !root.vertical && !root.secondIslandMode
         ? root.persistentIds.filter(id => id !== root.primaryId).slice(0, 2)
         : []
 
@@ -1397,6 +1397,7 @@ Item {
     }
 
     onPersistentIdsChanged: {
+        if (root.autoSplitDismissed !== "" && !root.persistentIds.includes(root.autoSplitDismissed)) root.autoSplitDismissed = ""
         if (root.splitId !== "" && !root.persistentIds.includes(root.splitId) && !root.standaloneViews.includes(root.splitId))
             root.splitId = ""
     }
@@ -1470,6 +1471,32 @@ Item {
     property string splitId: ""
     property bool splitArmed: false
 
+    // Second island: with it on, nothing else sits beside the pill. When a second live thing is going on (a race,
+    // a call, a timer…) it takes the second island by itself, in this order; a peek that borrows the pill (a
+    // notification, the volume) pushes the live thing there too, so it never leaves sight. A manual choice
+    // (right click) wins; flinging the automatic one away keeps it away until that activity ends.
+    readonly property bool secondIslandMode: (root.cfg.secondIsland ?? true) && !root.vertical
+    readonly property var secondIslandOrder: ["call", "recording", "f1", "timer", "download", "agents", "media"]
+    property string autoSplitDismissed: ""
+    function liveNow(id) {
+        switch (id) {
+            case "f1":     return F1.sessionLive
+            case "media":  return root.activePlayer?.isPlaying ?? false
+            case "agents": return ClaudeCode.anyWorking
+            default:       return true
+        }
+    }
+    readonly property string autoSplitId: {
+        if (!root.secondIslandMode) return ""
+        const kinds = root.cfg.secondIslandKinds ?? root.secondIslandOrder
+        return root.secondIslandOrder.find(id => kinds.includes(id) && id !== root.primaryId && id !== root.autoSplitDismissed
+            && root.persistentIds.includes(id) && root.liveNow(id)) ?? ""
+    }
+    readonly property string activeSplitId: root.splitId !== "" ? root.splitId : root.autoSplitId
+    // Everything active that neither island shows, as a count on the anchor
+    readonly property int hiddenCount: root.secondIslandMode
+        ? root.persistentIds.filter(id => id !== "idle" && id !== root.primaryId && id !== root.splitShownId).length : 0
+
     function toggleSplitArm() {
         if (root.splitId !== "") { root.splitId = ""; return }
         root.splitArmed = !root.splitArmed
@@ -1518,14 +1545,14 @@ Item {
     property real splitContentOpacity: 1
     readonly property bool splitShown: root.splitShownId !== "" && root.splitShownId !== root.primaryId && !root.vertical
 
-    onSplitIdChanged: {
-        if (root.splitId !== "") {
+    onActiveSplitIdChanged: {
+        if (root.activeSplitId !== "") {
             splitOut.stop()
             if (root.splitShownId === "" || root.splitProgress < 0.98) {
-                root.splitShownId = root.splitId
+                root.splitShownId = root.activeSplitId
                 splitIn.restart()
                 gulpPulse.restart()
-            } else if (root.splitShownId !== root.splitId) {
+            } else if (root.splitShownId !== root.activeSplitId) {
                 splitSwap.restart()
             }
         } else if (root.splitShownId !== "" && !splitFling.running) {
@@ -1573,7 +1600,7 @@ Item {
         }
         ScriptAction {
             script: {
-                root.splitShownId = root.splitId
+                root.splitShownId = root.activeSplitId
                 root.splitContentY = root.splitSwapDir * 14
             }
         }
@@ -1589,6 +1616,7 @@ Item {
         NumberAnimation { target: root; property: "splitDragX"; to: splitFling.toX; duration: 240; easing.type: Easing.OutCubic }
         NumberAnimation { target: root; property: "splitFade"; to: 0; duration: 220; easing.type: Easing.OutCubic }
         onFinished: {
+            if (root.splitId === "" && root.splitShownId === root.autoSplitId) root.autoSplitDismissed = root.autoSplitId
             root.splitShownId = ""
             root.splitProgress = 0
             root.splitDragX = 0
@@ -2204,7 +2232,7 @@ Item {
 
     Rectangle {
         id: homeTab
-        visible: !root.vertical && root.onPinnedView && !root.splitShown
+        visible: !root.vertical && root.onPinnedView && !root.splitShown && !root.secondIslandMode
         x: pill.width + 6
         anchors.verticalCenter: pill.verticalCenter
         width: visible ? 24 : 0
@@ -2245,7 +2273,7 @@ Item {
         id: f1Chip
         readonly property var driver: F1.focusDriver
         visible: !root.vertical && !root.overlayShown && F1.enabled && F1.sessionLive && f1Chip.driver !== null
-            && root.primaryId !== "f1" && (root.cfg.f1.pinPosition ?? true) && !root.splitShown
+            && root.primaryId !== "f1" && (root.cfg.f1.pinPosition ?? true) && !root.splitShown && !root.secondIslandMode
         x: pill.width + 6 + (homeTab.visible ? homeTab.width + 6 : 0)
         anchors.verticalCenter: pill.verticalCenter
         width: visible ? f1ChipRow.implicitWidth + 14 : 0
@@ -2301,7 +2329,7 @@ Item {
 
     Item {
         id: deck
-        visible: !root.vertical && root.stackDepth > 0 && !root.splitShown
+        visible: !root.vertical && root.stackDepth > 0 && !root.splitShown && !root.secondIslandMode
         x: pill.width + 12 + (homeTab.visible ? homeTab.width + 6 : 0) + (f1Chip.visible ? f1Chip.width + 6 : 0)
         anchors.verticalCenter: pill.verticalCenter
         width: visible ? 18 + (root.stackDepth - 1) * 4 + (deckLabel.implicitWidth > 0 ? deckLabel.implicitWidth + 5 : 0) : 0
@@ -2659,6 +2687,17 @@ Item {
                 id: anchorRow
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 4
+
+                StyledText {
+                    Layout.rightMargin: 3
+                    visible: root.hiddenCount > 0
+                    text: `+${root.hiddenCount}`
+                    font.pixelSize: Appearance.font.pixelSize.smallest
+                    font.weight: Font.DemiBold
+                    font.features: { "tnum": 1 }
+                    color: Appearance.colors.colOnLayer0
+                    opacity: 0.5
+                }
 
                 MaterialSymbol {
                     visible: root.anchorInfo.icon !== ""

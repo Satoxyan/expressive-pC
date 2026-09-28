@@ -327,10 +327,108 @@ ContentPage {
                         onCheckedChanged: { Config.options.bar.dynamicIsland.autoExpand = checked; }
                     }
                     ConfigSwitch {
+                        buttonIcon: "splitscreen_right"
+                        text: Translation.tr("Second island for a second live thing (a race, a call, a timer…)")
+                        checked: Config.options.bar.dynamicIsland.secondIsland
+                        onCheckedChanged: { Config.options.bar.dynamicIsland.secondIsland = checked; }
+                    }
+                    ConfigSwitch {
+                        visible: !Config.options.bar.dynamicIsland.secondIsland
                         buttonIcon: "bubble_chart"
                         text: Translation.tr("Split into bubbles when several things are active")
                         checked: Config.options.bar.dynamicIsland.splitMode
                         onCheckedChanged: { Config.options.bar.dynamicIsland.splitMode = checked; }
+                    }
+                }
+            }
+
+            ContentSubsection {
+                visible: Config.options.bar.dynamicIsland.secondIsland
+                title: Translation.tr("What may take the second island")
+                GroupedList {
+                    ConfigSwitch {
+                        buttonIcon: "call"
+                        text: Translation.tr("Call")
+                        checked: (Config.options.bar.dynamicIsland.secondIslandKinds ?? []).includes("call")
+                        onCheckedChanged: {
+                            const kinds = Array.from(Config.options.bar.dynamicIsland.secondIslandKinds ?? [])
+                            if (checked === kinds.includes("call")) return
+                            Config.options.bar.dynamicIsland.secondIslandKinds = checked
+                                ? [...kinds, "call"]
+                                : kinds.filter(k => k !== "call")
+                        }
+                    }
+                    ConfigSwitch {
+                        buttonIcon: "screen_record"
+                        text: Translation.tr("Screen recording")
+                        checked: (Config.options.bar.dynamicIsland.secondIslandKinds ?? []).includes("recording")
+                        onCheckedChanged: {
+                            const kinds = Array.from(Config.options.bar.dynamicIsland.secondIslandKinds ?? [])
+                            if (checked === kinds.includes("recording")) return
+                            Config.options.bar.dynamicIsland.secondIslandKinds = checked
+                                ? [...kinds, "recording"]
+                                : kinds.filter(k => k !== "recording")
+                        }
+                    }
+                    ConfigSwitch {
+                        buttonIcon: "sports_motorsports"
+                        text: Translation.tr("F1 session")
+                        checked: (Config.options.bar.dynamicIsland.secondIslandKinds ?? []).includes("f1")
+                        onCheckedChanged: {
+                            const kinds = Array.from(Config.options.bar.dynamicIsland.secondIslandKinds ?? [])
+                            if (checked === kinds.includes("f1")) return
+                            Config.options.bar.dynamicIsland.secondIslandKinds = checked
+                                ? [...kinds, "f1"]
+                                : kinds.filter(k => k !== "f1")
+                        }
+                    }
+                    ConfigSwitch {
+                        buttonIcon: "timer"
+                        text: Translation.tr("Timer")
+                        checked: (Config.options.bar.dynamicIsland.secondIslandKinds ?? []).includes("timer")
+                        onCheckedChanged: {
+                            const kinds = Array.from(Config.options.bar.dynamicIsland.secondIslandKinds ?? [])
+                            if (checked === kinds.includes("timer")) return
+                            Config.options.bar.dynamicIsland.secondIslandKinds = checked
+                                ? [...kinds, "timer"]
+                                : kinds.filter(k => k !== "timer")
+                        }
+                    }
+                    ConfigSwitch {
+                        buttonIcon: "download"
+                        text: Translation.tr("Download")
+                        checked: (Config.options.bar.dynamicIsland.secondIslandKinds ?? []).includes("download")
+                        onCheckedChanged: {
+                            const kinds = Array.from(Config.options.bar.dynamicIsland.secondIslandKinds ?? [])
+                            if (checked === kinds.includes("download")) return
+                            Config.options.bar.dynamicIsland.secondIslandKinds = checked
+                                ? [...kinds, "download"]
+                                : kinds.filter(k => k !== "download")
+                        }
+                    }
+                    ConfigSwitch {
+                        buttonIcon: "smart_toy"
+                        text: Translation.tr("AI agents at work")
+                        checked: (Config.options.bar.dynamicIsland.secondIslandKinds ?? []).includes("agents")
+                        onCheckedChanged: {
+                            const kinds = Array.from(Config.options.bar.dynamicIsland.secondIslandKinds ?? [])
+                            if (checked === kinds.includes("agents")) return
+                            Config.options.bar.dynamicIsland.secondIslandKinds = checked
+                                ? [...kinds, "agents"]
+                                : kinds.filter(k => k !== "agents")
+                        }
+                    }
+                    ConfigSwitch {
+                        buttonIcon: "music_note"
+                        text: Translation.tr("Music playing")
+                        checked: (Config.options.bar.dynamicIsland.secondIslandKinds ?? []).includes("media")
+                        onCheckedChanged: {
+                            const kinds = Array.from(Config.options.bar.dynamicIsland.secondIslandKinds ?? [])
+                            if (checked === kinds.includes("media")) return
+                            Config.options.bar.dynamicIsland.secondIslandKinds = checked
+                                ? [...kinds, "media"]
+                                : kinds.filter(k => k !== "media")
+                        }
                     }
                 }
             }
