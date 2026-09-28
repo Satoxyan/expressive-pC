@@ -2,71 +2,191 @@ import QtQuick
 import QtQuick.Layouts
 import Qt5Compat.GraphicalEffects
 import Quickshell
+import Quickshell.Io
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
+// The drawer: files dropped on the island, newest first, in a thumbnail grid. Images show a real preview, the rest
+// the icon of their type; every tile has its name and size. Hover a tile for open / tool / reveal / remove; drag it
+// out to drop the file anywhere. Drawer-wide actions sit in one row next to the title. Two rows fit the standard
+// height, more scroll inside the grid. Empty, the drawer narrows to one column with a hint.
 ColumnLayout {
     id: xshelf
     required property Item di
     spacing: 10
-    implicitWidth: 410
-    readonly property real wantedWidth: 410
+    implicitWidth: xshelf.wantedWidth
+    readonly property real wantedWidth: xshelf.empty ? 372 : 532
 
+    readonly property bool empty: DropShelf.items.length === 0
+    readonly property var ordered: [...DropShelf.items].reverse()
     readonly property var pdfs: DropShelf.items.filter(p => DropShelf.isPdf(p))
+    readonly property int columns: 5
+    readonly property int tileHeight: 92
+    // 234 of view minus the header row and the spacing
+    readonly property real gridMax: 192
 
-    readonly property var groups: {
-        const defs = [
-            ["image", Translation.tr("Images"), p => DropShelf.isImage(p)],
-            ["pdf", "PDF", p => DropShelf.isPdf(p)],
-            ["video", Translation.tr("Videos"), p => /\.(mp4|mkv|webm|mov|avi)$/i.test(p)],
-            ["audio", Translation.tr("Audio"), p => /\.(mp3|flac|ogg|wav|m4a|opus)$/i.test(p)],
-            ["other", Translation.tr("Others"), p => true]
-        ]
-        const items = [...DropShelf.items].reverse()
-        const used = new Set()
-        const out = []
-        for (const [key, label, test] of defs) {
-            const list = items.filter(p => !used.has(p) && test(p))
-            list.forEach(p => used.add(p))
-            if (list.length > 0) out.push({ key: key, label: label, items: list })
+    // path -> { size, dir }, filled by one stat call while the view is open
+    property var info: ({})
+    property bool infoReady: false
+
+    readonly property real totalBytes: {
+        let sum = 0
+        for (const p of DropShelf.items) {
+            const i = xshelf.info[p]
+            if (i && !i.dir) sum += i.size
         }
-        return out
+        return sum
     }
 
-    component HeaderButton: Rectangle {
-        id: headerButton
+    // The folder the files share, or the drawer's own folder when they come from several places
+    readonly property string folder: {
+        const dirs = [...new Set(DropShelf.items.map(p => p.substring(0, p.lastIndexOf("/"))))]
+        return dirs.length === 1 && dirs[0] !== "" ? dirs[0] : DropShelf.storeDir
+    }
+
+    function formatBytes(bytes) {
+        if (bytes < 1024) return `${bytes} B`
+        const units = ["KB", "MB", "GB", "TB"]
+        let v = bytes / 1024
+        let u = 0
+        while (v >= 1024 && u < units.length - 1) {
+            v /= 1024
+            u++
+        }
+        const num = v < 10 ? v.toFixed(1).replace(".", Qt.locale().decimalPoint) : Math.round(v).toString()
+        return `${num} ${units[u]}`
+    }
+
+    function extension(path) {
+        const name = DropShelf.fileName(path)
+        const dot = name.lastIndexOf(".")
+        return dot > 0 && name.length - dot <= 6 ? name.substring(dot + 1).toUpperCase() : ""
+    }
+
+    function refreshInfo() {
+        if (DropShelf.items.length === 0) {
+            xshelf.info = ({})
+            xshelf.infoReady = true
+            return
+        }
+        if (statProc.running) {
+            statProc.again = true
+            return
+        }
+        statProc.command = ["stat", "-L", "-c", "%s\t%F\t%n", "--", ...DropShelf.items]
+        statProc.running = true
+    }
+
+    Component.onCompleted: xshelf.refreshInfo()
+
+    Connections {
+        target: DropShelf
+        function onItemsChanged() {
+            Qt.callLater(xshelf.refreshInfo)
+        }
+    }
+
+    Process {
+        id: statProc
+        property bool again: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const out = {}
+                for (const line of text.split("\n")) {
+                    const a = line.indexOf("\t")
+                    const b = a < 0 ? -1 : line.indexOf("\t", a + 1)
+                    if (b < 0) continue
+                    out[line.substring(b + 1)] = {
+                        size: parseInt(line.substring(0, a)) || 0,
+                        dir: line.substring(a + 1, b) === "directory"
+                    }
+                }
+                xshelf.info = out
+                xshelf.infoReady = true
+            }
+        }
+        onExited: {
+            if (statProc.again) {
+                statProc.again = false
+                Qt.callLater(xshelf.refreshInfo)
+            }
+        }
+    }
+
+    component Chip: Rectangle {
+        id: chip
         property string icon
         property string label
+        property string tip
+        property bool danger: false
         property var onTap
-        implicitWidth: headerRow.implicitWidth + 18
-        implicitHeight: 28
-        radius: 14
-        color: headerMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1
+        implicitWidth: chip.label !== "" ? chipRow.implicitWidth + 24 : 32
+        implicitHeight: 32
+        radius: 16
+        color: chip.danger ? ColorUtils.mix(Appearance.colors.colError, Appearance.colors.colLayer1, 0.25)
+            : chipMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1
+
+        Behavior on color {
+            ColorAnimation { duration: IslandMotion.micro }
+        }
 
         RowLayout {
-            id: headerRow
+            id: chipRow
             anchors.centerIn: parent
-            spacing: 4
+            spacing: 5
             MaterialSymbol {
-                text: headerButton.icon
-                iconSize: 15
-                color: Appearance.colors.colOnLayer1
+                text: chip.icon
+                iconSize: 16
+                fill: 1
+                color: chip.danger ? Appearance.m3colors.m3onError : Appearance.colors.colOnLayer1
             }
             StyledText {
-                text: headerButton.label
+                visible: chip.label !== ""
+                text: chip.label
                 font.pixelSize: Appearance.font.pixelSize.smallest
-                color: Appearance.colors.colOnLayer1
+                font.weight: Font.DemiBold
+                color: chip.danger ? Appearance.m3colors.m3onError : Appearance.colors.colOnLayer1
             }
         }
 
         MouseArea {
-            id: headerMouse
+            id: chipMouse
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: headerButton.onTap()
+            onClicked: chip.onTap()
+        }
+        StyledToolTip {
+            text: chip.tip
+            extraVisibleCondition: false
+            alternativeVisibleCondition: chipMouse.containsMouse && chip.tip !== ""
+        }
+    }
+
+    component TileButton: Rectangle {
+        id: tileButton
+        property string icon
+        property var onTap
+        width: 20
+        height: 20
+        radius: 10
+        color: tileButtonMouse.containsMouse ? Qt.rgba(0, 0, 0, 0.8) : Qt.rgba(0, 0, 0, 0.6)
+
+        MaterialSymbol {
+            anchors.centerIn: parent
+            text: tileButton.icon
+            iconSize: 13
+            color: "white"
+        }
+
+        MouseArea {
+            id: tileButtonMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: tileButton.onTap()
         }
     }
 
@@ -75,29 +195,22 @@ ColumnLayout {
         required property string path
         required property Item di
         property int order: 0
-        property real enterT: 0
-        readonly property real tilt: (tile.order % 2 === 0 ? -1 : 1) * (5 + (tile.order % 3) * 2)
-        width: 90
-        height: 104
+        readonly property var meta: xshelf.info[tile.path]
+        readonly property bool missing: xshelf.infoReady && tile.meta === undefined
+        readonly property bool isImage: DropShelf.isImage(tile.path)
+        readonly property bool hovered: tileHover.hovered && !tileMouse.drag.active
+        height: xshelf.tileHeight
         radius: 12
-        color: tileMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1
-        opacity: tile.enterT
-        scale: (tileMouse.drag.active ? 0.94 : 1) * (0.72 + 0.28 * tile.enterT)
-        rotation: (1 - tile.enterT) * tile.tilt
-        transform: Translate { y: (1 - tile.enterT) * -30 - (tileMouse.containsMouse && !tileMouse.drag.active ? 3 : 0) }
+        color: tile.hovered ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1
 
         Behavior on color {
             ColorAnimation { duration: IslandMotion.micro }
         }
-        Behavior on scale {
-            enabled: tile.enterT >= 1
-            NumberAnimation { duration: IslandMotion.short; easing.type: Easing.OutBack }
-        }
 
-        SequentialAnimation {
-            running: true
-            PauseAnimation { duration: 40 + Math.min(tile.order, 12) * 38 }
-            NumberAnimation { target: tile; property: "enterT"; to: 1; duration: IslandMotion.long; easing.type: Easing.OutBack; easing.overshoot: 1.1 }
+        DiCascade { target: tile; index: 1 + Math.min(tile.order, 12); step: 25; pressed: tileMouse.pressed }
+
+        HoverHandler {
+            id: tileHover
         }
 
         Drag.active: tileMouse.drag.active
@@ -115,10 +228,10 @@ ColumnLayout {
 
         Rectangle {
             id: thumb
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: 8
-            width: 74
-            height: 58
+            x: 6
+            y: 6
+            width: tile.width - 12
+            height: 52
             radius: 8
             color: Appearance.colors.colLayer3
             layer.enabled: true
@@ -131,20 +244,36 @@ ColumnLayout {
             }
 
             Image {
+                id: preview
                 anchors.fill: parent
-                visible: DropShelf.isImage(tile.path)
-                source: visible ? `file://${tile.path}` : ""
+                visible: tile.isImage && preview.status === Image.Ready
+                source: tile.isImage ? `file://${tile.path}` : ""
                 fillMode: Image.PreserveAspectCrop
-                sourceSize.width: 160
+                sourceSize.width: 200
                 asynchronous: true
+                cache: true
             }
-            MaterialSymbol {
+
+            ColumnLayout {
                 anchors.centerIn: parent
-                visible: !DropShelf.isImage(tile.path)
-                text: DropShelf.iconFor(tile.path)
-                iconSize: 30
-                fill: 1
-                color: Appearance.colors.colPrimary
+                visible: !preview.visible
+                spacing: 0
+                MaterialSymbol {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: tile.missing ? "link_off" : tile.meta?.dir ? "folder" : DropShelf.iconFor(tile.path)
+                    iconSize: 24
+                    fill: 1
+                    color: tile.missing ? Appearance.colors.colError : Appearance.colors.colPrimary
+                }
+                StyledText {
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: text !== "" && !tile.meta?.dir
+                    text: xshelf.extension(tile.path)
+                    font.pixelSize: 9
+                    font.weight: Font.DemiBold
+                    color: Appearance.colors.colOnLayer1
+                    opacity: 0.55
+                }
             }
 
             Rectangle {
@@ -170,19 +299,39 @@ ColumnLayout {
         }
 
         StyledText {
+            id: nameText
             anchors {
                 left: parent.left
                 right: parent.right
                 top: thumb.bottom
-                topMargin: 6
-                leftMargin: 6
-                rightMargin: 6
+                topMargin: 5
+                leftMargin: 7
+                rightMargin: 7
             }
             horizontalAlignment: Text.AlignHCenter
             text: DropShelf.fileName(tile.path)
             font.pixelSize: Appearance.font.pixelSize.smallest
+            font.weight: Font.Medium
             color: Appearance.colors.colOnLayer1
             elide: Text.ElideMiddle
+        }
+
+        StyledText {
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: nameText.bottom
+                topMargin: 1
+            }
+            horizontalAlignment: Text.AlignHCenter
+            text: tile.missing ? Translation.tr("Missing")
+                : tile.meta === undefined ? " "
+                : tile.meta.dir ? Translation.tr("Folder")
+                : xshelf.formatBytes(tile.meta.size)
+            font.pixelSize: 9
+            font.features: { "tnum": 1 }
+            color: tile.missing ? Appearance.colors.colError : Appearance.colors.colOnLayer1
+            opacity: tile.missing ? 0.9 : 0.55
         }
 
         Item { id: tileDragProxy }
@@ -191,6 +340,7 @@ ColumnLayout {
             id: tileMouse
             anchors.fill: parent
             hoverEnabled: true
+            preventStealing: true
             cursorShape: drag.active ? Qt.ClosedHandCursor : Qt.OpenHandCursor
             drag.target: tileDragProxy
             onReleased: {
@@ -200,6 +350,22 @@ ColumnLayout {
             onDoubleClicked: Qt.openUrlExternally(`file://${tile.path}`)
         }
 
+        // Per-file actions, over the thumbnail while hovering
+        TileButton {
+            anchors {
+                right: thumb.right
+                top: thumb.top
+                margins: 4
+            }
+            opacity: tile.hovered ? 1 : 0
+            visible: opacity > 0
+            icon: "close"
+            onTap: () => DropShelf.remove(tile.path)
+            Behavior on opacity {
+                NumberAnimation { duration: IslandMotion.micro }
+            }
+        }
+
         Row {
             anchors {
                 horizontalCenter: thumb.horizontalCenter
@@ -207,53 +373,42 @@ ColumnLayout {
                 bottomMargin: 4
             }
             spacing: 4
-            opacity: tileMouse.containsMouse || buttonsHover.hovered ? 1 : 0
+            opacity: tile.hovered && !tile.missing ? 1 : 0
+            visible: opacity > 0
 
             Behavior on opacity {
                 NumberAnimation { duration: IslandMotion.micro }
             }
 
-            HoverHandler {
-                id: buttonsHover
+            TileButton {
+                icon: "open_in_new"
+                onTap: () => Qt.openUrlExternally(`file://${tile.path}`)
             }
-
-            Repeater {
-                model: [
-                    { icon: "compress", show: DropShelf.isPdf(tile.path), action: () => DropShelf.compressPdf(tile.path) },
-                    { icon: "folder_zip", show: !DropShelf.isArchive(tile.path), action: () => DropShelf.zipItems([tile.path]) },
-                    { icon: "unarchive", show: DropShelf.isArchive(tile.path), action: () => DropShelf.extract(tile.path) },
-                    { icon: "folder_open", show: true, action: () => Quickshell.execDetached(["dolphin", "--select", tile.path]) },
-                    { icon: "close", show: true, action: () => DropShelf.remove(tile.path) }
-                ].filter(b => b.show)
-                delegate: Rectangle {
-                    required property var modelData
-                    width: 20
-                    height: 20
-                    radius: 10
-                    color: Qt.rgba(0, 0, 0, 0.6)
-
-                    MaterialSymbol {
-                        anchors.centerIn: parent
-                        text: modelData.icon
-                        iconSize: 13
-                        color: "white"
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: modelData.action()
-                    }
+            TileButton {
+                icon: DropShelf.isPdf(tile.path) ? "compress" : DropShelf.isArchive(tile.path) ? "unarchive" : "folder_zip"
+                onTap: () => {
+                    if (DropShelf.isPdf(tile.path)) DropShelf.compressPdf(tile.path)
+                    else if (DropShelf.isArchive(tile.path)) DropShelf.extract(tile.path)
+                    else DropShelf.zipItems([tile.path])
                 }
+            }
+            TileButton {
+                icon: "folder_open"
+                onTap: () => Quickshell.execDetached(["dolphin", "--select", tile.path])
             }
         }
     }
 
+    // Header: title, count and size (or the result of the last tool), then the drawer-wide actions
     RowLayout {
+        id: header
         Layout.fillWidth: true
-        spacing: 8
+        spacing: 6
+
+        DiCascade { target: header; index: 0 }
 
         MaterialSymbol {
+            Layout.rightMargin: 2
             text: "inventory_2"
             iconSize: 20
             fill: 1
@@ -271,89 +426,153 @@ ColumnLayout {
             StyledText {
                 Layout.fillWidth: true
                 text: DropShelf.toolStatus !== "" ? DropShelf.toolStatus
+                    : xshelf.empty ? Translation.tr("Empty")
                     : `${DropShelf.items.length} ${DropShelf.items.length === 1 ? Translation.tr("file") : Translation.tr("files")}`
+                        + (xshelf.totalBytes > 0 ? ` · ${xshelf.formatBytes(xshelf.totalBytes)}` : "")
                 font.pixelSize: Appearance.font.pixelSize.smallest
+                font.features: { "tnum": 1 }
                 color: DropShelf.toolStatus !== "" ? Appearance.m3colors.m3success : Appearance.colors.colOnLayer0
                 opacity: DropShelf.toolStatus !== "" ? 1 : 0.6
                 elide: Text.ElideRight
             }
         }
-        HeaderButton {
+        Chip {
             visible: xshelf.pdfs.length >= 2
             icon: "merge"
-            label: Translation.tr("Merge PDFs")
+            tip: Translation.tr("Merge PDFs")
             onTap: () => DropShelf.mergePdfs(xshelf.pdfs)
         }
-        HeaderButton {
+        Chip {
             visible: DropShelf.items.length >= 2
             icon: "folder_zip"
-            label: Translation.tr("Zip all")
+            tip: Translation.tr("Zip all")
             onTap: () => DropShelf.zipItems(DropShelf.items)
         }
-        HeaderButton {
-            visible: DropShelf.items.length > 0
+        Chip {
+            visible: !xshelf.empty
             icon: "content_copy"
-            label: Translation.tr("Copy all")
+            tip: Translation.tr("Copy all")
             onTap: () => DropShelf.copyAll()
         }
-        HeaderButton {
-            visible: DropShelf.items.length > 0
-            icon: "delete_sweep"
-            label: Translation.tr("Clear")
-            onTap: () => DropShelf.clear()
+        Chip {
+            visible: !xshelf.empty
+            icon: "folder_open"
+            label: Translation.tr("Open folder")
+            onTap: () => Qt.openUrlExternally(`file://${xshelf.folder}`)
+        }
+        Chip {
+            id: clearChip
+            // Two taps: the first arms it for a moment, the second empties the drawer
+            property bool armed: false
+            visible: !xshelf.empty
+            icon: clearChip.armed ? "warning" : "delete_sweep"
+            label: clearChip.armed ? Translation.tr("Confirm") : Translation.tr("Clear all")
+            danger: clearChip.armed
+            onTap: () => {
+                if (clearChip.armed) {
+                    clearChip.armed = false
+                    DropShelf.clear()
+                } else {
+                    clearChip.armed = true
+                    disarm.restart()
+                }
+            }
+            Timer {
+                id: disarm
+                interval: 2600
+                onTriggered: clearChip.armed = false
+            }
         }
     }
 
-    StyledText {
+    // Empty state
+    ColumnLayout {
+        visible: xshelf.empty
         Layout.fillWidth: true
-        visible: DropShelf.items.length === 0
-        text: Translation.tr("Drag files onto the island to keep them here")
-        font.pixelSize: Appearance.font.pixelSize.smaller
-        color: Appearance.colors.colOnLayer0
-        opacity: 0.6
-        wrapMode: Text.Wrap
+        Layout.topMargin: 14
+        Layout.bottomMargin: 18
+        spacing: 3
+
+        Item {
+            id: emptyIcon
+            Layout.alignment: Qt.AlignHCenter
+            implicitWidth: 30
+            implicitHeight: 32
+            DiCascade { target: emptyIcon; index: 1 }
+            MaterialSymbol {
+                anchors.centerIn: parent
+                text: "move_to_inbox"
+                iconSize: 30
+                color: Appearance.colors.colOnLayer0
+                opacity: 0.35
+            }
+        }
+        StyledText {
+            id: emptyTitle
+            Layout.alignment: Qt.AlignHCenter
+            text: Translation.tr("Drawer is empty")
+            font.pixelSize: Appearance.font.pixelSize.smaller
+            font.weight: Font.DemiBold
+            color: Appearance.colors.colOnLayer0
+            DiCascade { target: emptyTitle; index: 2 }
+        }
+        StyledText {
+            id: emptyHint
+            Layout.alignment: Qt.AlignHCenter
+            Layout.maximumWidth: 300
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.Wrap
+            text: Translation.tr("Drag files onto the island to keep them here")
+                + (DropShelf.expireDays > 0 ? ` · ${Translation.tr("they stay for %1 days").arg(DropShelf.expireDays)}` : "")
+            font.pixelSize: Appearance.font.pixelSize.smallest
+            color: Appearance.colors.colOnLayer0
+            opacity: 0.55
+            DiCascade { target: emptyHint; index: 3 }
+        }
     }
 
-    Repeater {
-        model: xshelf.groups
+    // Grid; past two rows it scrolls, with the clipped edge fading out
+    Flickable {
+        id: gridFlick
+        visible: !xshelf.empty
+        Layout.fillWidth: true
+        Layout.preferredHeight: Math.min(grid.implicitHeight, xshelf.gridMax)
+        clip: true
+        contentHeight: grid.implicitHeight
+        boundsBehavior: Flickable.StopAtBounds
+        interactive: gridFlick.contentHeight > gridFlick.height + 1
 
-        delegate: ColumnLayout {
-            required property var modelData
-            Layout.fillWidth: true
-            spacing: 6
-
-            StyledText {
-                text: `${modelData.label} · ${modelData.items.length}`
-                font.pixelSize: Appearance.font.pixelSize.smallest
-                font.weight: Font.DemiBold
-                color: Appearance.colors.colOnLayer0
-                opacity: 0.65
-            }
-
-            Flow {
-                Layout.fillWidth: true
-                spacing: 8
-
-                Repeater {
-                    model: modelData.items
-                    delegate: Tile {
-                        required property string modelData
-                        required property int index
-                        path: modelData
-                        di: xshelf.di
-                        order: index
-                    }
+        readonly property real fade: 18 / Math.max(1, gridFlick.height)
+        layer.enabled: gridFlick.interactive
+        layer.effect: OpacityMask {
+            maskSource: Rectangle {
+                width: gridFlick.width
+                height: gridFlick.height
+                gradient: Gradient {
+                    GradientStop { position: 0; color: gridFlick.atYBeginning ? "black" : "transparent" }
+                    GradientStop { position: gridFlick.fade; color: "black" }
+                    GradientStop { position: 1 - gridFlick.fade; color: "black" }
+                    GradientStop { position: 1; color: gridFlick.atYEnd ? "black" : "transparent" }
                 }
             }
         }
-    }
 
-    StyledText {
-        Layout.fillWidth: true
-        visible: DropShelf.items.length > 0 && DropShelf.expireDays > 0
-        text: `${Translation.tr("Files leave the drawer after")} ${DropShelf.expireDays} ${Translation.tr("days")}`
-        font.pixelSize: Appearance.font.pixelSize.smallest
-        color: Appearance.colors.colOnLayer0
-        opacity: 0.45
+        Grid {
+            id: grid
+            width: gridFlick.width
+            columns: xshelf.columns
+            spacing: 8
+
+            Repeater {
+                model: xshelf.ordered.length
+                delegate: Tile {
+                    required property int index
+                    width: Math.floor((grid.width - (xshelf.columns - 1) * grid.spacing) / xshelf.columns)
+                    path: xshelf.ordered[index] ?? ""
+                    di: xshelf.di
+                    order: index
+                }
+            }
+        }
     }
 }
