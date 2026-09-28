@@ -306,12 +306,14 @@ Scope {
 
                     // The card's own surface, which a view can colour (Material You: the card takes the tone
                     // of what it shows). A view may declare `tint` (a colour for the whole card) and `backdrop`
-                    // (an image, e.g. the album art, blurred behind the tint). Painted here, under the content
-                    // and inside the island's own rounded clip, so it fills edge to edge, pager strip included,
-                    // and can never poke past the corners.
+                    // (an image, e.g. the album art, blurred behind the tint). Painted here, under the content,
+                    // with the island's own radius (its `clip` only cuts the bounding box, not the curve), so it
+                    // fills edge to edge, pager strip included, with the corners still round.
                     Item {
                         id: surfaceTint
                         anchors.fill: parent
+                        anchors.margins: island.border.width
+                        readonly property real cornerRadius: Math.max(0, island.radius - island.border.width)
                         readonly property color tint: detail.viewItem?.tint ?? "transparent"
                         readonly property string backdrop: detail.viewItem?.backdrop ?? ""
                         opacity: island.pc
@@ -328,9 +330,18 @@ Scope {
                             asynchronous: true
                             visible: false
                         }
+                        Rectangle {
+                            id: surfaceMask
+                            anchors.fill: parent
+                            radius: surfaceTint.cornerRadius
+                            visible: false
+                            layer.enabled: true
+                        }
                         MultiEffect {
                             anchors.fill: parent
                             source: backdropImage
+                            maskEnabled: true
+                            maskSource: surfaceMask
                             visible: surfaceTint.backdrop !== ""
                             blurEnabled: true
                             blur: 1
@@ -341,6 +352,7 @@ Scope {
                         }
                         Rectangle {
                             anchors.fill: parent
+                            radius: surfaceTint.cornerRadius
                             color: surfaceTint.tint
                             Behavior on color { ColorAnimation { duration: IslandMotion.long } }
                         }
@@ -482,17 +494,23 @@ Scope {
 
                         Repeater {
                             model: scope.di.switcherIds
+                            // Filled for what is active right now, a hollow ring for what is pinned (always there)
+                            // and for home, so you can tell at a glance which cards come and go
                             delegate: Rectangle {
                                 required property string modelData
                                 readonly property bool current: modelData === scope.di.expandedId
                                 readonly property bool splitPartner: modelData === scope.di.splitId
+                                readonly property bool active: scope.di.persistentIds.includes(modelData) || modelData === "privacy"
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: (current || splitPartner) ? 16 : 6
                                 height: 6
                                 radius: 3
                                 color: current ? Appearance.colors.colPrimary
                                     : splitPartner ? Appearance.colors.colSecondary
-                                    : ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.7)
+                                    : active ? ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.45)
+                                    : "transparent"
+                                border.width: current || splitPartner || active ? 0 : 1.2
+                                border.color: ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.45)
 
                                 Behavior on width {
                                     NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
