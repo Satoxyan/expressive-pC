@@ -43,7 +43,7 @@ Item {
         let c = 1
         const sl = Config.options.sidebar.quickSliders
         if (sl && sl.enable && (sl.showMic || sl.showVolume || sl.showBrightness)) c++
-        if (Config.options.sidebar.mediaPlayer && (root.activePlayer !== null || root.editMode)) c++
+        if (Config.options.sidebar.mediaPlayer && (root.hasMedia || root.editMode)) c++
         return c
     }
     readonly property bool threePanelsActive: root.activePanelCount >= 3
@@ -51,6 +51,8 @@ Item {
     readonly property bool shouldLimitRows: root.threePanelsActive && root.calendarExpanded && !root.editMode
 
     readonly property MprisPlayer activePlayer: MprisController.activePlayer
+    // phantom MPRIS (kdeconnect/playerctld with empty metadata) ≠ media
+    readonly property bool hasMedia: root.activePlayer !== null && ((root.activePlayer.trackTitle ?? "") !== "" || root.activePlayer.isPlaying)
     readonly property var realPlayers: MprisController.players
     readonly property var meaningfulPlayers: {
         const preferred = Config.options.bar.media.preferredPlayer.trim().toLowerCase()
@@ -387,7 +389,7 @@ Item {
                             const c = Config.options.sidebar.quickSliders
                             return c.enable && (c.showMic || c.showVolume || c.showBrightness)
                         }
-                        if (type === "media") return Config.options.sidebar.mediaPlayer && (root.activePlayer !== null || root.editMode)
+                        if (type === "media") return Config.options.sidebar.mediaPlayer && (root.hasMedia || root.editMode)
                         return false
                     }
                     function swapPanels(fromType, toType) {
@@ -728,20 +730,21 @@ Item {
     Component {
         id: mediaPanel
         Item {
-            implicitHeight: root.activePlayer !== null ? 160 : 80
+            // same sizing as bar popup: lyrics view needs 290 (MediaControls.qml)
+            implicitHeight: root.hasMedia ? (Config.options.bar.media.showLyrics ? 290 : Appearance.sizes.mediaControlsHeight) : 80
             Loader {
                 anchors.fill: parent
-                active: root.activePlayer !== null
+                active: root.hasMedia
                 sourceComponent: Player {
                     player: root.activePlayer
                     visualizerPoints: GlobalStates.visualizerPoints
-                    implicitHeight: 160
+                    implicitHeight: Config.options.bar.media.showLyrics ? 290 : Appearance.sizes.mediaControlsHeight
                     radius: Appearance.rounding.normal
                 }
             }
             ColumnLayout {
                 anchors.fill: parent
-                visible: root.activePlayer === null
+                visible: !root.hasMedia
                 spacing: 8
                 Item { Layout.fillHeight: true }
                 MaterialSymbol {

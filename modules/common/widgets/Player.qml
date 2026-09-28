@@ -148,10 +148,8 @@ Item {
                     blendedColors: root.blendedColors
                     displayedArtFilePath: root.displayedArtFilePath
                     radius: root.radius
-                    onToggleLyrics: {
-                        root.showLyrics = !root.showLyrics
-                        Config.options.bar.media.showLyrics = root.showLyrics
-                    }
+                    // write config only: assigning to root.showLyrics would break the binding above
+                    onToggleLyrics: Config.options.bar.media.showLyrics = !Config.options.bar.media.showLyrics
                 }
             }
 
@@ -163,10 +161,7 @@ Item {
                     displayedArtFilePath: root.displayedArtFilePath
                     radius: root.radius
                     artDominantColor: root.artDominantColor
-                    onToggleLyrics: {
-                        root.showLyrics = !root.showLyrics
-                        Config.options.bar.media.showLyrics = root.showLyrics
-                    }
+                    onToggleLyrics: Config.options.bar.media.showLyrics = !Config.options.bar.media.showLyrics
                 }
             }
         }

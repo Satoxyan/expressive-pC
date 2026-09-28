@@ -235,7 +235,6 @@ Item {
 
                     TrackChangeButton {
                         iconName: "lyrics"
-                        visible: !GlobalStates.sidebarRightOpen
                         downAction: () => root.toggleLyrics()
                     }
 
