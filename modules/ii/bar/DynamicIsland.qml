@@ -1812,8 +1812,12 @@ Item {
         pinFeedbackTimer.restart()
     }
 
+    // What the dots and wheel/swipe cycling reach: whatever is live right now, then the pinned views
+    // that are always around (even with nothing going on), then home last.
     readonly property var cycleIds: {
         const ids = root.persistentIds.filter(id => root.liveIds.includes(id))
+        for (const id of root.pinnedIds)
+            if (!ids.includes(id)) ids.push(id)
         ids.push("idle")
         return ids
     }
@@ -2566,7 +2570,7 @@ Item {
 
     Row {
         id: cyclePips
-        visible: !root.vertical && !root.overlayShown && root.liveActivityCount > 1
+        visible: !root.vertical && !root.overlayShown && root.cycleIds.length > 1
         readonly property real blockWidth: pill.width + (capsuleRow.visible ? capsuleRow.width : 0)
         x: pill.x + (cyclePips.blockWidth - cyclePips.implicitWidth) / 2
         y: pill.y + root.pillHeight + 2
@@ -2582,15 +2586,20 @@ Item {
             model: Math.min(7, root.cycleIds.length)
             delegate: Rectangle {
                 required property int index
+                readonly property string dotId: root.cycleIds[index] ?? ""
                 readonly property bool current: root.cycleIds.indexOf(root.primaryId) === index
                 readonly property bool home: root.homeIndex === index
+                // Live (something actually happening) reads as a plain dot; pinned-only (always there,
+                // nothing going on right now) reads hollow, same ring treatment as home
+                readonly property bool live: root.liveIds.includes(dotId)
+                readonly property bool pinnedOnly: !live && root.pinnedIds.includes(dotId)
                 width: current ? 8 : 3
                 height: 3
                 radius: 1.5
                 anchors.verticalCenter: parent.verticalCenter
                 color: current ? Appearance.colors.colPrimary
-                    : (home ? "transparent" : ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.55))
-                border.width: home && !current ? 1 : 0
+                    : (home || pinnedOnly ? "transparent" : ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.55))
+                border.width: (home || pinnedOnly) && !current ? 1 : 0
                 border.color: ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.35)
 
                 Behavior on width {
@@ -3185,7 +3194,9 @@ Item {
                     root.dismissSplit()
                     return
                 }
-                root.expandTo(2, root.hasDetails(root.primaryId) ? undefined : root.splitShownId)
+                // Tapping the second island should show what IT holds, not fall back to whatever the
+                // main pill happens to be (which almost always "has details" too, e.g. idle/home)
+                root.expandTo(2, root.hasDetails(root.splitShownId) ? root.splitShownId : undefined)
             }
         }
 
