@@ -372,7 +372,7 @@ Item {
                         anchors.fill: parent
                         anchors.margins: -4
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: diIdleRoot.di.expandTo(2, "calendar")
+                        onClicked: diIdleRoot.di.expandTo(2, "idle")
                     }
                 }
             }

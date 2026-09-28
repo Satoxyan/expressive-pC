@@ -2622,8 +2622,9 @@ Item {
                 cursorShape: Qt.PointingHandCursor
             }
 
+            // The clock opens home; the calendar is one click further, on the date there
             TapHandler {
-                onTapped: root.expandTo(2, "calendar")
+                onTapped: root.expandTo(2, "idle")
             }
             opacity: root.anchorShown ? 1 : 0
             visible: opacity > 0.01

@@ -187,13 +187,6 @@ ColumnLayout {
                     font.weight: Font.Medium
                     font.features: { "tnum": 1 }
                     color: Appearance.colors.colOnLayer0
-
-                    MouseArea {
-                        anchors.fill: parent
-                        anchors.margins: -6
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: xi.di.expand("calendar")
-                    }
                 }
 
                 RowLayout {
@@ -204,7 +197,17 @@ ColumnLayout {
                         text: DateTime.longDate
                         font.pixelSize: Appearance.font.pixelSize.smaller
                         color: Appearance.colors.colOnLayer0
-                        opacity: 0.65
+                        opacity: dateArea.containsMouse ? 0.95 : 0.65
+                        Behavior on opacity { NumberAnimation { duration: IslandMotion.micro } }
+
+                        MouseArea {
+                            id: dateArea
+                            anchors.fill: parent
+                            anchors.margins: -6
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: xi.di.expand("calendar")
+                        }
                     }
 
                     StyledText {
