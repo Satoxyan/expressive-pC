@@ -439,20 +439,35 @@ Singleton {
             data.seven_day?.used_percentage ?? 0, data.seven_day?.resets_at ?? 0)
     }
 
-    Timer {
-        interval: 60000
-        repeat: true
-        running: root.enabled && Object.values(root.limits).some(l => (l.five ?? 0) >= 70 && l.fiveReset)
-        onTriggered: {
-            for (const agent of Object.keys(root.limits)) {
-                const l = root.limits[agent]
-                if (!l.fiveReset) continue
-                const minutes = Math.round((l.fiveReset * 1000 - Date.now()) / 60000)
-                if (minutes > 0 && minutes <= 15 && (l.five ?? 0) >= 70)
-                    root.notice(`${agent}-5hsoon-${l.fiveReset}`, Translation.tr("%1 · 5h limit resets in %2 min").arg(root.agentNames[agent] ?? agent).arg(minutes),
-                        Translation.tr("%1% used so far").arg(Math.round(l.five)), "update", "attention")
-            }
+    // A 5h window that was getting full: say so the moment it actually resets ("free again"), not as a countdown
+    // before it. One single-shot timer aimed at the nearest such reset, re-aimed whenever the limits change.
+    readonly property real nextFullReset: {
+        let next = 0
+        for (const agent of Object.keys(root.limits)) {
+            const l = root.limits[agent]
+            const at = (l.fiveReset ?? 0) * 1000
+            if ((l.five ?? 0) >= 70 && at > Date.now() && (next === 0 || at < next)) next = at
         }
+        return next
+    }
+    Timer {
+        id: resetTimer
+        running: root.enabled && root.nextFullReset > 0
+        interval: Math.max(1000, Math.min(2147483647, root.nextFullReset - Date.now() + 2000))
+        onTriggered: root.announceResets()
+    }
+    function announceResets() {
+        const now = Date.now()
+        const updated = Object.assign({}, root.limits)
+        for (const agent of Object.keys(root.limits)) {
+            const l = root.limits[agent]
+            if ((l.five ?? 0) < 70 || !l.fiveReset || l.fiveReset * 1000 > now) continue
+            root.notice(`${agent}-5hfree-${l.fiveReset}`, Translation.tr("%1 · 5h limit reset").arg(root.agentNames[agent] ?? agent),
+                Translation.tr("Your session is free again"), "check_circle", "done")
+            // The next reading will bring the real number; until then the window is fresh
+            updated[agent] = Object.assign({}, l, { five: 0 })
+        }
+        root.limits = updated
     }
 
     function setContext(agent, sid, used, model) {

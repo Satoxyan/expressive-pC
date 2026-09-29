@@ -927,7 +927,10 @@ Item {
         if (IslandEvents.systemLoadActive) ids.push("systemLoad")
         if (IslandEvents.downloadActive || root.heldId === "download") ids.push("download")
         const agentActivityShown = IslandEvents.activities.some(a => ["claude", "codex", "gemini"].includes(a.icon))
-        if (ClaudeCode.openCount > 0 && (root.cfg.claudeCode ?? true) && !agentActivityShown && approvalActivity === "") ids.push("agents")
+        // Only while an agent is actually doing something (working, or waiting on you): an open but idle session
+        // has nothing to show, and the agents view stays one tap away from home
+        if ((ClaudeCode.anyWorking || ClaudeCode.anyWaiting) && (root.cfg.claudeCode ?? true) && !agentActivityShown && approvalActivity === "")
+            ids.push("agents")
         if (DropShelf.items.length > 0) ids.push("shelf")
         if (SongRec.running) ids.push("songRec")
         if (root.hasMedia) ids.push("media")

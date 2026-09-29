@@ -32,9 +32,46 @@ Item {
     readonly property bool boosted: osd.kind === "volume" && !osd.muted && osd.shown > 1.005
     readonly property color boostColor: IslandEvents.colorAttention
 
-    property real shown: osd.clamped
-    Behavior on shown {
-        NumberAnimation { duration: IslandMotion.micro; easing.type: Easing.OutCubic }
+    // The pill is a slider: press and drag anywhere on it to set the level, and the fill follows the finger on a
+    // spring (so it glides instead of stepping); a plain tap keeps the old ±5% edges and the centre opens it.
+    property bool dragging: false
+    property real dragValue: 0
+    readonly property real sliderMax: osd.kind === "volume" ? 1 : osd.maxValue
+    DiSpring {
+        id: shownSpring
+        target: osd.dragging ? osd.dragValue : osd.clamped
+        stiffness: osd.dragging ? 900 : 420
+        dampingRatio: 0.9
+        epsilon: 0.001
+    }
+    readonly property real shown: shownSpring.value
+    // A pressed pill swells a little, like a Material 3 slider thumb under the finger
+    DiSpring {
+        id: pressSpring
+        target: osd.dragging ? 1 : 0
+        stiffness: 500
+        dampingRatio: 0.7
+        epsilon: 0.002
+    }
+
+    function setLevel(v) {
+        if (osd.kind === "brightness") {
+            osd.pendingBrightness = v
+            if (!applyBrightness.running) applyBrightness.start()
+        } else if (osd.kind === "volume" && Audio.sink?.audio) {
+            Audio.sink.audio.muted = false
+            Audio.sink.audio.volume = Math.round(v * 100) / 100
+        }
+    }
+    // Brightness goes through ddcutil/brightnessctl: apply at most every 60 ms while dragging
+    property real pendingBrightness: -1
+    Timer {
+        id: applyBrightness
+        interval: 60
+        onTriggered: {
+            if (osd.pendingBrightness >= 0) osd.brightnessMonitor?.setBrightness(osd.pendingBrightness)
+            osd.pendingBrightness = -1
+        }
     }
 
     Rectangle {
@@ -46,7 +83,7 @@ Item {
         }
         width: Math.max(height, parent.width * Math.max(0, Math.min(1, osd.shown)))
         radius: height / 2
-        color: ColorUtils.transparentize(Appearance.colors.colPrimary, osd.muted ? 0.92 : 0.7)
+        color: ColorUtils.transparentize(Appearance.colors.colPrimary, osd.muted ? 0.92 : (0.7 - 0.15 * pressSpring.value))
 
         Behavior on color {
             ColorAnimation { duration: IslandMotion.short }
@@ -58,11 +95,11 @@ Item {
                 rightMargin: 6
                 verticalCenter: parent.verticalCenter
             }
-            width: 3
-            height: parent.height * 0.5
-            radius: 1.5
+            width: 3 + 2 * pressSpring.value
+            height: parent.height * (0.5 + 0.25 * pressSpring.value)
+            radius: width / 2
             color: Appearance.colors.colPrimary
-            opacity: osd.muted || osd.boosted ? 0 : 0.8
+            opacity: osd.muted || osd.boosted ? 0 : 0.8 + 0.2 * pressSpring.value
         }
     }
 
@@ -104,12 +141,38 @@ Item {
         id: zones
         anchors.fill: parent
         hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
-        onClicked: mouse => {
+        preventStealing: true
+        cursorShape: osd.dragging ? Qt.SizeHorCursor : Qt.PointingHandCursor
+        enabled: osd.kind !== "gamma"
+        property real pressX: 0
+
+        function levelAt(x) {
+            return Math.max(0, Math.min(osd.sliderMax, x / width * osd.sliderMax))
+        }
+        onPressed: mouse => {
+            zones.pressX = mouse.x
+            osd.di.childTapAt = Date.now()
+        }
+        onPositionChanged: mouse => {
+            if (!pressed) return
+            if (!osd.dragging && Math.abs(mouse.x - zones.pressX) < 5) return
+            osd.dragging = true
+            osd.dragValue = zones.levelAt(mouse.x)
+            osd.setLevel(osd.dragValue)
+        }
+        onReleased: mouse => {
+            osd.di.childTapAt = Date.now()
+            if (osd.dragging) {
+                osd.dragValue = zones.levelAt(mouse.x)
+                osd.setLevel(osd.dragValue)
+                osd.dragging = false
+                return
+            }
             if (mouse.x < width * 0.38) osd.nudge(-0.05)
             else if (mouse.x > width * 0.62) osd.nudge(0.05)
             else osd.di.toggleExpanded()
         }
+        onCanceled: osd.dragging = false
     }
 
     MaterialSymbol {
@@ -121,7 +184,7 @@ Item {
         text: "remove"
         iconSize: 14
         color: Appearance.colors.colOnLayer0
-        opacity: zones.containsMouse && zones.mouseX < zones.width * 0.38 ? 0.9 : (zones.containsMouse ? 0.3 : 0)
+        opacity: osd.dragging ? 0 : (zones.containsMouse && zones.mouseX < zones.width * 0.38 ? 0.9 : (zones.containsMouse ? 0.3 : 0))
 
         Behavior on opacity {
             NumberAnimation { duration: IslandMotion.micro }
@@ -137,7 +200,7 @@ Item {
         text: "add"
         iconSize: 14
         color: Appearance.colors.colOnLayer0
-        opacity: zones.containsMouse && zones.mouseX > zones.width * 0.62 ? 0.9 : (zones.containsMouse ? 0.3 : 0)
+        opacity: osd.dragging ? 0 : (zones.containsMouse && zones.mouseX > zones.width * 0.62 ? 0.9 : (zones.containsMouse ? 0.3 : 0))
 
         Behavior on opacity {
             NumberAnimation { duration: IslandMotion.micro }
