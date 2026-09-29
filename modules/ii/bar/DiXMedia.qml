@@ -45,6 +45,12 @@ Item {
     readonly property color tint: xm.albumColors ? xm.tone(xm.dark ? 0.12 : 0.93, 0.72) : "transparent"
     readonly property string backdrop: xm.albumColors ? (xm.player?.trackArtUrl ?? "") : ""
 
+    // Opening while paused: fetch the real position and put the highlight where the song stopped
+    Component.onCompleted: {
+        xm.player?.positionChanged()
+        Qt.callLater(LyricsService.resync)
+    }
+
     function formatTime(seconds) {
         const s = Math.max(0, Math.floor(seconds))
         return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`
@@ -444,7 +450,7 @@ Item {
                         id: lyricLine
                         required property var modelData
                         required property int index
-                        readonly property int distance: Math.abs(lyricLine.index - LyricsService.activeIndex)
+                        readonly property int distance: Math.abs(lyricLine.index - Math.max(0, LyricsService.activeIndex))
                         width: lyricsList.width
                         horizontalAlignment: Text.AlignHCenter
                         text: lyricLine.modelData.text || "♪"
