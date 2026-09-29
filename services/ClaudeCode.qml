@@ -13,6 +13,7 @@ Singleton {
     id: root
 
     readonly property bool enabled: Config.ready && (Config.options.bar.dynamicIsland.claudeCode ?? true)
+    onEnabledChanged: if (!root.enabled) Object.keys(root.sessions).forEach(key => IslandEvents.removeActivity(root.activityId(key)))
     readonly property int doneMinSeconds: Config.options.bar.dynamicIsland.claudeDoneMinSeconds ?? 20
     readonly property string home: Quickshell.env("HOME")
 
