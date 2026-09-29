@@ -896,7 +896,7 @@ Singleton {
                     property list<string> mutedConversations: [] // "App|Title" keys the island doesn't show
                     property list<string> mutedConversationsUntil: [] // "<epoch ms>|App|Title": muted for a while (1 h, until tomorrow)
                     property list<string> priorityNotificationApps: ["whatsapp"] // only these reveal the island by themselves
-                    property list<string> caseArtDevices: ["liberty 4 nc"] // Bluetooth names (substring) shown as the animated earbuds case
+                    property list<string> caseArtDevices: [] // Bluetooth names (substring) shown as the animated earbuds case
                     property bool pauseOnHeadphonesDisconnect: true // and resume when they reconnect
                     property bool followHeadphones: true // move the sound to headphones as soon as they connect
                     property bool claudeCode: true // Claude Code sessions (hooks + statusline caches)

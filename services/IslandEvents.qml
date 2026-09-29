@@ -532,8 +532,6 @@ Singleton {
 
     readonly property bool voiceCallActive: root.fakeCall || root.privacyLinks.some(link => link.source.type === PwNodeType.AudioSource
         && /vesktop|discord|webcord/i.test(`${link.target.properties?.["application.name"] ?? ""} ${link.target.properties?.["application.process.binary"] ?? ""}`))
-    property bool ztWarned: false
-    property bool ztStoppedForCall: false
 
     readonly property var callAppPattern: /vesktop|discord|webcord/i
     readonly property var callInStreams: root.privacyLinks.filter(link => link.source.type === PwNodeType.AudioSource
@@ -605,90 +603,36 @@ Singleton {
     onVoiceCallActiveChanged: {
         root.voiceCallSince = root.voiceCallActive ? Date.now() : 0
         root.voiceCallMinutes = 0
-        if (root.voiceCallActive) {
-            ztProbe.running = true
-            return
-        }
-        root.ztWarned = false
-        if (root.ztStoppedForCall) {
-            root.ztStoppedForCall = false
-            root.networkAlert.show({ kind: "ztRestore", name: "ZeroTier" }, 15000)
-        }
     }
 
-    Timer {
-        interval: 15000
-        repeat: true
-        running: root.voiceCallActive && !root.ztWarned
-        onTriggered: ztProbe.running = true
+    // Optional local ZeroTier backend: everything below stays off and hidden when the file is absent
+    property bool ztFilePresent: false
+    FileView {
+        path: Quickshell.shellPath("services/local/ZeroTierBackend.qml")
+        printErrors: false
+        onLoaded: root.ztFilePresent = true
+        onLoadFailed: root.ztFilePresent = false
     }
-
-    Process {
-        id: ztProbe
-        command: ["sh", "-c", "ls /sys/class/net | grep -q '^zt'"]
-        onExited: (exitCode, exitStatus) => {
-            if (exitCode !== 0 || !root.voiceCallActive || root.ztWarned || !(root.cfg.network ?? true)) return
-            root.ztWarned = true
-            root.networkAlert.show({ kind: "zerotier", name: "ZeroTier" }, 15000)
-        }
+    Loader {
+        id: ztLoader
+        active: root.ztFilePresent
+        source: Qt.resolvedUrl("local/ZeroTierBackend.qml")
     }
-
-    Process {
-        id: ztControl
-        property bool starting: false
-        onExited: (exitCode, exitStatus) => {
-            if (exitCode !== 0) {
-                root.networkAlert.show({ kind: "ztFailed", name: "ZeroTier" })
-                return
-            }
-            if (ztControl.starting) {
-                root.networkAlert.show({ kind: "connected", name: "ZeroTier" })
-            } else {
-                root.ztStoppedForCall = root.voiceCallActive
-                root.networkAlert.show({ kind: "ztOff", name: "ZeroTier" })
-            }
-        }
-    }
+    readonly property var ztBackend: ztLoader.item
+    readonly property bool ztAvailable: root.ztBackend !== null && root.ztBackend !== undefined
+    readonly property bool ztUp: root.ztAvailable && root.ztBackend.up
+    readonly property string ztNetwork: root.ztAvailable ? root.ztBackend.network : ""
+    readonly property bool ztBusy: root.ztAvailable && root.ztBackend.busy
+    // Views showing it register here while they exist; the backend only polls while someone looks
+    property int ztViewers: 0
+    readonly property bool ztWatch: root.ztViewers > 0
 
     function setZeroTier(on) {
-        if (ztControl.running) return
-        ztControl.starting = on
-        ztControl.command = ["sudo", "-n", "systemctl", on ? "start" : "stop", "zerotier-one"]
-        ztControl.running = true
+        if (root.ztAvailable) root.ztBackend.set(on)
     }
 
     function toggleZeroTier() {
         root.setZeroTier(!root.ztUp)
-    }
-
-    property bool ztUp: false
-    property string ztNetwork: ""
-    property bool ztBusy: ztControl.running
-
-    Process {
-        id: ztState
-        command: ["sh", "-c", "ip -o -4 addr show | awk '$2 ~ /^zt/ { print $2\" \"$4 }'"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const line = text.trim().split("\n")[0] ?? ""
-                root.ztUp = line !== ""
-                root.ztNetwork = line === "" ? "" : line.split(" ")[1].split("/")[0]
-            }
-        }
-    }
-
-    // Views showing ZeroTier register here while they exist; the state is only polled while someone looks
-    property int ztViewers: 0
-    readonly property bool ztWatch: root.ztViewers > 0
-
-    // Only while it matters: a call (where ZeroTier can break the voice) or while its view is watching.
-    // Nothing runs zerotier-cli in the background otherwise.
-    Timer {
-        interval: 5000
-        repeat: true
-        running: (root.cfg.network ?? true) && Config.ready && (root.ztWatch || root.voiceCallActive)
-        triggeredOnStart: true
-        onTriggered: ztState.running = true
     }
 
     property bool portalChecking: false
@@ -1939,11 +1883,11 @@ Singleton {
     function simulate(name) {
         switch (name) {
             case "bluetooth":
-                root.bluetooth.show({ address: "simulado", name: "Soundcore Liberty 4 NC", icon: "audio-headset", phase: "connecting" }, 20000)
-                root.later(2600, () => root.bluetooth.show({ address: "simulado", name: "Soundcore Liberty 4 NC", icon: "audio-headset", phase: "connected" }))
+                root.bluetooth.show({ address: "simulado", name: "Wireless earbuds", icon: "audio-headset", phase: "connecting" }, 20000)
+                root.later(2600, () => root.bluetooth.show({ address: "simulado", name: "Wireless earbuds", icon: "audio-headset", phase: "connected" }))
                 break
             case "audioOutput":
-                root.audioOutput.show({ name: "Liberty 4 NC", icon: "earbuds", isBluetooth: true, switching: true }, 4200)
+                root.audioOutput.show({ name: "Wireless earbuds", icon: "earbuds", isBluetooth: true, switching: true }, 4200)
                 break
             case "weather":
                 root.weather.show({ group: 5, code: 501, temp: Weather.data?.temp || "21°C", description: "chuva moderada", city: Weather.data?.city ?? "" })
@@ -2002,13 +1946,13 @@ Singleton {
                 root.networkAlert.show({ kind: "lost", name: root.lastNetworkName || "Casa 5G" })
                 break
             case "zerotier":
-                root.networkAlert.show({ kind: "zerotier", name: "ZeroTier" }, 15000)
+                if (root.ztAvailable) root.networkAlert.show({ kind: "zerotier", name: "ZeroTier" }, 15000)
                 break
             case "wifiWeak":
                 root.networkAlert.show({ kind: "weak", name: Network.networkName || "Casa 5G", strength: 22, rate: "13 Mbps" }, 8000)
                 break
             case "headphonesLow":
-                root.bluetooth.show({ address: "simulado", name: "Soundcore Liberty 4 NC", icon: "audio-headset", phase: "lowBattery", battery: 0.2 }, 7000)
+                root.bluetooth.show({ address: "simulado", name: "Wireless earbuds", icon: "audio-headset", phase: "lowBattery", battery: 0.2 }, 7000)
                 break
             case "netNew":
                 root.networkAlert.show({ kind: "connected", name: "Café Wi-Fi" })

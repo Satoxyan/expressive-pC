@@ -664,6 +664,7 @@ ContentPage {
                         }
                     }
                     ConfigSwitch {
+                        visible: IslandEvents.ztAvailable
                         buttonIcon: "vpn_lock"
                         text: "ZeroTier"
                         checked: (Config.options.bar.dynamicIsland.pinned ?? []).includes("zerotier")

@@ -276,19 +276,22 @@ RowLayout {
                 }
 
                 Loader {
+                    id: caseLoader
                     active: xb.caseArt
-                    visible: active
+                    visible: status === Loader.Ready
                     anchors.centerIn: parent
                     width: 52
                     height: 52
-                    sourceComponent: DiEarbudsCase {
-                        open: xb.connected
-                        busy: xb.busy
+                    // Optional local art: the generic icon shows when the file is absent
+                    source: Qt.resolvedUrl("DiEarbudsCase.qml")
+                    onLoaded: {
+                        item.open = Qt.binding(() => xb.connected)
+                        item.busy = Qt.binding(() => xb.busy)
                     }
                 }
 
                 MaterialSymbol {
-                    visible: !xb.caseArt
+                    visible: caseLoader.status !== Loader.Ready
                     anchors.centerIn: parent
                     text: IslandEvents.bluetoothSymbol(xb.icon)
                     iconSize: 34

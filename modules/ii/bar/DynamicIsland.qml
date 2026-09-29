@@ -635,7 +635,7 @@ Item {
 
     readonly property var criticalIds: ["hibernate", "session", "approval"]
     readonly property var liveIds: ["recording", "call", "f1", "timer", "activity", "systemLoad", "download", "agents", "songRec", "media"]
-    readonly property var toolIds: ["weather", "shelf", "clipboard", "system", "zerotier", "history"]
+    readonly property var toolIds: ["weather", "shelf", "clipboard", "system", "history"].concat(IslandEvents.ztAvailable ? ["zerotier"] : [])
     readonly property var peekIds: root.interruptIds.filter(id => !root.criticalIds.includes(id))
 
     function isCriticalNow(id) {
@@ -1086,7 +1086,7 @@ Item {
     property bool forceIdle: false
     onInterruptIdChanged: if (root.interruptId !== "") Qt.callLater(() => root.forceIdle = false)
 
-    readonly property var pinnableIds: ["weather", "shelf", "clipboard", "system", "media", "f1", "agents", "download", "zerotier"]
+    readonly property var pinnableIds: ["weather", "shelf", "clipboard", "system", "media", "f1", "agents", "download"].concat(IslandEvents.ztAvailable ? ["zerotier"] : [])
     readonly property var pinnedIds: (root.cfg.pinned ?? []).filter(id => root.pinnableIds.includes(id))
 
     readonly property string rawPrimaryId: {
@@ -1385,7 +1385,7 @@ Item {
         root.wantsKeyboard = true
         root.expandTo(2)
     }
-    readonly property var standaloneViews: ["watchRating", "privacy", "f1", "idle", "weather", "shelf", "overview", "system", "download", "history", "audioOutput", "calendar", "agents", "clipboard", "zerotier"]
+    readonly property var standaloneViews: ["watchRating", "privacy", "f1", "idle", "weather", "shelf", "overview", "system", "download", "history", "audioOutput", "calendar", "agents", "clipboard"].concat(IslandEvents.ztAvailable ? ["zerotier"] : [])
     readonly property string expandedId: root.expandedOverride !== "" ? root.expandedOverride : root.primaryId
 
     readonly property Item surfaceItem: {
@@ -1517,7 +1517,8 @@ Item {
     }
 
     readonly property var splitCandidates: {
-        const always = ["system", "shelf", "agents", "zerotier", "history"]
+        const always = ["system", "shelf", "agents", "history"]
+        if (IslandEvents.ztAvailable) always.push("zerotier")
         if (F1.enabled) always.push("f1")
         if (root.hasMedia) always.push("media")
         const ids = []
@@ -3382,7 +3383,14 @@ Item {
     Component { id: downloadDoneComponent; DiDownloadDone { di: root } }
     Component { id: agentsComponent; DiAgents { di: root } }
     Component { id: historyComponent; DiHistory { di: root } }
-    Component { id: zerotierComponent; DiZeroTier { di: root } }
+    // Optional local view; only offered when IslandEvents.ztAvailable
+    Component {
+        id: zerotierComponent
+        Loader {
+            anchors.fill: parent
+            Component.onCompleted: setSource(Qt.resolvedUrl("local/DiZeroTier.qml"), { di: root })
+        }
+    }
     Component { id: hardwareComponent; DiHardware { di: root } }
     Component { id: sessionComponent; DiSession { di: root } }
     Component { id: watchRatingComponent; DiWatch { di: root } }

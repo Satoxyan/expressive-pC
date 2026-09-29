@@ -24,23 +24,26 @@ RowLayout {
     readonly property string shortName: IslandEvents.shortName(bt.payload.name ?? "")
 
     readonly property bool caseArt: IslandEvents.hasCaseArt(bt.payload.name) && IslandEvents.caseClosedArt !== ""
+    readonly property bool caseShown: caseLoader.status === Loader.Ready
 
     Loader {
         id: caseLoader
         active: bt.caseArt
-        visible: active
+        visible: bt.caseShown
         Layout.preferredWidth: 30
         Layout.preferredHeight: 30
         DiEntrance { target: caseLoader }
-        sourceComponent: DiEarbudsCase {
-            open: bt.connected
-            busy: bt.phase === "connecting"
+        // Optional local art: nothing is drawn (generic icon instead) when the file is absent
+        source: Qt.resolvedUrl("DiEarbudsCase.qml")
+        onLoaded: {
+            item.open = Qt.binding(() => bt.connected)
+            item.busy = Qt.binding(() => bt.phase === "connecting")
         }
     }
 
     MaterialShapeWrappedMaterialSymbol {
         id: btShape
-        visible: !bt.caseArt
+        visible: !bt.caseShown
 
         DiEntrance { target: btShape }
         wrappedShape: bt.phase === "connecting" ? MaterialShape.Shape.Cookie12Sided

@@ -641,6 +641,7 @@ ColumnLayout {
             onTap: () => xi.di.expand("history")
         }
         Shortcut {
+            visible: IslandEvents.ztAvailable
             order: 12
             icon: "vpn_lock"
             label: "ZeroTier"
