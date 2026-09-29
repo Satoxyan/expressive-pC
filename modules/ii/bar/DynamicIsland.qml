@@ -2392,8 +2392,10 @@ Item {
                             anchors.bottom: parent.bottom
                             color: parent.parent.hasArt ? "white" : Appearance.colors.colPrimary
 
+                            // Only while these bars can actually be seen: an invisible looping animation still
+                            // drives a repaint of the whole bar every frame
                             SequentialAnimation on height {
-                                running: root.activePlayer?.isPlaying ?? false
+                                running: (root.activePlayer?.isPlaying ?? false) && bar.visible && deck.visible
                                 loops: Animation.Infinite
                                 PauseAnimation { duration: bar.index * 120 }
                                 NumberAnimation { to: 9; duration: 260; easing.type: Easing.OutQuad }

@@ -21,6 +21,9 @@ RowLayout {
     readonly property color accent: zt.risky ? IslandEvents.colorAttention
         : zt.up ? IslandEvents.colorSuccess : Appearance.colors.colOnLayer0
 
+    Component.onCompleted: IslandEvents.ztViewers++
+    Component.onDestruction: IslandEvents.ztViewers = Math.max(0, IslandEvents.ztViewers - 1)
+
     Binding {
         target: IslandEvents
         property: "ztWatch"

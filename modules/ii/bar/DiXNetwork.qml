@@ -19,8 +19,13 @@ ColumnLayout {
 
     // Which of the two this instance is, fixed at creation: the island's id moves on while this one fades out
     property string openedAs: xnet.di.expandedId
-    Component.onCompleted: xnet.openedAs = xnet.openedAs
     readonly property bool ztMode: xnet.openedAs === "zerotier"
+    // While the ZeroTier page is up, keep its on/off state fresh (nothing polls it otherwise)
+    Component.onCompleted: {
+        xnet.openedAs = xnet.openedAs
+        if (xnet.ztMode) IslandEvents.ztViewers++
+    }
+    Component.onDestruction: if (xnet.ztMode) IslandEvents.ztViewers = Math.max(0, IslandEvents.ztViewers - 1)
 
     component SectionLabel: StyledText {
         font.pixelSize: Appearance.font.pixelSize.smallest

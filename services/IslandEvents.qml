@@ -677,12 +677,16 @@ Singleton {
         }
     }
 
-    property bool ztWatch: false
+    // Views showing ZeroTier register here while they exist; the state is only polled while someone looks
+    property int ztViewers: 0
+    readonly property bool ztWatch: root.ztViewers > 0
 
+    // Only while it matters: a call (where ZeroTier can break the voice) or while its view is watching.
+    // Nothing runs zerotier-cli in the background otherwise.
     Timer {
-        interval: (root.ztWatch || root.voiceCallActive) ? 5000 : 120000
+        interval: 5000
         repeat: true
-        running: (root.cfg.network ?? true) && Config.ready
+        running: (root.cfg.network ?? true) && Config.ready && (root.ztWatch || root.voiceCallActive)
         triggeredOnStart: true
         onTriggered: ztState.running = true
     }
