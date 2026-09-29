@@ -1386,11 +1386,11 @@ Item {
         return pill
     }
 
+    // Same order as the compact cycle: pinned (behind home), home, then what is active
     readonly property var switcherIds: {
-        const ids = root.persistentIds.filter(id => root.hasDetails(id))
-        ids.push("idle")
-        for (const id of root.pinnedIds) if (!ids.includes(id)) ids.push(id)
-        if ((root.cfg.privacyIndicators ?? true) && IslandEvents.anyPrivacy) ids.push("privacy")
+        const ids = [...root.pinnedOnlyIds, "idle"]
+        for (const id of root.persistentIds) if (root.hasDetails(id) && !ids.includes(id)) ids.push(id)
+        if ((root.cfg.privacyIndicators ?? true) && IslandEvents.anyPrivacy && !ids.includes("privacy")) ids.push("privacy")
         return ids
     }
 
@@ -1814,31 +1814,18 @@ Item {
 
     // What the dots and wheel/swipe cycling reach: whatever is live right now, then the pinned views
     // that are always around (even with nothing going on), then home last.
-    readonly property var cycleIds: {
-        const ids = root.persistentIds.filter(id => root.liveIds.includes(id))
-        for (const id of root.pinnedIds)
-            if (!ids.includes(id)) ids.push(id)
-        ids.push("idle")
-        return ids
-    }
+    // Pinned views sit behind home, live things ahead of it: scrolling back from home reaches the pinned ones,
+    // forward the live ones. The expanded pager shows the same split.
+    readonly property var pinnedOnlyIds: root.pinnedIds.filter(id => !root.persistentIds.includes(id))
+    readonly property var cycleIds: [...root.pinnedOnlyIds, "idle",
+        ...root.persistentIds.filter(id => root.liveIds.includes(id) && !root.pinnedOnlyIds.includes(id))]
 
     readonly property int liveActivityCount: root.persistentIds.filter(id => root.liveIds.includes(id)).length
 
     readonly property int homeIndex: root.cycleIds.indexOf("idle")
     readonly property bool atHome: root.primaryId === "idle" || root.primaryId === root.rawPrimaryId
 
-    property bool cycleHintShown: false
-    Timer {
-        id: cycleHintTimer
-        interval: 1600
-        onTriggered: root.cycleHintShown = false
-    }
-
     function cycleIsland(direction) {
-        if (!root.expanded && root.interruptId === "" && root.cycleIds.length > 1) {
-            root.cycleHintShown = true
-            cycleHintTimer.restart()
-        }
         if (root.expanded) {
             const ids = root.switcherIds
             if (ids.length < 2) return
@@ -2563,47 +2550,6 @@ Item {
                         opacity: 0.6
                         elide: Text.ElideRight
                     }
-                }
-            }
-        }
-    }
-
-    Row {
-        id: cyclePips
-        visible: !root.vertical && !root.overlayShown && root.cycleIds.length > 1
-        readonly property real blockWidth: pill.width + (capsuleRow.visible ? capsuleRow.width : 0)
-        x: pill.x + (cyclePips.blockWidth - cyclePips.implicitWidth) / 2
-        y: pill.y + root.pillHeight + 2
-        spacing: 3
-        opacity: (root.cycleHintShown || root.hoverRevealed) ? 1 : 0
-        z: 3
-
-        Behavior on opacity {
-            NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
-        }
-
-        Repeater {
-            model: Math.min(7, root.cycleIds.length)
-            delegate: Rectangle {
-                required property int index
-                readonly property string dotId: root.cycleIds[index] ?? ""
-                readonly property bool current: root.cycleIds.indexOf(root.primaryId) === index
-                readonly property bool home: root.homeIndex === index
-                // Live (something actually happening) reads as a plain dot; pinned-only (always there,
-                // nothing going on right now) reads hollow, same ring treatment as home
-                readonly property bool live: root.liveIds.includes(dotId)
-                readonly property bool pinnedOnly: !live && root.pinnedIds.includes(dotId)
-                width: current ? 8 : 3
-                height: 3
-                radius: 1.5
-                anchors.verticalCenter: parent.verticalCenter
-                color: current ? Appearance.colors.colPrimary
-                    : (home || pinnedOnly ? "transparent" : ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.55))
-                border.width: (home || pinnedOnly) && !current ? 1 : 0
-                border.color: ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.35)
-
-                Behavior on width {
-                    NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
                 }
             }
         }

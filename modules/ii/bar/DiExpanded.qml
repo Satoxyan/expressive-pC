@@ -22,6 +22,37 @@ import qs.modules.common.functions
 // gets smaller while you scroll never slides out from under the pointer.
 Scope {
     id: scope
+
+    // Pinned views on the left (scrolling back from home), as small hollow squares, a
+    // little apart; then home and what is active as round dots. The current card is the wide one.
+    component PagerDot: Rectangle {
+        id: dot
+        required property string dotId
+        readonly property bool pinned: scope.di.pinnedOnlyIds.includes(dot.dotId)
+        readonly property bool current: dot.dotId === scope.di.expandedId
+        readonly property bool splitPartner: dot.dotId === scope.di.splitId
+        readonly property bool home: dot.dotId === "idle"
+        anchors.verticalCenter: parent.verticalCenter
+        width: (dot.current || dot.splitPartner) ? 16 : 6
+        height: 6
+        radius: dot.pinned && !dot.current ? 1.5 : 3
+        color: dot.current ? Appearance.colors.colPrimary
+            : dot.splitPartner ? Appearance.colors.colSecondary
+            : (dot.pinned || dot.home) ? "transparent"
+            : ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.45)
+        border.width: !dot.current && !dot.splitPartner && (dot.pinned || dot.home) ? 1.2 : 0
+        border.color: ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.45)
+
+        Behavior on width { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+        Behavior on radius { NumberAnimation { duration: 200 } }
+
+        MouseArea {
+            anchors.fill: parent
+            anchors.margins: -4
+            cursorShape: Qt.PointingHandCursor
+            onClicked: scope.di.selectForSplit(dot.dotId)
+        }
+    }
     required property Item di
     required property Item pillItem
 
@@ -309,6 +340,14 @@ Scope {
                     // (an image, e.g. the album art, blurred behind the tint). Painted here, under the content,
                     // with the island's own radius (its `clip` only cuts the bounding box, not the curve), so it
                     // fills edge to edge, pager strip included, with the corners still round.
+                    // The rounded shape the surface is cut to (a sibling, so the masked layer doesn't recurse)
+                    Rectangle {
+                        id: surfaceMask
+                        anchors.fill: surfaceTint
+                        radius: surfaceTint.cornerRadius
+                        visible: false
+                        layer.enabled: true
+                    }
                     Item {
                         id: surfaceTint
                         anchors.fill: parent
@@ -318,6 +357,13 @@ Scope {
                         readonly property string backdrop: detail.viewItem?.backdrop ?? ""
                         opacity: island.pc
                         visible: surfaceTint.opacity > 0.01 && (surfaceTint.tint.a > 0 || surfaceTint.backdrop !== "")
+                        // Backdrop and tint are cut to the curve together, as one layer: masking the blur alone
+                        // let its padding spill past the bottom corners as square edges
+                        layer.enabled: surfaceTint.visible
+                        layer.effect: MultiEffect {
+                            maskEnabled: true
+                            maskSource: surfaceMask
+                        }
 
                         Image {
                             id: backdropImage
@@ -330,18 +376,10 @@ Scope {
                             asynchronous: true
                             visible: false
                         }
-                        Rectangle {
-                            id: surfaceMask
-                            anchors.fill: parent
-                            radius: surfaceTint.cornerRadius
-                            visible: false
-                            layer.enabled: true
-                        }
                         MultiEffect {
                             anchors.fill: parent
                             source: backdropImage
-                            maskEnabled: true
-                            maskSource: surfaceMask
+                            autoPaddingEnabled: false
                             visible: surfaceTint.backdrop !== ""
                             blurEnabled: true
                             blur: 1
@@ -352,7 +390,6 @@ Scope {
                         }
                         Rectangle {
                             anchors.fill: parent
-                            radius: surfaceTint.cornerRadius
                             color: surfaceTint.tint
                             Behavior on color { ColorAnimation { duration: IslandMotion.long } }
                         }
@@ -492,36 +529,32 @@ Scope {
                         spacing: 5
                         opacity: Math.max(0, Math.min(1, (island.p - 0.6) / 0.4))
 
+
+                        Row {
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 4
+                            visible: scope.di.pinnedOnlyIds.length > 0
+                            Repeater {
+                                model: scope.di.pinnedOnlyIds
+                                delegate: PagerDot {
+                                    required property string modelData
+                                    dotId: modelData
+                                }
+                            }
+                        }
+                        // A thin divider between the pinned group and the rest
+                        Rectangle {
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: scope.di.pinnedOnlyIds.length > 0
+                            width: 1
+                            height: 8
+                            color: ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.7)
+                        }
                         Repeater {
-                            model: scope.di.switcherIds
-                            // Filled for what is active right now, a hollow ring for what is pinned (always there)
-                            // and for home, so you can tell at a glance which cards come and go
-                            delegate: Rectangle {
+                            model: scope.di.switcherIds.filter(id => !scope.di.pinnedOnlyIds.includes(id))
+                            delegate: PagerDot {
                                 required property string modelData
-                                readonly property bool current: modelData === scope.di.expandedId
-                                readonly property bool splitPartner: modelData === scope.di.splitId
-                                readonly property bool active: scope.di.persistentIds.includes(modelData) || modelData === "privacy"
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: (current || splitPartner) ? 16 : 6
-                                height: 6
-                                radius: 3
-                                color: current ? Appearance.colors.colPrimary
-                                    : splitPartner ? Appearance.colors.colSecondary
-                                    : active ? ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.45)
-                                    : "transparent"
-                                border.width: current || splitPartner || active ? 0 : 1.2
-                                border.color: ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.45)
-
-                                Behavior on width {
-                                    NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    anchors.margins: -4
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: scope.di.selectForSplit(parent.modelData)
-                                }
+                                dotId: modelData
                             }
                         }
                     }
