@@ -134,14 +134,40 @@ Item {
             NumberAnimation { duration: IslandMotion.short; easing.type: Easing.OutCubic }
         }
 
-        StyledText {
+        // Title: shown whole; scrolls gently only when it still overflows
+        Item {
+            id: titleBox
             Layout.fillWidth: true
-            text: media.player?.trackTitle ?? ""
-            font.pixelSize: Appearance.font.pixelSize.smaller
-            font.weight: Font.DemiBold
-            color: Appearance.colors.colOnLayer0
-            elide: Text.ElideRight
-            maximumLineCount: 1
+            implicitHeight: titleText.implicitHeight
+            clip: true
+
+            readonly property real overflow: Math.max(0, titleText.implicitWidth - titleBox.width)
+            readonly property bool scrolling: titleBox.overflow > 1 && media.di.mediaTrackInfoVisible
+
+            StyledText {
+                id: titleText
+                text: media.player?.trackTitle ?? ""
+                font.pixelSize: Appearance.font.pixelSize.smaller
+                font.weight: Font.DemiBold
+                color: Appearance.colors.colOnLayer0
+                maximumLineCount: 1
+                width: Math.max(implicitWidth, titleBox.width)
+            }
+
+            SequentialAnimation {
+                running: titleBox.scrolling
+                loops: Animation.Infinite
+                PauseAnimation { duration: 1400 }
+                NumberAnimation {
+                    target: titleText; property: "x"
+                    to: -titleBox.overflow
+                    duration: Math.max(1200, titleBox.overflow * 30)
+                    easing.type: Easing.InOutSine
+                }
+                PauseAnimation { duration: 1200 }
+                NumberAnimation { target: titleText; property: "x"; to: 0; duration: IslandMotion.long; easing.type: Easing.InOutCubic }
+                onRunningChanged: if (!running) titleText.x = 0
+            }
         }
         StyledText {
             Layout.fillWidth: true
@@ -155,7 +181,7 @@ Item {
 
         readonly property real computedContentWidth: artBox.width + (media.di.isMaterial ? 1 : 3) + 7
             + Math.max(trackTitleMetrics.implicitWidth, trackArtistMetrics.implicitWidth)
-            + 10 + (media.trailingItem ? media.trailingItem.width : 0) + 10
+            + 10 + (media.trailingItem ? media.trailingItem.implicitWidth : 0) + 10
 
         onComputedContentWidthChanged: media.di.mediaTextContentWidth = trackInfoColumn.computedContentWidth
         Component.onCompleted: media.di.mediaTextContentWidth = trackInfoColumn.computedContentWidth

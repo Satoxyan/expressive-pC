@@ -1210,6 +1210,7 @@ Item {
     function hoverExtra(id) {
         switch (id) {
             case "idle":         return 0
+            case "media":        return Math.max(0, Math.min(360, root.mediaTextContentWidth) - root.mediaWidth)
             case "f1":           return F1.sessionLive ? 74 : 0
             case "notification": return root.notifContentWidth > 340 ? 96 : 40
             case "activity":     return 56
