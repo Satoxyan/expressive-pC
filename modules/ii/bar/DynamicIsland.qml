@@ -111,7 +111,8 @@ Item {
         function onTrackArtistChanged() { mediaTrackChangeTimer.restart() }
     }
 
-    readonly property var visibleNotifications: Notifications.popupList.filter(n => !IslandEvents.isMuted(n))
+    // The recorder's own "started/stopped" notices: the recording pill and the anchor dot already say it
+    readonly property var visibleNotifications: Notifications.popupList.filter(n => !IslandEvents.isMuted(n) && n.appName !== "Recorder")
     readonly property int claudeSessionCount: ClaudeCode.openCount
     readonly property var latestNotification: root.visibleNotifications.length > 0
         ? root.visibleNotifications[root.visibleNotifications.length - 1]
@@ -2642,10 +2643,6 @@ Item {
                 cursorShape: Qt.PointingHandCursor
             }
 
-            // The clock opens home; the calendar is one click further, on the date there
-            TapHandler {
-                onTapped: root.expandTo(2, "idle")
-            }
             opacity: root.anchorShown ? 1 : 0
             visible: opacity > 0.01
 
@@ -2867,8 +2864,12 @@ Item {
                     root.openSplitPicker()
                     return
                 }
-                // The clock has its own tap (home); without this the pill would toggle right after and close it again
-                if (anchor.visible && anchor.contains(anchor.mapFromItem(pill, eventPoint.position))) return
+                // The anchor on the right: a recording dot stops the recording, the clock opens home
+                if (anchor.visible && anchor.contains(anchor.mapFromItem(pill, eventPoint.position))) {
+                    if (root.anchorInfo.icon === "fiber_manual_record") Quickshell.execDetached([Directories.recordScriptPath])
+                    else root.expandTo(2, "idle")
+                    return
+                }
                 if (Date.now() - root.childTapAt < 250) return
                 if (root.primaryId === "fsDigest") {
                     IslandEvents.fullscreenDigest.dismiss()

@@ -116,6 +116,15 @@ Scope {
         }
     }
 
+    // record.sh reports here instead of editing states.json behind Persistent's back (Persistent rewrote it)
+    IpcHandler {
+        target: "recorder"
+
+        function setRecording(on: bool): void {
+            Persistent.states.record.enable = on
+        }
+    }
+
     CompositorGlobalShortcut {
         name: "regionScreenshot"
         description: "Takes a screenshot of the selected region"
