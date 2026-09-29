@@ -1389,13 +1389,9 @@ Item {
         return pill
     }
 
-    // Same order as the compact cycle: pinned (behind home), home, then what is active
-    readonly property var switcherIds: {
-        const ids = [...root.pinnedOnlyIds, "idle"]
-        for (const id of root.persistentIds) if (root.hasDetails(id) && !ids.includes(id)) ids.push(id)
-        if ((root.cfg.privacyIndicators ?? true) && IslandEvents.anyPrivacy && !ids.includes("privacy")) ids.push("privacy")
-        return ids
-    }
+    // The expanded pager: the same order as the compact cycle, plus privacy while something is being used
+    readonly property var switcherIds: (root.cfg.privacyIndicators ?? true) && IslandEvents.anyPrivacy && !root.cycleIds.includes("privacy")
+        ? [...root.cycleIds, "privacy"] : root.cycleIds
 
     onSwitcherIdsChanged: {
         if (root.expandedOverride !== "" && !root.switcherIds.includes(root.expandedOverride)
@@ -1782,8 +1778,10 @@ Item {
     readonly property bool onPinnedView: root.pinnedIds.includes(root.primaryId)
         && root.manualFocusId === root.primaryId && !root.activeIds.includes(root.primaryId)
 
-    function scrollVertical(direction) {
-        root.cycleIsland(direction)
+    // Scroll semantics: scrolling down goes back (towards home and the pinned views, on the left of the pager),
+    // up goes forward (towards what is active). `wheelDirection` is +1 for a scroll down.
+    function scrollVertical(wheelDirection) {
+        root.cycleIsland(-wheelDirection)
     }
 
     function goHome() {
@@ -1817,32 +1815,37 @@ Item {
 
     // What the dots and wheel/swipe cycling reach: whatever is live right now, then the pinned views
     // that are always around (even with nothing going on), then home last.
-    // Pinned views sit behind home, live things ahead of it: scrolling back from home reaches the pinned ones,
-    // forward the live ones. The expanded pager shows the same split.
-    readonly property var pinnedOnlyIds: root.pinnedIds.filter(id => !root.persistentIds.includes(id))
-    readonly property var cycleIds: [...root.pinnedOnlyIds, "idle",
-        ...root.persistentIds.filter(id => root.liveIds.includes(id) && !root.pinnedOnlyIds.includes(id))]
+    // One stable order for the compact cycle and the expanded pager: the pinned views (in the order they were
+    // pinned) behind home, what is active ahead of it. A pinned view stays in the pinned group even while it is
+    // also active (F1 near a session, a download running), so nothing jumps between groups mid-scroll.
+    readonly property var pinnedCycle: root.pinnedIds.filter(id => root.hasDetails(id))
+    readonly property var activeCycle: root.persistentIds.filter(id => id !== "idle" && root.hasDetails(id) && !root.pinnedIds.includes(id))
+    readonly property var cycleIds: [...root.pinnedCycle, "idle", ...root.activeCycle]
 
     readonly property int liveActivityCount: root.persistentIds.filter(id => root.liveIds.includes(id)).length
 
     readonly property int homeIndex: root.cycleIds.indexOf("idle")
     readonly property bool atHome: root.primaryId === "idle" || root.primaryId === root.rawPrimaryId
 
+    // +1 moves right in the pager (towards what is active), -1 left (towards the pinned views). It stops at the
+    // ends instead of wrapping around, and a card that isn't in the list (a standalone view, an interruption)
+    // counts as home.
+    function cycleStep(ids, currentId, direction) {
+        let index = ids.indexOf(currentId)
+        if (index < 0) index = Math.max(0, ids.indexOf("idle"))
+        const next = Math.max(0, Math.min(ids.length - 1, index + direction))
+        return next === index ? "" : ids[next]
+    }
+
     function cycleIsland(direction) {
         if (root.expanded) {
-            const ids = root.switcherIds
-            if (ids.length < 2) return
-            const index = Math.max(0, ids.indexOf(root.expandedId))
-            root.selectIsland(ids[(index + direction + ids.length) % ids.length])
+            const target = root.cycleStep(root.switcherIds, root.expandedId, direction)
+            if (target !== "") root.selectIsland(target)
             return
         }
         if (root.interruptId !== "") return
-        const ids = root.cycleIds
-        if (ids.length < 2) return
-        const index = ids.indexOf(root.primaryId)
-        const next = index < 0
-            ? (direction > 0 ? ids[0] : ids[ids.length - 1])
-            : ids[(index + direction + ids.length) % ids.length]
+        const next = root.cycleStep(root.cycleIds, root.primaryId, direction)
+        if (next === "") return
         root.switchAxis = "vertical"
         root.switchDirection = direction
         root.markUserSwitch()

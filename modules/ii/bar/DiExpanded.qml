@@ -23,28 +23,65 @@ import qs.modules.common.functions
 Scope {
     id: scope
 
-    // Pinned views on the left (scrolling back from home), as small hollow squares, a
-    // little apart; then home and what is active as round dots. The current card is the wide one.
+    // The pager under an expanded card. Pinned views sit on the left (scrolling down goes back to them) as their
+    // own small icons, so you can tell which is which; a dot under one means it is also active right now. Then home
+    // (a ring) and what is active (dots). The current card is lit.
+    component PagerIcon: Rectangle {
+        id: pin
+        required property string dotId
+        readonly property bool current: pin.dotId === scope.di.expandedId
+        readonly property bool alsoActive: scope.di.persistentIds.includes(pin.dotId)
+        anchors.verticalCenter: parent.verticalCenter
+        width: pin.current ? 26 : 18
+        height: 16
+        radius: 8
+        color: pin.current ? Appearance.colors.colPrimary : (pinMouse.containsMouse ? ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.85) : "transparent")
+        Behavior on width { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+        Behavior on color { ColorAnimation { duration: 160 } }
+
+        MaterialSymbol {
+            anchors.centerIn: parent
+            text: scope.di.iconForId(pin.dotId)
+            iconSize: 12
+            fill: 1
+            color: pin.current ? Appearance.colors.colOnPrimary : Appearance.colors.colOnLayer0
+            opacity: pin.current ? 1 : 0.6
+        }
+        Rectangle {
+            visible: pin.alsoActive && !pin.current
+            anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom; bottomMargin: -2 }
+            width: 3
+            height: 3
+            radius: 1.5
+            color: Appearance.colors.colPrimary
+        }
+        MouseArea {
+            id: pinMouse
+            anchors.fill: parent
+            anchors.margins: -2
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: scope.di.selectForSplit(pin.dotId)
+        }
+    }
+
     component PagerDot: Rectangle {
         id: dot
         required property string dotId
-        readonly property bool pinned: scope.di.pinnedOnlyIds.includes(dot.dotId)
         readonly property bool current: dot.dotId === scope.di.expandedId
         readonly property bool splitPartner: dot.dotId === scope.di.splitId
         readonly property bool home: dot.dotId === "idle"
         anchors.verticalCenter: parent.verticalCenter
         width: (dot.current || dot.splitPartner) ? 16 : 6
         height: 6
-        radius: dot.pinned && !dot.current ? 1.5 : 3
+        radius: 3
         color: dot.current ? Appearance.colors.colPrimary
             : dot.splitPartner ? Appearance.colors.colSecondary
-            : (dot.pinned || dot.home) ? "transparent"
+            : dot.home ? "transparent"
             : ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.45)
-        border.width: !dot.current && !dot.splitPartner && (dot.pinned || dot.home) ? 1.2 : 0
+        border.width: dot.home && !dot.current ? 1.2 : 0
         border.color: ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.45)
-
         Behavior on width { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
-        Behavior on radius { NumberAnimation { duration: 200 } }
 
         MouseArea {
             anchors.fill: parent
@@ -151,7 +188,8 @@ Scope {
                         if (wheel.coolingDown) return
                         wheel.coolingDown = true
                         wheelCooldown.restart()
-                        const direction = event.angleDelta.y < 0 ? 1 : -1
+                        // Down goes back (left in the pager), up goes forward
+                        const direction = event.angleDelta.y < 0 ? -1 : 1
                         detail.direction = direction
                         scope.di.cycleIsland(direction)
                     }
@@ -430,8 +468,8 @@ Scope {
                             if (wheel.coolingDown) return
                             wheel.coolingDown = true
                             wheelCooldown.restart()
-                            detail.direction = direction
-                            scope.di.cycleIsland(direction)
+                            detail.direction = -direction
+                            scope.di.cycleIsland(-direction)
                         }
                         contentId: scope.di.expandedId
                         maxHeight: island.tallest - island.bottomReserve
@@ -532,11 +570,11 @@ Scope {
 
                         Row {
                             anchors.verticalCenter: parent.verticalCenter
-                            spacing: 4
-                            visible: scope.di.pinnedOnlyIds.length > 0
+                            spacing: 2
+                            visible: scope.di.pinnedCycle.length > 0
                             Repeater {
-                                model: scope.di.pinnedOnlyIds
-                                delegate: PagerDot {
+                                model: scope.di.pinnedCycle
+                                delegate: PagerIcon {
                                     required property string modelData
                                     dotId: modelData
                                 }
@@ -545,13 +583,13 @@ Scope {
                         // A thin divider between the pinned group and the rest
                         Rectangle {
                             anchors.verticalCenter: parent.verticalCenter
-                            visible: scope.di.pinnedOnlyIds.length > 0
+                            visible: scope.di.pinnedCycle.length > 0
                             width: 1
                             height: 8
                             color: ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.7)
                         }
                         Repeater {
-                            model: scope.di.switcherIds.filter(id => !scope.di.pinnedOnlyIds.includes(id))
+                            model: scope.di.switcherIds.filter(id => !scope.di.pinnedCycle.includes(id))
                             delegate: PagerDot {
                                 required property string modelData
                                 dotId: modelData
