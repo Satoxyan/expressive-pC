@@ -18,7 +18,8 @@ Item {
         max:           { name: "Max", color: "#4C6BFF", icon: "max" },
         appletv:       { name: "Apple TV", color: "#FFFFFF", icon: "appletv" },
         crunchyroll:   { name: "Crunchyroll", color: "#F47521", icon: "crunchyroll" },
-        paramountplus: { name: "Paramount+", color: "#2B7BFF", icon: "paramountplus" }
+        paramountplus: { name: "Paramount+", color: "#2B7BFF", icon: "paramountplus" },
+        jellyfin:      { name: "Jellyfin", color: "#00A4DC", icon: "jellyfin" }
     })
     readonly property var brand: mark.brands[mark.service] ?? null
     readonly property color color: mark.brand?.color ?? Appearance.colors.colOnLayer0

@@ -79,6 +79,10 @@ Singleton {
             if (code[1]) return { series: artist, season: Number(code[1]), episode: Number(code[2]), episodeTitle: title, service: code[3], source: "script" }
             return { series: artist, season: 0, episode: 0, episodeTitle: "", service: code[3], source: "script" }
         }
+        // Jellyfin's web player names the media session "Series - S1:E5 - Episode title (2025)"
+        const jf = title.match(/^(.+?) - S(\d+):E(\d+)(?: - (.*?))?(?: \((\d{4})\))?$/)
+        if (jf)
+            return { series: jf[1].trim(), season: Number(jf[2]), episode: Number(jf[3]), episodeTitle: (jf[4] ?? "").trim(), service: "jellyfin", source: "page" }
         const site = title.match(/^(.+?)\s*\|\s*(Disney\+|Netflix|Prime Video|Max|Apple TV\+|Crunchyroll|Paramount\+)\s*$/i)
         if (site)
             return { series: site[1].trim(), season: 0, episode: 0, episodeTitle: "", service: root.siteServices[site[2].toLowerCase()] ?? "", source: "page" }
