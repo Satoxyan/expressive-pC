@@ -240,7 +240,8 @@ ContentPage {
                         { displayName: Translation.tr("Float"),   icon: "view_day",   value: 1 },
                         { displayName: Translation.tr("Islands"), icon: "crop_3_2",   value: 2 },
                         { displayName: Translation.tr("M3"), icon: "interests",   value: 3 },
-                        { displayName: Translation.tr("M3 Hug"), icon: "category", value: 4 }
+                        { displayName: Translation.tr("M3 Hug"), icon: "category", value: 4 },
+                        { displayName: Translation.tr("Panel"), icon: "toolbar",   value: 5 }
                     ]
                 }
                 ConfigSelectionArray {

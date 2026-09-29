@@ -267,6 +267,11 @@ ApplicationWindow {
                                         displayName: Translation.tr("M3 Hug"),
                                         icon: "category",
                                         value: 4
+                                    },
+                                    {
+                                        displayName: Translation.tr("Panel"),
+                                        icon: "toolbar",
+                                        value: 5
                                     }
                                 ]
                             }
