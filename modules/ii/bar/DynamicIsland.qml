@@ -27,6 +27,15 @@ Item {
     readonly property color pillColor: root.isMaterial || (GlobalStates.barCenterOnly && Config.options.bar.cornerStyle === 0)
         ? "transparent" : root.surfaceColor
     readonly property color capsuleColor: root.isMaterial ? Appearance.colors.colLayer1 : root.surfaceColor
+    // Material You: while music plays, the pill (and the clock on it) takes a dark tone of the album art, the
+    // same seed the expanded player uses, so the island reads as part of what is playing
+    readonly property bool musicTinted: (root.cfg.albumColors ?? true) && (root.activePlayer?.isPlaying ?? false) && root.mediaArtReady
+    readonly property color musicTone: {
+        const c = Qt.color(root.mediaArtColor)
+        const sat = Math.max(0.28, Math.min(0.6, c.hslSaturation))
+        return Qt.hsla(c.hslHue, sat, Appearance.m3colors.darkmode ? 0.13 : 0.9, 1)
+    }
+    readonly property color pillSurface: root.musicTinted && root.pillColor.a > 0 ? root.musicTone : root.pillColor
 
     readonly property bool onFocusedScreen: root.visible && (root.QsWindow.window?.screen?.name ?? "") === (Hyprland.focusedMonitor?.name ?? "")
 
@@ -2569,7 +2578,8 @@ Item {
         width: pillWidth.value
         height: root.pillHeight
         radius: height / 2
-        color: root.pillColor
+        color: root.pillSurface
+        Behavior on color { ColorAnimation { duration: 900; easing.type: Easing.OutCubic } }
         visible: !root.vertical
         opacity: root.overlayShown ? 0 : 1
         scale: root.breath

@@ -358,7 +358,8 @@ Scope {
                         ? win.height - (win.barWindowHeight - win.surfaceRect.y - island.startH) - island.height + 1
                         : win.surfaceRect.y - 1
                     radius: Math.min(island.height / 2, island.startH / 2 + 12 * island.pc)
-                    color: scope.di.surfaceColor
+                    // Starts from the pill's own colour (tinted by the music while it plays), so opening doesn't flash
+                    color: scope.di.pillSurface.a > 0 ? scope.di.pillSurface : scope.di.surfaceColor
                     border.width: 1
                     border.color: ColorUtils.transparentize(Appearance.colors.colLayer0Border, 1 - island.pc * (island.pointerIn ? 1 : 0.6))
                     clip: true
