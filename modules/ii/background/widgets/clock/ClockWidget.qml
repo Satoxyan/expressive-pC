@@ -99,6 +99,9 @@ AbstractBackgroundWidget {
                 locked: GlobalStates.screenLocked
                 colText: root.effectiveColText
                 textHorizontalAlignment: root.textHorizontalAlignment
+                blurSource: root.wallpaperItem
+                originX: root.x
+                originY: root.y
             }
         }
 
@@ -119,7 +122,10 @@ AbstractBackgroundWidget {
             anchors.horizontalCenter: parent.horizontalCenter
             shown: root.clockStyle === "pixel" && Config.options.background.widgets.clock.pixel.showDate && GlobalStates.screenLocked && root.shouldShow
             fade: false
-            sourceComponent: ClockText {
+            sourceComponent: BlurredClockText {
+                blurSource: root.wallpaperItem
+                originX: root.x
+                originY: root.y
                 horizontalAlignment: Text.AlignHCenter
                 font {
                     family: Config.options.background.widgets.clock.digital.font.family
@@ -134,7 +140,11 @@ AbstractBackgroundWidget {
             id: quoteLoader
             anchors.horizontalCenter: parent.horizontalCenter
             shown: Config.options.background.widgets.clock.quote.enable && (root.clockStyle === "pixel" || root.clockStyle === "cookie") && Config.options.background.widgets.clock.quote.text !== "" && root.shouldShow
-            sourceComponent: CookieQuote {}
+            sourceComponent: CookieQuote {
+                wallpaperItem: root.wallpaperItem
+                originX: root.x
+                originY: root.y
+            }
         }
 
         StatusRow {

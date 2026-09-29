@@ -9,6 +9,11 @@ Item {
 
     readonly property string quoteText: Config.options.background.widgets.clock.quote.text
 
+    property Item wallpaperItem: null
+    property real originX: 0
+    property real originY: 0
+    readonly property bool blurOn: wallpaperItem !== null && Config.options.background.widgets.clock.blur
+
     implicitWidth: quoteBox.implicitWidth
     implicitHeight: quoteBox.implicitHeight
 
@@ -55,6 +60,27 @@ Item {
                     weight: Font.Normal
                 }
             }
+        }
+
+        // Blurred wallpaper clipped to the quote text, tinted with the text's own colour.
+        FastBlurred {
+            id: quoteBlur
+            anchors.fill: quoteRow
+            blurSource: root.wallpaperItem
+            cardRadius: 0
+            tint: Appearance.colors.colOnSecondaryContainer
+            tintOpacity: 0.55
+            tintEnabled: Config.options.background.widgets.clock.tintBlur
+            // Same refresh trigger as the other FastBlurred users: sourceRect can't track mapToItem().
+            trackX: root.originX + root.x
+            trackY: root.originY + root.y
+            visible: false
+        }
+        OpacityMask {
+            anchors.fill: quoteRow
+            source: quoteBlur
+            maskSource: quoteRow
+            visible: root.blurOn
         }
     }
 }
