@@ -442,6 +442,14 @@ ContentPage {
                         Config.options.background.widgets.clock.showOnlyWhenLocked = checked;
                     }
                 }
+                ConfigSwitch {
+                    buttonIcon: "blur_on"
+                    text: Translation.tr("Blur in lockscreen")
+                    checked: Config.options.background.widgets.clock.blurWhenLocked
+                    onCheckedChanged: {
+                        Config.options.background.widgets.clock.blurWhenLocked = checked;
+                    }
+                }
                 ConfigSelectionArray {
                     text: Translation.tr("Placement strategy")
                     icon: "move"

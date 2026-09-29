@@ -66,6 +66,12 @@ Singleton {
         || Config.options.bar.layouts.middleLayout.includes("dynamicIsland")
         || Config.options.bar.layouts.rightLayout.includes("dynamicIsland")
 
+    // Effective clock blur/tint — the lockscreen can drop both via clock.blurWhenLocked.
+    readonly property bool clockBlur: Config.options.background.widgets.clock.blur
+        && (Config.options.background.widgets.clock.blurWhenLocked || !root.screenLocked)
+    readonly property bool clockTintBlur: Config.options.background.widgets.clock.tintBlur
+        && (Config.options.background.widgets.clock.blurWhenLocked || !root.screenLocked)
+
     signal centeredWallpaperThumpRequested()
 
     // Shared by desktop (Background) and lock screen (LockSurface) scroll-to-cycle

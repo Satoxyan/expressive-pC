@@ -1,3 +1,4 @@
+import qs
 import qs.modules.common
 import qs.modules.common.widgets
 import QtQuick
@@ -12,7 +13,7 @@ Item {
     property Item wallpaperItem: null
     property real originX: 0
     property real originY: 0
-    readonly property bool blurOn: wallpaperItem !== null && Config.options.background.widgets.clock.blur
+    readonly property bool blurOn: wallpaperItem !== null && GlobalStates.clockBlur
 
     implicitWidth: quoteBox.implicitWidth
     implicitHeight: quoteBox.implicitHeight
@@ -70,7 +71,7 @@ Item {
             cardRadius: 0
             tint: Appearance.colors.colOnSecondaryContainer
             tintOpacity: 0.55
-            tintEnabled: Config.options.background.widgets.clock.tintBlur
+            tintEnabled: GlobalStates.clockTintBlur
             // Same refresh trigger as the other FastBlurred users: sourceRect can't track mapToItem().
             trackX: root.originX + root.x
             trackY: root.originY + root.y

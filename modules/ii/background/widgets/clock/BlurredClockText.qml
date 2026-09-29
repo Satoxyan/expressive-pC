@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 
+import qs
 import qs.modules.common
 import qs.modules.common.widgets
 import Qt5Compat.GraphicalEffects
@@ -17,7 +18,7 @@ Item {
 
     Layout.fillWidth: true
 
-    readonly property bool blurOn: blurSource !== null && Config.options.background.widgets.clock.blur
+    readonly property bool blurOn: blurSource !== null && GlobalStates.clockBlur
 
     implicitWidth: face.implicitWidth
     implicitHeight: face.implicitHeight
@@ -40,7 +41,7 @@ Item {
         cardRadius: 0
         tint: face.color
         tintOpacity: 0.55
-        tintEnabled: Config.options.background.widgets.clock.tintBlur
+        tintEnabled: GlobalStates.clockTintBlur
         // mapToItem() inside FastBlurred is invisible to QML binding tracking, so the
         // sampled wallpaper region only refreshes when these two change.
         trackX: root.originX + root.x

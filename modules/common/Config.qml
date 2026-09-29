@@ -326,6 +326,7 @@ Singleton {
                         property bool enable: true
                         property bool blur: true
                         property bool tintBlur: true
+                        property bool blurWhenLocked: true // drop blur+tint on lockscreen when false
                         property bool showOnlyWhenLocked: false
                         property string placementStrategy: "leastBusy" // "free", "leastBusy", "mostBusy"
                         property real x: 100
