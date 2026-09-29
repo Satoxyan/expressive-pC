@@ -76,6 +76,11 @@ AbstractBackgroundWidget {
             if (root.configEntry)
                 Config.saveStickerProps(root.stickerIndex, { placementStrategy: root.configEntry.placementStrategy })
         }
+        function onClicked(mouse) {
+            // Only open the picker in edit mode (widgets unlocked / draggable)
+            if (mouse.button === Qt.LeftButton && !Config.options.background.widgetsLocked)
+                FilePicker.pickImage(path => Config.updateSticker(root.stickerIndex, { path }))
+        }
     }
 
     Item {
