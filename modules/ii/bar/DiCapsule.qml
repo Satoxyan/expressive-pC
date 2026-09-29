@@ -25,6 +25,7 @@ RowLayout {
             case "timer":         return capsule.di.timerIcon()
             case "activity":      return capsule.activity?.icon ?? "bolt"
             case "systemLoad":    return "memory"
+            case "display":       return "desktop_windows"
             case "songRec":
             case "songRecResult": return "graphic_eq"
             case "notification":  return "notifications"
@@ -71,6 +72,7 @@ RowLayout {
             case "screenshot":    return Translation.tr("Screenshots")
             case "clipboard":     return Translation.tr("Copied")
             case "songRec":       return Translation.tr("Listening…")
+            case "display":       return Translation.tr("Second screen")
             case "songRecResult": return IslandEvents.songRecResult.payload?.title ?? ""
             case "weather":       return IslandEvents.weather.payload?.temp ?? ""
             case "privacy":       return Translation.tr("Privacy")

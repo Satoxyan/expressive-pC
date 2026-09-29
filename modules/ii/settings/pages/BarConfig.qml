@@ -696,6 +696,12 @@ ContentPage {
                         onCheckedChanged: { Config.options.bar.dynamicIsland.privacyIndicatorAnimated = checked; }
                     }
                     ConfigSwitch {
+                        buttonIcon: "desktop_windows"
+                        text: Translation.tr("Second screen as a Live Activity")
+                        checked: Config.options.bar.dynamicIsland.displayActivity
+                        onCheckedChanged: { Config.options.bar.dynamicIsland.displayActivity = checked; }
+                    }
+                    ConfigSwitch {
                         buttonIcon: "content_paste"
                         text: Translation.tr("Clipboard")
                         checked: Config.options.bar.dynamicIsland.clipboard

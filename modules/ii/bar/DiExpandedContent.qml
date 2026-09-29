@@ -1,4 +1,5 @@
 import QtQuick
+import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 
@@ -68,6 +69,7 @@ Item {
             case "download":
             case "zerotier":      return networkView
             case "hardware":      return hardwareView
+            case "display":       return displayView
             case "call":          return callView
             default:              return idleView
         }
@@ -92,6 +94,7 @@ Item {
     Component { id: batteryView; DiXBattery { di: content.di } }
     Component { id: screenshotView; DiXScreenshot { di: content.di } }
     Component { id: clipboardView; DiXClipboard { di: content.di } }
+    Component { id: displayView; DiXHardware { di: content.di; payload: IslandHardware.displayPayload ?? ({}); runAction: id => IslandHardware.runDisplayAction(id) } }
     Component { id: privacyView; DiXPrivacy { di: content.di } }
     Component { id: watchView; DiXWatch { di: content.di } }
     Component { id: weatherView; DiXWeather { di: content.di } }

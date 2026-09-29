@@ -634,7 +634,7 @@ Item {
         "audioOutput", "screenshot", "clipboard", "songRecResult", "weather", "f1Flag", "shelfDrop", "f1Event", "networkAlert", "hardware", "hibernate", "downloadDone", "watchRating", "approval", "fsDigest"]
 
     readonly property var criticalIds: ["hibernate", "session", "approval"]
-    readonly property var liveIds: ["recording", "call", "f1", "timer", "activity", "systemLoad", "download", "agents", "songRec", "media"]
+    readonly property var liveIds: ["recording", "call", "f1", "timer", "activity", "systemLoad", "download", "agents", "songRec", "media", "display"]
     readonly property var toolIds: ["weather", "shelf", "clipboard", "system", "history"].concat(IslandEvents.ztAvailable ? ["zerotier"] : [])
     readonly property var peekIds: root.interruptIds.filter(id => !root.criticalIds.includes(id))
 
@@ -943,6 +943,7 @@ Item {
         if (DropShelf.items.length > 0) ids.push("shelf")
         if (SongRec.running) ids.push("songRec")
         if (root.hasMedia) ids.push("media")
+        if (IslandHardware.displayPayload !== null && (root.cfg.displayActivity ?? true)) ids.push("display")
         return ids
     }
 
@@ -1094,7 +1095,8 @@ Item {
         if (root.forceIdle) return "idle"
         if (root.manualFocusId !== "" && (root.persistentIds.includes(root.manualFocusId) || root.pinnedIds.includes(root.manualFocusId)))
             return root.manualFocusId
-        return root.persistentIds[0] ?? "idle"
+        // "display" is zero priority: reachable by scroll and from home, never takes the pill on its own
+        return root.persistentIds.find(id => id !== "display") ?? "idle"
     }
 
     readonly property var urgentIds: ["hibernate", "approval", "session", "osd", "f1Start", "shelfDrop"]
@@ -1244,6 +1246,7 @@ Item {
             case "systemLoad":    return Pressure.culprit || Pressure.top ? 280 : 200
             case "system":        return 214
             case "songRec":       return 150
+            case "display":       return 214
             case "shelf":         return 132
             case "shelfDrop":     return root.dropHovering ? Math.max(236, root.dropActions.length * 82 + 10) : 236
             case "f1Event":       return 262
@@ -1386,7 +1389,7 @@ Item {
         root.wantsKeyboard = true
         root.expandTo(2)
     }
-    readonly property var standaloneViews: ["watchRating", "privacy", "f1", "idle", "weather", "shelf", "overview", "system", "download", "history", "audioOutput", "calendar", "agents", "clipboard"].concat(IslandEvents.ztAvailable ? ["zerotier"] : [])
+    readonly property var standaloneViews: ["watchRating", "privacy", "display", "f1", "idle", "weather", "shelf", "overview", "system", "download", "history", "audioOutput", "calendar", "agents", "clipboard"].concat(IslandEvents.ztAvailable ? ["zerotier"] : [])
     readonly property string expandedId: root.expandedOverride !== "" ? root.expandedOverride : root.primaryId
 
     readonly property Item surfaceItem: {
@@ -1940,6 +1943,7 @@ Item {
             case "clipboard":     return clipboardComponent
             case "songRecResult": return songRecComponent
             case "songRec":       return songRecComponent
+            case "display":       return displayComponent
             case "weather":       return weatherComponent
             case "f1Flag":        return f1FlagComponent
             case "f1Start":       return f1StartComponent
@@ -2188,6 +2192,7 @@ Item {
             case "call":       return Translation.tr("On a call")
             case "system":     return Translation.tr("System")
             case "songRec":    return Translation.tr("Listening…")
+            case "display":    return Translation.tr("Second screen")
             case "shelf":      return Translation.tr("Drawer")
             case "notification": return IslandEvents.notificationParts(root.latestNotification).app || Translation.tr("Notification")
             case "download":   return IslandEvents.downloadFileName !== "" ? IslandEvents.downloadFileName : Translation.tr("Download")
@@ -2222,6 +2227,7 @@ Item {
             case "call":       return "call"
             case "system":     return "monitoring"
             case "songRec":    return "graphic_eq"
+            case "display":    return "desktop_windows"
             case "shelf":      return "inventory_2"
             case "download":   return "download"
             case "agents":     return ClaudeCode.openAgents[0] ?? "bolt"
@@ -3374,6 +3380,7 @@ Item {
     Component { id: approvalComponent; DiApproval { di: root } }
     Component { id: callComponent; DiCall { di: root } }
     Component { id: songRecComponent; DiSongRec { di: root } }
+    Component { id: displayComponent; DiDisplay { di: root } }
     Component { id: weatherComponent; DiWeather { di: root } }
     Component { id: f1FlagComponent; DiF1Flag { di: root } }
     Component { id: f1StartComponent; DiF1Start { di: root } }

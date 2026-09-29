@@ -15,9 +15,10 @@ ColumnLayout {
     required property Item di
     spacing: 12
     implicitWidth: xhw.wantedWidth
-    readonly property real wantedWidth: ["monitor", "dock", "diskLow"].includes(xhw.kind) ? 532 : 372
+    readonly property real wantedWidth: xhw.kind === "monitor" ? 440 : ["dock", "diskLow"].includes(xhw.kind) ? 532 : 372
 
-    readonly property var payload: IslandHardware.payload
+    property var payload: IslandHardware.payload
+    property var runAction: id => IslandHardware.runAction(id)
     readonly property string kind: xhw.payload.kind ?? ""
     readonly property color accent: IslandEvents.toneColor(xhw.payload.tone)
     readonly property color onAccent: ColorUtils.isDark(xhw.accent) ? "white" : "black"
@@ -35,7 +36,7 @@ ColumnLayout {
 
     readonly property string headline: {
         switch (xhw.kind) {
-            case "monitor": return xhw.model
+            case "monitor": return xhw.parts.join(" · ")
             case "dock": return ""
             default: return xhw.payload.subtitle ?? ""
         }
@@ -156,7 +157,7 @@ ColumnLayout {
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: IslandHardware.runAction(pill.action.id)
+            onClicked: xhw.runAction(pill.action.id)
         }
     }
 
@@ -237,7 +238,7 @@ ColumnLayout {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: IslandHardware.runAction(seg.action.id)
+                        onClicked: xhw.runAction(seg.action.id)
                     }
                 }
             }
@@ -323,184 +324,143 @@ ColumnLayout {
         }
     }
 
-    // Monitor: the two screens as they are arranged now, what the new one runs at, and the layout picker
+    // Monitor: a stage with both screens standing on one desk line, then the layout picker
     Component {
         id: monitorBody
 
-        RowLayout {
-            spacing: 16
+        ColumnLayout {
+            spacing: 8
 
-            ColumnLayout {
-                Layout.fillWidth: false
-                Layout.preferredWidth: 186
-                Layout.maximumWidth: 186
-                spacing: 6
+            Rectangle {
+                id: stage
+                Layout.fillWidth: true
+                Layout.preferredHeight: 116
+                radius: 16
+                color: Appearance.colors.colLayer1
+                DiCascade { target: stage; index: 1 }
 
-                Item {
-                    id: diagram
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 104
-                    DiCascade { target: diagram; index: 1 }
+                readonly property bool mirror: xhw.layout === "mirror"
+                readonly property bool only: xhw.layout === "only"
+                readonly property real deskY: stage.height - 30
+                readonly property real gap: 18
+                readonly property real startX: (stage.width - laptopScreen.width - stage.gap - externalScreen.width) / 2
 
-                    Rectangle {
-                        id: laptopScreen
-                        width: 76
-                        height: 48
-                        radius: 6
-                        x: xhw.layout === "mirror" ? diagram.width / 2 - width / 2 - 14 : xhw.layout === "only" ? 4 : diagram.width / 2 - width - 6
-                        y: xhw.layout === "mirror" ? 36 : 40
-                        color: ColorUtils.transparentize(Appearance.colors.colPrimary, xhw.layout === "only" ? 1 : 0.82)
-                        border.width: 1.5
-                        border.color: xhw.layout === "only" ? ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.75) : Appearance.colors.colPrimary
-                        opacity: xhw.layout === "only" ? 0.5 : 1
+                Rectangle {
+                    id: laptopScreen
+                    width: 72
+                    height: 44
+                    radius: 6
+                    z: stage.mirror ? 2 : 0
+                    x: stage.mirror ? stage.width / 2 - width + 6 : stage.startX
+                    y: stage.deskY - height - 6
+                    color: stage.only ? Appearance.colors.colLayer1
+                        : Qt.tint(Appearance.colors.colLayer1, ColorUtils.transparentize(Appearance.colors.colPrimary, 0.85))
+                    border.width: 1.5
+                    border.color: stage.only ? ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.75) : Appearance.colors.colPrimary
+                    opacity: stage.only ? 0.45 : 1
 
-                        Behavior on x {
-                            NumberAnimation { duration: IslandMotion.long; easing.type: Easing.BezierSpline; easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial }
-                        }
-                        Behavior on y {
-                            NumberAnimation { duration: IslandMotion.long; easing.type: Easing.BezierSpline; easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial }
-                        }
-                        Behavior on opacity {
-                            NumberAnimation { duration: IslandMotion.short }
-                        }
-
-                        MaterialSymbol {
-                            anchors.centerIn: parent
-                            text: xhw.layout === "only" ? "desktop_access_disabled" : "laptop"
-                            iconSize: 18
-                            color: Appearance.colors.colOnLayer0
-                            opacity: 0.8
-                        }
-                        // The keyboard deck under the lid
-                        Rectangle {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            y: parent.height + 2
-                            width: parent.width + 12
-                            height: 4
-                            radius: 2
-                            color: parent.border.color
-                        }
+                    Behavior on x {
+                        NumberAnimation { duration: IslandMotion.long; easing.type: Easing.BezierSpline; easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial }
+                    }
+                    Behavior on opacity {
+                        NumberAnimation { duration: IslandMotion.short }
                     }
 
+                    MaterialSymbol {
+                        anchors.centerIn: parent
+                        text: stage.only ? "desktop_access_disabled" : stage.mirror ? "screen_share" : "laptop"
+                        iconSize: 17
+                        color: Appearance.colors.colOnLayer0
+                        opacity: 0.8
+                    }
+                    // The keyboard deck under the lid
                     Rectangle {
-                        id: externalScreen
-                        width: 106
-                        height: 64
-                        radius: 6
-                        x: xhw.layout === "mirror" ? diagram.width / 2 - width / 2 + 14
-                            : xhw.layout === "only" ? diagram.width - width - 4 : diagram.width / 2 + 6
-                        y: xhw.layout === "mirror" ? 6 : 14
-                        z: 1
-                        color: Qt.tint(Appearance.colors.colLayer1, ColorUtils.transparentize(Appearance.colors.colPrimary, 0.78))
-                        border.width: 1.5
-                        border.color: Appearance.colors.colPrimary
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: parent.height + 2
+                        width: parent.width + 12
+                        height: 4
+                        radius: 2
+                        color: parent.border.color
+                    }
+                }
 
-                        Behavior on x {
-                            NumberAnimation { duration: IslandMotion.long; easing.type: Easing.BezierSpline; easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial }
-                        }
-                        Behavior on y {
-                            NumberAnimation { duration: IslandMotion.long; easing.type: Easing.BezierSpline; easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial }
-                        }
+                Rectangle {
+                    id: externalScreen
+                    width: 108
+                    height: 62
+                    radius: 6
+                    z: 1
+                    x: stage.mirror ? stage.width / 2 - 14 : stage.startX + laptopScreen.width + stage.gap
+                    y: stage.deskY - height - 11
+                    color: Qt.tint(Appearance.colors.colLayer1, ColorUtils.transparentize(Appearance.colors.colPrimary, 0.78))
+                    border.width: 1.5
+                    border.color: Appearance.colors.colPrimary
 
-                        ColumnLayout {
-                            anchors.centerIn: parent
-                            spacing: 0
-                            MaterialSymbol {
-                                Layout.alignment: Qt.AlignHCenter
-                                text: xhw.layout === "mirror" ? "screen_share" : "desktop_windows"
-                                iconSize: 20
-                                color: Appearance.colors.colOnLayer0
-                            }
-                            StyledText {
-                                Layout.alignment: Qt.AlignHCenter
-                                visible: text !== ""
-                                text: xhw.resolution
-                                font.pixelSize: Appearance.font.pixelSize.smallest
-                                font.features: { "tnum": 1 }
-                                color: Appearance.colors.colOnLayer0
-                                opacity: 0.75
-                            }
+                    Behavior on x {
+                        NumberAnimation { duration: IslandMotion.long; easing.type: Easing.BezierSpline; easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial }
+                    }
+
+                    ColumnLayout {
+                        anchors.centerIn: parent
+                        spacing: 0
+                        MaterialSymbol {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "desktop_windows"
+                            iconSize: 19
+                            color: Appearance.colors.colOnLayer0
                         }
-                        // Stand
-                        Rectangle {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            y: parent.height
-                            width: 6
-                            height: 8
-                            color: parent.border.color
+                        StyledText {
+                            Layout.alignment: Qt.AlignHCenter
+                            visible: text !== ""
+                            text: xhw.resolution
+                            font.pixelSize: Appearance.font.pixelSize.smallest
+                            font.features: { "tnum": 1 }
+                            color: Appearance.colors.colOnLayer0
+                            opacity: 0.75
                         }
-                        Rectangle {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            y: parent.height + 8
-                            width: 34
-                            height: 3
-                            radius: 1.5
-                            color: parent.border.color
-                        }
+                    }
+                    // Stand
+                    Rectangle {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: parent.height
+                        width: 6
+                        height: 8
+                        color: parent.border.color
+                    }
+                    Rectangle {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: parent.height + 8
+                        width: 34
+                        height: 3
+                        radius: 1.5
+                        color: parent.border.color
                     }
                 }
 
                 StyledText {
                     id: layoutCaption
-                    Layout.alignment: Qt.AlignHCenter
-                    text: xhw.layout === "mirror" ? Translation.tr("Same picture on both")
-                        : xhw.layout === "only" ? Translation.tr("Laptop screen off")
+                    anchors {
+                        horizontalCenter: parent.horizontalCenter
+                        bottom: parent.bottom
+                        bottomMargin: 8
+                    }
+                    text: stage.mirror ? Translation.tr("Same picture on both")
+                        : stage.only ? Translation.tr("Laptop screen off")
                         : Translation.tr("Extended to the right")
                     font.pixelSize: Appearance.font.pixelSize.smallest
                     color: Appearance.colors.colOnLayer0
                     opacity: 0.6
-                    DiCascade { target: layoutCaption; index: 2 }
                 }
             }
 
-            ColumnLayout {
+            LayoutPicker {
+                id: monitorPicker
                 Layout.fillWidth: true
-                Layout.alignment: Qt.AlignTop
-                spacing: 6
-
-                SectionLabel {
-                    id: displayLabel
-                    text: Translation.tr("Display")
-                    DiCascade { target: displayLabel; index: 1 }
-                }
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 6
-                    InfoChip {
-                        id: resChip
-                        Layout.fillWidth: true
-                        Layout.preferredWidth: 1
-                        icon: "aspect_ratio"
-                        value: xhw.resolution || "–"
-                        label: Translation.tr("Resolution")
-                        DiCascade { target: resChip; index: 2 }
-                    }
-                    InfoChip {
-                        id: hzChip
-                        Layout.fillWidth: true
-                        Layout.preferredWidth: 1
-                        icon: "speed"
-                        value: xhw.refresh || "–"
-                        label: Translation.tr("Refresh rate")
-                        DiCascade { target: hzChip; index: 3 }
-                    }
-                }
-                SectionLabel {
-                    id: layoutLabel
-                    Layout.topMargin: 6
-                    visible: xhw.actions.length > 0
-                    text: Translation.tr("Screen layout")
-                    DiCascade { target: layoutLabel; index: 4 }
-                }
-                LayoutPicker {
-                    id: monitorPicker
-                    Layout.fillWidth: true
-                    visible: xhw.actions.length > 0
-                    DiCascade { target: monitorPicker; index: 5 }
-                }
-                StatusLine {
-                    Layout.fillWidth: true
-                }
+                visible: xhw.actions.length > 0
+                DiCascade { target: monitorPicker; index: 3 }
+            }
+            StatusLine {
+                Layout.fillWidth: true
             }
         }
     }
@@ -1220,7 +1180,7 @@ ColumnLayout {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: IslandHardware.runAction(tip.action.id)
+                            onClicked: xhw.runAction(tip.action.id)
                         }
                     }
                 }

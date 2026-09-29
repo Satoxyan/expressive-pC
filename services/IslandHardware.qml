@@ -107,6 +107,33 @@ Singleton {
 
     readonly property string internalOutput: Hyprland.monitors.values.map(m => m.name).find(n => /^(eDP|LVDS|DSI)/.test(n)) ?? "eDP-1"
     property bool internalDisabled: false
+
+    // The second screen as a standing Live Activity (not a flash): present for as long as the cable is in
+    property string displayLayout: ""
+    readonly property var externalMonitor: Hyprland.monitors.values.find(m => m.name !== root.internalOutput) ?? null
+    readonly property var displayPayload: {
+        const m = root.externalMonitor
+        if (!m) return null
+        const ipc = m.lastIpcObject ?? {}
+        const resolution = `${m.width}×${m.height}`
+        const hz = ipc.refreshRate ? ` · ${Math.round(ipc.refreshRate)} Hz` : ""
+        const layout = root.internalDisabled ? "only"
+            : root.displayLayout !== "" ? root.displayLayout
+            : (ipc.mirrorOf ?? "none") !== "none" ? "mirror" : "extend"
+        return {
+            kind: "monitor", icon: "desktop_windows", tone: "progress", title: Translation.tr("Second screen"),
+            subtitle: `${IslandEvents.shortName(ipc.model || m.description || m.name)} · ${resolution}${hz}`,
+            value: "", output: m.name, resolution: resolution, layout: layout,
+            actions: [
+                { id: "extend", label: Translation.tr("Extend"), icon: "splitscreen_right" },
+                { id: "mirror", label: Translation.tr("Mirror"), icon: "screen_share" },
+                { id: "only", label: Translation.tr("External only"), icon: "tv" }
+            ]
+        }
+    }
+    function runDisplayAction(id) {
+        if (root.displayPayload) root.applyMonitorLayout(root.displayPayload.output, id)
+    }
     property string lastLayout: ""
 
     Connections {
@@ -138,6 +165,7 @@ Singleton {
             Quickshell.execDetached(["hyprctl", "eval", `hl.monitor({ output = "${root.internalOutput}", mode = "preferred", position = "auto", scale = 1 })`])
             root.internalDisabled = false
         }
+        root.displayLayout = ""
         if (root.active && root.payload.output === name) root.dismiss()
         root.show({ kind: "monitorOff", icon: "desktop_access_disabled", tone: "neutral", title: Translation.tr("Monitor disconnected"),
             subtitle: name, value: "", actions: [] }, 3000)
@@ -208,6 +236,7 @@ Singleton {
             : `${internalOn}; hl.monitor({ output = "${output}", mode = "preferred", position = "auto-right", scale = 1 })`
         Quickshell.execDetached(["hyprctl", "eval", lua])
         root.internalDisabled = mode === "only"
+        root.displayLayout = mode
     }
 
     function revertMonitorLayout(reason) {
