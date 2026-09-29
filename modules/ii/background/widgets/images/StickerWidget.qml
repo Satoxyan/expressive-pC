@@ -101,8 +101,12 @@ AbstractBackgroundWidget {
             cache: false
             antialiasing: true
             playing: root._gifStarted && root.imagePath !== "" && root.visible && !root.coveredByWindow
-            sourceSize.width: parent.width * 2
-            sourceSize.height: parent.height * 2
+            // sourceSize dibekukan ke nilai tersimpan, BUKAN ukuran live saat drag.
+            // Tiap perubahan sourceSize membuat Qt baca + decode ulang file di GUI thread
+            // (terukur: 2,4 CPU-detik per 3 detik drag, file dibaca 651 MiB) => patah-patah.
+            // Imbas: preview sedikit blur waktu membesar, tajam lagi begitu resize selesai.
+            sourceSize.width: root.stickerSize * 2
+            sourceSize.height: root.stickerSize * 2
             visible: root.imagePath !== ""
 
             layer.enabled: true

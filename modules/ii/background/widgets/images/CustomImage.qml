@@ -192,8 +192,9 @@ AbstractBackgroundWidget {
                 cache: false
                 antialiasing: true
                 playing: root._gifStarted && root.imagePath !== "" && root.visible && !root.coveredByWindow
-                sourceSize.width: parent.width
-                sourceSize.height: parent.height
+                // Dibekukan ke ukuran tersimpan — lihat catatan di StickerWidget.qml.
+                sourceSize.width: root.imageSize
+                sourceSize.height: root.imageSize
                 visible: root.imagePath !== ""
             }
 
