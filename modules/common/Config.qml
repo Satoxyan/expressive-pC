@@ -860,6 +860,7 @@ Singleton {
                     property bool lyrics: true
                     property bool albumColors: true
                     property bool privacyIndicators: true
+                    property bool privacyIndicatorAnimated: false
                     property list<string> privacyIgnoredApps: ["easyeffects", "quickshell", "cava", "songrec"]
                     property bool clipboard: true
                     property bool screenshots: true

@@ -689,6 +689,13 @@ ContentPage {
                         onCheckedChanged: { Config.options.bar.dynamicIsland.privacyIndicators = checked; }
                     }
                     ConfigSwitch {
+                        buttonIcon: "animation"
+                        text: Translation.tr("Animate privacy indicators")
+                        enabled: Config.options.bar.dynamicIsland.privacyIndicators
+                        checked: Config.options.bar.dynamicIsland.privacyIndicatorAnimated
+                        onCheckedChanged: { Config.options.bar.dynamicIsland.privacyIndicatorAnimated = checked; }
+                    }
+                    ConfigSwitch {
                         buttonIcon: "content_paste"
                         text: Translation.tr("Clipboard")
                         checked: Config.options.bar.dynamicIsland.clipboard

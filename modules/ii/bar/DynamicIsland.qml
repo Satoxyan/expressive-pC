@@ -3253,6 +3253,7 @@ Item {
     Item {
         id: privacyPip
         readonly property bool on: (root.cfg.privacyIndicators ?? true) && IslandEvents.anyPrivacy && !root.vertical
+        readonly property bool animated: root.cfg.privacyIndicatorAnimated ?? false
         readonly property var dots: [
             { show: IslandEvents.micInUse, color: IslandEvents.colorAttention },
             { show: IslandEvents.cameraInUse || IslandEvents.screenInUse, color: "#30D158" }
@@ -3262,20 +3263,24 @@ Item {
         x: pill.x - width - 7
         anchors.verticalCenter: pill.verticalCenter
         opacity: privacyPip.on && !root.overlayShown ? 1 : 0
-        scale: privacyPip.on ? (pipHover.hovered ? 1.35 : 1) : 0.2
+        scale: privacyPip.on ? (pipHover.hovered ? 1.35 : 1) : (privacyPip.animated ? 0.2 : 1)
         visible: opacity > 0.01
 
         Behavior on opacity {
             NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
         }
         Behavior on scale {
-            NumberAnimation { duration: 380; easing.type: Easing.OutBack; easing.overshoot: 2.2 }
+            NumberAnimation {
+                duration: privacyPip.animated ? 380 : IslandMotion.micro
+                easing.type: privacyPip.animated ? Easing.OutBack : Easing.OutCubic
+                easing.overshoot: 2.2
+            }
         }
         Behavior on height {
             NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
         }
 
-        onOnChanged: if (privacyPip.on) pipRipple.restart()
+        onOnChanged: if (privacyPip.on && privacyPip.animated) pipRipple.restart()
 
         Column {
             anchors.centerIn: parent
@@ -3289,6 +3294,7 @@ Item {
                     height: 6
 
                     Rectangle {
+                        visible: privacyPip.animated
                         anchors.centerIn: parent
                         width: 12
                         height: 12
@@ -3297,7 +3303,7 @@ Item {
                         opacity: 0.18
 
                         SequentialAnimation on opacity {
-                            running: privacyPip.on
+                            running: privacyPip.on && privacyPip.animated
                             loops: Animation.Infinite
                             NumberAnimation { to: 0.05; duration: 1600; easing.type: Easing.InOutSine }
                             NumberAnimation { to: 0.22; duration: 1600; easing.type: Easing.InOutSine }
