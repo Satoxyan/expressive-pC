@@ -19,10 +19,15 @@ ColumnLayout {
     readonly property bool pinnedMode: !IslandEvents.clipboard.active
     readonly property var payload: xclip.pinnedMode ? IslandEvents.latestClipboard : (IslandEvents.clipboard.payload ?? ({}))
     readonly property bool isImage: xclip.payload.isImage ?? false
-    readonly property var kind: IslandEvents.clipKind(xclip.payload)
+    readonly property var kind: IslandEvents.clipKind({ isImage: xclip.isImage, files: xclip.payload.files ?? [], text: xclip.text })
     readonly property var files: xclip.payload.files ?? []
     readonly property bool hasFiles: xclip.files.length > 0
-    readonly property string text: xclip.payload.text ?? ""
+    // The history list flattens whitespace; the full entry is decoded once so multi-line code is detected and run as written
+    readonly property string listText: xclip.payload.text ?? ""
+    property string decodedEntry: ""
+    property string decodedText: ""
+    readonly property string text: xclip.decodedEntry === (xclip.payload.entry ?? "") && xclip.decodedText.trim() !== "" && !xclip.isImage && !xclip.hasFiles
+        ? xclip.decodedText.trim() : xclip.listText
     readonly property bool isUrl: /^https?:\/\/\S+$/.test(xclip.text)
     readonly property bool isPlainText: !xclip.isImage && !xclip.hasFiles && xclip.text !== ""
     readonly property bool isYoutube: xclip.isUrl && /^https?:\/\/(www\.|m\.|music\.)?(youtube\.com\/(watch|shorts|live)|youtu\.be\/)/.test(xclip.text)
@@ -47,6 +52,30 @@ ColumnLayout {
         return /^55\d{10,11}$/.test(digits) ? digits : ""
     }
     readonly property bool isEmail: xclip.isPlainText && /^\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*$/.test(xclip.text)
+    // Type shortcuts: conservative detection, everything runs only on click
+    readonly property bool isPython: xclip.kind.kind === "code" && xclip.kind.label === "Python"
+    readonly property bool isShellCommand: xclip.kind.kind === "code" && xclip.kind.label === "Shell" && xclip.text.length < 4000
+    readonly property bool isMediaLink: xclip.isYoutube || (xclip.isUrl && (
+        /^https?:\/\/(www\.|m\.|vm\.|vt\.)?(instagram\.com\/(p|reel|reels|tv)\/|tiktok\.com\/|soundcloud\.com\/[^\/]+\/|vimeo\.com\/\d|dailymotion\.com\/video|fb\.watch\/|facebook\.com\/(watch|reel|[^\/]+\/videos)|clips\.twitch\.tv\/|twitch\.tv\/[^\/]+\/clip\/|(twitter|x)\.com\/[^\/]+\/status\/)/i.test(xclip.text)
+        || /^https?:\/\/[^\/]*whatsapp\.net\//i.test(xclip.text)
+        || /\.(mp3|m4a|ogg|opus|wav|flac|aac|mp4|webm|mkv|mov)([?#]|$)/i.test(xclip.text)))
+    readonly property bool isAudioOnlyLink: xclip.isUrl && (/^https?:\/\/(www\.)?soundcloud\.com\//i.test(xclip.text) || /\.(mp3|m4a|ogg|opus|wav|flac|aac)([?#]|$)/i.test(xclip.text)
+        || /^https?:\/\/[^\/]*whatsapp\.net\/\S*\.(ogg|opus)/i.test(xclip.text))
+    readonly property bool isFilePath: xclip.isPlainText && xclip.text.length < 300 && /^\s*(~|\/[^\/\s][^\/\n]*)\/[^\n]+\s*$/.test(xclip.text) && !/^\s*\/\//.test(xclip.text)
+    // Short one-line title-like text (no digits/symbols, no closing period), for the IMDb rating lookup
+    readonly property string titleGuess: {
+        const t = xclip.text.trim()
+        if (!xclip.isPlainText || xclip.kind.kind !== "text") return ""
+        if (t.length < 2 || t.length > 60 || t.split(/\s+/).length > 7) return ""
+        if (!/^[^\d\n<>{}\[\]\/\\=@#$%^*_|~`]+$/.test(t) || /[.]$/.test(t) || xclip.isAddress) return ""
+        return t
+    }
+    property var imdbCache: ({})
+    property int imdbRev: 0
+    readonly property var imdbEntry: {
+        xclip.imdbRev
+        return xclip.titleGuess === "" ? undefined : xclip.imdbCache[xclip.titleGuess.toLowerCase()]
+    }
     readonly property string imagePath: IslandEvents.clipboardImagePath
     readonly property var imageFiles: xclip.files.filter(f => DropShelf.isImage(f))
     readonly property string exportDir: `${Directories.pictures}/Clipboard`
@@ -87,6 +116,56 @@ ColumnLayout {
         xclip.run(`printf '%s' ${xclip.q(value)} | wl-copy`, Translation.tr("Copied"))
     }
 
+    function terminalRun(script, arg) {
+        Quickshell.execDetached(["bash", "-c", script, "_", arg, Config.options.apps.terminal])
+        xclip.status = Translation.tr("Opened in the terminal")
+    }
+
+    function runPython() {
+        // Unquoted $2 on purpose: the terminal setting is a command line such as "kitty -1"
+        xclip.terminalRun(`f=$(mktemp --suffix=.py /tmp/island-clip-XXXXXX) && printf '%s\\n' "$1" > "$f" && exec $2 bash -c 'python3 "$1"; echo; read -n1 -s -r -p "Press any key to close..."' _ "$f"`, xclip.text)
+    }
+
+    function runShell() {
+        xclip.terminalRun(`exec $2 bash -c 'eval "$1"; exec "\${SHELL:-bash}"' _ "$1"`, xclip.text.trim())
+    }
+
+    function openInVsCode() {
+        const name = `clip-${xclip.stamp()}.py`
+        Quickshell.execDetached(["bash", "-c", `d="$HOME/Documentos/snippets"; mkdir -p "$d" && printf '%s\\n' "$1" > "$d/$2" && exec code "$d" "$d/$2"`, "_", xclip.text, name])
+        xclip.status = Translation.tr("Opening in VS Code…")
+    }
+
+    function openPathFolder() {
+        Quickshell.execDetached(["bash", "-c", `p="$1"; case "$p" in "~"*) p="$HOME\${p#\\~}";; esac; if [ -e "$p" ]; then exec dolphin --select "$p"; elif [ -d "$(dirname "$p")" ]; then exec dolphin "$(dirname "$p")"; fi`, "_", xclip.text.trim()])
+    }
+
+    function fetchImdb() {
+        const title = xclip.titleGuess
+        const key = title.toLowerCase()
+        const entry = xclip.imdbCache[key]
+        if (entry === "loading" || WatchRating.apiKey === "") return
+        if (entry && entry.imdbID) {
+            Qt.openUrlExternally(`https://www.imdb.com/title/${entry.imdbID}/`)
+            return
+        }
+        xclip.imdbCache[key] = "loading"
+        xclip.imdbRev++
+        const xhr = new XMLHttpRequest()
+        xhr.onreadystatechange = () => {
+            if (xhr.readyState !== XMLHttpRequest.DONE) return
+            let result = false
+            try {
+                const d = JSON.parse(xhr.responseText)
+                if (d.Response === "True") result = { imdbID: d.imdbID, rating: d.imdbRating, year: d.Year, name: d.Title }
+            } catch (e) {}
+            xclip.imdbCache[key] = result
+            xclip.imdbRev++
+        }
+        xhr.open("GET", `https://www.omdbapi.com/?t=${encodeURIComponent(title)}&apikey=${encodeURIComponent(WatchRating.apiKey)}`)
+        xhr.send()
+    }
+
     function keepInDrawer() {
         if (xclip.hasFiles) {
             DropShelf.addItems(xclip.files.map(f => `file://${f}`))
@@ -99,6 +178,24 @@ ColumnLayout {
             DropShelf.addText(xclip.text)
         }
         xclip.status = Translation.tr("Kept in the drawer")
+    }
+
+    Process {
+        id: decodeProc
+        readonly property string entry: !xclip.isImage && !xclip.hasFiles ? (xclip.payload.entry ?? "") : ""
+        onEntryChanged: {
+            if (decodeProc.entry === "") return
+            decodeProc.running = false
+            decodeProc.command = ["bash", "-c", `printf '%s' "$1" | ${Cliphist.cliphistBinary} decode`, "_", decodeProc.entry]
+            decodeProc.running = true
+        }
+        Component.onCompleted: if (decodeProc.entry !== "") decodeProc.entryChanged()
+        stdout: StdioCollector {
+            onStreamFinished: {
+                xclip.decodedText = text
+                xclip.decodedEntry = decodeProc.entry
+            }
+        }
     }
 
     Process {
@@ -325,7 +422,7 @@ ColumnLayout {
                         }
                         text: xclip.text
                         font.pixelSize: Appearance.font.pixelSize.smaller
-                        font.family: /^\s*[{<\[]|;\s*$|\bfunction\b|=>/.test(xclip.text) ? Appearance.font.family.monospace : Appearance.font.family.main
+                        font.family: (xclip.isPython || xclip.isShellCommand || /^\s*[{<\[]|;\s*$|\bfunction\b|=>/.test(xclip.text)) ? Appearance.font.family.monospace : Appearance.font.family.main
                         color: Appearance.colors.colOnLayer1
                         wrapMode: Text.WrapAnywhere
                         maximumLineCount: 5
@@ -347,43 +444,55 @@ ColumnLayout {
                 }
             }
 
-            // Every action in one scrollable line, instead of wrapping and pushing the view taller
-            Flickable {
-                id: actionsFlick
-                Layout.fillWidth: true
-                implicitHeight: 32
-                contentWidth: actionsRow.implicitWidth
-                contentHeight: 32
-                clip: true
-                flickableDirection: Flickable.HorizontalFlick
-                boundsBehavior: Flickable.StopAtBounds
-                interactive: actionsFlick.contentWidth > actionsFlick.width
-                DiCascade { target: actionsFlick; index: 2 }
-
-            Row {
+            // The actions wrap onto a second line instead of scrolling sideways out of sight (the old single row cut
+            // them off with nothing to say there was more); two lines at most, the shortcuts for this kind of
+            // content first, then the general ones
+            Flow {
                 id: actionsRow
-                height: 32
+                Layout.fillWidth: true
+                Layout.maximumHeight: 70
+                clip: true
                 spacing: 6
+                DiCascade { target: actionsRow; index: 2 }
+
 
                 ActionChip {
-                    visible: !xclip.isImage && !xclip.hasFiles && xclip.text.trim() !== ""
+                    visible: xclip.isPython
                     primary: true
-                    agent: "gemini"
-                    label: Translation.tr("Ask Gemini")
-                    onTap: () => {
-                        IslandEvents.sendToGemini(xclip.text, true)
-                        xclip.di.collapse()
-                    }
+                    icon: "play_arrow"
+                    label: Translation.tr("Run")
+                    onTap: () => xclip.runPython()
                 }
                 ActionChip {
-                    visible: !xclip.isImage && !xclip.hasFiles && !xclip.isUrl && xclip.text.trim() !== "" && xclip.text.length < 300
+                    visible: xclip.isPython
+                    icon: "code"
+                    label: Translation.tr("Open in VS Code")
+                    onTap: () => xclip.openInVsCode()
+                }
+                ActionChip {
+                    visible: xclip.isShellCommand
                     primary: true
-                    icon: "search"
-                    label: Translation.tr("Search")
-                    onTap: () => {
-                        Qt.openUrlExternally(`https://www.google.com/search?q=${encodeURIComponent(xclip.text.trim())}`)
-                        xclip.di.collapse()
-                    }
+                    icon: "terminal"
+                    label: Translation.tr("Run in terminal")
+                    onTap: () => xclip.runShell()
+                }
+                ActionChip {
+                    visible: xclip.isFilePath
+                    icon: "folder_open"
+                    label: Translation.tr("Open folder")
+                    onTap: () => xclip.openPathFolder()
+                }
+                ActionChip {
+                    readonly property var entry: xclip.imdbEntry
+                    visible: xclip.titleGuess !== "" && WatchRating.apiKey !== ""
+                    primary: chipEntryReady
+                    readonly property bool chipEntryReady: entry !== undefined && entry !== null && typeof entry === "object"
+                    icon: "star"
+                    label: entry === "loading" ? "…"
+                        : chipEntryReady ? `${entry.rating} · ${entry.year}`
+                        : entry === false ? Translation.tr("Not found on IMDb")
+                        : Translation.tr("IMDb rating")
+                    onTap: () => xclip.fetchImdb()
                 }
 
                 ActionChip {
@@ -465,7 +574,7 @@ ColumnLayout {
                     onTap: () => Qt.openUrlExternally(xclip.text)
                 }
                 ActionChip {
-                    visible: xclip.isYoutube
+                    visible: xclip.isMediaLink && !xclip.isAudioOnlyLink
                     icon: "movie"
                     label: Translation.tr("Download video")
                     onTap: () => {
@@ -474,7 +583,7 @@ ColumnLayout {
                     }
                 }
                 ActionChip {
-                    visible: xclip.isYoutube
+                    visible: xclip.isMediaLink
                     icon: "music_note"
                     label: Translation.tr("Download audio")
                     onTap: () => {
@@ -615,6 +724,25 @@ ColumnLayout {
                         xclip.di.collapse()
                     }
                 }
+                                            ActionChip {
+                    visible: !xclip.isImage && !xclip.hasFiles && xclip.text.trim() !== ""
+                    primary: true
+                    agent: "gemini"
+                    label: Translation.tr("Ask Gemini")
+                    onTap: () => {
+                        IslandEvents.sendToGemini(xclip.text, true)
+                        xclip.di.collapse()
+                    }
+                }
+                ActionChip {
+                    visible: !xclip.isImage && !xclip.hasFiles && !xclip.isUrl && xclip.text.trim() !== "" && xclip.text.length < 300
+                    primary: true
+                    icon: "search"
+                    label: Translation.tr("Search")
+                    onTap: () => {
+                        Qt.openUrlExternally(`https://www.google.com/search?q=${encodeURIComponent(xclip.text.trim())}`)
+                        xclip.di.collapse()
+                    }
                 }
             }
 
