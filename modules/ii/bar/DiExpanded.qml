@@ -304,8 +304,12 @@ Scope {
                             if (need <= step) return Math.min(step, island.maxH)
                         return island.tallest
                     }
+                    // A card that hugs its content gets a strip on top matching the pager's at the bottom, so the
+                    // content sits centred between the top edge and the dots (with the uniform height, the extra
+                    // room already centres it)
+                    readonly property real topBalance: (scope.di.cfg.uniformHeight ?? false) ? 0 : 12
                     readonly property real contentNeed: Math.max(detail.naturalHeight, island.splitActive ? splitDetail.naturalHeight : 0)
-                        + island.bottomReserve
+                        + island.bottomReserve + island.topBalance
 
                     // Width follows the view, between a floor (never narrower than the pill it grew out of) and a ceiling
                     // (only split view, two views side by side, may go past it). Two-column views sit near the top of it.
@@ -477,13 +481,13 @@ Scope {
                             scope.di.cycleIsland(-direction)
                         }
                         contentId: scope.di.expandedId
-                        maxHeight: island.tallest - island.bottomReserve
+                        maxHeight: island.tallest - island.bottomReserve - island.topBalance
                         x: (island.width - island.pairW) / 2
                         // The frame the view is centred in: the island minus the strip kept for the pager
-                        y: win.bottomBar ? island.bottomReserve : 0
+                        y: win.bottomBar ? island.bottomReserve : island.topBalance
                         width: island.splitActive ? Math.min(island.maxW, implicitWidth)
                             : Math.min(island.maxW, Math.max(island.width, implicitWidth))
-                        height: Math.max(0, island.height - island.bottomReserve)
+                        height: Math.max(0, island.height - island.bottomReserve - island.topBalance)
                         opacity: (scope.closing
                             ? Math.max(0, Math.min(1, (island.p - 0.5) / 0.5))
                             : Math.max(0, Math.min(1, (island.p - 0.35) / 0.5)))
@@ -506,7 +510,7 @@ Scope {
                         id: splitDetail
                         di: scope.di
                         contentId: island.splitActive ? scope.di.splitId : ""
-                        maxHeight: island.tallest - island.bottomReserve
+                        maxHeight: island.tallest - island.bottomReserve - island.topBalance
                         x: detail.x + detail.width + 12
                         y: detail.y
                         width: Math.min(island.maxW, implicitWidth)
