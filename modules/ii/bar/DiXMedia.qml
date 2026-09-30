@@ -340,6 +340,17 @@ Item {
                 spacing: 8
                 DiCascade { target: controls; index: 2 }
 
+                // On its own (no lyrics column) the transport is centred: a spacer each side, and a stand-in as
+                // wide as the like button on the left so it isn't pushed off-centre by it
+                Item {
+                    visible: !xm.lyricsOn && likeButton.visible
+                    implicitWidth: likeButton.implicitWidth
+                }
+                Item {
+                    visible: !xm.lyricsOn
+                    Layout.fillWidth: true
+                }
+
                 TonalButton {
                     icon: "skip_previous"
                     enabledState: xm.player?.canGoPrevious ?? false

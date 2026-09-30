@@ -515,7 +515,10 @@ ColumnLayout {
         }
         StyledText {
             id: emptyTitle
-            Layout.alignment: Qt.AlignHCenter
+            // Filling the width (centred text) is what lets this column span the view: a column is never wider
+            // than its widest child, and a capped one pinned it to the left
+            Layout.fillWidth: true
+            horizontalAlignment: Text.AlignHCenter
             text: Translation.tr("Drawer is empty")
             font.pixelSize: Appearance.font.pixelSize.smaller
             font.weight: Font.DemiBold
@@ -524,8 +527,7 @@ ColumnLayout {
         }
         StyledText {
             id: emptyHint
-            Layout.alignment: Qt.AlignHCenter
-            Layout.maximumWidth: 280
+            Layout.fillWidth: true
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.Wrap
             // Two lines on purpose: what to do, then how long things stay
