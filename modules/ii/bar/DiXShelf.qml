@@ -125,7 +125,8 @@ ColumnLayout {
         implicitWidth: chip.label !== "" ? chipRow.implicitWidth + 24 : 32
         implicitHeight: 32
         radius: 16
-        color: chip.danger ? ColorUtils.mix(Appearance.colors.colError, Appearance.colors.colLayer1, 0.25)
+        // Material 3's error container pair, so the armed "Confirm" reads clearly on a dark island
+        color: chip.danger ? (chipMouse.containsMouse ? Appearance.colors.colErrorContainerHover : Appearance.colors.colErrorContainer)
             : chipMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1
 
         Behavior on color {
@@ -140,14 +141,14 @@ ColumnLayout {
                 text: chip.icon
                 iconSize: 16
                 fill: 1
-                color: chip.danger ? Appearance.m3colors.m3onError : Appearance.colors.colOnLayer1
+                color: chip.danger ? Appearance.m3colors.m3onErrorContainer : Appearance.colors.colOnLayer1
             }
             StyledText {
                 visible: chip.label !== ""
                 text: chip.label
                 font.pixelSize: Appearance.font.pixelSize.smallest
                 font.weight: Font.DemiBold
-                color: chip.danger ? Appearance.m3colors.m3onError : Appearance.colors.colOnLayer1
+                color: chip.danger ? Appearance.m3colors.m3onErrorContainer : Appearance.colors.colOnLayer1
             }
         }
 
@@ -402,6 +403,8 @@ ColumnLayout {
     // Header: title, count and size (or the result of the last tool), then the drawer-wide actions
     RowLayout {
         id: header
+        // Empty, the empty state says it all: no header above it
+        visible: !xshelf.empty
         Layout.fillWidth: true
         spacing: 6
 
@@ -489,22 +492,25 @@ ColumnLayout {
     ColumnLayout {
         visible: xshelf.empty
         Layout.fillWidth: true
-        Layout.topMargin: 14
-        Layout.bottomMargin: 18
-        spacing: 3
+        Layout.topMargin: 8
+        Layout.bottomMargin: 8
+        spacing: 4
 
         Item {
             id: emptyIcon
             Layout.alignment: Qt.AlignHCenter
-            implicitWidth: 30
-            implicitHeight: 32
-            DiCascade { target: emptyIcon; index: 1 }
-            MaterialSymbol {
+            Layout.bottomMargin: 4
+            implicitWidth: 48
+            implicitHeight: 48
+            DiCascade { target: emptyIcon; index: 0 }
+            MaterialShapeWrappedMaterialSymbol {
                 anchors.centerIn: parent
+                wrappedShape: MaterialShape.Shape.Cookie9Sided
+                color: Appearance.colors.colSecondaryContainer
+                colSymbol: Appearance.colors.colOnSecondaryContainer
                 text: "move_to_inbox"
-                iconSize: 30
-                color: Appearance.colors.colOnLayer0
-                opacity: 0.35
+                iconSize: 22
+                padding: 12
             }
         }
         StyledText {
@@ -514,20 +520,21 @@ ColumnLayout {
             font.pixelSize: Appearance.font.pixelSize.smaller
             font.weight: Font.DemiBold
             color: Appearance.colors.colOnLayer0
-            DiCascade { target: emptyTitle; index: 2 }
+            DiCascade { target: emptyTitle; index: 1 }
         }
         StyledText {
             id: emptyHint
             Layout.alignment: Qt.AlignHCenter
-            Layout.maximumWidth: 300
+            Layout.maximumWidth: 280
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.Wrap
+            // Two lines on purpose: what to do, then how long things stay
             text: Translation.tr("Drag files onto the island to keep them here")
-                + (DropShelf.expireDays > 0 ? ` · ${Translation.tr("they stay for %1 days").arg(DropShelf.expireDays)}` : "")
+                + (DropShelf.expireDays > 0 ? `\n${Translation.tr("they stay for %1 days").arg(DropShelf.expireDays)}` : "")
             font.pixelSize: Appearance.font.pixelSize.smallest
             color: Appearance.colors.colOnLayer0
             opacity: 0.55
-            DiCascade { target: emptyHint; index: 3 }
+            DiCascade { target: emptyHint; index: 2 }
         }
     }
 
