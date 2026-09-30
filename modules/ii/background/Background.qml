@@ -408,6 +408,30 @@ Variants {
                 anchors.fill: parent
             }
 
+            /* AOD cover — once the lockscreen idles, black sweeps in from the edges
+               over the wallpaper / blur / dim / centered layers. Kept below the widget
+               canvas so the clock still shows, and the password bar lives on the lock
+               surface, which sits above this whole background. */
+            ShaderEffect {
+                id: aodEffect
+                anchors.fill: parent
+                visible: aodEffect.progress > 0
+
+                property real progress: GlobalStates.lockAod ? 1 : 0
+                Behavior on progress {
+                    // Same easing as transitionAnim (the wallpaper change), a
+                    // notch quicker so the lock does not feel held up.
+                    NumberAnimation {
+                        duration: 800
+                        easing.type: Easing.InOutQuad
+                    }
+                }
+                property vector2d aspectRatio: Qt.vector2d(width / height, 1.0)
+                property vector2d origin: Qt.vector2d(0.5, 0.5)
+
+                fragmentShader: Qt.resolvedUrl("shaders/aod.frag.qsb")
+            }
+
             /* Widgets Loader */
             WidgetCanvas {
                 id: widgetCanvas

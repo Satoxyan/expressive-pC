@@ -74,6 +74,7 @@ Scope {
             // Unlock the screen before exiting, or the compositor will display a
             // fallback lock you can't interact with.
             GlobalStates.screenLockPending = false;
+            GlobalStates.lockAod = false;
             unlockPendingTimer.restart();
 
             // Reset
@@ -96,12 +97,16 @@ Scope {
         }
     }
 
-    // The lock badge ("Locked") fades in before the screen locks and fades out
-    // before it unlocks, so the clock's size is already settled when its
-    // centering animation runs. Lead it by a short delay.
+    // AOD lives in the Background window; on niri the lock surface paints its
+    // own wallpaper over that, so the sweep would never be seen there.
+    readonly property bool aodAvailable: Config.options.lock.aod.enable && WM.compositor !== "niri"
+
+    // Wait the sweep out only when it actually armed — AOD is the idle path
+    // alone, so a manual lock still locks immediately. Interval must match the
+    // AOD sweep duration in Background.qml.
     Timer {
         id: lockPendingTimer
-        interval: 100
+        interval: GlobalStates.lockAod ? 800 : 100
         onTriggered: GlobalStates.screenLocked = true
     }
     Timer {
@@ -110,13 +115,28 @@ Scope {
         onTriggered: GlobalStates.screenLocked = false
     }
 
-    function lock() {
+    // fromIdle == true only when hypridle's timeout fired it. AOD belongs to
+    // that path alone; manual lock, startup lock and before-sleep lock skip it.
+    function lock(fromIdle = false) {
         if (Config.options.lock.useHyprlock) {
             Quickshell.execDetached(["bash", "-c", "pidof hyprlock || hyprlock"]);
             return;
         }
-        if (GlobalStates.screenLockPending || GlobalStates.screenLocked) return;
+
+        const sweep = fromIdle && root.aodAvailable;
+
+        if (GlobalStates.screenLocked) {
+            // Hypridle timed out again while already locked: blacken the screen
+            // once more, but never touch the lock itself.
+            if (sweep) GlobalStates.lockAod = true;
+            return;
+        }
+        if (GlobalStates.screenLockPending) return;
+
         GlobalStates.screenLockPending = true;
+        // Sweep first; lockPendingTimer locks only after it has covered the
+        // screen, so the lockscreen arrives beneath already-black pixels.
+        if (sweep) GlobalStates.lockAod = true;
         lockPendingTimer.restart();
     }
 
@@ -137,6 +157,15 @@ Scope {
 
         onPressed: {
             root.lock()
+        }
+    }
+
+    CompositorGlobalShortcut {
+        name: "lockIdle"
+        description: "Locks after an idle timeout, running the AOD sweep first"
+
+        onPressed: {
+            root.lock(true)
         }
     }
 

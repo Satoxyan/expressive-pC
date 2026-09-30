@@ -26,7 +26,7 @@ AbstractWidget {
     y: targetY
     z: targetZ
     visible: opacity > 0
-    opacity: (GlobalStates.screenLocked && !visibleWhenLocked) ? 0 : 1
+    opacity: ((GlobalStates.screenLocked || GlobalStates.lockAod) && !visibleWhenLocked) ? 0 : 1
     Behavior on opacity {
         animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
     }

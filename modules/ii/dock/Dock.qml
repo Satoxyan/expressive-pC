@@ -23,7 +23,7 @@ Scope {
             id: dockRoot
             required property var modelData
             screen: modelData
-            visible: !GlobalStates.screenLocked
+            visible: !GlobalStates.screenLocked && !GlobalStates.lockAod
 
             property var monitor: WM.monitorFor(modelData)
             property bool fullscreenOnThisMonitor: WM.fullscreenOnMonitor(monitor?.name)

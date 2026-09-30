@@ -33,6 +33,9 @@ Singleton {
     property bool screenLockPending: false
     property bool screenLockContainsCharacters: false
     property bool screenUnlockFailed: false
+    // Lockscreen went idle: Background sweeps its wallpaper to black (aod shader).
+    // The clock sits above that sweep and the password bar is on the lock surface.
+    property bool lockAod: false
     property bool screenTranslatorOpen: false
     property bool sessionOpen: false
     property bool superDown: false

@@ -797,6 +797,11 @@ Singleton {
                     property bool enable: false
                     property real strength: 20
                 }
+                // Sweep the screen to black before the session actually locks;
+                // any keypress brings the lockscreen back.
+                property JsonObject aod: JsonObject {
+                    property bool enable: true
+                }
                 property JsonObject security: JsonObject {
                     property bool unlockKeyring: true
                     property bool requirePasswordToPower: false

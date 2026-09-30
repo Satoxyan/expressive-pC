@@ -206,6 +206,16 @@ ContentPage {
                 Layout.topMargin: -2
 
                 ConfigSwitch {
+                    buttonIcon: "bedtime"
+                    text: Translation.tr("Always-on display when locking")
+                    enabled: WM.compositor !== "niri"
+                    checked: Config.options.lock.aod.enable
+                    onCheckedChanged: {
+                        Config.options.lock.aod.enable = checked;
+                    }
+                }
+
+                ConfigSwitch {
                     id: syncWallpaperSwitch
                     buttonIcon: "sync"
                     text: Translation.tr("Use same wallpaper for both")

@@ -50,6 +50,8 @@ Scope {
         }
     }
 
+    // AOD is armed in LockScreen.lock() and lifted again by any keyboard
+    // interaction — typing or a bare keypress both count.
     onCurrentTextChanged: {
         if (currentText.length > 0) {
             showFailure = false;
@@ -57,6 +59,7 @@ Scope {
         }
         GlobalStates.screenLockContainsCharacters = currentText.length > 0;
         passwordClearTimer.restart();
+        GlobalStates.lockAod = false;
     }
 
     function tryUnlock(alsoInhibitIdle = false) {

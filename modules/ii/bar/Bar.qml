@@ -25,7 +25,7 @@ Scope {
         }
         LazyLoader {
             id: barLoader
-            active: GlobalStates.barOpen && !GlobalStates.screenLocked && !GlobalStates.startupLockPending
+            active: GlobalStates.barOpen && !GlobalStates.screenLocked && !GlobalStates.lockAod && !GlobalStates.startupLockPending
             required property ShellScreen modelData
             component: PanelWindow { // Bar window
                 id: barRoot
