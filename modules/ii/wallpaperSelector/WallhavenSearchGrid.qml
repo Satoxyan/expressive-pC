@@ -280,6 +280,18 @@ Item {
                 width: wallhavenGrid.cellWidth
                 height: wallhavenGrid.cellHeight
 
+                HoverHandler {
+                    id: delegateHover
+                    onHoveredChanged: {
+                        if (hovered) {
+                            wallhavenGrid.currentSelection = delegateItem.index
+                            wallhavenGrid.forceActiveFocus()
+                        } else if (wallhavenGrid.currentSelection === delegateItem.index) {
+                            wallhavenGrid.currentSelection = -1
+                        }
+                    }
+                }
+
                 property string thumbnailUrl: modelData ? WallhavenSearch.getThumbnailUrl(modelData, "large") : ""
                 property string wallpaperId: modelData?.id ?? ""
                 property bool isDownloading: root.downloading && root.downloadingId === wallpaperId
@@ -370,14 +382,6 @@ Item {
                     anchors.fill: parent
                     hoverEnabled: true
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
-                    onEntered: {
-                        wallhavenGrid.currentSelection = delegateItem.index
-                        wallhavenGrid.forceActiveFocus()
-                    }
-                    onExited: {
-                        if (wallhavenGrid.currentSelection === delegateItem.index)
-                            wallhavenGrid.currentSelection = -1
-                    }
                     onClicked: event => {
                         wallhavenGrid.currentSelection = delegateItem.index
                         if (event.button === Qt.LeftButton)
@@ -394,7 +398,7 @@ Item {
                     }
                     z: 10
                     spacing: 4
-                    opacity: delegateItem.index === wallhavenGrid.currentSelection && thumbMouse.containsMouse ? 1 : 0
+                    opacity: delegateHover.hovered ? 1 : 0
                     Behavior on opacity { NumberAnimation { duration: 100 } }
 
                     Rectangle {

@@ -64,6 +64,12 @@ AbstractBackgroundWidget {
         coveredByWindow = false;
     }
 
+    onDoubleClicked: (mouse) => {
+        if (mouse.button !== Qt.LeftButton) return
+        root.widgetRotation = 0
+        Config.options.background.widgets.sticker.rotation = 0
+    }
+
     implicitWidth: contentItem.implicitWidth
     implicitHeight: contentItem.implicitHeight
 

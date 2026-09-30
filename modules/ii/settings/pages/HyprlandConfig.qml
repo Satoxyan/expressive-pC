@@ -61,7 +61,8 @@ ContentPage {
             "input:touchpad:natural_scroll":        h.input.touchpad.naturalScroll ? 1 : 0,
             "input:touchpad:disable_while_typing":  h.input.touchpad.disableWhileTyping ? 1 : 0,
             "input:touchpad:clickfinger_behavior":  h.input.touchpad.clickfingerBehavior ? 1 : 0,
-            "input:touchpad:scroll_factor":         h.input.touchpad.scrollFactor
+            "input:touchpad:scroll_factor":         h.input.touchpad.scrollFactor,
+            "misc:focus_on_activate":               h.misc.focusOnActivate ? 1 : 0
         }, HyprlandConfig.borderColorEntries()))
     }
     MonitorConfigOption { id: monitorConfig }
@@ -851,6 +852,26 @@ ContentPage {
                             Config.options.hyprland.general.borderColor.inactiveOpacity = value / 100.0
                             HyprlandConfig.applyBorderColors()
                         }
+                    }
+                }
+            }
+        }
+
+        // Misc
+        ContentSection {
+            icon: "tune"
+            shape: MaterialShape.Shape.Gem
+            title: Translation.tr("Misc")
+
+            GroupedList {
+                ConfigSwitch {
+                    buttonIcon: "center_focus_strong"
+                    text: Translation.tr("Focus on activate")
+                    checked: Config.options.hyprland.misc.focusOnActivate
+                    onCheckedChanged: {
+                        if (checked === Config.options.hyprland.misc.focusOnActivate) return
+                        Config.options.hyprland.misc.focusOnActivate = checked
+                        HyprlandConfig.set("misc:focus_on_activate", checked ? 1 : 0)
                     }
                 }
             }

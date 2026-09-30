@@ -141,30 +141,14 @@ AbstractBackgroundWidget {
         converter.running = true
     }
     
-    StyledRectangularShadow {
-        target: contentItem
-        z: -2
-        visible: Config.options.background.widgets.shadow
-    }
-
-    Rectangle {
+    WidgetCard {
         id: contentItem
-        color: Appearance.colors.colPrimaryContainer
-        radius: Appearance.rounding?.verylarge ?? 30
+        widget: root
         implicitWidth: 276
         implicitHeight: 252
 
-        FastBlurred {
-            anchors.fill: parent
-            blurSource: root.wallpaperItem
-            cardRadius: contentItem.radius
-            tint: Appearance.colors.colPrimaryContainer
-            tintOpacity: 0.55
-            trackX: root.x  
-            trackY: root.y
-            visible: Config.options.background.widgets.images.blur
-            tintEnabled: Config.options.background.widgets.images.tintBlur
-        }
+        blurred: Config.options.background.widgets.images.blur
+        tintEnabled: Config.options.background.widgets.images.tintBlur
 
         ColumnLayout {
             id: columnLayout

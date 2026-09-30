@@ -13,6 +13,7 @@ import Quickshell.Widgets
 
 Item {
     id: root
+    signal styleEditorRequested()
 
     property real iconSize:      23
     property real btnSize:       28
@@ -325,6 +326,7 @@ Item {
                         }
                         middleClickAction: () => { if (slotItem.deskEntry) Quickshell.execDetached(["gtk-launch", slotItem.deskEntry.id]) }
                         altAction:         () => { TaskbarApps.togglePin(slotItem.appId) }
+                        altLongPressAction: () => { root.styleEditorRequested() }
 
                         contentItem: Item {
                             anchors.centerIn: parent
@@ -431,6 +433,7 @@ Item {
                         altAction: () => {
                             TaskbarApps.togglePin(activeSlot.modelData.appId)
                         }
+                        altLongPressAction: () => root.styleEditorRequested()
 
                         contentItem: Item {
                             anchors.centerIn: parent

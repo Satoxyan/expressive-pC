@@ -59,7 +59,7 @@ Scope {
             id: cornerWidget
             anchors.fill: parent
             corner: cornerPanelWindow.corner
-            implicitSize: 22 // fix me >> variable
+            implicitSize: Math.max(0, Appearance.rounding.screenRounding - root.frameThickness)
             color: root.frameColor
         }
     }

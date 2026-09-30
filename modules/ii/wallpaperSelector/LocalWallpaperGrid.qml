@@ -33,6 +33,7 @@ Item {
     property var draggedItemData: null
 
     function startDrag(fromIdx, data, pos) {
+        grid.currentIndex = fromIdx;
         dragFromIndex = fromIdx;
         dropTargetIndex = fromIdx;
         draggedItemData = data;
@@ -126,6 +127,7 @@ Item {
         anchors.fill: parent
         visible: contextMenu.visible
         z: 105
+        hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
         onClicked: contextMenu.visible = false
     }
@@ -329,8 +331,18 @@ Item {
     }
 
     // ─── Grid ───
+    Timer {
+        id: introTimer
+        interval: 1200
+        onTriggered: grid.introDone = true
+    }
+
     GridView {
         id: grid
+        property bool introDone: false
+        property int introCounter: 0
+        onCountChanged: if (count > 0 && !introDone && !introTimer.running) introTimer.start()
+        Component.onCompleted: if (count > 0) introTimer.start()
         anchors.fill: parent
         visible: Wallpapers.wallpaperModel.count > 0
 
@@ -378,6 +390,10 @@ Item {
             height: grid.cellHeight
 
             readonly property bool isGhost: root.isDragging && root.dragFromIndex === index
+
+            Component.onDestruction: {
+                if (root.isDragging && root.dragFromIndex === index) root.cancelDrag();
+            }
             readonly property bool isDropTarget: root.isDragging && root.dropTargetIndex === index && root.dragFromIndex !== index
 
             opacity: isGhost ? 0.3 : 1.0
@@ -387,7 +403,19 @@ Item {
 
             WallpaperDirectoryItem {
                 id: wallpaperItem
+                property int introOrder: -1
                 anchors.fill: parent
+                opacity: grid.introDone ? 1 : 0
+                scale: grid.introDone ? 1 : 0.85
+                transform: Translate {
+                    id: introShift
+                    y: grid.introDone ? 0 : 28
+                }
+                Component.onCompleted: {
+                    if (grid.introDone) return;
+                    introOrder = grid.introCounter++;
+                    introAnim.start();
+                }
                 fileModelData: delegateCell.modelData
                 colBackground: (delegateCell.index === grid.currentIndex || cellMouseArea.containsMouse)
                     ? Appearance.colors.colPrimary
@@ -399,6 +427,38 @@ Item {
                     : (delegateCell.modelData.filePath === Config.options.background.wallpaperPath)
                         ? Appearance.colors.colOnSecondaryContainer
                         : Appearance.colors.colOnLayer0
+            }
+
+            SequentialAnimation {
+                id: introAnim
+                PauseAnimation {
+                    duration: Math.min(wallpaperItem.introOrder, 20) * 16
+                }
+                ParallelAnimation {
+                    NumberAnimation {
+                        target: wallpaperItem
+                        property: "opacity"
+                        to: 1
+                        duration: 200
+                        easing.type: Easing.OutQuad
+                    }
+                    SpringAnimation {
+                        target: wallpaperItem
+                        property: "scale"
+                        to: 1
+                        spring: 3.5
+                        damping: 0.35
+                        epsilon: 0.002
+                    }
+                    SpringAnimation {
+                        target: introShift
+                        property: "y"
+                        to: 0
+                        spring: 3.5
+                        damping: 0.35
+                        epsilon: 0.1
+                    }
+                }
             }
 
             // Drop target indicator

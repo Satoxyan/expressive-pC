@@ -125,31 +125,22 @@ AbstractBackgroundWidget {
         visible: Config.options.background.widgets.shadow
     }
 
-    Rectangle {
+    WidgetCard {
         id: card
+        widget: root
+        shadowed: false
         implicitWidth: root.widgetWidth
         implicitHeight: (root.sizeMode === "2x3" || root.sizeMode === "2x2")
             ? root.doubleCardHeight
             : (root.cardHeight + (root.sizeMode === "1x3" && root.showLyrics ? 264 : 0))
-        radius: Appearance.rounding?.verylarge ?? 30
-        color: Appearance.colors.colPrimaryContainer
         clip: true
 
         Behavior on implicitHeight {
             NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
         }
 
-        FastBlurred {
-            anchors.fill: parent
-            blurSource: root.wallpaperItem
-            cardRadius: card.radius
-            tint: Appearance.colors.colPrimaryContainer
-            tintOpacity: 0.55
-            trackX: root.x  
-            trackY: root.y
-            visible: Config.options.background.widgets.media.blur
-            tintEnabled: Config.options.background.widgets.media.tintBlur
-        }
+        blurred: Config.options.background.widgets.media.blur
+        tintEnabled: Config.options.background.widgets.media.tintBlur
 
         Loader {
             anchors.fill: parent

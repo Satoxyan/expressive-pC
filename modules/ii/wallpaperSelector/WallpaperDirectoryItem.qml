@@ -6,6 +6,7 @@ import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.services
 import qs
+import Quickshell.Widgets
 
 Item {
     id: root
@@ -20,6 +21,9 @@ Item {
     property alias margins: background.anchors.margins
     property bool showLabel: true
     property alias padding: wallpaperItemColumnLayout.anchors.margins
+    readonly property real imageWidth: Math.max(1, root.width - 2 * (root.margins + root.padding))
+    readonly property real imageHeight: Math.max(1, root.height - 2 * (root.margins + root.padding)
+        - (root.showLabel ? wallpaperItemColumnLayout.spacing + wallpaperItemName.implicitHeight : 0))
 
     signal activated()
     signal previewRequested()
@@ -49,6 +53,7 @@ Item {
                     id: thumbnailShadowLoader
 
                     active: thumbnailImageLoader.active && thumbnailImageLoader.item.status === Image.Ready
+                    asynchronous: true
                     anchors.fill: thumbnailImageLoader
 
                     sourceComponent: StyledRectangularShadow {
@@ -63,19 +68,22 @@ Item {
                     id: thumbnailImageLoader
 
                     anchors.fill: parent
-                    active: root.useThumbnail
+                    active: root.useThumbnail && root.width > 0 && root.height > 0
 
-                    sourceComponent: ThumbnailImage {
+                    sourceComponent: ClippingRectangle {
+                        readonly property alias status: thumbnailImage.status
+                        radius: Appearance.rounding.small
+                        color: "transparent"
+
+                    ThumbnailImage {
                         id: thumbnailImage
-
+                        anchors.fill: parent
                         generateThumbnail: false
                         sourcePath: (fileModelData && fileModelData.filePath) ? fileModelData.filePath : ""
                         cache: false
                         fillMode: Image.PreserveAspectCrop
-                        clip: true
-                        sourceSize.width: wallpaperItemColumnLayout.width
-                        sourceSize.height: wallpaperItemColumnLayout.height - wallpaperItemColumnLayout.spacing - wallpaperItemName.height
-                        layer.enabled: true
+                        sourceSize.width: root.imageWidth
+                        sourceSize.height: root.imageHeight
 
                         Connections {
                             function onThumbnailGenerated(directory) {
@@ -102,17 +110,7 @@ Item {
 
                             target: Wallpapers
                         }
-
-                        layer.effect: OpacityMask {
-
-                            maskSource: Rectangle {
-                                width: wallpaperItemImageContainer.width
-                                height: wallpaperItemImageContainer.height
-                                radius: Appearance.rounding.small
-                            }
-
-                        }
-
+                    }
                     }
 
                 }
@@ -125,8 +123,8 @@ Item {
 
                     sourceComponent: DirectoryIcon {
                         fileModelData: root.fileModelData
-                        sourceSize.width: wallpaperItemColumnLayout.width
-                        sourceSize.height: wallpaperItemColumnLayout.height - wallpaperItemColumnLayout.spacing - wallpaperItemName.height
+                        sourceSize.width: root.imageWidth
+                        sourceSize.height: root.imageHeight
                     }
 
                 }

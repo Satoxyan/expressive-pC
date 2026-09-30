@@ -70,31 +70,15 @@ AbstractBackgroundWidget {
         animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
     }
 
-    Rectangle {
+    WidgetCard {
         id: card
         visible: root.style === "card"
         implicitWidth: root.widgetWidth
         implicitHeight: root.widgetHeight
-        radius: Appearance.rounding?.verylarge ?? 30
-        color: Appearance.colors.colPrimaryContainer
 
-        StyledRectangularShadow {
-            target: card
-            z: -2
-            visible: Config.options.background.widgets.shadow
-        }
-
-        FastBlurred {
-            anchors.fill: parent
-            blurSource: root.wallpaperItem
-            cardRadius: card.radius
-            tint: Appearance.colors.colPrimaryContainer
-            tintOpacity: 0.55
-            trackX: root.x  
-            trackY: root.y
-            visible: Config.options.background.widgets.weather.blur
-            tintEnabled: Config.options.background.widgets.weather.tintBlur
-        }
+        widget: root
+        blurred: Config.options.background.widgets.weather.blur
+        tintEnabled: Config.options.background.widgets.weather.tintBlur
 
         Loader {
             anchors.fill: parent

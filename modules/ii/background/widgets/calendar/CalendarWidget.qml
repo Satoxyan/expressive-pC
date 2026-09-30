@@ -137,32 +137,16 @@ AbstractBackgroundWidget {
         }
     }
 
-    Rectangle {
+    WidgetCard {
         id: card
         implicitWidth: root.widgetWidth
         implicitHeight: root.sizeMode === "1x1" ? root.cardHeight
                       : root.sizeMode === "1x2" ? root.cardHeight
                       : root.cardHeight * 2 + root.cardSpacing
-        radius: Appearance.rounding?.verylarge ?? 30
-        color: Appearance.colors.colPrimaryContainer
 
-        FastBlurred {
-            anchors.fill: parent
-            blurSource: root.wallpaperItem
-            cardRadius: card.radius
-            tint: Appearance.colors.colPrimaryContainer
-            tintOpacity: 0.55
-            trackX: root.x  
-            trackY: root.y
-            visible: Config.options.background.widgets.calendar.blur
-            tintEnabled: Config.options.background.widgets.calendar.tintBlur
-        }
-
-        StyledRectangularShadow {
-            target: card
-            z: -2
-            visible: Config.options.background.widgets.shadow
-        }
+        widget: root
+        blurred: Config.options.background.widgets.calendar.blur
+        tintEnabled: Config.options.background.widgets.calendar.tintBlur
 
         Loader {
             anchors.fill: parent

@@ -478,6 +478,7 @@ MouseArea {
                         anchors.fill: parent
                         visible: sortMenuPopup.visible
                         z: 9
+                        hoverEnabled: true
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                         onClicked: sortMenuPopup.visible = false
                     }

@@ -219,38 +219,21 @@ Item {
                                 }
                                 spacing: 1
 
-                                Rectangle {
-                                    id: avatarRect
-                                    width: 48; height: 48; radius: width / 2
-                                    color: Appearance.colors.colPrimaryContainer
 
-                                    Image {
-                                        id: avatarImage
-                                        anchors.fill: parent
-                                        source: Avatar.effectiveAvatarSource
-                                        sourceSize.width: avatarImage.width * 2
-                                        sourceSize.height: avatarImage.height * 2
-                                        fillMode: Image.PreserveAspectCrop
-                                        layer.enabled: true
-                                        layer.effect: OpacityMask {
-                                            maskSource: Rectangle {
-                                                width: avatarRect.width
-                                                height: avatarRect.height
-                                                radius: avatarRect.radius
-                                            }
-                                        }
-                                        onStatusChanged: {
-                                            if (status === Image.Error) visible = false
+                                Process {
+                                    id: avatarCropProc
+                                    property string outputPath: ""
+                                    onExited: (code) => {
+                                        if (code === 0 && avatarCropProc.outputPath !== "") {
+                                            Config.options.profile.avatarPath = ""
+                                            Config.options.profile.avatarPicture = avatarCropProc.outputPath
                                         }
                                     }
+                                }
 
-                                    MaterialSymbol {
-                                        anchors.centerIn: parent
-                                        text: "account_circle"
-                                        iconSize: 32
-                                        color: Appearance.colors.colOnPrimaryContainer
-                                        visible: avatarImage.status === Image.Error
-                                    }
+                                UserAvatar {
+                                    width: 48
+                                    height: 48
 
                                     MouseArea {
                                         anchors.fill: parent
@@ -268,17 +251,6 @@ Item {
                                                     avatarCropProc.running = true
                                                 }
                                             })
-                                        }
-                                    }
-                                }
-
-                                Process {
-                                    id: avatarCropProc
-                                    property string outputPath: ""
-                                    onExited: (code) => {
-                                        if (code === 0 && avatarCropProc.outputPath !== "") {
-                                            Config.options.profile.avatarPath = ""
-                                            Config.options.profile.avatarPicture = avatarCropProc.outputPath
                                         }
                                     }
                                 }

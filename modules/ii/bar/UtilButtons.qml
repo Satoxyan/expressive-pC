@@ -10,6 +10,8 @@ import Quickshell.Services.UPower
 
 Item {
     id: root
+    property color contentColor: Appearance.colors.colOnLayer2
+    property bool contentColorOverridden: false
     property bool borderless: Config.options.bar.borderless
     property bool vertical: Config.options.bar.vertical
     property bool isMaterial: Config.options.bar.cornerStyle === 3 || Config.options.bar.cornerStyle === 4
@@ -45,7 +47,7 @@ Item {
                     horizontalAlignment: Qt.AlignHCenter
                     fill: 1; text: "screenshot_region"
                     iconSize: Appearance.font.pixelSize.large
-                    color: Appearance.colors.colOnLayer2
+                    color: root.contentColor
                 }
             }
         }
@@ -107,7 +109,7 @@ Item {
                     horizontalAlignment: Qt.AlignHCenter
                     fill: 1; text: "colorize"
                     iconSize: Appearance.font.pixelSize.large
-                    color: Appearance.colors.colOnLayer2
+                    color: root.contentColor
                 }
             }
         }
@@ -132,7 +134,7 @@ Item {
                     horizontalAlignment: Qt.AlignHCenter
                     fill: 0; text: "keyboard"
                     iconSize: Appearance.font.pixelSize.large
-                    color: Appearance.colors.colOnLayer2
+                    color: root.contentColor
                 }
             }
         }
@@ -157,7 +159,7 @@ Item {
                     horizontalAlignment: Qt.AlignHCenter
                     fill: 0; text: "imagesmode"
                     iconSize: Appearance.font.pixelSize.large
-                    color: Appearance.colors.colOnLayer2
+                    color: root.contentColor
                 }
             }
         }
@@ -183,7 +185,7 @@ Item {
                     fill: 0
                     text: Pipewire.defaultAudioSource?.audio?.muted ? "mic_off" : "mic"
                     iconSize: Appearance.font.pixelSize.large
-                    color: Appearance.colors.colOnLayer2
+                    color: root.contentColor
                 }
             }
         }
@@ -219,7 +221,7 @@ Item {
                     fill: 0
                     text: Appearance.m3colors.darkmode ? "light_mode" : "dark_mode"
                     iconSize: Appearance.font.pixelSize.large
-                    color: Appearance.colors.colOnLayer2
+                    color: root.contentColor
                 }
             }
         }
@@ -273,7 +275,7 @@ Item {
                         case PowerProfile.Performance: return "local_fire_department"
                     }
                     iconSize: Appearance.font.pixelSize.large
-                    color: Appearance.colors.colOnLayer2
+                    color: root.contentColor
                 }
             }
         }

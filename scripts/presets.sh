@@ -14,6 +14,8 @@ ONLINE_PRESETS_DIR="$HOME/.cache/quickshell/presets"
 IMPORTED_PRESETS_DIR="$HOME/.cache/quickshell/presets_imported"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SWITCHWALL="$SCRIPT_DIR/colors/switchwall.sh"
+# shellcheck source=lib/config.sh
+source "$SCRIPT_DIR/lib/config.sh"
 
 mkdir -p "$LOCAL_PRESETS_DIR" "$ONLINE_PRESETS_DIR" "$IMPORTED_PRESETS_DIR"
 
@@ -128,7 +130,7 @@ case "$action" in
         # Filter preset input before merge so blacklisted keys never overwrite local config
         tmp=$(mktemp)
         jq "$BLACKLIST_FILTER" "$preset_file" > "$tmp"
-        jq -s '.[0] * .[1] | del(._presetMeta)' "$CONFIG_FILE" "$tmp" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+        jq -s '.[0] * .[1] | del(._presetMeta)' "$CONFIG_FILE" "$tmp" | config_json_replace "$CONFIG_FILE"
         rm -f "$tmp"
         "$SWITCHWALL" --noswitch
         ;;

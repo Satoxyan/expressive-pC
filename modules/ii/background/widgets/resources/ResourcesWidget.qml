@@ -23,7 +23,7 @@ AbstractBackgroundWidget {
     implicitWidth: row.implicitWidth
     implicitHeight: row.implicitHeight
 
-    component StatCard: Rectangle {
+    component StatCard: WidgetCard {
         id: statCard
         property string icon: ""
         property string value: ""
@@ -34,26 +34,13 @@ AbstractBackgroundWidget {
 
         implicitWidth: root.cardWidth
         implicitHeight: root.cardHeight
-        radius: Appearance.rounding?.verylarge ?? 30
+        widget: root
         color: statCard.bgColor
 
-        StyledRectangularShadow {
-            target: statCard
-            z: -2
-            visible: Config.options.background.widgets.shadow
-        }
 
-        FastBlurred {
-            anchors.fill: parent
-            blurSource: root.wallpaperItem
-            cardRadius: statCard.radius
-            tint: statCard.bgColor
-            tintOpacity: 0.55
-            trackX: statCard.x + root.x
-            trackY: statCard.y + root.y
-            visible: Config.options.background.widgets.resources.blur
-            tintEnabled: Config.options.background.widgets.resources.tintBlur
-        }
+        tint: statCard.bgColor
+        blurred: Config.options.background.widgets.resources.blur
+        tintEnabled: Config.options.background.widgets.resources.tintBlur
 
         ColumnLayout {
             anchors {

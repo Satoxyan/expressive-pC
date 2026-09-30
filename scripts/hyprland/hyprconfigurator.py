@@ -12,6 +12,7 @@ BOOL_KEYS = {
     "input:touchpad:natural_scroll",
     "input:touchpad:disable_while_typing",
     "input:touchpad:clickfinger_behavior",
+    "misc:focus_on_activate",
 }
 
 ANIM_PRESETS = {

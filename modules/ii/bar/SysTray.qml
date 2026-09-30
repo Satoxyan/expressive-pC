@@ -9,6 +9,9 @@ import qs.modules.common.widgets
 
 Item {
     id: root
+    property color contentColor: Appearance.colors.colOnLayer2
+    property bool contentColorOverridden: false
+    signal styleEditorRequested()
     property bool vertical: false
     property bool invertSide: false
     property bool trayOverflowOpen: false
@@ -94,7 +97,7 @@ Item {
                 iconSize: Appearance.font.pixelSize.larger
                 text: Config.options.bar.bottom ? "keyboard_control_key" : "expand_more"
                 horizontalAlignment: Text.AlignHCenter
-                color: root.trayOverflowOpen ? Appearance.colors.colOnSecondaryContainer : Appearance.colors.colOnLayer2
+                color: root.trayOverflowOpen ? Appearance.colors.colOnSecondaryContainer : root.contentColor
                 rotation: (root.trayOverflowOpen ? 180 : 0) - (90 * root.vertical) + (180 * root.invertSide)
                 Behavior on rotation {
                     animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
@@ -122,6 +125,7 @@ Item {
                             Layout.fillWidth: root.vertical
                             onMenuClosed: root.releaseFocus()
                             onMenuOpened: (qsWindow) => root.setExtraWindowAndGrabFocus(qsWindow)
+                            onStyleEditorRequested: root.styleEditorRequested()
                         }
                     }
                 }
@@ -140,6 +144,7 @@ Item {
                 Layout.rightMargin: 6
                 onMenuClosed: root.releaseFocus()
                 onMenuOpened: (qsWindow) => root.setExtraWindowAndGrabFocus(qsWindow)
+                onStyleEditorRequested: root.styleEditorRequested()
             }
         }
     }

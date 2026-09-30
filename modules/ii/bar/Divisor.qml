@@ -4,6 +4,8 @@ import qs.modules.common.widgets
 
 Item {
     id: root
+    property color contentColor: Appearance.colors.colOnLayer0
+    property bool contentColorOverridden: false
     property bool vertical: Config.options.bar.vertical
     property real btnSize: 40
     property real btnSpacing: 2
@@ -19,7 +21,7 @@ Item {
         anchors.centerIn: parent
         width:  vertical ? Math.round(btnSize * 0.6) : 1
         height: vertical ? 1 : Math.round(btnSize * 0.6)
-        color:  isMaterial ? Appearance.colors.colPrimary : Appearance.colors.colOutlineVariant
+        color:  isMaterial ? Appearance.colors.colPrimary : (root.contentColorOverridden ? Qt.alpha(root.contentColor, 0.4) : Appearance.colors.colOutlineVariant)
     }
 
     StyledText {
@@ -27,7 +29,7 @@ Item {
         visible: root.style === "dot"
         anchors.centerIn: parent
         text: "• "
-        color: isMaterial ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer0
+        color: isMaterial ? Appearance.colors.colPrimary : root.contentColor
         font.pixelSize: Appearance.font.pixelSize.normal
     }
 }

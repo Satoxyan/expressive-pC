@@ -25,7 +25,7 @@ AbstractBackgroundWidget {
     property string editingText: ""
     onModeChanged: GlobalStates.desktopWidgetKeyboardFocus = (mode === "edit")
 
-    function toggleFlip() { flipAnim.start() }
+    function toggleFlip() { cardWrapper.flip() }
 
     function openNewTask() {
         root.editingText = ""
@@ -39,54 +39,18 @@ AbstractBackgroundWidget {
         toggleFlip()
     }
 
-    Item {
+    FlipCard {
         id: cardWrapper
         anchors.fill: parent
+        onFlipped: root.mode = (root.mode === "list" ? "edit" : "list")
 
-        transform: Scale {
-            id: flipScale
-            origin.x: cardWrapper.width  / 2
-            origin.y: cardWrapper.height / 2
-            xScale: 1
-        }
-
-        SequentialAnimation {
-            id: flipAnim
-            NumberAnimation {
-                target: flipScale; property: "xScale"
-                to: 0; duration: 150; easing.type: Easing.InQuad
-            }
-            ScriptAction {
-                script: root.mode = (root.mode === "list" ? "edit" : "list")
-            }
-            NumberAnimation {
-                target: flipScale; property: "xScale"
-                to: 1; duration: 150; easing.type: Easing.OutQuad
-            }
-        }
-
-        StyledDropShadow { 
-            target: contentRect 
-            visible: Config.options.background.widgets.shadow
-        }
-
-        Rectangle {
+        WidgetCard {
             id: contentRect
             anchors.fill: parent
-            color: Appearance.colors.colPrimaryContainer
-            radius: Appearance.rounding?.verylarge ?? 30
 
-            FastBlurred {
-                anchors.fill: parent
-                blurSource: root.wallpaperItem
-                cardRadius: contentRect.radius
-                tint: Appearance.colors.colPrimaryContainer
-                tintOpacity: 0.55
-                trackX: root.x  
-                trackY: root.y
-                visible: Config.options.background.widgets.todo.blur
+            widget: root
+            blurred: Config.options.background.widgets.todo.blur
             tintEnabled: Config.options.background.widgets.todo.tintBlur
-            }
 
             // List
             ColumnLayout {

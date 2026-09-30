@@ -22,7 +22,7 @@ AbstractBackgroundWidget {
     implicitWidth: row.implicitWidth
     implicitHeight: row.implicitHeight
 
-    component TimerCard: Rectangle {
+    component TimerCard: WidgetCard {
         id: timerCard
         property string icon: ""
         property string value: ""
@@ -37,26 +37,12 @@ AbstractBackgroundWidget {
 
         implicitWidth: root.cardWidth
         implicitHeight: root.cardHeight
-        radius: Appearance.rounding?.verylarge ?? 30
+        widget: root
         color: timerCard.bgColor
 
-        StyledRectangularShadow {
-            target: timerCard
-            z: -2
-            visible: Config.options.background.widgets.shadow
-        }
 
-        FastBlurred {
-            anchors.fill: parent
-            blurSource: root.wallpaperItem
-            cardRadius: timerCard.radius
-            tint: Appearance.colors.colPrimaryContainer
-            tintOpacity: 0.55
-            trackX: timerCard.x + root.x
-            trackY: timerCard.y + root.y
-            visible: Config.options.background.widgets.timers.blur
-            tintEnabled: Config.options.background.widgets.timers.tintBlur
-        }
+        blurred: Config.options.background.widgets.timers.blur
+        tintEnabled: Config.options.background.widgets.timers.tintBlur
 
         MouseArea {
             anchors.fill: parent
