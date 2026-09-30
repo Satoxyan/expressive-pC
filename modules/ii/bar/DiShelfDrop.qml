@@ -24,8 +24,9 @@ Item {
         anchors.margins: 2
         radius: height / 2
         color: ColorUtils.transparentize(Appearance.colors.colPrimary, dropState.hovering ? 0.9 : 1)
-        border.width: 1.5
-        border.color: dropState.hovering ? Appearance.colors.colPrimary : Appearance.m3colors.m3success
+        // The outline only marks the drop target while something is being dragged; the confirmation after it stays quiet
+        border.width: dropState.hovering ? 1.5 : 0
+        border.color: Appearance.colors.colPrimary
     }
 
     Item {
@@ -103,28 +104,32 @@ Item {
         visible: !dropState.hovering
         anchors {
             fill: parent
-            leftMargin: 4
+            leftMargin: 8
             rightMargin: 14
         }
         spacing: 8
 
-        MaterialShapeWrappedMaterialSymbol {
-            wrappedShape: MaterialShape.Shape.Circle
-            color: Appearance.m3colors.m3success
-            colSymbol: Appearance.colors.colOnPrimary
-            text: dropState.feedback?.icon ?? "check"
-            iconSize: 16
-            fill: 1
-            padding: 5
-            scale: 0.3
+        // A small tonal mark, not a solid badge: it confirms without shouting
+        Rectangle {
+            id: doneMark
+            implicitWidth: 24
+            implicitHeight: 24
+            radius: 12
+            color: ColorUtils.transparentize(Appearance.m3colors.m3success, 0.82)
+            opacity: 0
+            scale: 0.85
 
-            NumberAnimation on scale {
+            MaterialSymbol {
+                anchors.centerIn: parent
+                text: dropState.feedback?.icon ?? "check"
+                iconSize: 14
+                color: Appearance.m3colors.m3success
+            }
+
+            ParallelAnimation {
                 running: !dropState.hovering
-                from: 0.3
-                to: 1
-                duration: IslandMotion.long
-                easing.type: Easing.OutBack
-                easing.overshoot: 2.4
+                NumberAnimation { target: doneMark; property: "opacity"; from: 0; to: 1; duration: IslandMotion.short; easing.type: Easing.OutCubic }
+                NumberAnimation { target: doneMark; property: "scale"; from: 0.85; to: 1; duration: IslandMotion.medium; easing.type: Easing.OutCubic }
             }
         }
 
@@ -136,7 +141,7 @@ Item {
                 Layout.fillWidth: true
                 text: dropState.feedback?.label ?? Translation.tr("Kept in the drawer")
                 font.pixelSize: Appearance.font.pixelSize.smaller
-                font.weight: Font.DemiBold
+                font.weight: Font.Medium
                 color: Appearance.colors.colOnLayer0
                 elide: Text.ElideRight
             }
