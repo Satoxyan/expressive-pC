@@ -32,7 +32,8 @@ Item {
     property bool showWifiDialog: false
     property bool editMode: false
     property bool showIconPickerDialog: false
-    property int draggingSlot: -1
+    property string draggingType: ""
+    property int hoverPos: -1
     property point dragPosition
 
     readonly property bool animatedEntrance: WM.compositor !== "hyprland"
@@ -294,142 +295,93 @@ Item {
                 }
             }
 
-            // ponytail: 3 reorderable panels — drag handle swaps Config panelOrder
+            // ponytail: 3 reorderable panels — hold one, the others make room live
             Item {
+                id: panelArea
                 Layout.fillWidth: true
-                implicitHeight: panelSlots.implicitHeight
+                implicitHeight: panelArea.totalHeight
 
-                Rectangle {
-                    id: panelDropIndicator
-                    visible: false
-                    z: 99
-                    width: parent.width
-                    height: 3
-                    radius: 2
-                    color: Appearance.colors.colPrimary
+                readonly property int gap: root.editMode ? 8 : sidebarPadding
+                readonly property var baseOrder: {
+                    const o = Config.options.sidebar.panelOrder
+                    return (o && o.length === 3) ? o.map(String) : ["quickToggles", "sliders", "media"]
+                }
+                // urutan tampil selama drag: panel yang dipegang ditempatkan di posisi hover
+                readonly property var displayOrder: {
+                    const b = panelArea.baseOrder
+                    const d = root.draggingType
+                    if (d === "" || root.hoverPos < 0 || b.indexOf(d) === root.hoverPos) return b
+                    const a = [...b]
+                    a.splice(a.indexOf(d), 1)
+                    a.splice(root.hoverPos, 0, d)
+                    return a
+                }
+                readonly property real totalHeight: {
+                    let h = 0
+                    let n = 0
+                    for (const t of panelArea.displayOrder) {
+                        const hs = panelArea.hostOf(t)
+                        if (!hs || !hs.visible) continue
+                        h += hs.stackHeight + (n > 0 ? panelArea.gap : 0)
+                        n++
+                    }
+                    return h
                 }
 
-                ColumnLayout {
-                    id: panelSlots
-                    width: parent.width
-                    spacing: root.editMode ? 8 : sidebarPadding
-
-                    function panelSource(type) {
-                        if (type === "quickToggles") return quickTogglesPanel
-                        if (type === "sliders") return slidersPanel
-                        if (type === "media") return mediaPanel
-                        return null
-                    }
-                    function panelVisible(type) {
-                        if (type === "quickToggles") return true
-                        if (type === "sliders") {
-                            const c = Config.options.sidebar.quickSliders
-                            return c.enable && (c.showMic || c.showVolume || c.showBrightness)
-                        }
-                        if (type === "media") return Config.options.sidebar.mediaPlayer && (root.activePlayer !== null || root.editMode)
-                        return false
-                    }
-                    function swapPanels(fromType, toType) {
-                        const order = [...Config.options.sidebar.panelOrder]
-                        const fi = order.indexOf(fromType)
-                        const ti = order.indexOf(toType)
-                        if (fi === -1 || ti === -1 || fi === ti) return
-                        const item = order.splice(fi, 1)[0]
-                        order.splice(ti, 0, item)
-                        Config.options.sidebar.panelOrder = order
-                    }
-
-                    // Slot 0
-                    Item {
-                        Layout.fillWidth: true
-                        Layout.leftMargin: slot0Loader.panelType === "media" ? -8 : 0
-                        Layout.rightMargin: slot0Loader.panelType === "media" ? -8 : 0
-                        Layout.topMargin: slot0Loader.panelType === "media" ? -4 : 0
-                        Layout.bottomMargin: slot0Loader.panelType === "media" ? -4 : 0
-                        implicitHeight: slot0Column.implicitHeight
-                        visible: (slot0Loader.panelType === "media" || slot0Loader.panelType === "sliders") ? panelSlots.panelVisible(slot0Loader.panelType) : (root.editMode || panelSlots.panelVisible(slot0Loader.panelType))
-                        opacity: dragHandler0.active ? 0 : (root.editMode && !panelSlots.panelVisible(slot0Loader.panelType) ? 0.4 : 1)
-
-                        ColumnLayout {
-                            id: slot0Column
-                            anchors.fill: parent
-                            spacing: 0
-                            visible: (slot0Loader.panelType === "media" || slot0Loader.panelType === "sliders") ? panelSlots.panelVisible(slot0Loader.panelType) : (root.editMode || panelSlots.panelVisible(slot0Loader.panelType))
-                            ReorderDragHandle { id: dragHandler0; panelType: slot0Loader.panelType; order: 0 }
-                            Loader {
-                                id: slot0Loader
-                                Layout.fillWidth: true
-                                active: panelSlots.panelVisible(slot0Loader.panelType) || (root.editMode && slot0Loader.panelType !== "sliders" && slot0Loader.panelType !== "media")
-                                asynchronous: true
-                                property string panelType: {
-                                    const o = Config.options.sidebar.panelOrder
-                                    return (o && o.length === 3) ? String(o[0]) : "quickToggles"
-                                }
-                                sourceComponent: panelSlots.panelSource(panelType)
-                            }
-                        }
-                    }
-                    // Slot 1
-                    Item {
-                        Layout.fillWidth: true
-                        Layout.leftMargin: slot1Loader.panelType === "media" ? -8 : 0
-                        Layout.rightMargin: slot1Loader.panelType === "media" ? -8 : 0
-                        Layout.topMargin: slot1Loader.panelType === "media" ? -4 : 0
-                        Layout.bottomMargin: slot1Loader.panelType === "media" ? -4 : 0
-                        implicitHeight: slot1Column.implicitHeight
-                        visible: (slot1Loader.panelType === "media" || slot1Loader.panelType === "sliders") ? panelSlots.panelVisible(slot1Loader.panelType) : (root.editMode || panelSlots.panelVisible(slot1Loader.panelType))
-                        opacity: dragHandler1.active ? 0 : (root.editMode && !panelSlots.panelVisible(slot1Loader.panelType) ? 0.4 : 1)
-
-                        ColumnLayout {
-                            id: slot1Column
-                            anchors.fill: parent
-                            spacing: 0
-                            visible: (slot1Loader.panelType === "media" || slot1Loader.panelType === "sliders") ? panelSlots.panelVisible(slot1Loader.panelType) : (root.editMode || panelSlots.panelVisible(slot1Loader.panelType))
-                            ReorderDragHandle { id: dragHandler1; panelType: slot1Loader.panelType; order: 1 }
-                            Loader {
-                                id: slot1Loader
-                                Layout.fillWidth: true
-                                active: panelSlots.panelVisible(slot1Loader.panelType)
-                                asynchronous: true
-                                property string panelType: {
-                                    const o = Config.options.sidebar.panelOrder
-                                    return (o && o.length === 3) ? String(o[1]) : "sliders"
-                                }
-                                sourceComponent: panelSlots.panelSource(panelType)
-                            }
-                        }
-                    }
-                    // Slot 2
-                    Item {
-                        Layout.fillWidth: true
-                        Layout.leftMargin: slot2Loader.panelType === "media" ? -8 : 0
-                        Layout.rightMargin: slot2Loader.panelType === "media" ? -8 : 0
-                        Layout.topMargin: slot2Loader.panelType === "media" ? -4 : 0
-                        Layout.bottomMargin: slot2Loader.panelType === "media" ? -4 : 0
-                        implicitHeight: slot2Column.implicitHeight
-                        visible: (slot2Loader.panelType === "media" || slot2Loader.panelType === "sliders") ? panelSlots.panelVisible(slot2Loader.panelType) : (root.editMode || panelSlots.panelVisible(slot2Loader.panelType))
-                        opacity: dragHandler2.active ? 0 : (root.editMode && !panelSlots.panelVisible(slot2Loader.panelType) ? 0.4 : 1)
-
-                        ColumnLayout {
-                            id: slot2Column
-                            anchors.fill: parent
-                            spacing: 0
-                            visible: (slot2Loader.panelType === "media" || slot2Loader.panelType === "sliders") ? panelSlots.panelVisible(slot2Loader.panelType) : (root.editMode || panelSlots.panelVisible(slot2Loader.panelType))
-                            ReorderDragHandle { id: dragHandler2; panelType: slot2Loader.panelType; order: 2 }
-                            Loader {
-                                id: slot2Loader
-                                Layout.fillWidth: true
-                                active: panelSlots.panelVisible(slot2Loader.panelType)
-                                asynchronous: true
-                                property string panelType: {
-                                    const o = Config.options.sidebar.panelOrder
-                                    return (o && o.length === 3) ? String(o[2]) : "media"
-                                }
-                                sourceComponent: panelSlots.panelSource(panelType)
-                            }
-                        }
-                    }
+                function panelSource(type) {
+                    if (type === "quickToggles") return quickTogglesPanel
+                    if (type === "sliders") return slidersPanel
+                    if (type === "media") return mediaPanel
+                    return null
                 }
+                function panelVisible(type) {
+                    if (type === "quickToggles") return true
+                    if (type === "sliders") {
+                        const c = Config.options.sidebar.quickSliders
+                        return c.enable && (c.showMic || c.showVolume || c.showBrightness)
+                    }
+                    if (type === "media") return Config.options.sidebar.mediaPlayer && (root.activePlayer !== null || root.editMode)
+                    return false
+                }
+                function hostOf(type) {
+                    if (type === "quickToggles") return qtPanel
+                    if (type === "sliders") return slPanel
+                    return mdPanel
+                }
+                function yFor(type) {
+                    let y = 0
+                    for (const t of panelArea.displayOrder) {
+                        if (t === type) break
+                        const hs = panelArea.hostOf(t)
+                        if (!hs || !hs.visible) continue
+                        y += hs.stackHeight + panelArea.gap
+                    }
+                    return y
+                }
+                // indeks jatuh dari kursor: berapa panel lain yang tengahnya sudah di atas kursor
+                function hoverAt(scenePos) {
+                    const local = panelArea.mapFromItem(null, scenePos.x, scenePos.y)
+                    const seq = panelArea.displayOrder.filter(t => t !== root.draggingType)
+                    let above = 0
+                    for (const t of seq) {
+                        const hs = panelArea.hostOf(t)
+                        if (!hs || !hs.visible) continue
+                        if (hs.y + hs.height / 2 <= local.y) above++
+                    }
+                    // sisip tepat setelah `above` panel terlihat (panel tersembunyi dihitung nol tinggi)
+                    let seen = 0
+                    for (let i = 0; i < seq.length; i++) {
+                        const hs = panelArea.hostOf(seq[i])
+                        if (!hs || !hs.visible) continue
+                        if (seen === above) return i
+                        seen++
+                    }
+                    return seq.length
+                }
+
+                PanelHost { id: qtPanel; panelType: "quickToggles" }
+                PanelHost { id: slPanel; panelType: "sliders" }
+                PanelHost { id: mdPanel; panelType: "media" }
             }
 
             CenterWidgetGroup {
@@ -497,10 +449,10 @@ Item {
         dialog: IconPickerDialog {}
     }
 
-    // Drag ghost — hidden per request (only drop indicator shows)
+    // Drag ghost — panel yang dipegang terangkat di atas panel lain
     Item {
         id: dragGhost
-        visible: false
+        visible: root.draggingType !== ""
         z: 999
         width: sidebarWidth + 30
         height: dragGhostContent.implicitHeight + 16
@@ -536,14 +488,43 @@ Item {
             Loader {
                 id: dragGhostLoader
                 Layout.fillWidth: true
-                active: root.draggingSlot >= 0
-                property string panelType: {
-                    if (root.draggingSlot < 0) return ""
-                    const o = Config.options.sidebar.panelOrder
-                    if (!o || o.length !== 3) return ""
-                    return String(o[root.draggingSlot])
-                }
-                sourceComponent: panelSlots.panelSource(panelType)
+                active: root.draggingType !== ""
+                property string panelType: root.draggingType
+                sourceComponent: panelArea.panelSource(panelType)
+            }
+        }
+    }
+
+    // ponytail: satu item stabil per panel — urutan datang dari panelArea.displayOrder
+    component PanelHost: Item {
+        id: host
+        property string panelType: ""
+        readonly property bool bleed: panelType === "media"
+        readonly property real stackHeight: height - (bleed ? 20 : 0)
+
+        x: bleed ? -10 : 0
+        width: panelArea.width + (bleed ? 20 : 0)
+        y: panelArea.yFor(panelType) + (bleed ? -10 : 0)
+        height: hostColumn.implicitHeight
+        visible: panelArea.panelVisible(panelType)
+        opacity: root.draggingType === panelType ? 0
+            : (root.editMode && !panelArea.panelVisible(panelType) ? 0.4 : 1)
+
+        Behavior on y {
+            enabled: root.draggingType !== ""
+            animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(host)
+        }
+
+        ColumnLayout {
+            id: hostColumn
+            width: parent.width
+            spacing: 0
+            ReorderDragHandle { panelType: host.panelType }
+            Loader {
+                Layout.fillWidth: true
+                active: panelArea.panelVisible(host.panelType)
+                asynchronous: true
+                sourceComponent: panelArea.panelSource(host.panelType)
             }
         }
     }
@@ -559,7 +540,6 @@ Item {
         border.width: 1
         border.color: Appearance.colors.colLayer0Border
         property string panelType: ""
-        property int order: 0
         Behavior on color { animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this) }
 
         RowLayout {
@@ -585,27 +565,16 @@ Item {
             target: null
             onActiveChanged: {
                 if (active) {
-                    root.draggingSlot = reorderHandle.order
+                    root.draggingType = reorderHandle.panelType
+                    root.hoverPos = panelArea.baseOrder.indexOf(reorderHandle.panelType)
                 } else {
-                    panelDropIndicator.visible = false
-                    root.draggingSlot = -1
-                    const sc = centroid.scenePosition
-                    const slots = [slot0Column.parent, slot1Column.parent, slot2Column.parent]
-                    const types = [
-                        (Config.options.sidebar.panelOrder && Config.options.sidebar.panelOrder.length === 3) ? String(Config.options.sidebar.panelOrder[0]) : "quickToggles",
-                        (Config.options.sidebar.panelOrder && Config.options.sidebar.panelOrder.length === 3) ? String(Config.options.sidebar.panelOrder[1]) : "sliders",
-                        (Config.options.sidebar.panelOrder && Config.options.sidebar.panelOrder.length === 3) ? String(Config.options.sidebar.panelOrder[2]) : "media"
-                    ]
-                    let nearestIdx = -1
-                    let minDist = Infinity
-                    for (let i = 0; i < slots.length; i++) {
-                        const center = slots[i].mapToItem(null, slots[i].width / 2, slots[i].height / 2)
-                        const d = Math.sqrt(Math.pow(sc.x - center.x, 2) + Math.pow(sc.y - center.y, 2))
-                        if (d < minDist) { minDist = d; nearestIdx = i }
-                    }
-                    if (nearestIdx !== -1 && nearestIdx !== reorderHandle.order) {
-                        panelSlots.swapPanels(reorderHandle.panelType, types[nearestIdx])
-                    }
+                    // preview sudah sesuai: tulis jadi urutan baru
+                    const cur = Config.options.sidebar.panelOrder
+                    const next = panelArea.displayOrder
+                    if (cur && cur.length === 3 && next.some((t, i) => String(cur[i]) !== t))
+                        Config.options.sidebar.panelOrder = next
+                    root.draggingType = ""
+                    root.hoverPos = -1
                 }
             }
             onCentroidChanged: {
@@ -613,24 +582,7 @@ Item {
                 const sc = centroid.scenePosition
                 const localPos = root.mapFromItem(null, sc.x, sc.y)
                 root.dragPosition = Qt.point(localPos.x, localPos.y)
-                const slots = [slot0Column.parent, slot1Column.parent, slot2Column.parent]
-                let nearestIdx = -1
-                let minDist = Infinity
-                for (let i = 0; i < slots.length; i++) {
-                    const center = slots[i].mapToItem(null, slots[i].width / 2, slots[i].height / 2)
-                    const d = Math.sqrt(Math.pow(sc.x - center.x, 2) + Math.pow(sc.y - center.y, 2))
-                    if (d < minDist) { minDist = d; nearestIdx = i }
-                }
-                if (nearestIdx !== -1 && nearestIdx !== reorderHandle.order) {
-                    const target = slots[nearestIdx]
-                    const self = slots[reorderHandle.order]
-                    const after = target.y > self.y
-                    const indicatorPos = target.mapToItem(panelDropIndicator.parent, 0, after ? target.height : 0)
-                    panelDropIndicator.y = indicatorPos.y - 2
-                    panelDropIndicator.visible = true
-                } else {
-                    panelDropIndicator.visible = false
-                }
+                root.hoverPos = panelArea.hoverAt(sc)
             }
         }
         HoverHandler { cursorShape: reorderDragHandler.active ? Qt.ClosedHandCursor : Qt.OpenHandCursor }
