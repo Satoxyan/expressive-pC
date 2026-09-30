@@ -59,7 +59,9 @@ Item {
     readonly property string lyricLine: (root.cfg.lyrics ?? true) && (root.cfg.lyricsPill ?? true) && LyricsService.status === "ok"
         && LyricsService.activeIndex >= 0 && (root.activePlayer?.isPlaying ?? false)
         ? (LyricsService.slots[LyricsService.before] ?? "") : ""
-    readonly property bool mediaTrackInfoVisible: root.hoverRevealed || mediaTrackChangeTimer.running
+    // Paused, the pill shows which song it is (as on hover): with nothing moving there is room to read it
+    readonly property bool mediaPaused: root.activePlayer !== null && !(root.activePlayer?.isPlaying ?? false)
+    readonly property bool mediaTrackInfoVisible: root.hoverRevealed || mediaTrackChangeTimer.running || root.mediaPaused
     readonly property real mediaWidth: root.lyricLine !== "" ? 250 : Math.max(140, Math.min(260, root.mediaTextContentWidth))
 
     Timer {
@@ -1207,7 +1209,8 @@ Item {
         : []
 
     function compactWidth(id) {
-        return root.baseWidth(id) + (root.hoverRevealed && id === root.primaryId ? root.hoverExtra(id) : 0)
+        const opened = root.hoverRevealed || (id === "media" && root.mediaPaused)
+        return root.baseWidth(id) + (opened && id === root.primaryId ? root.hoverExtra(id) : 0)
             + (id === root.primaryId ? root.anchorInset : 0)
     }
 
