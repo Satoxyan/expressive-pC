@@ -296,6 +296,10 @@ Scope {
                     readonly property var heightSteps: [280]
                     readonly property real tallest: Math.min(island.maxH, island.heightSteps[island.heightSteps.length - 1])
                     function stepFor(need) {
+                        // By default a card is just as tall as what it shows (up to the tallest step); the uniform
+                        // height is an option, since a near-empty view in a full-height card reads as a hole
+                        if (!(scope.di.cfg.uniformHeight ?? false))
+                            return Math.min(Math.max(need, island.startH), island.tallest)
                         for (const step of island.heightSteps)
                             if (need <= step) return Math.min(step, island.maxH)
                         return island.tallest

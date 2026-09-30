@@ -15,7 +15,9 @@ Item {
     id: xm
     required property Item di
     implicitWidth: xm.wantedWidth
-    readonly property real wantedWidth: 532
+    // With the lyrics switched off the card is just the player, one column
+    readonly property bool lyricsOn: xm.di.cfg.lyrics ?? true
+    readonly property real wantedWidth: xm.lyricsOn ? 532 : 262
     implicitHeight: layout.implicitHeight
 
     readonly property MprisPlayer player: xm.di.activePlayer
@@ -100,7 +102,7 @@ Item {
             id: leftCol
             Layout.fillWidth: false
             Layout.preferredWidth: 262
-            Layout.maximumWidth: 262
+            Layout.maximumWidth: xm.lyricsOn ? 262 : 100000
             Layout.alignment: Qt.AlignTop
             spacing: 10
 
@@ -383,6 +385,14 @@ Item {
 
                 Item { Layout.fillWidth: true }
 
+                // Show or hide the lyrics (the same switch as in the island settings)
+                TonalButton {
+                    icon: "lyrics"
+                    filled: xm.lyricsOn
+                    iconColor: xm.lyricsOn ? xm.primary : xm.onSurfaceVariant
+                    onClicked: Config.options.bar.dynamicIsland.lyrics = !xm.lyricsOn
+                }
+
                 TonalButton {
                     id: likeButton
                     property bool justLiked: false
@@ -408,6 +418,7 @@ Item {
         // Right: the lyrics, in their own tonal card taking the full height
         Rectangle {
             id: lyricsCard
+            visible: xm.lyricsOn
             Layout.fillWidth: true
             Layout.fillHeight: true
             radius: 20

@@ -327,6 +327,12 @@ ContentPage {
                         onCheckedChanged: { Config.options.bar.dynamicIsland.autoExpand = checked; }
                     }
                     ConfigSwitch {
+                        buttonIcon: "height"
+                        text: Translation.tr("Same height for every expanded card")
+                        checked: Config.options.bar.dynamicIsland.uniformHeight
+                        onCheckedChanged: { Config.options.bar.dynamicIsland.uniformHeight = checked; }
+                    }
+                    ConfigSwitch {
                         buttonIcon: "splitscreen_right"
                         text: Translation.tr("Second island for a second live thing (a race, a call, a timer…)")
                         checked: Config.options.bar.dynamicIsland.secondIsland
