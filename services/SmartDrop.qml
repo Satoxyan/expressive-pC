@@ -6,7 +6,7 @@ import Quickshell
 import qs.modules.common
 
 /**
- * Smart Drop: what can be done with whatever is being dragged onto the island, by kind.
+ * Smart Drop: actions for whatever is dragged onto the island, by kind.
  *
  * To add a kind: extend kindOf(). To add an action: put it in `catalog` and handle it in run(). Actions get
  * paths and text as separate argv entries (never spliced into a shell string), so a file name with quotes or

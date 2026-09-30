@@ -372,9 +372,6 @@ Singleton {
         }
     }
 
-    //////////////////// Quick tools ////////////////////
-    // Plain words start timers and friends: "timer 5 min", "10m", "cronômetro", "pomodoro",
-    // "lembrar em 10 min tirar o bolo", "alarme 7:30", "não perturbe"
     function normalize(text) {
         return (text ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
     }
@@ -440,7 +437,6 @@ Singleton {
         const words = query.replace(/^(\S+)\s*/, "");
         const durationOnly = /^\d+(?:[.,]\d+)?\s*(?:horas?|hours?|hrs?|h|minutos?|minutes?|mins?|m|segundos?|seconds?|secs?|seg|s)(?:\s*\d+\s*(?:minutos?|mins?|m|segundos?|secs?|seg|s)?)*$/.test(query);
 
-        // Countdown timer
         if (durationOnly || root.startsWithKeyword(query, ["timer", "temporizador", "contagem", "countdown"])) {
             const seconds = root.parseDuration(durationOnly ? query : words);
             if (seconds > 0) {
@@ -478,7 +474,7 @@ Singleton {
             }
         }
 
-        // Stopwatch (only reads the ticking time while paused, so the list doesn't rebuild every 10 ms)
+        // Stopwatch (reads the ticking time only while paused, so the list is not rebuilt every 10 ms)
         if (root.startsWithKeyword(query, ["cronometro", "stopwatch"])) {
             const running = TimerService.stopwatchRunning;
             const hasTime = !running && TimerService.stopwatchTime > 0;
@@ -503,7 +499,6 @@ Singleton {
             }
         }
 
-        // Pomodoro
         if (root.startsWithKeyword(query, ["pomodoro", "foco", "focus"])) {
             results.push(root.quickResult({
                 name: TimerService.pomodoroRunning ? Translation.tr("Pause pomodoro") : Translation.tr("Start pomodoro"),
@@ -518,7 +513,6 @@ Singleton {
             }));
         }
 
-        // Alarm at a time of day (or in a while)
         if (root.startsWithKeyword(query, ["alarme", "despertador", "alarm", "acordar"])) {
             const clockSeconds = root.parseClock(words);
             const seconds = clockSeconds >= 0 ? clockSeconds : root.parseDuration(words.replace(/^(em|in|daqui a)\s+/, ""));
@@ -570,7 +564,6 @@ Singleton {
             }
         }
 
-        // Do not disturb
         if (root.startsWithKeyword(query, ["nao perturbe", "dnd", "do not disturb", "silenciar notificacoes"])) {
             results.push(root.quickResult({
                 name: Notifications.silent ? Translation.tr("Turn off Do Not Disturb") : Translation.tr("Turn on Do Not Disturb"),

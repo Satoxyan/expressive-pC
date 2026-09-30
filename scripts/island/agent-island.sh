@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Codex and Gemini (Antigravity CLI) hooks -> Dynamic Island (Quickshell end4-pC). Same flow as claude-island.sh:
+# Codex and Gemini (Antigravity CLI) hooks -> Dynamic Island. Same flow as claude-island.sh:
 #   Codex:        ~/.codex/hooks.json          -> agent-island.sh codex            (event inside the JSON payload)
 #   Antigravity:  ~/.gemini/config/hooks.json  -> agent-island.sh gemini <Event>   (event passed as an argument)
 # Never blocks the agent: the island is told in the background and the script exits right away.

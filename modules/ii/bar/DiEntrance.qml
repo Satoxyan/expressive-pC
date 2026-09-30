@@ -1,6 +1,6 @@
 import QtQuick
 
-// The island's single entrance motion: fade in while growing from slightly small, with a soft settle
+// Shared entrance motion: fade in while scaling up slightly
 ParallelAnimation {
     id: entrance
     required property Item target

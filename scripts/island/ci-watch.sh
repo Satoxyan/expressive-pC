@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 # Follows the GitHub workflow run that a push just started, and reports it on the island.
-#
-# Called in the background right after a successful `git push`. It waits for GitHub to register a run for the
-# pushed commit, then polls until the run finishes, so the island says "build passed" or "build failed" without
-# anyone opening a browser.
-#
 # Usage: ci-watch.sh <repo dir>
 
 set -uo pipefail

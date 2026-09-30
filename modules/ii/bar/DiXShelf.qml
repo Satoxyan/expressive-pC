@@ -8,10 +8,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// The drawer: files dropped on the island, newest first, in a thumbnail grid. Images show a real preview, the rest
-// the icon of their type; every tile has its name and size. Hover a tile for open / tool / reveal / remove; drag it
-// out to drop the file anywhere. Drawer-wide actions sit in one row next to the title. Two rows fit the standard
-// height, more scroll inside the grid. Empty, the drawer narrows to one column with a hint.
+// The drawer: files dropped on the island, in a thumbnail grid with per-tile actions and drag-out.
 ColumnLayout {
     id: xshelf
     required property Item di
@@ -27,7 +24,6 @@ ColumnLayout {
     // 234 of view minus the header row and the spacing
     readonly property real gridMax: 192
 
-    // path -> { size, dir }, filled by one stat call while the view is open
     property var info: ({})
     property bool infoReady: false
 
@@ -40,7 +36,6 @@ ColumnLayout {
         return sum
     }
 
-    // The folder the files share, or the drawer's own folder when they come from several places
     readonly property string folder: {
         const dirs = [...new Set(DropShelf.items.map(p => p.substring(0, p.lastIndexOf("/"))))]
         return dirs.length === 1 && dirs[0] !== "" ? dirs[0] : DropShelf.storeDir
@@ -125,7 +120,6 @@ ColumnLayout {
         implicitWidth: chip.label !== "" ? chipRow.implicitWidth + 24 : 32
         implicitHeight: 32
         radius: 16
-        // Material 3's error container pair, so the armed "Confirm" reads clearly on a dark island
         color: chip.danger ? (chipMouse.containsMouse ? Appearance.colors.colErrorContainerHover : Appearance.colors.colErrorContainer)
             : chipMouse.containsMouse ? Appearance.colors.colLayer2 : Appearance.colors.colLayer1
 
@@ -351,7 +345,6 @@ ColumnLayout {
             onDoubleClicked: Qt.openUrlExternally(`file://${tile.path}`)
         }
 
-        // Per-file actions, over the thumbnail while hovering
         TileButton {
             anchors {
                 right: thumb.right
@@ -400,10 +393,8 @@ ColumnLayout {
         }
     }
 
-    // Header: title, count and size (or the result of the last tool), then the drawer-wide actions
     RowLayout {
         id: header
-        // Empty, the empty state says it all: no header above it
         visible: !xshelf.empty
         Layout.fillWidth: true
         spacing: 6
@@ -465,7 +456,6 @@ ColumnLayout {
         }
         Chip {
             id: clearChip
-            // Two taps: the first arms it for a moment, the second empties the drawer
             property bool armed: false
             visible: !xshelf.empty
             icon: clearChip.armed ? "warning" : "delete_sweep"
@@ -488,7 +478,6 @@ ColumnLayout {
         }
     }
 
-    // Empty state
     ColumnLayout {
         visible: xshelf.empty
         Layout.fillWidth: true
@@ -515,8 +504,7 @@ ColumnLayout {
         }
         StyledText {
             id: emptyTitle
-            // Filling the width (centred text) is what lets this column span the view: a column is never wider
-            // than its widest child, and a capped one pinned it to the left
+            // Filling the width lets this column span the view: a column is never wider than its widest child.
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignHCenter
             text: Translation.tr("Drawer is empty")
@@ -530,7 +518,6 @@ ColumnLayout {
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.Wrap
-            // Two lines on purpose: what to do, then how long things stay
             text: Translation.tr("Drag files onto the island to keep them here")
                 + (DropShelf.expireDays > 0 ? `\n${Translation.tr("they stay for %1 days").arg(DropShelf.expireDays)}` : "")
             font.pixelSize: Appearance.font.pixelSize.smallest
@@ -540,7 +527,6 @@ ColumnLayout {
         }
     }
 
-    // Grid; past two rows it scrolls, with the clipped edge fading out
     Flickable {
         id: gridFlick
         visible: !xshelf.empty

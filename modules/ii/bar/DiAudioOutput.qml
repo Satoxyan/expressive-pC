@@ -5,9 +5,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// Where the sound is going. When headphones connect, the island shows the hand-off itself: the old device fades
-// out on the left, an arc of sound travels across, and the new one lands on the right; then the old one and the
-// trail clear away, so the pill does not sit on a half-finished hand-off.
+// Headphone hand-off: the old device fades out, an arc travels across, the new one lands.
 RowLayout {
     id: output
     required property Item di

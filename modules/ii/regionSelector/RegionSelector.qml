@@ -116,7 +116,7 @@ Scope {
         }
     }
 
-    // record.sh reports here instead of editing states.json behind Persistent's back (Persistent rewrote it)
+    // record.sh reports here instead of editing states.json (Persistent would rewrite it)
     IpcHandler {
         target: "recorder"
 

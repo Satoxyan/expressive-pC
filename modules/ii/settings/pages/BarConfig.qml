@@ -469,8 +469,6 @@ ContentPage {
                 }
             }
 
-            // What each feature costs while it's on, heaviest first — so it's clear which ones are worth turning
-            // off. Every switch here stops the work itself (process, timer, network), not just the drawing.
             ContentSubsection {
                 title: Translation.tr("Background work · heaviest first")
                 GroupedList {
@@ -591,8 +589,7 @@ ContentPage {
 
             ContentSubsection {
                 title: Translation.tr("Pinned islands")
-                // Declared one by one on purpose: GroupedList counts each declared child as a row, and a
-                // Repeater would arrive as a single zero-height entry whose rows then overlap the next section.
+                // Declared one by one: GroupedList counts a Repeater as a single zero-height row
                 GroupedList {
                     ConfigSwitch {
                         buttonIcon: "partly_cloudy_day"
@@ -789,7 +786,6 @@ ContentPage {
                 }
             }
 
-            // Fullscreen: critical still breaks through; everything else waits behind the hairline
             ContentSubsection {
                 title: Translation.tr("Fullscreen")
                 GroupedList {
@@ -834,8 +830,7 @@ ContentPage {
                     }
                 }
 
-                // Loaded once and written back parsed, never bound: a binding would rewrite the text (and move the
-                // cursor) on every keystroke
+                // Loaded once and written back parsed; a binding would rewrite the text and move the cursor per keystroke
                 MaterialTextArea {
                     Layout.fillWidth: true
                     placeholderText: Translation.tr("Game windows (class, comma separated)")

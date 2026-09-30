@@ -12,7 +12,6 @@ ColumnLayout {
     required property Item di
     spacing: 8
     implicitWidth: xclip.wantedWidth
-    // Two columns (the entry · its history) when browsing the history; one for the "just copied" peek
     readonly property bool twoColumns: xclip.pinnedMode && Cliphist.entries.length > 1
     readonly property real wantedWidth: xclip.twoColumns ? 532 : 372
 
@@ -52,7 +51,6 @@ ColumnLayout {
         return /^55\d{10,11}$/.test(digits) ? digits : ""
     }
     readonly property bool isEmail: xclip.isPlainText && /^\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*$/.test(xclip.text)
-    // Type shortcuts: conservative detection, everything runs only on click
     readonly property bool isPython: xclip.kind.kind === "code" && xclip.kind.label === "Python"
     readonly property bool isShellCommand: xclip.kind.kind === "code" && xclip.kind.label === "Shell" && xclip.text.length < 4000
     readonly property bool isMediaLink: xclip.isYoutube || (xclip.isUrl && (
@@ -62,7 +60,6 @@ ColumnLayout {
     readonly property bool isAudioOnlyLink: xclip.isUrl && (/^https?:\/\/(www\.)?soundcloud\.com\//i.test(xclip.text) || /\.(mp3|m4a|ogg|opus|wav|flac|aac)([?#]|$)/i.test(xclip.text)
         || /^https?:\/\/[^\/]*whatsapp\.net\/\S*\.(ogg|opus)/i.test(xclip.text))
     readonly property bool isFilePath: xclip.isPlainText && xclip.text.length < 300 && /^\s*(~|\/[^\/\s][^\/\n]*)\/[^\n]+\s*$/.test(xclip.text) && !/^\s*\/\//.test(xclip.text)
-    // Short one-line title-like text (no digits/symbols, no closing period), for the IMDb rating lookup
     readonly property string titleGuess: {
         const t = xclip.text.trim()
         if (!xclip.isPlainText || xclip.kind.kind !== "text") return ""
@@ -321,7 +318,6 @@ ColumnLayout {
             Item {
                 id: preview
                 Layout.fillWidth: true
-                // Capped so the current-item column never pushes the view past the standard height
                 implicitHeight: (xclip.isImage || xclip.hasFiles) ? 120 : Math.min(120, textBox.implicitHeight)
                 DiCascade { target: preview; index: 1 }
 
@@ -353,7 +349,6 @@ ColumnLayout {
                     }
                 }
 
-                // Scrolls inside its own 120 px budget instead of growing with the file count
                 Flickable {
                     id: filesFlick
                     anchors.fill: parent
@@ -444,9 +439,6 @@ ColumnLayout {
                 }
             }
 
-            // The actions wrap onto a second line instead of scrolling sideways out of sight (the old single row cut
-            // them off with nothing to say there was more); two lines at most, the shortcuts for this kind of
-            // content first, then the general ones
             Flow {
                 id: actionsRow
                 Layout.fillWidth: true
@@ -678,7 +670,6 @@ ColumnLayout {
                     onTap: () => Qt.openUrlExternally(`mailto:${xclip.text.trim()}`)
                 }
 
-                // Utility tools, tucked at the end of the same line: case/whitespace, keep, remove
                 Rectangle {
                     visible: !xclip.isImage && !xclip.hasFiles && xclip.text.trim() !== ""
                     width: textTools.implicitWidth + 8
@@ -797,8 +788,6 @@ ColumnLayout {
             }
         }
 
-        // History beside the current entry, in a list of its own that scrolls inside the height the left column
-        // sets — it no longer stacks a dozen rows under everything else
         ColumnLayout {
             id: historyCol
             visible: xclip.twoColumns
@@ -817,7 +806,6 @@ ColumnLayout {
                 opacity: 0.8
             }
 
-            // Compact rows that scroll inside their own list, never inside the whole view
             Flickable {
                 id: historyFlick
                 Layout.fillWidth: true

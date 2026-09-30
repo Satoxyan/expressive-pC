@@ -27,7 +27,7 @@ Singleton {
     }
 
     // Next ~24 h in 3 h steps: [{ dt, temp, wCode, night, pop }], temp in the configured unit, pop 0..1.
-    // Only fetched on demand (requestForecast) by views that show it, and kept for 30 min.
+    // Fetched on demand (requestForecast), kept for 30 min.
     property var forecast: []
     property real forecastFetchedAt: 0
     // UV index now and today's peak (Open-Meteo, keyless), fetched together with the forecast; -1 = unknown

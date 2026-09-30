@@ -7,10 +7,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// Expanded face of the IMDb rating. With a show playing: the poster on the left; on the right the show, this
-// episode's rating and where it ranks, and the whole season as bars that grow in on open (current lit, best in
-// gold, hover says which episode). With nothing playing: what it detects and why it might be quiet, the setup it
-// needs (OMDb key, episode script) and the shows looked up this session.
+// Expanded IMDb rating: poster and season bars when a show plays, setup/status otherwise.
 Item {
     id: xw
     required property Item di
@@ -32,7 +29,6 @@ Item {
     property int hovered: -1
     readonly property var focusEpisode: xw.hovered >= 0 ? (xw.episodes[xw.hovered] ?? null) : WatchRating.currentEpisode
 
-    // Why the view is empty, most blocking first
     readonly property bool switchedOff: Config.ready && Config.options.bar.dynamicIsland.watchRatings === false
     readonly property bool keyMissing: WatchRating.apiKey === ""
     readonly property string seriesName: xw.now?.series ?? ""
@@ -40,7 +36,6 @@ Item {
         WatchRating.revision
         return xw.seriesName !== "" ? WatchRating.titleCache[xw.seriesName.toLowerCase()] : undefined
     }
-    // Shows found this session, newest first (the cache keeps them in insertion order)
     readonly property var recent: {
         WatchRating.revision
         return Object.values(WatchRating.titleCache).filter(v => v && typeof v === "object").reverse().slice(0, 2)
@@ -101,7 +96,6 @@ Item {
         }
     }
 
-    // One setup/status line: icon, what it is, where it lives, and whether it is in place
     component SetupRow: Rectangle {
         id: row
         property string icon
@@ -179,7 +173,6 @@ Item {
         sourceComponent: xw.hasShow ? showView : emptyView
     }
 
-    // A show is playing and IMDb knows it
     Component {
         id: showView
 
@@ -199,7 +192,6 @@ Item {
                     title: xw.info
                 }
 
-                // Rating of the whole show, on the poster
                 Rectangle {
                     anchors {
                         left: parent.left
@@ -238,7 +230,6 @@ Item {
                 Layout.alignment: Qt.AlignTop
                 spacing: 10
 
-                // Show, year, genre
                 Item {
                     id: header
                     Layout.fillWidth: true
@@ -296,7 +287,6 @@ Item {
                     }
                 }
 
-                // This episode (or the hovered one): code, title, where it ranks, and the big number
                 Rectangle {
                     id: episodeCard
                     Layout.fillWidth: true
@@ -374,7 +364,6 @@ Item {
                     }
                 }
 
-                // The season, one bar per episode, built on open
                 ColumnLayout {
                     id: chart
                     Layout.fillWidth: true
@@ -433,7 +422,6 @@ Item {
                                     readonly property bool best: barSlot.d !== null && WatchRating.bestEpisode === barSlot.d
                                     readonly property real level: barSlot.rating < 0 ? 0.08
                                         : 0.18 + 0.82 * (xw.high > xw.low ? (barSlot.rating - xw.low) / (xw.high - xw.low) : 1)
-                                    // Left to right: each bar starts a little after the one before it
                                     readonly property real grow: Math.max(0, Math.min(1,
                                         chartReveal.value * 1.8 - 0.8 * barSlot.index / Math.max(1, bars.count)))
                                     width: bars.barWidth
@@ -464,7 +452,6 @@ Item {
                             }
                         }
 
-                        // Marks the episode playing under its bar
                         Rectangle {
                             readonly property int currentIndex: xw.episodes.findIndex(e => Number(e.Episode) === (xw.now?.episode ?? -1))
                             visible: currentIndex >= 0
@@ -478,7 +465,6 @@ Item {
                     }
                 }
 
-                // No episode known (a film, or only the series from the page title): the rating and the plot
                 RowLayout {
                     id: bigRating
                     Layout.fillWidth: true
@@ -528,7 +514,6 @@ Item {
                     DiCascade { target: plot; index: 3 }
                 }
 
-                // Only the series name reached the island: point at the script that adds the episode
                 Item {
                     id: scriptTip
                     Layout.fillWidth: true
@@ -583,7 +568,6 @@ Item {
         }
     }
 
-    // Nothing to rate: what it listens for, why it may be quiet, the setup, and what was seen this session
     Component {
         id: emptyView
 
@@ -640,7 +624,6 @@ Item {
                     DiCascade { target: heroHint; index: 2 }
                 }
 
-                // The services it recognises
                 Item {
                     id: services
                     Layout.alignment: Qt.AlignHCenter

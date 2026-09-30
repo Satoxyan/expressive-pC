@@ -5,8 +5,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// A Dynamic Island feature with what it actually costs: what runs, when, and how heavy it is (a three-bar meter,
-// like signal strength). Turning it off stops that work, not just the drawing (each one was audited to be passive).
+// A Dynamic Island feature with what it costs: what runs, when, and how heavy (three-bar meter).
 RippleButton {
     id: row
     property string buttonIcon: ""

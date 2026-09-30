@@ -7,15 +7,11 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// Now playing, Material You style: the whole card takes a tonal palette from the album art (the island paints
-// `tint` over the art itself, blurred, as `backdrop`), the progress is the wavy line that ripples while the song
-// plays, and the play button changes shape with the state. Two columns at the standard height: the song and its
-// transport on the left, the lyrics in their own tonal card on the right.
+// Now playing: tonal palette from the album art, wavy progress, lyrics card on the right.
 Item {
     id: xm
     required property Item di
     implicitWidth: xm.wantedWidth
-    // With the lyrics switched off the card is just the player, one column
     readonly property bool lyricsOn: (xm.di.cfg.lyrics ?? true) && (xm.di.cfg.lyricsCard ?? true)
     readonly property real wantedWidth: xm.lyricsOn ? 532 : 372
     implicitHeight: layout.implicitHeight
@@ -28,8 +24,6 @@ Item {
     readonly property bool showLyrics: (xm.di.cfg.lyrics ?? true) && LyricsService.status === "ok" && LyricsService.lyricsLines.length > 0
     readonly property var hero: (xm.player?.trackArtUrl ?? "") !== "" ? { key: "media-art", item: bigArt } : null
 
-    // Tonal palette from the art's dominant colour: same hue, the saturation kept in a range that reads as colour
-    // without shouting, and the lightness picked per role (as Material You does from a seed)
     readonly property bool dark: Appearance.m3colors.darkmode
     readonly property color seed: xm.di.mediaArtColor
     function tone(lightness, alpha) {
@@ -47,7 +41,6 @@ Item {
     readonly property color tint: xm.albumColors ? xm.tone(xm.dark ? 0.12 : 0.93, 0.72) : "transparent"
     readonly property string backdrop: xm.albumColors ? (xm.player?.trackArtUrl ?? "") : ""
 
-    // Opening while paused: fetch the real position and put the highlight where the song stopped
     Component.onCompleted: {
         xm.player?.positionChanged()
         Qt.callLater(LyricsService.resync)
@@ -58,7 +51,6 @@ Item {
         return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`
     }
 
-    // A round tonal button (skip, like)
     component TonalButton: Rectangle {
         id: tb
         property string icon
@@ -100,7 +92,6 @@ Item {
 
         ColumnLayout {
             id: leftCol
-            // Fixed beside the lyrics; the whole card on its own
             Layout.fillWidth: !xm.lyricsOn
             Layout.preferredWidth: xm.lyricsOn ? 262 : 372
             Layout.maximumWidth: xm.lyricsOn ? 262 : 100000
@@ -174,7 +165,6 @@ Item {
                     Layout.alignment: Qt.AlignVCenter
                     spacing: 2
 
-                    // Where it is playing from, as a small tonal label
                     Rectangle {
                         implicitWidth: sourceRow.implicitWidth + 14
                         implicitHeight: 20
@@ -223,7 +213,6 @@ Item {
                 }
             }
 
-            // The wavy progress: ripples while playing, lies flat when paused, the rest of the track a plain line
             ColumnLayout {
                 id: seekBlock
                 Layout.fillWidth: true
@@ -270,7 +259,6 @@ Item {
                             ctx.lineCap = "round"
                             ctx.lineWidth = 3.5
 
-                            // What is left: a straight, quieter line after a small gap
                             if (x + gap < width - 2) {
                                 ctx.strokeStyle = rest
                                 ctx.beginPath()
@@ -279,7 +267,6 @@ Item {
                                 ctx.stroke()
                             }
 
-                            // What was played: the wave
                             if (x > 3) {
                                 ctx.strokeStyle = played
                                 ctx.beginPath()
@@ -292,7 +279,6 @@ Item {
                                 ctx.stroke()
                             }
 
-                            // The thumb: a short vertical pill, as Material 3 sliders have
                             ctx.fillStyle = played
                             const tw = 4, th = 16
                             ctx.beginPath()
@@ -340,8 +326,6 @@ Item {
                 spacing: 8
                 DiCascade { target: controls; index: 2 }
 
-                // On its own (no lyrics column) the transport is centred: a spacer each side, and a stand-in as
-                // wide as the like button on the left so it isn't pushed off-centre by it
                 Item {
                     visible: !xm.lyricsOn && likeButton.visible
                     implicitWidth: likeButton.implicitWidth
@@ -357,8 +341,6 @@ Item {
                     onClicked: xm.player?.previous()
                 }
 
-                // Material 3 Expressive: the main button is a pill while paused and closes into a rounded
-                // square while playing, and squeezes a little under the finger
                 Rectangle {
                     id: playButton
                     implicitWidth: 64
@@ -419,7 +401,6 @@ Item {
             }
         }
 
-        // Right: the lyrics, in their own tonal card taking the full height
         Rectangle {
             id: lyricsCard
             visible: xm.lyricsOn

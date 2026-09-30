@@ -1,7 +1,5 @@
-# Dynamic Island: commands running longer than ISLAND_CMD_MIN seconds (default 30) show up as a live
-# activity, and report ✓/✗ with the duration when they finish (output, run again and go to terminal in
-# the expanded view). Nothing shows while the terminal is the focused window. Sourced from ~/.zshrc.
-# Interactive programs (editors, pagers, ssh, TUIs) are skipped; git push/pull is handled by git-island.zsh.
+# Dynamic Island: commands running longer than ISLAND_CMD_MIN seconds (default 30) show up as a live activity.
+# Sourced from ~/.zshrc. Interactive programs (editors, pagers, ssh, TUIs) are skipped; git push/pull is git-island.zsh.
 
 typeset -g ISLAND_CMD_MIN=${ISLAND_CMD_MIN:-30}
 typeset -ga ISLAND_CMD_SKIP=(vim nvim vi nano micro hx less more man ssh mosh top htop btop nvtop claude yazi

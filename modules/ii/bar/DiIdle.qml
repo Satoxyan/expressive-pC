@@ -8,8 +8,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// Home, compact: photo, one glance line that picks the single thing worth reading right now, the time.
-// Whatever the glance didn't pick stays reachable as a quiet glyph; exceptional states keep their own glyphs.
+// Home, compact: photo, one glance line for the most relevant thing, the time.
 Item {
     id: diIdleRoot
     required property Item di
@@ -30,7 +29,6 @@ Item {
         }
     }
 
-    // --- What the glance can talk about ---
     readonly property bool agentsOn: diIdleRoot.di.cfg.claudeCode ?? true
     readonly property var waitingSession: diIdleRoot.agentsOn ? (ClaudeCode.liveSessions.find(s => s.state === "waiting") ?? null) : null
     readonly property var workingSession: diIdleRoot.agentsOn ? (ClaudeCode.liveSessions.find(s => s.state === "working") ?? null) : null
@@ -192,7 +190,6 @@ Item {
                 }
             }
 
-            // Unread notifications the glance is not already showing: a dot on the photo, like an app badge
             Rectangle {
                 readonly property bool on: diIdleRoot.unread > 0 && diIdleRoot.glanceKind !== "notification"
                 anchors { right: parent.right; bottom: parent.bottom; rightMargin: -1; bottomMargin: -1 }
@@ -207,7 +204,6 @@ Item {
             }
         }
 
-        // The glance
         Item {
             id: glanceBox
             readonly property real textWidth: Math.min(200, Math.max(glanceTitle.implicitWidth, glanceSub.text !== "" ? glanceSub.implicitWidth : 0))
@@ -244,7 +240,6 @@ Item {
                 }
             }
 
-            // Count of unread notifications, only when there is more than the one on screen
             Rectangle {
                 visible: diIdleRoot.glanceKind === "notification" && diIdleRoot.unread > 1
                 anchors { left: parent.right; leftMargin: 4; verticalCenter: parent.verticalCenter }
@@ -293,7 +288,6 @@ Item {
             Layout.alignment: Qt.AlignVCenter
             spacing: 0
 
-            // Exceptional states
             Revealer {
                 reveal: !diIdleRoot.systemIconsElsewhere && (Audio.source?.audio?.muted ?? false)
                 StatusGlyph {
@@ -351,7 +345,6 @@ Item {
                 }
             }
 
-            // The important three, when the glance is busy with another one
             Revealer {
                 reveal: (diIdleRoot.waitingSession || diIdleRoot.workingSession) !== null
                     && !diIdleRoot.glanceKind.startsWith("agent")

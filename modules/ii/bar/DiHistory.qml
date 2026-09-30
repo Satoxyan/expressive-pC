@@ -4,7 +4,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 
-// The compact face of the island's memory: the last thing that happened, and how many are behind it
+// Compact history: last event and how many are behind it
 RowLayout {
     id: history
     required property Item di

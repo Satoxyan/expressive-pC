@@ -27,8 +27,6 @@ Item {
     readonly property color pillColor: root.isMaterial || (GlobalStates.barCenterOnly && Config.options.bar.cornerStyle === 0)
         ? "transparent" : root.surfaceColor
     readonly property color capsuleColor: root.isMaterial ? Appearance.colors.colLayer1 : root.surfaceColor
-    // Material You: while music plays, the pill (and the clock on it) takes a dark tone of the album art, the
-    // same seed the expanded player uses, so the island reads as part of what is playing
     readonly property bool musicTinted: (root.cfg.albumColors ?? true) && (root.cfg.albumTint ?? true)
         && (root.activePlayer?.isPlaying ?? false) && root.mediaArtReady
     readonly property color musicTone: {
@@ -59,7 +57,6 @@ Item {
     readonly property string lyricLine: (root.cfg.lyrics ?? true) && (root.cfg.lyricsPill ?? true) && LyricsService.status === "ok"
         && LyricsService.activeIndex >= 0 && (root.activePlayer?.isPlaying ?? false)
         ? (LyricsService.slots[LyricsService.before] ?? "") : ""
-    // Paused, the pill shows which song it is (as on hover): with nothing moving there is room to read it
     readonly property bool mediaPaused: root.activePlayer !== null && !(root.activePlayer?.isPlaying ?? false)
     readonly property bool mediaTrackInfoVisible: root.hoverRevealed || mediaTrackChangeTimer.running || root.mediaPaused
     readonly property real mediaWidth: root.lyricLine !== "" ? 250 : Math.max(140, Math.min(260, root.mediaTextContentWidth))
@@ -114,7 +111,6 @@ Item {
         function onTrackArtistChanged() { mediaTrackChangeTimer.restart() }
     }
 
-    // The recorder's own "started/stopped" notices: the recording pill and the anchor dot already say it
     readonly property var visibleNotifications: Notifications.popupList.filter(n => !IslandEvents.isMuted(n) && n.appName !== "Recorder")
     readonly property int claudeSessionCount: ClaudeCode.openCount
     readonly property var latestNotification: root.visibleNotifications.length > 0
@@ -743,8 +739,6 @@ Item {
 
     function fsImportantLine(id) {
         switch (id) {
-            // The episode's own IMDb rating: fullscreen used to drop it outright, but a fullscreen video is
-            // how it's watched most of the time
             case "watchRating": {
                 const now = WatchRating.now
                 if (!now) return null
@@ -940,8 +934,6 @@ Item {
         if (IslandEvents.systemLoadActive) ids.push("systemLoad")
         if (IslandEvents.downloadActive || root.heldId === "download") ids.push("download")
         const agentActivityShown = IslandEvents.activities.some(a => ["claude", "codex", "gemini"].includes(a.icon))
-        // Only while an agent is actually doing something (working, or waiting on you): an open but idle session
-        // has nothing to show, and the agents view stays one tap away from home
         if ((ClaudeCode.anyWorking || ClaudeCode.anyWaiting) && (root.cfg.claudeCode ?? true) && !agentActivityShown && approvalActivity === "")
             ids.push("agents")
         if (DropShelf.items.length > 0) ids.push("shelf")
@@ -987,7 +979,6 @@ Item {
         if (!root.anchorAlwaysTime || (info.text === DateTime.time)) return info
         return { text: DateTime.time, icon: info.icon, tone: info.tone === "error" ? "error" : "plain" }
     }
-    // The anchor never repeats what one of the islands is already showing
     function shownOnIsland(id) {
         return root.primaryId === id || root.splitShownId === id
     }
@@ -1099,7 +1090,6 @@ Item {
         if (root.forceIdle) return "idle"
         if (root.manualFocusId !== "" && (root.persistentIds.includes(root.manualFocusId) || root.pinnedIds.includes(root.manualFocusId)))
             return root.manualFocusId
-        // "display" is zero priority: reachable by scroll and from home, never takes the pill on its own
         return root.persistentIds.find(id => id !== "display") ?? "idle"
     }
 
@@ -1407,7 +1397,6 @@ Item {
         return pill
     }
 
-    // The expanded pager: the same order as the compact cycle, plus privacy while something is being used
     readonly property var switcherIds: (root.cfg.privacyIndicators ?? true) && IslandEvents.anyPrivacy && !root.cycleIds.includes("privacy")
         ? [...root.cycleIds, "privacy"] : root.cycleIds
 
@@ -1492,10 +1481,7 @@ Item {
     property string splitId: ""
     property bool splitArmed: false
 
-    // Second island: with it on, nothing else sits beside the pill. When a second live thing is going on (a race,
-    // a call, a timer…) it takes the second island by itself, in this order; a peek that borrows the pill (a
-    // notification, the volume) pushes the live thing there too, so it never leaves sight. A manual choice
-    // (right click) wins; flinging the automatic one away keeps it away until that activity ends.
+    // Second island: a second live activity takes it automatically; a manual choice (right click) wins.
     readonly property bool secondIslandMode: (root.cfg.secondIsland ?? true) && !root.vertical
     readonly property var secondIslandOrder: ["call", "recording", "f1", "timer", "download", "agents", "media"]
     property string autoSplitDismissed: ""
@@ -1504,7 +1490,6 @@ Item {
             case "f1":     return F1.sessionLive
             case "media":  return root.activePlayer?.isPlaying ?? false
             case "agents": return ClaudeCode.anyWorking
-            // A finished timer waits to be dismissed, but it is no longer live
             case "timer":  return TimerService.pomodoroRunning || TimerService.countdownRunning || TimerService.stopwatchRunning
             default:       return true
         }
@@ -1516,7 +1501,6 @@ Item {
             && root.persistentIds.includes(id) && root.liveNow(id)) ?? ""
     }
     readonly property string activeSplitId: root.splitId !== "" ? root.splitId : root.autoSplitId
-    // Everything active that neither island shows, as a count on the anchor
     readonly property int hiddenCount: root.secondIslandMode
         ? root.persistentIds.filter(id => id !== "idle" && id !== root.primaryId && id !== root.splitShownId).length : 0
 
@@ -1832,11 +1816,8 @@ Item {
         pinFeedbackTimer.restart()
     }
 
-    // What the dots and wheel/swipe cycling reach: whatever is live right now, then the pinned views
-    // that are always around (even with nothing going on), then home last.
-    // One stable order for the compact cycle and the expanded pager: the pinned views (in the order they were
-    // pinned) behind home, what is active ahead of it. A pinned view stays in the pinned group even while it is
-    // also active (F1 near a session, a download running), so nothing jumps between groups mid-scroll.
+    // One stable order for the compact cycle and expanded pager: pinned views behind home, active ones ahead.
+    // A pinned view stays in the pinned group while active, so nothing jumps mid-scroll.
     readonly property var pinnedCycle: root.pinnedIds.filter(id => root.hasDetails(id))
     readonly property var activeCycle: root.persistentIds.filter(id => id !== "idle" && root.hasDetails(id) && !root.pinnedIds.includes(id))
     readonly property var cycleIds: [...root.pinnedCycle, "idle", ...root.activeCycle]
@@ -1846,9 +1827,7 @@ Item {
     readonly property int homeIndex: root.cycleIds.indexOf("idle")
     readonly property bool atHome: root.primaryId === "idle" || root.primaryId === root.rawPrimaryId
 
-    // +1 moves right in the pager (towards what is active), -1 left (towards the pinned views). It stops at the
-    // ends instead of wrapping around, and a card that isn't in the list (a standalone view, an interruption)
-    // counts as home.
+    // +1 moves right (towards what is active), -1 left. Stops at the ends; a card not in the list counts as home.
     function cycleStep(ids, currentId, direction) {
         let index = ids.indexOf(currentId)
         if (index < 0) index = Math.max(0, ids.indexOf("idle"))
@@ -2606,8 +2585,6 @@ Item {
             }
         ]
 
-        // On a spring: a new width mid-flight bends the motion instead of restarting it (text changing while the
-        // pill is still growing used to read as a jump)
         DiSpring {
             id: pillWidth
             target: root.compactWidth(root.primaryId)
@@ -2701,8 +2678,6 @@ Item {
                 ColumnLayout {
                     spacing: -3
 
-                    // The date, and on hover a peek at the weather in its place. Both lines keep their size, so the
-                    // hover never changes the anchor's shape (it used to, and flickered at the bottom edge).
                     Item {
                         id: topLine
                         clip: true
@@ -2868,7 +2843,6 @@ Item {
                     root.openSplitPicker()
                     return
                 }
-                // The anchor on the right: a recording dot stops the recording, the clock opens home
                 if (anchor.visible && anchor.contains(anchor.mapFromItem(pill, eventPoint.position))) {
                     if (root.anchorInfo.icon === "fiber_manual_record") Quickshell.execDetached([Directories.recordScriptPath])
                     else root.expandTo(2, "idle")
@@ -3171,8 +3145,6 @@ Item {
                     root.dismissSplit()
                     return
                 }
-                // Tapping the second island should show what IT holds, not fall back to whatever the
-                // main pill happens to be (which almost always "has details" too, e.g. idle/home)
                 root.expandTo(2, root.hasDetails(root.splitShownId) ? root.splitShownId : undefined)
             }
         }

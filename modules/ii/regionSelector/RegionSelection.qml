@@ -216,6 +216,12 @@ PanelWindow {
             root.recordingShouldStop = (exitCode === 0);
         }
     }
+    // If the recorder never reports that it started, don't leave the outline stuck on screen
+    Timer {
+        id: recordStartGuard
+        interval: 3000
+        onTriggered: if (!Persistent.states.record.enable) root.dismiss()
+    }
     property bool preparationDone: false
     onPreparationDoneChanged: {
         if (!preparationDone) return;

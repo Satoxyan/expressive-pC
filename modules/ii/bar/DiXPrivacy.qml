@@ -5,9 +5,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 
-// Privacy: who is using the microphone, the camera and the screen right now, or when each was last used. Left, one
-// card per resource; right, the microphone itself (mute, input level, volume control). With nothing in use and no
-// history yet, a single column with the empty state and the same controls.
+// Privacy: who uses the mic, camera and screen now (or last), plus mic controls.
 ColumnLayout {
     id: xp
     required property Item di
@@ -19,7 +17,6 @@ ColumnLayout {
     readonly property bool wide: IslandEvents.anyPrivacy || xp.hasHistory
     readonly property real wantedWidth: xp.wide ? 532 : 372
 
-    // Ticks only while the view is open, for the "x min ago" texts
     property real now: Date.now()
     Timer {
         interval: 20000
@@ -68,7 +65,6 @@ ColumnLayout {
         opacity: 0.6
     }
 
-    // Pill or card button with an icon and a label
     component ActionChip: Rectangle {
         id: chip
         property string icon
@@ -114,7 +110,6 @@ ColumnLayout {
         }
     }
 
-    // Input level: click or drag to set it
     component MicLevel: Rectangle {
         id: level
         property int order: 0
@@ -202,7 +197,6 @@ ColumnLayout {
         }
     }
 
-    // One resource: who holds it now, or who held it last
     component ResourceCard: Rectangle {
         id: card
         required property var res
@@ -231,7 +225,6 @@ ColumnLayout {
             Item {
                 implicitWidth: 30
                 implicitHeight: 30
-                // Soft ring that breathes while the resource is live
                 Rectangle {
                     anchors.centerIn: parent
                     width: 30
@@ -309,7 +302,6 @@ ColumnLayout {
         }
     }
 
-    // Header: title and a one-line summary
     RowLayout {
         id: header
         Layout.fillWidth: true
@@ -338,7 +330,6 @@ ColumnLayout {
         }
     }
 
-    // Wide: resources on the left, the microphone on the right
     RowLayout {
         Layout.fillWidth: true
         visible: xp.wide
@@ -407,7 +398,6 @@ ColumnLayout {
         }
     }
 
-    // Narrow: nothing in use and nothing to recall
     ColumnLayout {
         id: emptyState
         Layout.fillWidth: true

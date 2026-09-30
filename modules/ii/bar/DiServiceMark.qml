@@ -4,8 +4,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import Qt5Compat.GraphicalEffects
 
-// The streaming service's own mark, in its colour: Simple Icons (assets/island/apps, square) for most, and the
-// Disney+ wordmark (Wikimedia Commons, public domain — wide, painted white so it reads on the dark pill).
+// Streaming service mark: Simple Icons SVGs, plus a white Disney+ wordmark.
 Item {
     id: mark
     property string service: ""

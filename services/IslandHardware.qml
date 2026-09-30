@@ -10,8 +10,8 @@ import Quickshell.Services.UPower
 import qs.modules.common
 import qs.modules.common.functions
 
-// Hardware moments on the island: monitors, removable drives, docks, chargers, wireless peripherals, game controllers,
-// Caps Lock and keyboard layout, waking up from sleep and heat. They share one interrupt island ("hardware"); the
+// Hardware moments on the island (monitors, drives, docks, chargers, peripherals, Caps Lock, sleep, heat).
+// They share one interrupt island ("hardware"); the payload says what to show:
 // payload says what to show: { kind, icon, tone, title, subtitle, value, status, urgent, actions: [{ id, label, icon }] }.
 Singleton {
     id: root
@@ -108,7 +108,6 @@ Singleton {
     readonly property string internalOutput: Hyprland.monitors.values.map(m => m.name).find(n => /^(eDP|LVDS|DSI)/.test(n)) ?? "eDP-1"
     property bool internalDisabled: false
 
-    // The second screen as a standing Live Activity (not a flash): present for as long as the cable is in
     property string displayLayout: ""
     readonly property var externalMonitor: Hyprland.monitors.values.find(m => m.name !== root.internalOutput) ?? null
     readonly property var displayPayload: {
@@ -206,10 +205,7 @@ Singleton {
         }
     }
 
-    // Changing the screen layout is the one action here that can leave you with nothing to look at: turning the
-    // laptop panel off only works if the external one really came up, and an HDMI cable that is loose, a mode the
-    // screen refuses, or a monitor that sleeps all end the same way — a black machine that looks crashed.
-    // So the layout is applied, then verified, and it undoes itself unless it is confirmed.
+    // A bad layout can leave a black screen (loose cable, refused mode), so it is applied, verified, and undone unless confirmed.
     property string layoutBefore: "extend"
     property string layoutPending: ""
     property string layoutOutput: ""

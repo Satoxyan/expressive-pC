@@ -6,9 +6,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// Song recognition in two columns. Left: the match, big — cover, title, artist, album/year, and a row of
-// quick actions (copy, Spotify, YouTube, Shazam). While still listening, the cover slot turns into a small
-// live equalizer instead of standing empty. Right: the last few tracks this session picked up.
+// Song recognition: the match with quick actions on the left, recent tracks on the right.
 RowLayout {
     id: xsr
     required property Item di
@@ -40,7 +38,6 @@ RowLayout {
         opacity: 0.6
     }
 
-    // A round action button: a brand mark when `brand` is given, a Material Symbol otherwise
     component ActionButton: Rectangle {
         id: action
         property string icon: ""
@@ -81,7 +78,6 @@ RowLayout {
         }
     }
 
-    // Left: the match, or the live listen
     ColumnLayout {
         Layout.fillWidth: false
         Layout.preferredWidth: 150
@@ -109,7 +105,6 @@ RowLayout {
             }
             MaterialSymbol {
                 anchors.centerIn: parent
-                // Covers the missing-url case and the failed-to-load case alike
                 visible: xsr.showResult && coverImg.status !== Image.Ready
                 text: "album"
                 iconSize: 36
@@ -117,7 +112,6 @@ RowLayout {
                 opacity: 0.35
             }
 
-            // Listening: a small live equalizer instead of an empty tile
             RowLayout {
                 anchors.centerIn: parent
                 visible: !xsr.showResult
@@ -157,7 +151,6 @@ RowLayout {
                 }
             }
 
-            // Little badge marking the tile as a music match, tucked in the corner
             Rectangle {
                 visible: xsr.showResult
                 anchors {
@@ -203,7 +196,6 @@ RowLayout {
             }
         }
 
-        // Result: quick actions. Listening: one button to give up
         RowLayout {
             id: actionRow
             Layout.fillWidth: true
@@ -279,7 +271,6 @@ RowLayout {
         }
     }
 
-    // Right: what played before this session
     ColumnLayout {
         Layout.fillWidth: true
         Layout.alignment: Qt.AlignTop
@@ -351,7 +342,7 @@ RowLayout {
                     spacing: 4
 
                     Repeater {
-                        // By count, so the list doesn't rebuild (and re-cascade) as tracks are prepended
+                        // By count, so the list isn't rebuilt when tracks are prepended
                         model: xsr.history.length
 
                         Rectangle {

@@ -5,8 +5,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// Expanded pressure alert: which resource, how it's been going, and the processes behind it — with a way to end
-// the one that's out of line. Opens on the resource that raised the alert; the tabs look at the other two.
+// Expanded pressure alert: resource tabs and the processes behind it, with a way to end them.
 ColumnLayout {
     id: xl
     required property Item di

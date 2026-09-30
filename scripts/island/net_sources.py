@@ -15,7 +15,6 @@ import sys
 
 INTERVAL = 2
 
-# process name -> (friendly label, icon name)
 KNOWN = {
     "chrome": ("Google Chrome", "google-chrome"),
     "chromium": ("Chromium", "chromium"),

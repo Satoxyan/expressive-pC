@@ -5,8 +5,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// Weather in two columns: now and the sun's path through the day on the left; the next 24 h as a temperature
-// curve and the conditions that matter (UV, humidity, wind, pressure) on the right. Everything cascades in.
+// Weather in two columns: now and sun path left, 24 h curve and conditions right.
 RowLayout {
     id: xw
     required property Item di
@@ -22,7 +21,6 @@ RowLayout {
     readonly property real nowTs: DateTime.clock.date.getTime() / 1000
     readonly property string hourFormat: DateTime.use12HourFormat ? "h AP" : "HH:mm"
 
-    // "Now" first, then the forecast in 3 h steps
     readonly property var steps: {
         const first = { dt: 0, temp: xw.tempNow, wCode: Weather.data?.wCode ?? 800, night: Weather.data?.night, pop: 0, isNow: true }
         return [first].concat(Weather.forecast ?? [])
@@ -44,7 +42,6 @@ RowLayout {
         if (uv < 11) return Translation.tr("Very high")
         return Translation.tr("Extreme")
     }
-    // Where the wind comes from, as a compass point
     function compass(deg) {
         const points = Translation.tr("N NE E SE S SW W NW").split(" ")
         return points[Math.round(((deg % 360) + 360) % 360 / 45) % 8] ?? ""
@@ -135,7 +132,6 @@ RowLayout {
         }
     }
 
-    // Left: now
     ColumnLayout {
         // Children filling the width would otherwise make this column fill the row too
         Layout.fillWidth: false
@@ -215,8 +211,6 @@ RowLayout {
 
         Item { Layout.fillHeight: true }
 
-        // The sun's path from sunrise to sunset (the moon's from sunset to sunrise at night), traced up to now
-        // when the view opens, with the sun or the moon riding the tip
         Item {
             id: sunArc
             Layout.fillWidth: true
@@ -236,7 +230,6 @@ RowLayout {
             readonly property real shown: sunArc.phase * arcReveal.value
             readonly property color tint: sunArc.isDay ? Appearance.colors.colPrimary : Appearance.colors.colTertiary
 
-            // The same geometry the canvas draws with
             readonly property real cx: arcCanvas.width / 2
             readonly property real cy: arcCanvas.height - 3
             readonly property real rx: arcCanvas.width / 2 - 10
@@ -280,7 +273,6 @@ RowLayout {
                         }
                     }
 
-                    // Horizon
                     ctx.strokeStyle = Qt.rgba(lineColor.r, lineColor.g, lineColor.b, 0.15)
                     ctx.lineWidth = 1
                     ctx.beginPath()
@@ -288,7 +280,6 @@ RowLayout {
                     ctx.lineTo(width, sunArc.cy)
                     ctx.stroke()
 
-                    // The whole arc, dashed
                     ctx.setLineDash([3, 4])
                     ctx.strokeStyle = Qt.rgba(lineColor.r, lineColor.g, lineColor.b, 0.25)
                     ctx.lineWidth = 1.5
@@ -297,7 +288,6 @@ RowLayout {
                     ctx.setLineDash([])
                     if (sunArc.shown <= 0.001) return
 
-                    // The part already travelled: a soft fill down to the horizon, then the line
                     const tint = sunArc.tint
                     trace(0, sunArc.shown)
                     const tip = sunArc.pointAt(sunArc.shown)
@@ -318,7 +308,6 @@ RowLayout {
                 }
             }
 
-            // The sun (or the moon) at the tip of the travelled part
             Item {
                 id: body
                 readonly property point at: sunArc.pointAt(sunArc.shown)
@@ -350,7 +339,6 @@ RowLayout {
                     iconSize: 15
                     fill: 1
                     color: sunArc.tint
-                    // A slow turn while it settles into place
                     rotation: sunArc.isDay ? (1 - arcReveal.value) * -90 : 0
                 }
             }
@@ -367,7 +355,6 @@ RowLayout {
                 opacity: 0.6
             }
 
-            // Where the arc starts and ends: sunrise → sunset by day, sunset → sunrise at night
             RowLayout {
                 anchors {
                     left: parent.left
@@ -408,7 +395,6 @@ RowLayout {
         }
     }
 
-    // Right: the next hours and the conditions
     ColumnLayout {
         Layout.fillWidth: true
         Layout.fillHeight: true
@@ -428,7 +414,6 @@ RowLayout {
 
             readonly property var steps: xw.steps
             readonly property real colW: strip.width / Math.max(1, strip.steps.length)
-            // The curve lives between these two lines; the warmest step sits on top
             readonly property real curveTop: 58
             readonly property real curveBottom: 82
             function yFor(temp) {
@@ -439,7 +424,6 @@ RowLayout {
             onStepsChanged: curve.requestPaint()
             onWidthChanged: curve.requestPaint()
 
-            // The curve is drawn from left to right as the columns cascade in; each dot pops as the line reaches it
             readonly property real drawnX: curveReveal.value * strip.width
             onDrawnXChanged: curve.requestPaint()
             DiSpring {
@@ -479,7 +463,6 @@ RowLayout {
                     ctx.beginPath()
                     ctx.rect(0, 0, strip.drawnX, height)
                     ctx.clip()
-                    // Through the midpoints, so the line is smooth and still passes over every dot
                     const path = () => {
                         ctx.beginPath()
                         ctx.moveTo(pts[0][0], pts[0][1])
@@ -511,7 +494,6 @@ RowLayout {
             }
 
             Repeater {
-                // By count, so a new reading of "now" updates the delegates instead of rebuilding (and re-cascading) them
                 model: strip.steps.length
 
                 Item {
@@ -561,7 +543,6 @@ RowLayout {
                         border.width: hour.modelData.isNow ? 2 : 0
                         border.color: Appearance.colors.colOnPrimary
                     }
-                    // Chance of rain, only when it is worth reading
                     StyledText {
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.bottom: parent.bottom

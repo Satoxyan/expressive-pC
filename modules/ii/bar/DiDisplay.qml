@@ -5,8 +5,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// The second screen, compact: which screen, how it is laid out. Quiet on purpose — it only lives here so the
-// layout picker is always one scroll away.
+// Compact second-screen view
 RowLayout {
     id: disp
     required property Item di

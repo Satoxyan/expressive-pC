@@ -12,9 +12,6 @@ import qs.modules.common
 import qs.modules.common.functions
 import qs.modules.common.widgets
 
-/**
- * Short-lived system events and live activities surfaced by the dynamic island.
- */
 Singleton {
     id: root
 
@@ -605,7 +602,7 @@ Singleton {
         root.voiceCallMinutes = 0
     }
 
-    // Optional local ZeroTier backend: everything below stays off and hidden when the file is absent
+    // Optional local ZeroTier backend: stays off and hidden when the file is absent
     property bool ztFilePresent: false
     FileView {
         path: Quickshell.shellPath("services/local/ZeroTierBackend.qml")

@@ -5,9 +5,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// The icon for what was copied (IslandEvents.clipKind): the color itself for a color, the brand for a known
-// link or a language (YouTube, GitHub, Python…), otherwise a Material Symbol for the kind (email, phone, map…).
-// Everything sits on the same round tile, so switching kinds doesn't jump.
+// Icon for the copied item (IslandEvents.clipKind): color swatch, brand mark, or a Material Symbol.
 Item {
     id: clipIcon
     property var kind: ({ kind: "text", icon: "content_paste" })

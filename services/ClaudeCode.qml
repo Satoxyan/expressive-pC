@@ -6,9 +6,7 @@ import Quickshell
 import Quickshell.Io
 import qs.modules.common
 
-// AI agent sessions on the island: Claude Code, Codex and Gemini (Antigravity CLI). Hooks
-// (scripts/island/claude-island.sh and agent-island.sh) report what each session is doing; Claude's statusline
-// cache and Codex's session rollouts report context size, model and plan usage.
+// Agent sessions on the island (Claude Code, Codex, Gemini), fed by hooks and by statusline/rollout caches.
 Singleton {
     id: root
 
@@ -440,8 +438,7 @@ Singleton {
             data.seven_day?.used_percentage ?? 0, data.seven_day?.resets_at ?? 0)
     }
 
-    // A 5h window that was getting full: say so the moment it actually resets ("free again"), not as a countdown
-    // before it. One single-shot timer aimed at the nearest such reset, re-aimed whenever the limits change.
+    // Announces "free again" when a nearly full 5h window resets; one single-shot timer aimed at the nearest reset
     readonly property real nextFullReset: {
         let next = 0
         for (const agent of Object.keys(root.limits)) {
@@ -465,7 +462,6 @@ Singleton {
             if ((l.five ?? 0) < 70 || !l.fiveReset || l.fiveReset * 1000 > now) continue
             root.notice(`${agent}-5hfree-${l.fiveReset}`, Translation.tr("%1 · 5h limit reset").arg(root.agentNames[agent] ?? agent),
                 Translation.tr("Your session is free again"), "check_circle", "done")
-            // The next reading will bring the real number; until then the window is fresh
             updated[agent] = Object.assign({}, l, { five: 0 })
         }
         root.limits = updated

@@ -8,14 +8,10 @@ import Quickshell.Services.Mpris
 import qs.modules.common
 
 /**
- * IMDb rating of what's playing in the browser (Netflix / Disney+), via the OMDb API.
- *
- * Where the episode comes from: scripts/island/watch-rating.user.js (Tampermonkey) writes it into the page's
- * media metadata, which Chrome forwards to MPRIS as title = episode title, artist = series, album = "S03E05".
- * Without the userscript it still works for the series itself: Chrome publishes "Series | Disney+" as the title.
- *
- * The API key lives outside the repo, in ~/.config/illogical-impulse/omdb.key. Lookups are cached per series
- * and per season (a whole season is one request), so a binge costs a handful of calls, not one per episode.
+ * IMDb rating of what is playing in the browser (Netflix / Disney+), via the OMDb API.
+ * The episode comes from scripts/island/watch-rating.user.js, which sets media metadata that Chrome forwards to
+ * MPRIS (title = episode, artist = series, album = "S03E05"). Without it only the series is known.
+ * The API key is in ~/.config/illogical-impulse/omdb.key. Lookups are cached per series and season.
  */
 Singleton {
     id: root

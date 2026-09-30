@@ -6,9 +6,7 @@ import qs.modules.common.widgets
 import qs.modules.common.functions
 import "../sidebarRight/calendar/calendar_layout.js" as CalendarLayout
 
-// The calendar, opened from the anchor. The date is the one piece of information you look up rather than
-// glance at, so it gets a whole view instead of a line — today in full, the month around it, and whatever
-// the shell already knows about the rest of the day.
+// Calendar view: today, the month, and what else the shell knows about the day.
 ColumnLayout {
     id: xc
     required property Item di
@@ -28,8 +26,6 @@ ColumnLayout {
         }
     }
 
-    // Today on the left, the month on the right: laid out side by side, the calendar keeps the island's standard
-    // height instead of stacking a header over a tall grid
     RowLayout {
         Layout.fillWidth: true
         spacing: 18
@@ -79,7 +75,6 @@ ColumnLayout {
 
             Item { Layout.fillHeight: true }
 
-            // What else is on today: a running timer, the next F1 session
             Rectangle {
                 Layout.fillWidth: true
                 visible: xc.upNext.length > 0

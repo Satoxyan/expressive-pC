@@ -6,10 +6,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// A hardware moment, expanded. The headline stays on top; below it, a picture of what just happened, sized for it:
-// the screens and how they are arranged (monitor), everything that came through the dock, how full a drive is,
-// how much power the charger really gives, and which partitions are filling up with what can be cleared.
-// Everything else (controllers, peripherals, heat…) keeps the headline, status and actions.
+// Expanded hardware event: headline on top, a visual per kind (monitor layout, dock, drive, charger, disk).
 ColumnLayout {
     id: xhw
     required property Item di
@@ -63,7 +60,6 @@ ColumnLayout {
         elide: Text.ElideRight
     }
 
-    // A small card: icon, a value and what it is
     component InfoChip: Rectangle {
         id: chip
         property string icon: ""
@@ -116,7 +112,6 @@ ColumnLayout {
         }
     }
 
-    // One action as a pill; the first one usually leads
     component ActionPill: Rectangle {
         id: pill
         property var action: ({})
@@ -161,7 +156,6 @@ ColumnLayout {
         }
     }
 
-    // Screen layout picker: the actions as segments, the current one under a sliding pill
     component LayoutPicker: Rectangle {
         id: picker
         readonly property int count: xhw.actions.length
@@ -245,7 +239,6 @@ ColumnLayout {
         }
     }
 
-    // Headline: the icon stays still for the hero flight from the pill; the text cascades in
     RowLayout {
         Layout.fillWidth: true
         spacing: 10
@@ -324,7 +317,6 @@ ColumnLayout {
         }
     }
 
-    // Monitor: a stage with both screens standing on one desk line, then the layout picker
     Component {
         id: monitorBody
 
@@ -373,7 +365,6 @@ ColumnLayout {
                         color: Appearance.colors.colOnLayer0
                         opacity: 0.8
                     }
-                    // The keyboard deck under the lid
                     Rectangle {
                         anchors.horizontalCenter: parent.horizontalCenter
                         y: parent.height + 2
@@ -419,7 +410,6 @@ ColumnLayout {
                             opacity: 0.75
                         }
                     }
-                    // Stand
                     Rectangle {
                         anchors.horizontalCenter: parent.horizontalCenter
                         y: parent.height
@@ -465,7 +455,6 @@ ColumnLayout {
         }
     }
 
-    // Dock: the laptop, one cable, and everything the dock brought with it
     Component {
         id: dockBody
 
@@ -473,7 +462,6 @@ ColumnLayout {
             id: dockCol
             spacing: 6
 
-            // "1 monitor · network · USB · 65 W", read back into ports
             readonly property var ports: xhw.parts.map(p => {
                 if (/\d\s*W$/.test(p)) return { icon: "power", value: p, label: Translation.tr("Charging") }
                 if (p === "USB") return { icon: "usb", value: "USB", label: Translation.tr("Hub") }
@@ -586,7 +574,6 @@ ColumnLayout {
         }
     }
 
-    // Removable drive: how much is used and free, drawn as the stick itself filling up
     Component {
         id: driveBody
 
@@ -604,7 +591,6 @@ ColumnLayout {
             readonly property string device: xhw.payload.device ?? ""
 
             function probe() {
-                // The simulated drive has no device behind it
                 if (driveCol.device.startsWith("/dev/ilha-teste")) {
                     driveCol.sizeBytes = 32e9
                     driveCol.usedBytes = 11.4e9
@@ -681,7 +667,6 @@ ColumnLayout {
                 }
             }
 
-            // The stick: body filling with what is used, connector on the right
             Item {
                 id: stick
                 Layout.fillWidth: true
@@ -800,7 +785,6 @@ ColumnLayout {
         }
     }
 
-    // Slow charger: what it gives against what a normal charge needs, and what that means for the battery
     Component {
         id: chargerBody
 
@@ -856,7 +840,6 @@ ColumnLayout {
                         opacity: 0.6
                     }
                 }
-                // Battery glyph with its charge
                 Item {
                     implicitWidth: 58
                     implicitHeight: 28
@@ -897,7 +880,6 @@ ColumnLayout {
                 }
             }
 
-            // Power gauge: this charger against the minimum mark
             Item {
                 id: gauge
                 Layout.fillWidth: true
@@ -976,7 +958,6 @@ ColumnLayout {
         }
     }
 
-    // Disk almost full: each partition as a card filling with its use, and what can be cleared right away
     Component {
         id: diskBody
 
@@ -1012,7 +993,6 @@ ColumnLayout {
                 }
             }
 
-            // Until df answers, the root filesystem as the resource monitor sees it
             readonly property var shown: diskRow.partitions.length > 0 ? diskRow.partitions
                 : [{ target: "/", fs: "", size: ResourceUsage.diskTotal * 1024, used: ResourceUsage.diskUsed * 1024 }]
 
@@ -1127,7 +1107,6 @@ ColumnLayout {
                         id: tip
                         required property int index
                         readonly property var action: diskRow.suggestions[tip.index] ?? ({})
-                        // "Trash · 1.2 GB" → name and size apart
                         readonly property var labelParts: (tip.action.label ?? "").split(" · ")
                         Layout.fillWidth: true
                         implicitHeight: 40
@@ -1199,7 +1178,6 @@ ColumnLayout {
         }
     }
 
-    // Everything else: status and actions
     Component {
         id: genericBody
 

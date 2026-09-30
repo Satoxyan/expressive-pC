@@ -4,16 +4,9 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 
-// The episode that just started, and its IMDb rating — the episode's, never the show's (you already know
-// that one; it lives small in the expanded view). The rating arrives as a small motion piece: a ring draws
-// itself from zero to the score while the number counts up with it, coloured by how good the episode is;
-// once it lands, the season/episode line rises in under the show's name.
+// IMDb rating of the episode that just started (never the show's), drawn as a ring.
 //
-// Then one highlight, the rarest that applies (WatchRating.tier):
-//   top3  — top 3 of the whole show: gold/silver/bronze medal, confetti bursting from the ring, gold sweep
-//   top10 — top 10 of the show: violet trophy, violet sweep
-//   best  — best of its season: crown, gold sweep
-//   high  — 8.5 or more: the ring's halo pulses twice
+// Highlight, the rarest that applies (WatchRating.tier):
 Item {
     id: watch
     required property Item di

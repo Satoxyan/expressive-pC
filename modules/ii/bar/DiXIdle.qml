@@ -7,10 +7,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// Home, the island's main widget. Left: the time and day, the weather for the next hours and the toggles you
-// reach for most (do not disturb, stay awake, focus). Right: everything going on now, in one list — what is
-// playing, live activities, the next F1 session and islands you silenced. Across the bottom, the shortcuts.
-// Always two columns at the standard height, so nothing here pushes the island taller.
+// Home view: clock, weather and toggles on the left, everything active on the right, shortcuts below.
 ColumnLayout {
     id: xi
     required property Item di
@@ -64,7 +61,6 @@ ColumnLayout {
         const rows = []
         if (xi.di.hasMedia) rows.push({ kind: "media", id: "media" })
         for (const id of xi.nowIds) rows.push({ kind: "live", id: id })
-        // Further than the live countdown reaches: still worth a line as what comes next
         if (F1.enabled && !xi.nowIds.includes("f1") && F1.nextSession !== null && F1.secondsToNext > 0)
             rows.push({ kind: "f1Next", id: "f1" })
         for (const id of IslandEvents.silencedIslands) rows.push({ kind: "silenced", id: id })
@@ -183,7 +179,6 @@ ColumnLayout {
         Layout.fillHeight: true
         spacing: 18
 
-        // Left: the day
         ColumnLayout {
             Layout.fillWidth: false
             Layout.preferredWidth: 272
@@ -215,7 +210,6 @@ ColumnLayout {
                     spacing: 2
 
                     StyledText {
-                        // Weekday and date spelled out, without the year
                         text: DateTime.clock.date.toLocaleDateString(Qt.locale(), Locale.LongFormat).replace(/,?\s*(de\s)?\d{4}$/, "")
                         font.pixelSize: Appearance.font.pixelSize.small
                         color: Appearance.colors.colOnLayer0
@@ -241,7 +235,6 @@ ColumnLayout {
                 }
             }
 
-            // Weather now and the next four steps; the whole card opens the weather view
             Rectangle {
                 id: weatherCard
                 Layout.fillWidth: true
@@ -359,7 +352,6 @@ ColumnLayout {
             }
         }
 
-        // Right: now
         ColumnLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -386,7 +378,6 @@ ColumnLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
 
-                // Nothing going on: say so, instead of leaving a hole
                 ColumnLayout {
                     id: emptyState
                     anchors.centerIn: parent
@@ -598,7 +589,6 @@ ColumnLayout {
         }
     }
 
-    // Shortcuts to the other views
     RowLayout {
         id: shortcuts
         Layout.fillWidth: true

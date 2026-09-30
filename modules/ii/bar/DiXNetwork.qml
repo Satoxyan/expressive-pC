@@ -7,9 +7,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// Network, in two columns. As "download": the speed right now over a live curve on the left; on the right the
-// files arriving and who is pulling the traffic, or, when nothing is downloading, the latest downloads. As
-// "zerotier": an optional local page (local/DiXZeroTier.qml), shown only when its backend exists.
+// Network in two columns: live speed, downloads and traffic sources. "zerotier" shows an optional local page (local/DiXZeroTier.qml).
 ColumnLayout {
     id: xnet
     required property Item di
@@ -113,7 +111,6 @@ ColumnLayout {
         }
     }
 
-    // A row of a list: icon, two lines and a value on the right
     component ListRow: Rectangle {
         id: row
         property string icon: ""
@@ -218,7 +215,6 @@ ColumnLayout {
         source: Qt.resolvedUrl("local/DiXZeroTier.qml")
     }
 
-    // ───────────── Download / network activity ─────────────
     Component {
         id: downloadPage
 
@@ -232,8 +228,7 @@ ColumnLayout {
             readonly property string topName: IslandEvents.downloadTop?.name ?? ""
             property double now: Date.now()
 
-            // Speed samples taken while the view is open (the service reads the counters every second meanwhile),
-            // started from what the service already kept of the current burst
+            // Samples taken while the view is open, seeded from the service's current burst.
             property var samples: IslandEvents.downloadHistory.map(v => ({ rx: v, tx: -1 }))
             readonly property int windowSize: 40
             readonly property real graphMax: Math.max(64 * 1024, ...dl.samples.map(s => Math.max(s.rx, s.tx)))
@@ -242,7 +237,6 @@ ColumnLayout {
                 dl.samples = [...dl.samples, { rx: IslandEvents.downloadRate, tx: IslandEvents.uploadRate }].slice(-dl.windowSize)
             }
 
-            // The downloads that finished (files) and the traffic bursts, newest first
             readonly property var recent: {
                 const files = (IslandEvents.eventLog ?? []).filter(e => e.kind === "download").map(e => ({
                     kind: "file", time: e.time, title: e.title, bytes: e.subtitle, path: e.action?.path ?? ""
@@ -287,7 +281,6 @@ ColumnLayout {
                 return { number: parts[0], unit: parts[1] ?? "" }
             }
 
-            // Left: now
             ColumnLayout {
                 Layout.fillWidth: false
                 Layout.preferredWidth: 236
@@ -310,7 +303,6 @@ ColumnLayout {
                             : Translation.tr("Network now")
                         font.features: { "tnum": 1 }
                     }
-                    // Log of every burst
                     Rectangle {
                         implicitWidth: 24
                         implicitHeight: 24
@@ -380,7 +372,6 @@ ColumnLayout {
                     DiCascade { target: rateSub; index: 2 }
                 }
 
-                // Recent speed: download filled, upload as a thin line; drawn from the left as it opens
                 Item {
                     id: graph
                     Layout.fillWidth: true
@@ -430,7 +421,6 @@ ColumnLayout {
                             ctx.reset()
                             const list = dl.samples
                             if (list.length < 2 || graph.reveal <= 0) return
-                            // Spread over the width until the window fills, then it scrolls
                             const n = Math.max(12, list.length)
                             const dx = width / (n - 1)
                             const offset = 0
@@ -453,7 +443,6 @@ ColumnLayout {
                                         ctx.moveTo(x, y)
                                         started = true
                                     } else {
-                                        // Midpoint smoothing keeps spikes readable without sharp corners
                                         const px = (offset + i - 1) * dx
                                         const py = yOf(list[i - 1][key])
                                         ctx.quadraticCurveTo(px, py, (px + x) / 2, (py + y) / 2)
@@ -529,7 +518,6 @@ ColumnLayout {
                 }
             }
 
-            // Right: files and sources while downloading, the latest downloads otherwise
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -642,7 +630,6 @@ ColumnLayout {
                     }
                 }
 
-                // The connection itself, idle only
                 ListRow {
                     id: connRow
                     Layout.bottomMargin: 4
@@ -658,7 +645,6 @@ ColumnLayout {
                     ].filter(Boolean).join(" · ")
                 }
 
-                // Latest downloads (only when idle)
                 SectionLabel {
                     id: recentLabel
                     visible: !dl.active && dl.recent.length > 0
@@ -687,7 +673,6 @@ ColumnLayout {
                     }
                 }
 
-                // Who is using the network
                 SectionLabel {
                     id: sourcesLabel
                     Layout.topMargin: (filesLabel.visible || recentLabel.visible) ? 4 : 0
@@ -710,7 +695,6 @@ ColumnLayout {
                 }
 
                 Repeater {
-                    // Fewer rows when a file or the recent list already takes the room
                     model: IslandEvents.downloadSourcesError !== "" ? 0
                         : Math.min(dl.sources.length, dl.active ? (filesLabel.visible ? 2 : 3) : (dl.recent.length > 0 ? 1 : 2))
 
@@ -731,7 +715,6 @@ ColumnLayout {
                             color: Appearance.colors.colLayer1
                             clip: true
 
-                            // Share of the traffic as a soft fill behind the row
                             Rectangle {
                                 anchors {
                                     left: parent.left
@@ -812,7 +795,6 @@ ColumnLayout {
                     }
                 }
 
-                // With people on the network the list above fills the column; a line is enough
                 StyledText {
                     id: noRecent
                     Layout.fillWidth: true
@@ -826,7 +808,6 @@ ColumnLayout {
                     elide: Text.ElideRight
                 }
 
-                // Browser hint, only when there is room for it
                 Rectangle {
                     id: hint
                     Layout.fillWidth: true
@@ -857,7 +838,6 @@ ColumnLayout {
                     }
                 }
 
-                // Nothing downloaded yet and nobody on the network
                 Item {
                     Layout.fillWidth: true
                     Layout.fillHeight: true

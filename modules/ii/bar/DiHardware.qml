@@ -5,7 +5,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// A hardware moment, compact: what happened first, the detail under it, the number that matters on the right
+// Compact hardware event: title, detail, value
 RowLayout {
     id: hw
     required property Item di

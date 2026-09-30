@@ -3,9 +3,8 @@ import Quickshell
 import Quickshell.Wayland
 import qs.modules.common
 
-// A thin, invisible strip at the very top of the screen, right above the island. A floating bar sits a few pixels
-// below the edge, so a pointer pushed against the edge leaves the bar; this strip is what "insisting" upward touches.
-// Only the part over the island takes input, so the rest of the top edge is untouched.
+// Invisible strip at the top edge above the island. The floating bar sits below the edge,
+// so this catches a pointer pushed upward. Only the part over the island takes input.
 Scope {
     id: edge
     required property Item di

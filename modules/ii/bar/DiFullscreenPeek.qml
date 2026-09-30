@@ -7,17 +7,12 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// A fullscreen window buries the bar, and the island with it (DynamicIsland.qml decides what each
-// island does then). This is what is left of it at the top edge, only while something is there:
-//  - a mini island for what has to break through: critical (hibernating, battery, heat, the power menu), taking
-//    input, and feedback on what you just did (volume, a screenshot), click-through
-//  - a hairline when something queued up or an agent is waiting on you — pulsing for the agent, brighter the more
-//    urgent the queue. Resting the pointer on it opens the queue (and the approval itself, to answer right there)
-//  - a red dot while recording
-//  - a discreet line for messages from priority apps (WhatsApp): sender and text for a few seconds; resting on it
-//    holds it and offers reply, mute this conversation and quiet everything until the fullscreen ends
-// A middle click on the hairline (or `ipc call island quiet`) toggles that quiet mode.
-// Games take no input at the edge at all (strategy games scroll the map by pushing the pointer there).
+// What remains of the island at the top edge while a fullscreen window covers the bar:
+//  - mini island for critical or just-done feedback
+//  - hairline for queued items or a waiting agent (middle click or `ipc call island quiet` toggles quiet mode)
+//  - red dot while recording
+//  - line for priority-app messages
+// Games get no input at the edge (strategy games scroll by pushing the pointer there).
 Scope {
     id: peek
     required property Item di

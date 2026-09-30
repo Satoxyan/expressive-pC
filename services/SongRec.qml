@@ -44,7 +44,6 @@ Singleton {
     property var recognizedTrack: ({ title:"", subtitle:"", url:""})
     property bool manuallyStopped: false
 
-    // Short in-memory log of what got recognized this session, newest first
     readonly property int historyMax: 8
     property var history: []
 

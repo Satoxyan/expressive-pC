@@ -33,7 +33,6 @@ RowLayout {
         Layout.preferredWidth: 30
         Layout.preferredHeight: 30
         DiEntrance { target: caseLoader }
-        // Optional local art: nothing is drawn (generic icon instead) when the file is absent
         source: Qt.resolvedUrl("DiEarbudsCase.qml")
         onLoaded: {
             item.open = Qt.binding(() => bt.connected)

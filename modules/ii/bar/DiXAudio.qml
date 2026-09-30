@@ -12,7 +12,6 @@ ColumnLayout {
     required property Item di
     spacing: 10
     implicitWidth: xa.wantedWidth
-    // Two columns (outputs · apps) when there are apps playing; just the slider for brightness
     readonly property real wantedWidth: xa.brightnessMode ? 340 : (IslandEvents.audioStreams.length > 0 ? 540 : 360)
 
     readonly property bool brightnessMode: xa.di.expandedId === "osd" && GlobalStates.osdIndicatorType === "brightness"
@@ -78,8 +77,6 @@ ColumnLayout {
         }
     }
 
-    // Where the sound goes on the left, how loud each app is on the right: side by side, the view keeps the
-    // island's standard height instead of stacking into a tall list
     RowLayout {
         visible: !xa.brightnessMode
         Layout.fillWidth: true
@@ -150,7 +147,6 @@ ColumnLayout {
                 }
             }
 
-            // Other profiles of the same card (HDMI, the laptop speakers) as small chips under the devices
             Flow {
                 Layout.fillWidth: true
                 visible: profileRepeater.count > 0

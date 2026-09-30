@@ -7,15 +7,8 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// The heaviest processes for one resource, with a way to end them. Registers with Pressure while it's on screen —
-// that's what makes the process scan run at all when no alert is up (and it stops the moment this goes away).
-//
-// Each row: the app's icon, its name, and a faint fill behind it for its share of what's being used. Up to
-// `visibleRows` show at once; the rest scroll inside the list (the wheel never leaks into the island).
-//
-// Ending takes two clicks (the first arms the button for a few seconds): SIGTERM lets the app close properly;
-// if it's still there after that, the button turns into "Force" (SIGKILL). Protected processes — the compositor,
-// the shell, audio — never get a button.
+// Heaviest processes for one resource, with end/force buttons.
+// Registers with Pressure while visible: the process scan only runs then.
 Item {
     id: list
     property string kind: "cpu"

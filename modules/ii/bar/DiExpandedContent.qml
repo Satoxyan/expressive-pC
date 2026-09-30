@@ -3,22 +3,19 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 
-// The expanded island's content: one view at a time, handed over to the next with a crossfade between two layers
-// (DiExpandedSlot). The outgoing view drifts a few px against the direction of travel and fades; the incoming
-// one arrives from the other side. Both sit centred in the frame the island gives them, so the island's spring
-// resize and this handover play as a single motion.
+// Expanded content: crossfades between two DiExpandedSlot layers, one view at a time.
 Item {
     id: content
     required property Item di
     required property string contentId
     property real maxHeight: 100000
-    // +1 travelling forward (scrolling to the next island), -1 back, 0 for a jump; consumed by the next swap
+    // +1 forward, -1 back, 0 jump; consumed by the next swap
     property int direction: 0
 
     property int activeSlot: 0
     readonly property Item currentSlot: content.activeSlot === 0 ? slotA : slotB
     readonly property Item viewItem: content.currentSlot.view
-    // What the incoming view needs, not what is fading out: the island starts resizing for it right away
+    // Follows the incoming view so the island starts resizing right away
     readonly property real naturalHeight: content.currentSlot.naturalHeight
     readonly property real naturalWidth: content.currentSlot.naturalWidth
 
@@ -75,7 +72,6 @@ Item {
         }
     }
 
-    // A scrollable view pulled past its end: the island moves on to the next one
     signal overscrolled(int direction)
 
     DiExpandedSlot { id: slotA; host: content; onOverscrolled: direction => content.overscrolled(direction) }

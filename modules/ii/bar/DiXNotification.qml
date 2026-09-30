@@ -8,10 +8,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// The full view of a notification, sized to the standard height. For chats it reads like a chat: the photo and
-// the name, the message before this one for context and this one in a bubble, one-tap replies in a single row
-// that scrolls sideways, and the reply field sharing a row with the app's own actions. The bubbles rise in one
-// after another when it opens; the quick replies pop in behind them.
+// Full notification view at standard height; chats get a thread layout with quick replies.
 ColumnLayout {
     id: xn
     readonly property real wantedWidth: 420
@@ -150,7 +147,6 @@ ColumnLayout {
             sourceSize.width: 30
             sourceSize.height: 30
         }
-        // In a chat the sender leads and the app steps back beside the time, which frees a line for the thread
         StyledText {
             Layout.maximumWidth: 190
             text: xn.messaging ? xn.parts.title : (xn.parts.app || Translation.tr("Notification"))
@@ -349,7 +345,6 @@ ColumnLayout {
                 id: thread
                 Layout.fillWidth: true
                 Layout.preferredWidth: 1
-                // What is left of the standard height once the replies and actions below have their rows
                 Layout.preferredHeight: Math.min(threadColumn.implicitHeight, xn.canReply ? 130 : (xn.appActions.length > 0 ? 146 : 176))
                 contentWidth: width
                 contentHeight: threadColumn.implicitHeight
@@ -451,7 +446,6 @@ ColumnLayout {
                                     font.pixelSize: Appearance.font.pixelSize.small
                                     color: Appearance.colors.colOnLayer0
                                     wrapMode: Text.Wrap
-                                    // Chats show the last two messages whole: the one before gets a line, this one the rest
                                     maximumLineCount: xn.messaging ? (xn.earlier.length > 0 ? 3 : 5) : 100
                                     elide: Text.ElideRight
                                     lineHeight: 1.1
@@ -527,7 +521,6 @@ ColumnLayout {
         }
     }
 
-    // Quick replies in one row; past the width it scrolls sideways (the wheel scrolls it too)
     Flickable {
         id: quickRow
         Layout.fillWidth: true
@@ -630,7 +623,6 @@ ColumnLayout {
         }
     }
 
-    // The app's own actions and the reply field, side by side
     RowLayout {
         id: actionRow
         Layout.fillWidth: true
@@ -698,7 +690,6 @@ ColumnLayout {
                 Layout.fillWidth: true
                 Layout.minimumWidth: 120
                 Layout.preferredHeight: 34
-                // After sending, the confirmation takes the placeholder's place instead of a line of its own
                 placeholderText: xn.replyHint || xn.notif?.inlineReplyPlaceholder || Translation.tr("Reply…")
                 color: Appearance.colors.colOnLayer0
                 placeholderTextColor: xn.replyHint !== "" ? Appearance.m3colors.m3success : ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.5)

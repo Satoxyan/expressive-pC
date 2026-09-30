@@ -20,8 +20,8 @@ import time
 
 PARTIAL_SUFFIXES = (".crdownload", ".part", ".partial", ".download", ".opdownload", ".!ut")
 ARCHIVE_SUFFIXES = (".zip", ".tar", ".tar.gz", ".tgz", ".tar.xz", ".tar.zst", ".tar.bz2", ".7z", ".rar")
-POLL_IDLE_SECONDS = 4.0      # nothing is being downloaded: just watch the folder
-POLL_ACTIVE_SECONDS = 1.0    # something is arriving: follow it closely
+POLL_IDLE_SECONDS = 4.0
+POLL_ACTIVE_SECONDS = 1.0
 TOTALS_REFRESH_SECONDS = 4.0
 
 CHROMIUM_HISTORIES = [

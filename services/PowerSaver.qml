@@ -8,9 +8,8 @@ import Quickshell.Bluetooth
 import qs.modules.common
 
 /**
- * Quick ways to stretch the battery, offered by the low-battery alert. Each one remembers what it changed and
- * everything goes back the moment the charger is plugged in — the saver never becomes a setting you have to
- * remember to undo.
+ * Quick battery savers offered by the low-battery alert. Each remembers what it changed and all revert when the
+ * charger is plugged in.
  *
  *   profile    — power-profiles-daemon "power-saver"
  *   dim        — internal screen to 35% (never raises it)

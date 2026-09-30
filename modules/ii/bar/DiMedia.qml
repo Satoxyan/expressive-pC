@@ -134,7 +134,6 @@ Item {
             NumberAnimation { duration: IslandMotion.short; easing.type: Easing.OutCubic }
         }
 
-        // Title: shown whole; scrolls gently only when it still overflows
         Item {
             id: titleBox
             Layout.fillWidth: true

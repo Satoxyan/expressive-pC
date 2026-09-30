@@ -1,12 +1,8 @@
 #!/usr/bin/env bash
-# Sends a reply to a web chat (WhatsApp Web in the browser) from the island.
-#
-# The island has already invoked the notification's own "default" action — the same thing clicking the
-# notification does — so the web app opens *that* conversation and the browser comes to the front. This waits
-# for the focused window to really be that chat app, then types the text (never through the clipboard) and
-# presses Enter. If the chat never comes up, nothing is typed anywhere: the reply is left on the clipboard and
-# the script exits 1 so the island can say so.
-#
+# Sends a reply to a web chat (WhatsApp Web) from the island. The island already invoked the notification's
+# default action, so the browser shows that conversation. Waits for that window to be focused, types the text
+# (not via clipboard) and presses Enter. If the chat never comes up nothing is typed: the reply stays on the
+# clipboard and the script exits 1.
 # Usage: reply-send.sh <text> <window title hint, e.g. "WhatsApp">
 
 set -uo pipefail

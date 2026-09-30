@@ -34,8 +34,7 @@ Singleton {
     readonly property bool autoPlayRadio: Config.options.bar.dynamicIsland.f1.autoPlayRadio ?? false
     readonly property bool radioPlaying: radioPlayer.running
 
-    // Passive, on-demand data for the off-session view: fetched only when a view asks (Component.onCompleted)
-    // and cached for hours, never polled.
+    // Fetched on demand by views, cached for hours, never polled
     property var weekend: []
     property real weekendFetchedAt: 0
     readonly property int weekendCacheMs: 6 * 3600 * 1000
@@ -43,14 +42,11 @@ Singleton {
     property real standingsFetchedAt: 0
     readonly property int standingsCacheMs: 6 * 3600 * 1000
 
-    // The whole season, past and future rounds, so the off-session view can page through other race
-    // weekends instead of only the next one. One source (Jolpica/Ergast) for the full weekend agenda
-    // (practice/quali/sprint/race) of every round, fetched once and cached for a day.
+    // Whole season from Jolpica/Ergast (full weekend agenda of every round), fetched once, cached for a day
     property var calendar: []
     property real calendarFetchedAt: 0
     readonly property int calendarCacheMs: 24 * 3600 * 1000
 
-    // Final classification per round, fetched only for a round someone actually opened, kept in memory.
     property var resultsByRound: ({})
     property var resultsRequestedAt: ({})
     readonly property int resultsCacheMs: 24 * 3600 * 1000
@@ -461,9 +457,8 @@ Singleton {
         onTriggered: root.nowMs = Date.now()
     }
 
-    // Passive: between race weekends there is no process at all. "live --until-idle" reports the next session and
-    // exits (or, inside a session's window, streams it and exits when it's over); this single-shot timer wakes it
-    // again 30 minutes before the next one. A crash inside a session's window retries after 15 s.
+    // "live --until-idle" reports the next session and exits, or streams the session and exits when it ends;
+    // this single-shot timer restarts it 30 min before the next one. A crash inside a session retries after 15 s.
     readonly property int preWindowMs: 30 * 60 * 1000
 
     Timer {

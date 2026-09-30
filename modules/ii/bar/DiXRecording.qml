@@ -7,9 +7,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// Screen recording in two columns: a live dot, the big elapsed time, a seconds ticker and the stop button on the
-// left; the file being written (size and write rate), where it goes and what is captured on the right.
-// wf-recorder has no pause, so stop is the only control. The file is only looked at while this view is open.
+// Screen recording view: elapsed time and stop on the left, file details on the right.
 RowLayout {
     id: xr
     required property Item di
@@ -20,13 +18,11 @@ RowLayout {
     readonly property int elapsed: xr.di.recordingElapsedSeconds
     readonly property string home: Quickshell.env("HOME") ?? ""
 
-    // What the running wf-recorder is doing, read from /proc when the view opens
     property bool found: false
     property string filePath: ""
     property bool withAudio: false
     property bool region: false
     property string outputName: ""
-    // Bytes on disk and the write rate between the last two reads
     property real fileSize: -1
     property real rate: -1
     property real lastSize: -1
@@ -107,7 +103,6 @@ RowLayout {
         }
     }
 
-    // Only while the view is open (this item lives only then)
     Timer {
         interval: 1500
         repeat: true
@@ -134,7 +129,6 @@ RowLayout {
         opacity: 0.6
     }
 
-    // A 40 px card row: icon, value over label, optional trailing icon; tappable when onTap is set
     component InfoCard: Rectangle {
         id: card
         property string icon: ""
@@ -206,7 +200,6 @@ RowLayout {
         }
     }
 
-    // Left: live time and stop
     ColumnLayout {
         Layout.fillWidth: false
         Layout.preferredWidth: 196
@@ -220,7 +213,6 @@ RowLayout {
             spacing: 8
             DiCascade { target: headRow; index: 0 }
 
-            // Red dot with a halo that keeps breathing out
             Item {
                 implicitWidth: 14
                 implicitHeight: 14
@@ -275,7 +267,6 @@ RowLayout {
             DiCascade { target: bigTime; index: 1 }
         }
 
-        // One tick per 2 s of the current minute
         Item {
             id: ticker
             Layout.fillWidth: true
@@ -354,7 +345,6 @@ RowLayout {
         }
     }
 
-    // Right: the file, where it goes, what is captured
     ColumnLayout {
         Layout.fillWidth: true
         Layout.alignment: Qt.AlignTop

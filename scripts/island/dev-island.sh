@@ -1,16 +1,8 @@
 #!/usr/bin/env bash
-# Dynamic Island helper for local dev servers (Dev Activity). Framework-agnostic: it never
-# parses a specific tool's output, only generic patterns (a localhost URL, common error/ready words), so
-# it works the same for Next.js, Vite, Django's runserver, or anything else that prints to stdout.
-#
-# Usage: wrap the dev command's output with it, piped through so you still see everything normally:
-#   npm run dev 2>&1 | ~/.config/quickshell/end4-pC/scripts/island/dev-island.sh myapp "My App"
-#
-# First line of stdin marks "building". A localhost URL anywhere in the output marks "ready" and starts
-# polling that port every few seconds to keep the Live Activity alive for as long as the server answers —
-# unlike a one-off "done", ready has to persist for however long you leave the server running. A generic
-# error/failed keyword before a URL has appeared marks "error". The activity is removed when the wrapped
-# command exits or the port stops answering.
+# Dynamic Island helper for local dev servers. Framework-agnostic: only generic patterns (localhost URL, error/ready words).
+# Usage: npm run dev 2>&1 | ~/.config/quickshell/end4-pC/scripts/island/dev-island.sh myapp "My App"
+# First stdin line = "building"; a localhost URL = "ready" (the port is then polled to keep the activity alive);
+# an error keyword before any URL = "error". Removed when the command exits or the port stops answering.
 command -v qs >/dev/null 2>&1 || { cat; exit 0; }
 
 id=$1

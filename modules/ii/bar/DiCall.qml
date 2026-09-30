@@ -6,9 +6,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// On a call (Vesktop/Discord): the app's mark, how long you've been talking, and the two controls you reach
-// for mid-sentence — mic and headset — right on the pill. Muted shows in red, so a glance answers "can they
-// hear me?".
+// Active call: app mark, duration, mic and headset toggles
 Item {
     id: call
     required property Item di

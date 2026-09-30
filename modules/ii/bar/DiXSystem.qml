@@ -45,8 +45,6 @@ ColumnLayout {
         }
     }
 
-    // Load on the left (graph, heaviest process, heat and power profile), who is using it on the right (processes,
-    // peripherals' batteries): side by side, the view fits the island's standard height
     RowLayout {
         Layout.fillWidth: true
         spacing: 16

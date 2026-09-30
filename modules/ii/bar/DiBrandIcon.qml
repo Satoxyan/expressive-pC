@@ -2,7 +2,7 @@ import QtQuick
 import Qt5Compat.GraphicalEffects
 import qs.modules.common
 
-// A brand mark from assets/island/apps, painted in one color (the app's accent)
+// Brand mark from assets/island/apps, painted in one color
 Item {
     id: brand
     property string source: ""

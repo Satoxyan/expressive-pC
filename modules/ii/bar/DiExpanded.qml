@@ -10,22 +10,11 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// Click-to-open state of the island. The overlay starts exactly on the island's visible surface and grows out of
-// it; closing shrinks it back into that same shape, so it reads as the island changing size, not a second window.
-// While the pointer rests on it the island leans in a touch; when the pointer leaves it eases back and a thin fuse
-// shows how long until it closes by itself. Clicking anywhere else closes it right away.
-//
-// Size and motion: every view opens at one standard height rather than following its content (so moving between
-// islands keeps the same height), the width adapts between clear bounds, and every change of shape runs
-// on a spring (DiSpring) that keeps its velocity when the target moves mid-flight. Input is separate from the
-// visuals: the window's input region is a hitbox that only shrinks once a gesture is over, so an island that
-// gets smaller while you scroll never slides out from under the pointer.
+// Click-to-open state of the island. The overlay grows out of the island's surface and shrinks back into it.
+// Shape changes run on a spring (DiSpring); the input region only shrinks once a gesture is over.
 Scope {
     id: scope
 
-    // The pager under an expanded card. Pinned views sit on the left (scrolling down goes back to them) as their
-    // own small icons, so you can tell which is which; a dot under one means it is also active right now. Then home
-    // (a ring) and what is active (dots). The current card is lit.
     component PagerIcon: Rectangle {
         id: pin
         required property string dotId
@@ -93,7 +82,6 @@ Scope {
     required property Item di
     required property Item pillItem
 
-    // 0 closed → 1 open. Opening carries a hair of overshoot; closing settles without one
     property DiSpring openSpring: DiSpring {
         target: scope.di.expanded ? 1 : 0
         stiffness: scope.di.expanded ? IslandMotion.springOpen.stiffness : IslandMotion.springClose.stiffness
@@ -161,9 +149,7 @@ Scope {
                 onCleared: if (scope.di.expanded) scope.di.collapse()
             }
 
-            // Everything interactive hangs off this full-window item. The window only takes input inside `hitbox`
-            // (see the mask), so "the pointer is in the window" means "the pointer is on the island or on the ground it
-            // covered a moment ago" — hover and the wheel live here instead of on the visual shape.
+            // Hover and wheel live here, not on the visual shape: the window only takes input inside `hitbox`
             Item {
                 id: stage
                 anchors.fill: parent
@@ -188,7 +174,6 @@ Scope {
                         if (wheel.coolingDown) return
                         wheel.coolingDown = true
                         wheelCooldown.restart()
-                        // Down goes back (left in the pager), up goes forward
                         const direction = event.angleDelta.y < 0 ? -1 : 1
                         detail.direction = direction
                         scope.di.cycleIsland(direction)
@@ -201,8 +186,6 @@ Scope {
                     onTriggered: wheel.coolingDown = false
                 }
 
-                // The hitbox's margin outside the visual island is still "outside": a click there closes, as it would
-                // anywhere else on the screen
                 TapHandler {
                     enabled: scope.di.expanded
                     onTapped: point => {
@@ -212,10 +195,8 @@ Scope {
                     }
                 }
 
-                // The input region. At rest it is exactly the visual island; while the pointer is on it, it becomes
-                // the union of every shape the island has taken since, so the island can shrink (scrolling to a smaller
-                // one) without the region leaving the pointer behind. Once the gesture is over and the shape has
-                // settled, it relaxes back to the island — from then on, a pointer left outside really is outside.
+                // Input region: the island at rest; while hovered, the union of every shape it has taken,
+                // so a shrinking island never leaves the pointer outside.
                 Item {
                     id: hitbox
                     property bool engaged: false
@@ -291,28 +272,21 @@ Scope {
 
                     readonly property real bottomReserve: 18 + (scope.di.splitArmed ? splitPicker.implicitHeight + 10 : 0)
 
-                    // One standard height for every view: the tall ones are laid out in two columns to fit it, and a
-                    // view sits centred in it; anything taller still scrolls inside. Kept as a list so a step can return.
+                    // One standard height for every view; tall ones use two columns or scroll
                     readonly property var heightSteps: [280]
                     readonly property real tallest: Math.min(island.maxH, island.heightSteps[island.heightSteps.length - 1])
                     function stepFor(need) {
-                        // By default a card is just as tall as what it shows (up to the tallest step); the uniform
-                        // height is an option, since a near-empty view in a full-height card reads as a hole
                         if (!(scope.di.cfg.uniformHeight ?? false))
                             return Math.min(Math.max(need, island.startH), island.tallest)
                         for (const step of island.heightSteps)
                             if (need <= step) return Math.min(step, island.maxH)
                         return island.tallest
                     }
-                    // A card that hugs its content gets a strip on top matching the pager's at the bottom, so the
-                    // content sits centred between the top edge and the dots (with the uniform height, the extra
-                    // room already centres it)
+                    // Top strip mirroring the pager so hugging content stays centred
                     readonly property real topBalance: (scope.di.cfg.uniformHeight ?? false) ? 0 : 12
                     readonly property real contentNeed: Math.max(detail.naturalHeight, island.splitActive ? splitDetail.naturalHeight : 0)
                         + island.bottomReserve + island.topBalance
 
-                    // Width follows the view, between a floor (never narrower than the pill it grew out of) and a ceiling
-                    // (only split view, two views side by side, may go past it). Two-column views sit near the top of it.
                     readonly property real minW: Math.min(island.maxW, Math.max(island.startW, 340))
                     readonly property real maxSingleW: Math.min(island.maxW, 600)
                     readonly property real wantedW: Math.max(island.minW, Math.min(island.splitActive ? island.maxW : island.maxSingleW,
@@ -366,7 +340,6 @@ Scope {
                         ? win.height - (win.barWindowHeight - win.surfaceRect.y - island.startH) - island.height + 1
                         : win.surfaceRect.y - 1
                     radius: Math.min(island.height / 2, island.startH / 2 + 12 * island.pc)
-                    // Starts from the pill's own colour (tinted by the music while it plays), so opening doesn't flash
                     color: scope.di.pillSurface.a > 0 ? scope.di.pillSurface : scope.di.surfaceColor
                     border.width: 1
                     border.color: ColorUtils.transparentize(Appearance.colors.colLayer0Border, 1 - island.pc * (island.pointerIn ? 1 : 0.6))
@@ -382,12 +355,7 @@ Scope {
                         onTapped: scope.di.collapse()
                     }
 
-                    // The card's own surface, which a view can colour (Material You: the card takes the tone
-                    // of what it shows). A view may declare `tint` (a colour for the whole card) and `backdrop`
-                    // (an image, e.g. the album art, blurred behind the tint). Painted here, under the content,
-                    // with the island's own radius (its `clip` only cuts the bounding box, not the curve), so it
-                    // fills edge to edge, pager strip included, with the corners still round.
-                    // The rounded shape the surface is cut to (a sibling, so the masked layer doesn't recurse)
+                    // Card surface; a view can set `tint` and `backdrop`. Painted with the island's radius since `clip` only cuts the bounding box.
                     Rectangle {
                         id: surfaceMask
                         anchors.fill: surfaceTint
@@ -404,8 +372,7 @@ Scope {
                         readonly property string backdrop: detail.viewItem?.backdrop ?? ""
                         opacity: island.pc
                         visible: surfaceTint.opacity > 0.01 && (surfaceTint.tint.a > 0 || surfaceTint.backdrop !== "")
-                        // Backdrop and tint are cut to the curve together, as one layer: masking the blur alone
-                        // let its padding spill past the bottom corners as square edges
+                        // Masking the blur alone let its padding spill past the bottom corners
                         layer.enabled: surfaceTint.visible
                         layer.effect: MultiEffect {
                             maskEnabled: true
@@ -416,7 +383,7 @@ Scope {
                             id: backdropImage
                             anchors.fill: parent
                             source: surfaceTint.backdrop
-                            // Tiny on purpose: it is blurred to nothing anyway, and this keeps the blur cheap
+                            // Tiny on purpose: it is blurred anyway
                             sourceSize.width: 64
                             sourceSize.height: 64
                             fillMode: Image.PreserveAspectCrop
@@ -483,7 +450,6 @@ Scope {
                         contentId: scope.di.expandedId
                         maxHeight: island.tallest - island.bottomReserve - island.topBalance
                         x: (island.width - island.pairW) / 2
-                        // The frame the view is centred in: the island minus the strip kept for the pager
                         y: win.bottomBar ? island.bottomReserve : island.topBalance
                         width: island.splitActive ? Math.min(island.maxW, implicitWidth)
                             : Math.min(island.maxW, Math.max(island.width, implicitWidth))
@@ -589,7 +555,6 @@ Scope {
                                 }
                             }
                         }
-                        // A thin divider between the pinned group and the rest
                         Rectangle {
                             anchors.verticalCenter: parent.verticalCenter
                             visible: scope.di.pinnedCycle.length > 0

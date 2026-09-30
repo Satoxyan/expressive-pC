@@ -5,8 +5,7 @@ import qs.modules.common.widgets
 import qs.modules.common.models
 import qs.modules.common.functions
 
-// A bar utility button, Material 3 Expressive: at rest a soft "cookie" shape that turns a little, on hover it
-// opens into a filled pill, and it squeezes under a press.
+// Bar utility button: cookie shape at rest, filled pill on hover.
 Item {
     id: root
     signal clicked(event: var)
@@ -40,7 +39,6 @@ Item {
         NumberAnimation { duration: 180; easing.type: Easing.OutBack; easing.overshoot: 2 }
     }
 
-    // At rest: the expressive shape
     MaterialShape {
         anchors.centerIn: parent
         implicitSize: 26
@@ -52,7 +50,6 @@ Item {
         Behavior on rotation { NumberAnimation { duration: 420; easing.type: Easing.OutCubic } }
     }
 
-    // On hover: the filled pill
     Rectangle {
         anchors.fill: parent
         radius: Appearance.rounding.full

@@ -16,8 +16,6 @@ ColumnLayout {
     readonly property color flagColor: F1.flagColor(F1.flag)
     readonly property string hourFormat: DateTime.use12HourFormat ? "h AP" : "HH:mm"
 
-    // Material You palette seeded from the F1 red: same hue, lightness picked per role. The island paints `tint`
-    // over the whole card, so the view reads as one tonal surface instead of text on the plain island.
     readonly property bool dark: Appearance.m3colors.darkmode
     readonly property color seed: "#E10600"
     function tone(lightness, alpha) {
@@ -49,9 +47,7 @@ ColumnLayout {
         }
     }
 
-    // The island keeps this view's instance alive across a close/reopen (only navigating away to a
-    // different card tears it down), so browsing history would otherwise leak into the next time the
-    // view is opened. Reopening always lands back on the next race.
+    // The island keeps this instance across close/reopen, so browsing state is reset when the view opens.
     Connections {
         target: xf.di
         function onExpandedChanged() {
@@ -59,8 +55,7 @@ ColumnLayout {
         }
     }
 
-    // Browsing other race weekends: -1 follows the next one automatically (today's behaviour); the
-    // chevrons in the pager step through the season either way, past or future.
+    // -1 follows the next race; the pager steps through the season.
     property int viewIndex: -1
     readonly property var calendar: F1.calendar
     readonly property int autoIndex: {
@@ -72,7 +67,6 @@ ColumnLayout {
     readonly property var race: xf.calendar[xf.effectiveIndex] ?? null
     readonly property bool browsing: xf.viewIndex >= 0 && xf.viewIndex !== xf.autoIndex
     readonly property bool racePast: xf.race !== null && Date.parse(xf.race.raceDate) < xf.localNow
-    // A local clock for the countdown to whatever race is being browsed, ticking only while open
     property real localNow: Date.now()
     Timer {
         interval: 1000
@@ -89,13 +83,11 @@ ColumnLayout {
     }
     function browseToNext() { xf.viewIndex = -1 }
 
-    // Checked straight from the race here: `racePast` depends on `race` and may not have caught up yet when
-    // this fires, which left a past round stuck on "loading results"
+    // Checked from `race` directly: `racePast` may not have updated yet when this fires.
     function fetchResultsIfPast() {
         if (xf.race && Date.parse(xf.race.raceDate) < Date.now()) F1.requestResults(xf.race.round)
     }
     onRaceChanged: xf.fetchResultsIfPast()
-    // And again every couple of seconds while a past round still has nothing (a dropped request, no network)
     Timer {
         interval: 2500
         repeat: true
@@ -113,7 +105,6 @@ ColumnLayout {
         return F1.formatCountdown(seconds)
     }
 
-    // "Practice 1" -> "FP1" ("TL1" in pt_BR); short labels for the weekend agenda list
     function weekendShortLabel(name) {
         const practice = (name ?? "").match(/^Practice (\d)$/)
         if (practice) return Translation.tr("FP%1").arg(practice[1])
@@ -127,9 +118,7 @@ ColumnLayout {
         }
     }
 
-    // OpenF1's circuit_short_name -> the matching layout in julesr0y/f1-circuits-svg (a plain outline,
-    // one path, no fill) — picked to be the current-era layout for each track. Unlisted/renamed tracks
-    // fall back to a first-guess slug, and the watermark just stays hidden if that 404s.
+    // OpenF1 circuit_short_name -> layout in julesr0y/f1-circuits-svg. Unlisted tracks fall back to a guessed slug; the watermark hides on 404.
     readonly property var trackSlugs: ({
         sakhir: "bahrain-1", bahrain: "bahrain-1",
         melbourne: "melbourne-2",
@@ -199,8 +188,6 @@ ColumnLayout {
         opacity: 0.6
     }
 
-    // Only while a session is actually live: off-session the pager below already carries the round,
-    // circuit and race name, so this would just repeat it.
     RowLayout {
         Layout.fillWidth: true
         spacing: 8
@@ -458,8 +445,6 @@ ColumnLayout {
                     }
                 }
 
-                // A quick burst of speed lines sweeps through on an overtake, in the direction of the move —
-                // the visual a car makes blowing past on the straight, not just the row sliding into place.
                 Row {
                     id: streaks
                     anchors {
@@ -591,17 +576,12 @@ ColumnLayout {
         }
     }
 
-    // Off-session, Material You style: the card takes a tonal red palette (the island paints `tint`), a hero
-    // card holds the countdown (or, for a past round, the winner) with the circuit drawn in its corner, the
-    // championship sits under it, and the weekend agenda or the classification fills the right column —
-    // scrolling inside that list only, never the whole view. The pager steps through the season.
     ColumnLayout {
         id: offSession
         Layout.fillWidth: true
         visible: !F1.sessionLive
         spacing: 10
 
-        // Header: which weekend is on screen
         RowLayout {
             id: pager
             Layout.fillWidth: true
@@ -639,7 +619,6 @@ ColumnLayout {
                 }
             }
 
-            // Back to the next race, only once you've browsed away
             Rectangle {
                 visible: xf.browsing
                 implicitWidth: backRow.implicitWidth + 16
@@ -692,7 +671,6 @@ ColumnLayout {
                 readonly property var upcomingSessions: xf.race ? xf.race.sessions.filter(s => Date.parse(s.start) > xf.localNow) : []
                 readonly property var results: xf.race ? (F1.resultsByRound[xf.race.round] ?? null) : null
 
-                // Hero: countdown (or winner), with the circuit drawn in the card's corner
                 Rectangle {
                     id: hero
                     Layout.fillWidth: true
@@ -778,7 +756,6 @@ ColumnLayout {
                     }
                 }
 
-                // Championship: who leads and by how much, then the top five
                 ColumnLayout {
                     id: champ
                     Layout.fillWidth: true
@@ -846,7 +823,6 @@ ColumnLayout {
                 }
             }
 
-            // Right: the weekend agenda, or the classification once the race is done. Only this list scrolls.
             Rectangle {
                 id: listCard
                 Layout.fillWidth: true
@@ -913,7 +889,6 @@ ColumnLayout {
                             }
                             spacing: 6
 
-                            // Agenda listRow
                             MaterialSymbol {
                                 visible: !xf.racePast
                                 text: listRow.isPast ? "check" : (listRow.isNext ? "timer" : "schedule")
@@ -941,7 +916,6 @@ ColumnLayout {
                                 opacity: listRow.isPast ? 0.5 : 1
                             }
 
-                            // Result listRow
                             StyledText {
                                 visible: xf.racePast
                                 Layout.preferredWidth: 22
@@ -977,7 +951,6 @@ ColumnLayout {
                         }
                     }
 
-                    // A slim scroll indicator, only when the list overflows
                     Rectangle {
                         visible: list.contentHeight > list.height
                         anchors.right: parent.right

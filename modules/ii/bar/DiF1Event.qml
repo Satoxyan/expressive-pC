@@ -5,7 +5,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// Pit stops (tyre change), rain at the track and the session result
+// Pit stops, rain and session result
 RowLayout {
     id: event
     required property Item di

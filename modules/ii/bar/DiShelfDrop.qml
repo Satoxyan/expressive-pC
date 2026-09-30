@@ -5,9 +5,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// Smart Drop. While something is dragged over the island the pill splits into one zone per action that fits
-// it (services/SmartDrop.qml); a highlight glides to the zone under the pointer like it's being pulled there,
-// and that zone's icon hops up. After the drop it says what happened.
+// Smart Drop: the pill splits into one zone per action that fits the dragged item (services/SmartDrop.qml).
 Item {
     id: dropState
     required property Item di
@@ -24,7 +22,6 @@ Item {
         anchors.margins: 2
         radius: height / 2
         color: ColorUtils.transparentize(Appearance.colors.colPrimary, dropState.hovering ? 0.9 : 1)
-        // The outline only marks the drop target while something is being dragged; the confirmation after it stays quiet
         border.width: dropState.hovering ? 1.5 : 0
         border.color: Appearance.colors.colPrimary
     }
@@ -109,7 +106,6 @@ Item {
         }
         spacing: 8
 
-        // A small tonal mark, not a solid badge: it confirms without shouting
         Rectangle {
             id: doneMark
             implicitWidth: 24

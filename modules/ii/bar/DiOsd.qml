@@ -32,8 +32,6 @@ Item {
     readonly property bool boosted: osd.kind === "volume" && !osd.muted && osd.shown > 1.005
     readonly property color boostColor: IslandEvents.colorAttention
 
-    // The pill is a slider: press and drag anywhere on it to set the level, and the fill follows the finger on a
-    // spring (so it glides instead of stepping); a plain tap keeps the old ±5% edges and the centre opens it.
     property bool dragging: false
     property real dragValue: 0
     readonly property real sliderMax: osd.kind === "volume" ? 1 : osd.maxValue
@@ -45,7 +43,6 @@ Item {
         epsilon: 0.001
     }
     readonly property real shown: shownSpring.value
-    // A pressed pill swells a little, like a Material 3 slider thumb under the finger
     DiSpring {
         id: pressSpring
         target: osd.dragging ? 1 : 0

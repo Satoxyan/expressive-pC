@@ -6,10 +6,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// Coding agents and live activities. One compact row per session (agent, project · model, short state, context as
-// a mini bar); only the session stopped on a permission or a question shows its answer buttons. Tapping a row opens
-// its details (one at a time): full status, context, diff, Open/Resume. When usage limits are known they sit in a
-// second column with a session summary, as bars that build up on open.
+// Coding agents and live activities: one row per session, details on tap, usage limits in a second column.
 RowLayout {
     id: xact
     required property Item di
@@ -119,7 +116,6 @@ RowLayout {
         }
     }
 
-    // Thin track + fill that grows in with `reveal` (0..1)
     component MiniBar: Rectangle {
         id: miniBar
         property real percent: 0
@@ -141,7 +137,6 @@ RowLayout {
         }
     }
 
-    // ── Left: sessions and live activities ──
     ColumnLayout {
         id: mainColumn
         Layout.fillWidth: false
@@ -161,7 +156,6 @@ RowLayout {
                 Layout.fillWidth: true
                 text: Translation.tr("Agents")
             }
-            // In one column there is no side summary, so the counts ride here
             SectionLabel {
                 visible: !xact.twoColumns && text !== ""
                 text: xact.statusSummary()
@@ -261,7 +255,6 @@ RowLayout {
                         }
                         spacing: 6
 
-                        // Compact line: icon · project · model / short state · context · chevron
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 9
@@ -362,7 +355,6 @@ RowLayout {
                             }
                         }
 
-                        // Permission prompt: only the session that is waiting on it gets the buttons
                         RowLayout {
                             Layout.fillWidth: true
                             visible: row.asksPermission
@@ -393,7 +385,6 @@ RowLayout {
                             }
                         }
 
-                        // A question with numbered answers
                         Flow {
                             Layout.fillWidth: true
                             visible: row.hasOptions && !row.asksPermission
@@ -411,7 +402,6 @@ RowLayout {
                             }
                         }
 
-                        // Details, on demand
                         ColumnLayout {
                             Layout.fillWidth: true
                             visible: row.open
@@ -663,7 +653,6 @@ RowLayout {
                             }
                         }
 
-                        // Actions and output, on demand
                         Flow {
                             Layout.fillWidth: true
                             visible: item.open
@@ -724,7 +713,6 @@ RowLayout {
                         }
                     }
 
-                    // Progress as a hairline along the bottom edge
                     Item {
                         visible: item.running
                         anchors {
@@ -769,7 +757,6 @@ RowLayout {
             }
         }
 
-        // Nothing at all: say so, instead of leaving a hole
         ColumnLayout {
             id: emptyState
             Layout.fillWidth: true
@@ -807,7 +794,6 @@ RowLayout {
         }
     }
 
-    // ── Right: session summary and usage limits ──
     ColumnLayout {
         id: sideColumn
         visible: xact.twoColumns
@@ -817,7 +803,6 @@ RowLayout {
         Layout.alignment: Qt.AlignTop
         spacing: 6
 
-        // Open sessions at a glance; dropped when three limit cards need the room
         RowLayout {
             id: summary
             Layout.fillWidth: true

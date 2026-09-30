@@ -4,8 +4,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 
-// What queued up behind a fullscreen window, handed back in one line once it ends. A click opens History,
-// where every one of them is waiting.
+// Digest of what queued during a fullscreen window; click opens History
 RowLayout {
     id: digest
     required property Item di

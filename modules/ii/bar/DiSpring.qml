@@ -1,9 +1,7 @@
 import QtQuick
 
-// A damped spring integrated every frame. Material 3 Expressive specifies motion as stiffness + damping ratio
-// rather than duration + curve, and that is what this takes. Changing `target` mid-flight keeps the current
-// velocity, so a change of mind bends the motion instead of restarting it from a standstill (which is what reads
-// as a jump). Only ticks while it is moving.
+// Damped spring integrated every frame, driven by stiffness + damping ratio.
+// Changing `target` mid-flight keeps the current velocity.
 QtObject {
     id: spring
 
@@ -12,11 +10,9 @@ QtObject {
     property real velocity: 0
     property real stiffness: 380
     property real dampingRatio: 0.84
-    // Close enough to call it settled, in the value's own unit (px for sizes, 0..1 for a progress)
     property real epsilon: 0.25
     readonly property bool moving: spring.ticker.running
 
-    // Off while nothing is on screen: the value just follows the target, and no frame ticks for it
     property bool animated: true
 
     // Straight to the target, no motion (without touching a binding on `target`)

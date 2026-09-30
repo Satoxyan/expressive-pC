@@ -3,7 +3,7 @@ import Qt5Compat.GraphicalEffects
 import Quickshell
 import qs.services
 
-// An AI agent's mark (assets/island/<agent>.svg: claude, codex, gemini), tinted with its brand color by default
+// Agent mark (assets/island/<agent>.svg), tinted with its brand color by default
 Item {
     id: mark
     property string agent: "claude"

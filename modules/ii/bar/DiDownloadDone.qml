@@ -5,7 +5,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// A finished download, with what you would do next: open it, find it, keep it in the drawer, unpack it
+// Finished download with open, find, keep and unpack actions
 RowLayout {
     id: done
     required property Item di

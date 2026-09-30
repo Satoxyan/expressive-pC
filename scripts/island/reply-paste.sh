@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
-# Puts a reply into the chat it belongs to.
-#
-# Web apps (WhatsApp in a browser, for one) don't implement the notification protocol's inline reply, so there is
-# no channel to answer through. This copies the text, brings the app's window to the front and pastes it there.
-# It never presses Enter: the message waits in the field for you to read and send.
-#
+# Puts a reply into its chat. Web apps lack inline notification reply, so this copies the text, focuses the
+# app window and pastes. Never presses Enter.
 # Usage: reply-paste.sh <text> <app hints>
 
 set -euo pipefail

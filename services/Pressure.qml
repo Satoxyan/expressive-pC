@@ -7,15 +7,11 @@ import Quickshell.Io
 import qs.modules.common
 
 /**
- * Sustained pressure on the machine — CPU, memory or GPU — and who is causing it.
+ * Sustained CPU, memory or GPU pressure and who is causing it.
  *
- * Passive: no timer of its own for detection. It listens to the samples ResourceUsage already takes for the bar
- * (CPU and memory), and on the same beat reads one sysfs counter for the GPU (Intel's RC6 residency: the time the
- * GPU spent asleep; busy = the rest). Only once an alert is up — or a panel that lists processes is open — does
- * it look at processes, through scripts/island/top_consumers.py, every few seconds.
- *
- * "Abnormal" comes from the script: one process holding a disproportionate part of the resource that isn't a job
- * heavy by nature. The island names it, and the expanded view can end it (SIGTERM, then SIGKILL if it hangs on).
+ * Passive: rides on the ResourceUsage samples; GPU busy is 1 - Intel RC6 residency (sysfs). Processes are read
+ * through scripts/island/top_consumers.py only while an alert or a process panel is open. "Abnormal" is decided
+ * by that script. Ending a process sends SIGTERM, then SIGKILL.
  */
 Singleton {
     id: root

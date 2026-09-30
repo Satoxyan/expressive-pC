@@ -853,15 +853,15 @@ Singleton {
                     property int hoverExpandDelay: 250
                     property bool autoExpand: true
                     property int autoExpandDuration: 4500
-                    property bool splitMode: false // classic side (secondIsland off): false = card stack, true = bubbles
-                    property bool secondIsland: true // beside the pill only a second island for a second live thing, and "+N" in the anchor
-                    property list<string> secondIslandKinds: ["call", "recording", "f1", "timer", "download", "agents", "media"] // what may take the second island
+                    property bool splitMode: false
+                    property bool secondIsland: true
+                    property list<string> secondIslandKinds: ["call", "recording", "f1", "timer", "download", "agents", "media"]
                     property list<string> pinned: ["weather", "shelf"]
                     property bool lyrics: true
-                    property bool lyricsPill: true // the current lyric line on the compact pill
-                    property bool lyricsCard: true // the lyrics column in the expanded player
-                    property bool albumTint: true // the pill and the expanded player take a tone of the album art
-                    property bool uniformHeight: false // true: every expanded card is the same height; false: cards hug their content (up to that height)
+                    property bool lyricsPill: true
+                    property bool lyricsCard: true
+                    property bool albumTint: true
+                    property bool uniformHeight: false
                     property bool albumColors: true
                     property bool privacyIndicators: true
                     property bool privacyIndicatorAnimated: false
@@ -877,37 +877,37 @@ Singleton {
                     property bool updatesIndicator: true
                     property bool liveActivities: true
                     property bool network: true
-                    property bool anchor: true // keep one fact (the clock, or something more urgent) pinned to the pill
-                    property bool anchorDate: true // the date above the clock, quiet most days
+                    property bool anchor: true
+                    property bool anchorDate: true
                     property string anchorFont: "expressive" // expressive | numbers | monospace | main
-                    property bool anchorAlwaysTime: false // the clock never gives its place away; urgent facts become its icon
-                    property bool watchRatings: true // IMDb rating of the episode playing in the browser (OMDb key in ~/.config/illogical-impulse/omdb.key)
-                    property bool callActivity: true // Vesktop/Discord call as a Live Activity with mute/deafen
+                    property bool anchorAlwaysTime: false
+                    property bool watchRatings: true  // OMDb key in ~/.config/illogical-impulse/omdb.key
+                    property bool callActivity: true
                     property string callLeaveShortcut: "" // Discord keybind for "Disconnect", e.g. "CTRL SHIFT, E"
                     property int memoryThreshold: 90
                     property int gpuThreshold: 90
                     property real volumeMax: 1.5
                     property bool hoverExpandsMessages: true
-                    property bool fullscreenPeek: true // a hairline while an app is fullscreen, only when something queued up
-                    property bool fullscreenFeedback: true // volume/brightness and screenshots still show, as a mini island
-                    property bool fullscreenCatchUp: true // one summary of what queued up once the fullscreen ends
-                    property bool fullscreenMessages: true // messages from priority apps (WhatsApp) as a discreet line over fullscreen
-                    property int fullscreenHoverDelay: 350 // ms resting on the hairline before it opens
+                    property bool fullscreenPeek: true
+                    property bool fullscreenFeedback: true
+                    property bool fullscreenCatchUp: true
+                    property bool fullscreenMessages: true
+                    property int fullscreenHoverDelay: 350  // ms
                     // Fullscreen windows treated as games (class substring): the top edge takes no input at all
                     property list<string> fullscreenGameClasses: ["steam_app_", "gamescope", "minecraft", "retroarch"]
-                    property bool fullscreenGameQuiet: true // games start in quiet mode: only critical and your own timers
+                    property bool fullscreenGameQuiet: true
                     // "files": only a file landing in the downloads folder counts; "traffic": any sustained burst
                     property string downloadDetection: "files"
                     property int shelfExpireDays: 14 // 0 keeps files in the drawer forever
-                    property list<string> mutedConversations: [] // "App|Title" keys the island doesn't show
+                    property list<string> mutedConversations: []
                     property list<string> mutedConversationsUntil: [] // "<epoch ms>|App|Title": muted for a while (1 h, until tomorrow)
-                    property list<string> priorityNotificationApps: ["whatsapp"] // only these reveal the island by themselves
+                    property list<string> priorityNotificationApps: ["whatsapp"]
                     property list<string> caseArtDevices: [] // Bluetooth names (substring) shown as the animated earbuds case
-                    property bool pauseOnHeadphonesDisconnect: true // and resume when they reconnect
-                    property bool followHeadphones: true // move the sound to headphones as soon as they connect
-                    property bool claudeCode: true // Claude Code sessions (hooks + statusline caches)
-                    property int claudeDoneMinSeconds: 20 // shorter turns finish silently
-                    property bool hardware: true // monitors, drives, docks, peripherals, Caps Lock, sleep, heat
+                    property bool pauseOnHeadphonesDisconnect: true
+                    property bool followHeadphones: true
+                    property bool claudeCode: true
+                    property int claudeDoneMinSeconds: 20
+                    property bool hardware: true
                     property int slowChargerWatts: 25
                     property int hotTemperature: 90
                     property JsonObject f1: JsonObject {
@@ -915,9 +915,9 @@ Singleton {
                         property string favoriteDriver: "" // Driver TLA, e.g. "NOR"; empty follows the leader
                         property bool autoExpandFlags: true
                         property int countdownMinutes: 15
-                        property bool teamRadio: true // radio messages of the focused driver
+                        property bool teamRadio: true
                         property bool autoPlayRadio: false
-                        property bool pinPosition: true // position chip beside the island during a session
+                        property bool pinPosition: true
                     }
                     property string leftWidget: "none"
                     property string rightWidget: "none"

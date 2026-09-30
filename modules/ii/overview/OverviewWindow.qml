@@ -18,8 +18,7 @@ Item { // Window
     property var windowData
     property var monitorData
     property var scale
-    // Only needed for tiledCount below (a single tiled window fills its whole workspace cell); neither
-    // delegate that instantiates this component passed them through until now
+    // Only needed for tiledCount below
     property var windowAddresses: []
     property var windowByAddress: ({})
     property bool restrictToWorkspace: true

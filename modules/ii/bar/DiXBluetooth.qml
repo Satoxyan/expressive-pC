@@ -7,9 +7,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// Bluetooth in two columns: the headphones on the left (case art inside a battery ring that fills as the view
-// opens, per-part levels when the device reports them, audio output and volume), the other devices and the
-// actions on the right. Everything cascades in.
+// Bluetooth in two columns: headphones (battery ring, per-part levels, output) left, other devices and actions right.
 RowLayout {
     id: xb
     required property Item di
@@ -17,7 +15,6 @@ RowLayout {
     implicitWidth: xb.wantedWidth
     readonly property real wantedWidth: 532
 
-    // The device the island is talking about; without a flash, the first connected one
     readonly property var payload: IslandEvents.bluetooth.payload ?? ({})
     readonly property bool simulated: (xb.payload.address ?? "") === "simulado"
     readonly property var device: IslandEvents.bluetoothDevice(xb.payload.address ?? "")
@@ -31,7 +28,6 @@ RowLayout {
         : xb.payload.phase === "connecting"
     readonly property bool connected: xb.device ? !!BluetoothStatus.isConnected(xb.device)
         : (xb.payload.phase === "connected" || xb.payload.phase === "lowBattery")
-    // A simulated flash borrows the level of the real device with the same name, if there is one
     readonly property var batterySource: xb.device
         ?? BluetoothStatus.connectedBatteryDevices.find(d => (d.name ?? "").toLowerCase() === xb.fullName.toLowerCase()) ?? null
     readonly property real battery: xb.simulated && xb.payload.battery !== undefined ? xb.payload.battery
@@ -82,7 +78,6 @@ RowLayout {
         opacity: 0.6
     }
 
-    // A thin level bar that grows in with the view
     component LevelBar: Rectangle {
         id: bar
         property real level: 0
@@ -213,7 +208,6 @@ RowLayout {
         }
     }
 
-    // Left: the headphones
     ColumnLayout {
         // Children filling the width would otherwise make this column fill the row too
         Layout.fillWidth: false
@@ -256,7 +250,6 @@ RowLayout {
             spacing: 14
             DiCascade { target: heroRow; index: 1 }
 
-            // Case art inside the battery ring
             Item {
                 implicitWidth: 88
                 implicitHeight: 88
@@ -282,7 +275,6 @@ RowLayout {
                     anchors.centerIn: parent
                     width: 52
                     height: 52
-                    // Optional local art: the generic icon shows when the file is absent
                     source: Qt.resolvedUrl("DiEarbudsCase.qml")
                     onLoaded: {
                         item.open = Qt.binding(() => xb.connected)
@@ -333,7 +325,6 @@ RowLayout {
                     opacity: 0.6
                 }
 
-                // Per-part levels (left, right, case) when the device reports them apart
                 Repeater {
                     model: xb.parts.length > 1 ? xb.parts.length : 0
                     delegate: RowLayout {
@@ -368,7 +359,6 @@ RowLayout {
             }
         }
 
-        // Nothing connected
         ColumnLayout {
             visible: !xb.hasMain
             Layout.fillWidth: true
@@ -430,7 +420,6 @@ RowLayout {
         }
     }
 
-    // Right: other devices and actions
     ColumnLayout {
         Layout.fillWidth: true
         Layout.fillHeight: true
@@ -511,7 +500,6 @@ RowLayout {
             }
         }
 
-        // No other devices
         ColumnLayout {
             id: othersEmpty
             visible: xb.others.length === 0

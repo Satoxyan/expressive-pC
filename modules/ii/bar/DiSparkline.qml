@@ -2,12 +2,8 @@ import QtQuick
 import qs.modules.common
 import qs.modules.common.functions
 
-// History as a smooth line, newest at the right edge. Values are 0–1.
-//
-// Unlike the generic Graph it never stretches a short history across the width (that's what drew the diagonal
-// to the corner): with fewer samples than `points`, the line simply starts later. Curves pass through the
-// midpoints between samples, the fill fades downward, `threshold` draws a faint dashed line where the alert
-// kicks in, and a dot marks the current value. Repaints only when a new sample arrives.
+// History as a smooth line, newest at the right. Values are 0-1.
+// Fewer samples than `points` start later instead of stretching across the width.
 Canvas {
     id: spark
     property var values: []

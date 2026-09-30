@@ -6,9 +6,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// The events that already went by, newest first — the island's short-term memory. Across the top, one chip per
-// kind of event that is actually in the log; below, a compact list grouped by when it happened, and beside it the
-// selected event in full, with what it can still do (open the file, run it again, show the notification).
+// The island's event log, newest first: filter chips, grouped list, detail of the selected event.
 ColumnLayout {
     id: xh
     required property Item di
@@ -26,7 +24,6 @@ ColumnLayout {
         onTriggered: xh.now = Date.now()
     }
 
-    // Filters: only the kinds the log holds show up, "All" always does
     readonly property var groups: [
         { id: "all", label: Translation.tr("All"), icon: "history", kinds: [] },
         { id: "notification", label: Translation.tr("Notifications"), icon: "notifications", kinds: ["notification"] },
@@ -51,7 +48,6 @@ ColumnLayout {
         const group = xh.groups.find(g => g.id === xh.filter)
         return !group || group.id === "all" ? xh.log : xh.log.filter(e => group.kinds.includes(e.kind))
     }
-    // A filter left with nothing (the log was cleared or rolled over) falls back to everything
     onFilteredChanged: if (xh.filter !== "all" && xh.filtered.length === 0) xh.filter = "all"
 
     function keyOf(entry) {
@@ -60,7 +56,6 @@ ColumnLayout {
     property string selectedKey: ""
     readonly property var selected: xh.filtered.find(e => xh.keyOf(e) === xh.selectedKey) ?? xh.filtered[0] ?? null
 
-    // Flat rows for the list: a section label whenever the bucket changes, then the entries
     function bucketOf(time) {
         if (xh.now - time < 5 * 60000) return "now"
         return new Date(time).toDateString() === new Date(xh.now).toDateString() ? "today" : "earlier"
@@ -117,7 +112,6 @@ ColumnLayout {
         xh.di.collapse()
     }
 
-    // Swiping sideways on the island walks the whole log; follow it here
     Connections {
         target: xh.di
         function onHistoryIndexChanged() {
@@ -128,7 +122,6 @@ ColumnLayout {
         }
     }
 
-    // Rows rebuilt while the view is already open come in quickly instead of replaying the whole cascade
     property bool settled: false
     Timer {
         interval: 900
@@ -136,7 +129,6 @@ ColumnLayout {
         onTriggered: xh.settled = true
     }
 
-    // ── Filters and clear ─────────────────────────────────────────────
     RowLayout {
         Layout.fillWidth: true
         Layout.preferredHeight: 32
@@ -150,7 +142,6 @@ ColumnLayout {
                 required property int index
                 readonly property var d: xh.chips[chipSlot.index] ?? ({})
                 readonly property bool active: xh.filter === chipSlot.d.id
-                // The active chip spells its name; the others are an icon and a count
                 readonly property real fullWidth: chipRow.implicitWidth + 22
                 Layout.preferredWidth: chipSlot.fullWidth
                 Layout.preferredHeight: 32
@@ -211,7 +202,6 @@ ColumnLayout {
             }
         }
 
-        // Empty log: the header just names the view
         RowLayout {
             visible: xh.log.length === 0
             spacing: 8
@@ -276,7 +266,6 @@ ColumnLayout {
         }
     }
 
-    // ── Empty state ───────────────────────────────────────────────────
     Item {
         id: emptySlot
         visible: xh.log.length === 0
@@ -317,7 +306,6 @@ ColumnLayout {
         }
     }
 
-    // ── List and detail ───────────────────────────────────────────────
     RowLayout {
         visible: xh.log.length > 0
         Layout.fillWidth: true
@@ -365,7 +353,6 @@ ColumnLayout {
 
                         onIsSelectedChanged: if (slot.isSelected && xh.settled) list.reveal(slot)
 
-                        // Section label
                         StyledText {
                             id: sectionLabel
                             visible: slot.d.header
@@ -402,7 +389,6 @@ ColumnLayout {
                                 ColorAnimation { duration: IslandMotion.micro }
                             }
 
-                            // Selection mark
                             Rectangle {
                                 anchors {
                                     left: parent.left
@@ -474,7 +460,6 @@ ColumnLayout {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                // One click picks it; a second click on the picked row does what it offers
                                 onClicked: {
                                     if (slot.isSelected) xh.runAction(slot.entry)
                                     else xh.selectedKey = xh.keyOf(slot.entry)
@@ -486,7 +471,6 @@ ColumnLayout {
             }
         }
 
-        // Detail of the selected event
         Item {
             id: detailSlot
             Layout.preferredWidth: 176
@@ -588,7 +572,6 @@ ColumnLayout {
                         visible: (detail.entry?.subtitle ?? "") === ""
                     }
 
-                    // Nothing to do with it: sum up the day instead
                     RowLayout {
                         visible: !actionSlot.visible
                         Layout.fillWidth: true

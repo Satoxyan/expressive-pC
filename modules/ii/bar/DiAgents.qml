@@ -5,7 +5,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// The AI agents, pinned: one ring per agent with its 5h usage, and what they are doing right now
+// Pinned AI agents: one ring per agent with its 5h usage
 RowLayout {
     id: agents
     required property Item di

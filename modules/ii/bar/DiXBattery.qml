@@ -33,10 +33,8 @@ ColumnLayout {
         { key: "performance", icon: "speed", label: Translation.tr("Performance") }
     ]
 
-    // The profile is read once on open (no polling); the rest comes from UPower signals
     Component.onCompleted: IslandHardware.refreshPower()
 
-    // The ring and the number build up together when the view opens
     DiSpring {
         id: ringBuild
         stiffness: 50
@@ -123,7 +121,6 @@ ColumnLayout {
         Layout.fillWidth: true
         spacing: 18
 
-        // Left: the charge, then either the savers (on battery) or speed and health (plugged in)
         ColumnLayout {
             Layout.fillWidth: true
             Layout.preferredWidth: 1
@@ -182,7 +179,6 @@ ColumnLayout {
                 }
             }
 
-            // Plugged in: how fast, and when it will be full
             RowLayout {
                 id: speedRow
                 Layout.fillWidth: true
@@ -204,7 +200,6 @@ ColumnLayout {
                 }
             }
 
-            // Plugged in: what is left of the battery compared to new
             Rectangle {
                 id: healthCard
                 Layout.fillWidth: true
@@ -339,7 +334,6 @@ ColumnLayout {
             }
         }
 
-        // Right: what is draining it (on battery), or the power mode and the other batteries (plugged in)
         ColumnLayout {
             Layout.fillWidth: true
             Layout.preferredWidth: 1
@@ -369,7 +363,6 @@ ColumnLayout {
                 DiCascade { target: modeLabel; index: 1 }
             }
 
-            // Segmented power profile switch
             Rectangle {
                 id: modeSwitch
                 Layout.fillWidth: true
@@ -490,7 +483,6 @@ ColumnLayout {
                     clip: true
                     DiCascade { target: device; index: 5 + device.index }
 
-                    // The level fills the row from the left as it comes in
                     Rectangle {
                         anchors {
                             left: parent.left
@@ -539,7 +531,6 @@ ColumnLayout {
                 }
             }
 
-            // No other batteries around
             Item {
                 id: noDevices
                 Layout.fillWidth: true
