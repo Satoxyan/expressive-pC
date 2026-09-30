@@ -183,13 +183,19 @@ Item {
         anchors.centerIn: parent
         width: root.centeredShapeRenderSize
         height: root.centeredShapeRenderSize
-        color: root.wallpaperIsVideo ? "transparent" : root.centeredWallpaperColor
+        // Transparent while the shape is not the subject (desktop end): the layer
+        // must keep rendering so its FBO stays allocated, but everything stacked
+        // below in Background.qml (wallpaper, the transition shader) must show.
+        color: root.centeredShapeActive && !root.wallpaperIsVideo
+            ? root.centeredWallpaperColor : "transparent"
         shape: root.centeredWallpaperShape
         transformOrigin: Item.Center
         property real shapeZoom: 1
         scale: (root.centeredShapeSize() / root.centeredShapeRenderSize) * shapeZoom
+        // Always rendered while enabled so the layer FBO (screen-diagonal sized)
+        // is already allocated before the lock animation starts; allocating it on
+        // frame 1 is what made desktop->lock stutter while lock->desktop was smooth.
         visible: root.centeredWallpaperEnabled
-            && (root.centeredProgress < 1 || root.centeredAnimating)
 
         SequentialAnimation {
             id: shapeZoomAnim
@@ -229,7 +235,7 @@ Item {
             width: root.width
             height: root.height
             anchors.centerIn: parent
-            visible: !root.wallpaperIsVideo
+            visible: !root.wallpaperIsVideo && root.centeredShapeActive
             source: root.wallpaperPath
             fillMode: Image.PreserveAspectCrop
             mipmap: true
@@ -246,7 +252,7 @@ Item {
             width: root.width
             height: root.height
             anchors.centerIn: parent
-            visible: root.wallpaperIsVideo
+            visible: root.wallpaperIsVideo && root.centeredShapeActive
             source: root.effectiveWallpaperPath
             thumbnail: root.wallpaperPath
             radius: 0
@@ -258,6 +264,9 @@ Item {
         MouseArea {
             anchors.fill: parent
             z: 1
+            // Input only when the shape is actually the visible subject; the layer
+            // itself stays rendered at desktop end so it must not swallow clicks.
+            enabled: root.centeredShapeActive
             acceptedButtons: Qt.LeftButton
                 onClicked: centeredWallpaperShapeItem.thump()
             onWheel: (wheel) => {

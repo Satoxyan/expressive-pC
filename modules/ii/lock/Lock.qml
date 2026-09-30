@@ -15,6 +15,7 @@ LockScreen {
     property var savedWorkspaces: ({})
     property string lastProcessedLockWall: ""
     property bool lastProcessedDarkmode: Appearance.m3colors.darkmode
+    property string pendingLockBatch: ""
 
     Timer {
         id: restoreTimer
@@ -31,6 +32,21 @@ LockScreen {
             }
             if (batch.length > 0) {
                 Quickshell.execDetached(["bash", "-c", batch])
+            }
+        }
+    }
+
+    // Mirror of restoreTimer: on lock the hyprctl batch used to fire in the very
+    // frame the centered-wallpaper sweep starts, so compositor work stacked on
+    // frame 1. Deferred the same way the unlock path already is.
+    Timer {
+        id: lockBatchTimer
+        interval: 150
+        repeat: false
+        onTriggered: {
+            if (root.pendingLockBatch.length > 0) {
+                Quickshell.execDetached(["bash", "-c", root.pendingLockBatch])
+                root.pendingLockBatch = ""
             }
         }
     }
@@ -81,12 +97,14 @@ LockScreen {
                     batch += `hyprctl dispatch 'hl.dsp.focus({monitor="${mon}"})'; hyprctl dispatch 'hl.dsp.focus({workspace=${2147483647 - ws}})';`
                 }
                 root.savedWorkspaces = next
-                Quickshell.execDetached(["bash", "-c", batch])
+                root.pendingLockBatch = batch
+                lockBatchTimer.start()
             } else {
                 if (Config.options.background.lockWall !== "") {
                     MaterialThemeLoader.useLiveTheme()
                 }
                 if (WM.compositor !== "niri") {
+                    lockBatchTimer.stop() // unlock before the150ms defer elapsed
                     restoreTimer.start()
                 }
             }
