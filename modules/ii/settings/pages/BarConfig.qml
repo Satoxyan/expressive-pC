@@ -509,6 +509,20 @@ ContentPage {
                         checked: Config.options.bar.dynamicIsland.lyrics
                         onCheckedChanged: { Config.options.bar.dynamicIsland.lyrics = checked; }
                     }
+                    ConfigSwitch {
+                        visible: Config.options.bar.dynamicIsland.lyrics
+                        buttonIcon: "subtitles"
+                        text: Translation.tr("Lyrics on the compact island")
+                        checked: Config.options.bar.dynamicIsland.lyricsPill
+                        onCheckedChanged: { Config.options.bar.dynamicIsland.lyricsPill = checked; }
+                    }
+                    ConfigSwitch {
+                        visible: Config.options.bar.dynamicIsland.lyrics
+                        buttonIcon: "lyrics"
+                        text: Translation.tr("Lyrics in the expanded player")
+                        checked: Config.options.bar.dynamicIsland.lyricsCard
+                        onCheckedChanged: { Config.options.bar.dynamicIsland.lyricsCard = checked; }
+                    }
                     IslandCostSwitch {
                         buttonIcon: "system_update_alt"
                         title: Translation.tr("Check for updates")
@@ -540,6 +554,13 @@ ContentPage {
                         cost: "light"
                         checked: Config.options.bar.dynamicIsland.albumColors
                         onCheckedChanged: { Config.options.bar.dynamicIsland.albumColors = checked; }
+                    }
+                    ConfigSwitch {
+                        visible: Config.options.bar.dynamicIsland.albumColors
+                        buttonIcon: "format_color_fill"
+                        text: Translation.tr("Tint the island with the song's colours")
+                        checked: Config.options.bar.dynamicIsland.albumTint
+                        onCheckedChanged: { Config.options.bar.dynamicIsland.albumTint = checked; }
                     }
                     IslandCostSwitch {
                         buttonIcon: "smart_toy"

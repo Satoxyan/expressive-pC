@@ -29,7 +29,8 @@ Item {
     readonly property color capsuleColor: root.isMaterial ? Appearance.colors.colLayer1 : root.surfaceColor
     // Material You: while music plays, the pill (and the clock on it) takes a dark tone of the album art, the
     // same seed the expanded player uses, so the island reads as part of what is playing
-    readonly property bool musicTinted: (root.cfg.albumColors ?? true) && (root.activePlayer?.isPlaying ?? false) && root.mediaArtReady
+    readonly property bool musicTinted: (root.cfg.albumColors ?? true) && (root.cfg.albumTint ?? true)
+        && (root.activePlayer?.isPlaying ?? false) && root.mediaArtReady
     readonly property color musicTone: {
         const c = Qt.color(root.mediaArtColor)
         const sat = Math.max(0.28, Math.min(0.6, c.hslSaturation))
@@ -55,7 +56,7 @@ Item {
     property real mediaTextContentWidth: 0
     property real idleTextContentWidth: 0
     property real notifContentWidth: 0
-    readonly property string lyricLine: (root.cfg.lyrics ?? true) && LyricsService.status === "ok"
+    readonly property string lyricLine: (root.cfg.lyrics ?? true) && (root.cfg.lyricsPill ?? true) && LyricsService.status === "ok"
         && LyricsService.activeIndex >= 0 && (root.activePlayer?.isPlaying ?? false)
         ? (LyricsService.slots[LyricsService.before] ?? "") : ""
     readonly property bool mediaTrackInfoVisible: root.hoverRevealed || mediaTrackChangeTimer.running

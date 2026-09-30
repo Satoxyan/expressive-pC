@@ -16,8 +16,8 @@ Item {
     required property Item di
     implicitWidth: xm.wantedWidth
     // With the lyrics switched off the card is just the player, one column
-    readonly property bool lyricsOn: xm.di.cfg.lyrics ?? true
-    readonly property real wantedWidth: xm.lyricsOn ? 532 : 262
+    readonly property bool lyricsOn: (xm.di.cfg.lyrics ?? true) && (xm.di.cfg.lyricsCard ?? true)
+    readonly property real wantedWidth: xm.lyricsOn ? 532 : 372
     implicitHeight: layout.implicitHeight
 
     readonly property MprisPlayer player: xm.di.activePlayer
@@ -43,7 +43,7 @@ Item {
     readonly property color onSurface: xm.tone(xm.dark ? 0.95 : 0.12)
     readonly property color onSurfaceVariant: xm.tone(xm.dark ? 0.78 : 0.32)
 
-    readonly property bool albumColors: xm.di.cfg.albumColors ?? true
+    readonly property bool albumColors: (xm.di.cfg.albumColors ?? true) && (xm.di.cfg.albumTint ?? true)
     readonly property color tint: xm.albumColors ? xm.tone(xm.dark ? 0.12 : 0.93, 0.72) : "transparent"
     readonly property string backdrop: xm.albumColors ? (xm.player?.trackArtUrl ?? "") : ""
 
@@ -100,8 +100,9 @@ Item {
 
         ColumnLayout {
             id: leftCol
-            Layout.fillWidth: false
-            Layout.preferredWidth: 262
+            // Fixed beside the lyrics; the whole card on its own
+            Layout.fillWidth: !xm.lyricsOn
+            Layout.preferredWidth: xm.lyricsOn ? 262 : 372
             Layout.maximumWidth: xm.lyricsOn ? 262 : 100000
             Layout.alignment: Qt.AlignTop
             spacing: 10
@@ -384,14 +385,6 @@ Item {
                 }
 
                 Item { Layout.fillWidth: true }
-
-                // Show or hide the lyrics (the same switch as in the island settings)
-                TonalButton {
-                    icon: "lyrics"
-                    filled: xm.lyricsOn
-                    iconColor: xm.lyricsOn ? xm.primary : xm.onSurfaceVariant
-                    onClicked: Config.options.bar.dynamicIsland.lyrics = !xm.lyricsOn
-                }
 
                 TonalButton {
                     id: likeButton

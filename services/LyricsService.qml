@@ -20,7 +20,9 @@ Singleton {
 
     readonly property MprisPlayer activePlayer: MprisController.activePlayer
     property int viewers: 0
-    readonly property bool wanted: root.viewers > 0 || (Config.options?.bar?.dynamicIsland?.lyrics ?? true)
+    // Fetched only if lyrics are on and shown somewhere (the pill or the expanded player)
+    readonly property bool wanted: root.viewers > 0 || ((Config.options?.bar?.dynamicIsland?.lyrics ?? true)
+        && ((Config.options?.bar?.dynamicIsland?.lyricsPill ?? true) || (Config.options?.bar?.dynamicIsland?.lyricsCard ?? true)))
     readonly property bool playing: root.activePlayer?.isPlaying ?? false
     property string fetchedFor: ""
     readonly property string trackKey: `${root.activePlayer?.trackTitle ?? ""}|${root.activePlayer?.trackArtist ?? ""}`

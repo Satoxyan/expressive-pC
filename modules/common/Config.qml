@@ -858,6 +858,9 @@ Singleton {
                     property list<string> secondIslandKinds: ["call", "recording", "f1", "timer", "download", "agents", "media"] // what may take the second island
                     property list<string> pinned: ["weather", "shelf"]
                     property bool lyrics: true
+                    property bool lyricsPill: true // the current lyric line on the compact pill
+                    property bool lyricsCard: true // the lyrics column in the expanded player
+                    property bool albumTint: true // the pill and the expanded player take a tone of the album art
                     property bool uniformHeight: false // true: every expanded card is the same height; false: cards hug their content (up to that height)
                     property bool albumColors: true
                     property bool privacyIndicators: true
