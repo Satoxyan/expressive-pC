@@ -495,8 +495,8 @@ Item {
         x: root.dragPosition.x - width / 2
         y: root.dragPosition.y - 40
 
-        Behavior on x { animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this) }
-        Behavior on y { animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this) }
+        // ponytail: no Behavior on x/y — ghost harus nempel 1:1 di kursor,
+        // animasi di sini yang bikin "fling" dari posisi lama ke kursor
         Behavior on opacity { animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this) }
 
         layer.enabled: true
@@ -602,6 +602,11 @@ Item {
             acceptedButtons: Qt.LeftButton
             onActiveChanged: {
                 if (active) {
+                    // seed dulu: centroid cuma dihitung ulang pada gerakan pertama,
+                    // kalau tidak ghost muncul dari posisi drag sebelumnya (atau 0,0)
+                    const sc = centroid.scenePosition
+                    const lp = root.mapFromItem(null, sc.x, sc.y)
+                    root.dragPosition = Qt.point(lp.x, lp.y)
                     root.draggingType = reorderHandle.panelType
                     root.hoverPos = panelArea.baseOrder.indexOf(reorderHandle.panelType)
                 } else {
