@@ -14,7 +14,7 @@ DelegateChooser {
     required property real baseCellHeight
     required property real spacing
     required property int startingIndex
-    property var dropIndicatorRef: null 
+    property var panelRef: null
     property bool isUnused: false
     property var gridRef: null 
     signal openAudioOutputDialog()
@@ -37,7 +37,7 @@ DelegateChooser {
         baseCellHeight: root.baseCellHeight
         cellSpacing: root.spacing
         cellSize: modelData.size
-        dropIndicatorRef: root.dropIndicatorRef
+        panelRef: root.panelRef
         isUnused: root.isUnused
         onOpenMenu: root.openNightLightDialog()
     } }
@@ -54,7 +54,7 @@ DelegateChooser {
         baseCellHeight: root.baseCellHeight
         cellSpacing: root.spacing
         cellSize: modelData.size
-        dropIndicatorRef: root.dropIndicatorRef
+        panelRef: root.panelRef
         isUnused: root.isUnused
         onOpenMenu: root.openAudioOutputDialog()
     } }
@@ -71,7 +71,7 @@ DelegateChooser {
         baseCellHeight: root.baseCellHeight
         cellSpacing: root.spacing
         cellSize: modelData.size
-        dropIndicatorRef: root.dropIndicatorRef
+        panelRef: root.panelRef
         isUnused: root.isUnused
         onOpenMenu: root.openBluetoothDialog()
     } }
@@ -88,7 +88,7 @@ DelegateChooser {
         baseCellHeight: root.baseCellHeight
         cellSpacing: root.spacing
         cellSize: modelData.size
-        dropIndicatorRef: root.dropIndicatorRef
+        panelRef: root.panelRef
         isUnused: root.isUnused
     } }
 
@@ -104,7 +104,7 @@ DelegateChooser {
         baseCellHeight: root.baseCellHeight
         cellSpacing: root.spacing
         cellSize: modelData.size
-        dropIndicatorRef: root.dropIndicatorRef
+        panelRef: root.panelRef
         isUnused: root.isUnused
     } }
 
@@ -120,7 +120,7 @@ DelegateChooser {
         baseCellHeight: root.baseCellHeight
         cellSpacing: root.spacing
         cellSize: modelData.size
-        dropIndicatorRef: root.dropIndicatorRef
+        panelRef: root.panelRef
         isUnused: root.isUnused
     } }
 
@@ -136,7 +136,7 @@ DelegateChooser {
         baseCellHeight: root.baseCellHeight
         cellSpacing: root.spacing
         cellSize: modelData.size
-        dropIndicatorRef: root.dropIndicatorRef
+        panelRef: root.panelRef
         isUnused: root.isUnused
     } }
 
@@ -152,7 +152,7 @@ DelegateChooser {
         baseCellHeight: root.baseCellHeight
         cellSpacing: root.spacing
         cellSize: modelData.size
-        dropIndicatorRef: root.dropIndicatorRef
+        panelRef: root.panelRef
         isUnused: root.isUnused
     } }
 
@@ -168,7 +168,7 @@ DelegateChooser {
         baseCellHeight: root.baseCellHeight
         cellSpacing: root.spacing
         cellSize: modelData.size
-        dropIndicatorRef: root.dropIndicatorRef
+        panelRef: root.panelRef
         isUnused: root.isUnused
     } }
 
@@ -185,7 +185,7 @@ DelegateChooser {
         cellSpacing: root.spacing
         cellSize: modelData.size
         isUnused: root.isUnused
-        dropIndicatorRef: root.dropIndicatorRef
+        panelRef: root.panelRef
         onOpenMenu: root.openAudioInputDialog()
     } }
 
@@ -201,7 +201,7 @@ DelegateChooser {
         baseCellHeight: root.baseCellHeight
         cellSpacing: root.spacing
         cellSize: modelData.size
-        dropIndicatorRef: root.dropIndicatorRef
+        panelRef: root.panelRef
         isUnused: root.isUnused
     } }
 
@@ -218,7 +218,7 @@ DelegateChooser {
         cellSpacing: root.spacing
         cellSize: modelData.size
         isUnused: root.isUnused
-        dropIndicatorRef: root.dropIndicatorRef
+        panelRef: root.panelRef
         onOpenMenu: root.openWifiDialog()
     } }
 
@@ -235,7 +235,7 @@ DelegateChooser {
         cellSpacing: root.spacing
         cellSize: modelData.size
         isUnused: root.isUnused
-        dropIndicatorRef: root.dropIndicatorRef
+        panelRef: root.panelRef
         onOpenMenu: root.openNightLightDialog()
     } }
 
@@ -251,7 +251,7 @@ DelegateChooser {
         baseCellHeight: root.baseCellHeight
         cellSpacing: root.spacing
         cellSize: modelData.size
-        dropIndicatorRef: root.dropIndicatorRef
+        panelRef: root.panelRef
         isUnused: root.isUnused
     } }
 
@@ -267,7 +267,7 @@ DelegateChooser {
         baseCellHeight: root.baseCellHeight
         cellSpacing: root.spacing
         cellSize: modelData.size
-        dropIndicatorRef: root.dropIndicatorRef
+        panelRef: root.panelRef
         isUnused: root.isUnused
     } }
 
@@ -283,7 +283,7 @@ DelegateChooser {
         baseCellHeight: root.baseCellHeight
         cellSpacing: root.spacing
         cellSize: modelData.size
-        dropIndicatorRef: root.dropIndicatorRef
+        panelRef: root.panelRef
         isUnused: root.isUnused
     } }
 
@@ -299,7 +299,7 @@ DelegateChooser {
         baseCellHeight: root.baseCellHeight
         cellSpacing: root.spacing
         cellSize: modelData.size
-        dropIndicatorRef: root.dropIndicatorRef
+        panelRef: root.panelRef
         isUnused: root.isUnused
     } }
 }

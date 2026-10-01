@@ -3,6 +3,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import QtQuick
 import QtQuick.Layouts
+import Qt5Compat.GraphicalEffects
 import Quickshell
 import Quickshell.Bluetooth
 
@@ -17,7 +18,7 @@ AbstractQuickPanel {
     visible: root.editMode || root.toggles.length > 0
 
     readonly property int maxRows: root.limitRows ? 2 : 99
-    implicitHeight: (editMode ? contentItem.implicitHeight : Math.min(usedRows.implicitHeight, root.maxRows * (root.baseCellHeight + root.spacing))) + root.padding * 2
+    implicitHeight: (editMode ? contentItem.implicitHeight : usedGrid.implicitHeight) + root.padding * 2
     clip: root.limitRows
     Behavior on implicitHeight {
         animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
@@ -40,14 +41,46 @@ AbstractQuickPanel {
         const raw = Config.options.sidebar.quickToggles.android.toggles
         return WM.compositor === "hyprland" ? raw : raw.filter(t => !t || t.type !== "gameMode")
     }
-    readonly property list<var> toggleRows: toggleRowsForList(toggles)
+    readonly property list<var> toggleRows: toggleRowsForList(displayToggles)
     readonly property list<var> unusedToggles: {
         const types = availableToggleTypes.filter(type => !toggles.some(toggle => (toggle && toggle.type === type)))
         return types.map(type => { return { type: type, size: 1 } })
     }
     readonly property list<var> unusedToggleRows: toggleRowsForList(unusedToggles)
 
-    property alias dropIndicator: dropIndicator
+    // ponytail: live reflow tombol saat di-drag — satu Repeater key-by-type, x/y dihitung sendiri.
+    // Posisi datang dari usedLayout, jadi tombol yang pindah BAWAH baris ikut meluncur (bukan pop),
+    // dan celahnya otomatis ikut ukuran tombol karena packing pakai `size`.
+    property string draggingType: ""
+    property int hoverIndex: -1
+    property point dragPos
+    readonly property var draggedToggle: toggles.find(t => t && t.type === draggingType)
+    readonly property list<var> displayToggles: {
+        if (draggingType === "" || hoverIndex < 0) return toggles;
+        const dragged = draggedToggle;
+        if (!dragged) return toggles;
+        const rest = toggles.filter(t => t && t.type !== draggingType);
+        const at = Math.max(0, Math.min(hoverIndex, rest.length));
+        rest.splice(at, 0, dragged);
+        return rest;
+    }
+    readonly property int usedRowCount: Math.min(toggleRows.length, maxRows)
+    readonly property list<var> usedToggles: {
+        let out = [];
+        for (let i = 0; i < usedRowCount; i++) out = out.concat(toggleRows[i]);
+        return out;
+    }
+    readonly property var usedLayout: {
+        const out = [];
+        let row = 0, col = 0;
+        for (const t of usedToggles) {
+            if (col + t.size > columns) { row++; col = 0; }
+            out.push({ x: col * (baseCellWidth + spacing), y: row * (baseCellHeight + spacing) });
+            col += t.size;
+        }
+        return out;
+    }
+    readonly property int usedGridHeight: usedRowCount > 0 ? usedRowCount * (baseCellHeight + spacing) - spacing : 0
 
     function toggleRowsForList(togglesList) {
         var rows = [];
@@ -75,37 +108,44 @@ AbstractQuickPanel {
         }
         spacing: 12
 
-        Column {
-            id: usedRows
-            spacing: root.spacing
+        Item {
+            id: usedGrid
+            width: parent.width
+            implicitHeight: root.usedGridHeight
 
             Repeater {
-                id: usedRowsRepeater
                 model: ScriptModel {
-                    values: Array(Math.min(root.toggleRows.length, root.maxRows))
+                    values: root.usedToggles
+                    objectProp: "type"
                 }
-                delegate: ButtonGroup {
-                    id: toggleRow
-                    required property int index
-                    property var modelData: root.toggleRows[index]
-                    property int startingIndex: {
-                        const rows = root.toggleRows;
-                        let sum = 0;
-                        for (let i = 0; i < index; i++) sum += rows[i].length;
-                        return sum;
-                    }
-                    spacing: root.spacing
+                delegate: Item {
+                    id: slot
+                    x: root.usedLayout[index].x
+                    y: root.usedLayout[index].y
+                    width: root.baseCellWidth * modelData.size + root.spacing * (modelData.size - 1)
+                    height: root.baseCellHeight
+                    // slot ditinggal kosong — tombolnya sendiri ada di dragGhost, nempel di kursor
+                    opacity: root.draggingType !== "" && root.draggingType === modelData.type ? 0 : 1
 
+                    Behavior on x {
+                        enabled: root.draggingType !== ""
+                        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                    }
+                    Behavior on y {
+                        enabled: root.draggingType !== ""
+                        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                    }
+
+                    // DelegateChooser harus jadi delegate Repeater langsung: kalau dibungkus Item,
+                    // pilihannya tidak pernah cocok dan tombolnya tidak jadi. Repeater 1-item ini
+                    // yang bikin tombol ter-parent ke slot, jadi slot-lah yang memposisikan.
                     Repeater {
-                        model: ScriptModel {
-                            values: toggleRow?.modelData ?? []
-                            objectProp: "type"
-                        }
+                        model: ScriptModel { values: [modelData]; objectProp: "type" }
                         delegate: AndroidToggleDelegateChooser {
-                            startingIndex: toggleRow.startingIndex
+                            startingIndex: 0
                             editMode: root.editMode
-                            gridRef: usedRows
-                            dropIndicatorRef: dropIndicator
+                            gridRef: usedGrid
+                            panelRef: root
                             isUnused: false
                             baseCellWidth: root.baseCellWidth
                             baseCellHeight: root.baseCellHeight
@@ -120,30 +160,42 @@ AbstractQuickPanel {
                 }
             }
 
-            Rectangle {
-                id: dropIndicator
-                visible: false
-                z: 99
-                width: 3
-                radius: 2
-                color: Appearance.colors.colPrimary
+            Item {
+                id: dragGhost
+                visible: root.draggingType !== "" && !!root.draggedToggle
+                z: 999
+                x: root.dragPos.x - width / 2
+                y: root.dragPos.y - height / 2
+                scale: 1.08
+                readonly property int gsize: root.draggedToggle ? root.draggedToggle.size : 1
+                width: root.baseCellWidth * gsize + root.spacing * (gsize - 1)
+                height: root.baseCellHeight
 
-                Behavior on x { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
-                Behavior on y { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
+                // ponytail: tanpa Behavior x/y — ghost harus nempel 1:1 di kursor
+                Behavior on opacity { animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this) }
 
-                Rectangle {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.top: parent.top
-                    anchors.topMargin: -4
-                    width: 8; height: 8; radius: 4
-                    color: Appearance.colors.colPrimary
+                layer.enabled: true
+                layer.effect: DropShadow {
+                    horizontalOffset: 0
+                    verticalOffset: 6
+                    radius: 16
+                    color: Qt.rgba(0, 0, 0, 0.3)
+                    samples: 33
                 }
-                Rectangle {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: -4
-                    width: 8; height: 8; radius: 4
-                    color: Appearance.colors.colPrimary
+
+                Repeater {
+                    model: ScriptModel {
+                        values: root.draggedToggle ? [root.draggedToggle] : []
+                        objectProp: "type"
+                    }
+                    delegate: AndroidToggleDelegateChooser {
+                        startingIndex: 0
+                        editMode: false
+                        isUnused: false
+                        baseCellWidth: root.baseCellWidth
+                        baseCellHeight: root.baseCellHeight
+                        spacing: root.spacing
+                    }
                 }
             }
         }

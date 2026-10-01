@@ -16,9 +16,11 @@ GroupButton {
     required property real baseCellHeight
     required property real cellSpacing
     required property int cellSize
-    property var dropIndicatorRef: null
+    property var panelRef: null
     property bool isUnused: false 
     property var gridRef: null
+    // flat grid tidak pakai RowLayout, jadi pertumbuhan tekan (+10px) cuma menabrak tetangga
+    bounce: !root.isUnused
 
     signal openMenu()
 
@@ -165,86 +167,73 @@ GroupButton {
             target: null
             acceptedButtons: Qt.LeftButton
 
-            function getAllSiblings() {
-                const siblings = [];
-                if (!root.gridRef) return siblings;
-                for (let r = 0; r < root.gridRef.children.length; r++) {
-                    const row = root.gridRef.children[r];
-                    if (!row || !row.visible) continue;
-                    const rowLayout = row.children[0];
-                    if (!rowLayout) continue;
-                    for (let c = 0; c < rowLayout.children.length; c++) {
-                        const sib = rowLayout.children[c];
-                        if (!sib || !sib.visible || !sib.buttonData) continue;
-                        siblings.push(sib);
-                    }
+            function commitOrder() {
+                const panel = root.panelRef;
+                if (!panel || panel.hoverIndex < 0) return;
+                // tulis SEKALIGUS, bukan swap in-place: tiap swap me-notify config sehingga
+                // displayToggles dihitung ulang lewat urutan setengah jadi, dan Behavior
+                // (draggingType belum dihapus) menerbangkan slot ke sana — itu "fling karet
+                // ketapel" yang muncul sesaat setelah drop sebelum snapping ke posisi akhir.
+                // bandingkan pakai `type`, bukan identitas objek: dua kali baca list<var>
+                // dari JsonAdapter menghasilkan wrapper berbeda, jadi === tidak pernah cocok
+                const nextTypes = panel.displayToggles.map(t => t ? t.type : null).filter(t => !!t);
+                const pool = Config.options.sidebar.quickToggles.android.toggles.map(t => t);
+                const out = [];
+                for (const ty of nextTypes) {
+                    const i = pool.findIndex(t => t && t.type === ty);
+                    if (i === -1) continue;
+                    out.push(pool[i]);
+                    pool.splice(i, 1);
                 }
-                return siblings;
-            }
-
-            function findNearest(sceneX, sceneY) {
-                const siblings = getAllSiblings();
-                let nearest = null;
-                let minDist = Infinity;
-                for (let i = 0; i < siblings.length; i++) {
-                    const sib = siblings[i];
-                    if (sib.buttonData.type === root.buttonData.type) continue;
-                    const sibScene = sib.mapToItem(null, sib.width / 2, sib.height / 2);
-                    const dx = sceneX - sibScene.x;
-                    const dy = sceneY - sibScene.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < minDist) {
-                        minDist = dist;
-                        nearest = sib;
-                    }
-                }
-                return nearest;
+                // sisa elemen yang tak ikut (mis. gameMode di non-hyprland) ditaruh di belakang
+                for (const t of pool) out.push(t);
+                Config.options.sidebar.quickToggles.android.toggles = out;
             }
 
             onActiveChanged: {
                 editModeInteraction.isDragging = active;
 
-                if (!active) {
-                    if (root.dropIndicatorRef) root.dropIndicatorRef.visible = false;
-                    const sceneX = centroid.scenePosition.x;
-                    const sceneY = centroid.scenePosition.y;
-                    const nearest = findNearest(sceneX, sceneY);
-                    if (nearest) {
-                        const toggleList = Config.options.sidebar.quickToggles.android.toggles;
-                        const myType = root.buttonData.type;
-                        const sibType = nearest.buttonData.type;
-                        const myIdx = toggleList.findIndex(t => t.type === myType);
-                        const sibIdx = toggleList.findIndex(t => t.type === sibType);
-                        if (myIdx !== -1 && sibIdx !== -1 && myIdx !== sibIdx) {
-                            const temp = toggleList[myIdx];
-                            toggleList[myIdx] = toggleList[sibIdx];
-                            toggleList[sibIdx] = temp;
-                        }
+                if (!active && root.panelRef) commitOrder();
+                if (!root.panelRef) return;
+
+                if (active) {
+                    root.panelRef.draggingType = root.buttonData.type;
+                    root.panelRef.hoverIndex = -1;
+                    if (root.gridRef) {
+                        const p = centroid.scenePosition;
+                        root.panelRef.dragPos = root.gridRef.mapFromItem(null, p.x, p.y);
                     }
+                } else {
+                    root.panelRef.draggingType = "";
+                    root.panelRef.hoverIndex = -1;
                 }
             }
 
             onCentroidChanged: {
-                if (!active || !root.dropIndicatorRef || !root.gridRef) return;
-                const sceneX = centroid.scenePosition.x;
-                const sceneY = centroid.scenePosition.y;
-                const nearest = findNearest(sceneX, sceneY);
+                if (!active || !root.panelRef || !root.gridRef) return;
+                const p = root.gridRef.mapFromItem(null, centroid.scenePosition.x, centroid.scenePosition.y);
+                const panel = root.panelRef;
+                panel.dragPos = p;
 
-                if (nearest) {
-                    const nearestScene = nearest.mapToItem(null, 0, 0);
-                    const myScene = root.mapToItem(null, 0, 0);
-                    const goesAfter = nearestScene.x > myScene.x || nearestScene.y > myScene.y;
-                    const nearestLocal = nearest.mapToItem(root.gridRef, 0, 0);
-
-                    root.dropIndicatorRef.x = goesAfter
-                        ? nearestLocal.x + nearest.width + 1
-                        : nearestLocal.x - 5;
-                    root.dropIndicatorRef.y = nearestLocal.y;
-                    root.dropIndicatorRef.height = nearest.height;
-                    root.dropIndicatorRef.visible = true;
-                } else {
-                    root.dropIndicatorRef.visible = false;
+                // index visual slot yang sedang di bawah kursor = hoverIndex, jadi tombol yang
+                // dipegang LANGSUNG menggantikan slot itu dan lubangnya selalu pas di kursor.
+                // (aturan lama "sebelum/setelah pusat tombol terdekat" bikin lubangnya tertinggal
+                // setengah tombol, dan frame `rest`-nya ikut geser tiap hoverIndex berubah)
+                // dipakai posisi target, bukan posisi animasi, supaya tidak bolak-balik saat
+                // Behavior masih jalan
+                const layout = panel.usedLayout;
+                const list = panel.usedToggles;
+                let best = -1;
+                let minDist = Infinity;
+                for (let i = 0; i < layout.length; i++) {
+                    if (!list[i]) continue;
+                    const w = root.baseCellWidth * list[i].size + root.cellSpacing * (list[i].size - 1);
+                    const dx = p.x - (layout[i].x + w / 2);
+                    const dy = p.y - (layout[i].y + root.baseCellHeight / 2);
+                    const d = dx * dx + dy * dy;
+                    if (d < minDist) { minDist = d; best = i; }
                 }
+                panel.hoverIndex = best;
             }
         }
 
