@@ -405,6 +405,7 @@ Singleton {
         "general:Hide sussy/anime wallpapers": root.toggle(() => Config.options.workSafety.enable.wallpaper, v => Config.options.workSafety.enable.wallpaper = v),
 
         "services:Use Levenshtein distance-based algorithm instead of fuzzy": root.toggle(() => Config.options.search.sloppy, v => Config.options.search.sloppy = v),
+        "services:Show clipboard preview popups": root.optionSwitch("search.clipboardPreviewPopup"),
         "services:Enable update checks": root.toggle(() => Config.options.updates.enableCheck, v => Config.options.updates.enableCheck = v),
         "services:Enable GPS based location": root.toggle(() => Config.options.bar.weather.enableGPS, v => Config.options.bar.weather.enableGPS = v),
         "services:Fahrenheit unit": root.toggle(() => Config.options.bar.weather.useUSCS, v => Config.options.bar.weather.useUSCS = v),

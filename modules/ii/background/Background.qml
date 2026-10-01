@@ -403,6 +403,16 @@ Variants {
                 wallpaperIsVideo: bgRoot.wallpaperIsVideo
             }
 
+            /* Multiple wallpapers */
+            Loader {
+                id: collageLoader
+                anchors.fill: parent
+                active: Collage.enabled
+                sourceComponent: MultipleWalls {
+                    screen: bgRoot.screen
+                }
+            }
+
             /* Wallpaper Drop Area */
             WallpaperDropArea {
                 anchors.fill: parent
@@ -441,9 +451,18 @@ Variants {
 
                 WidgetsLoader {
                     screen: bgRoot.screen
-                    wallpaperItem: wallpaper
+                    wallpaperItem: Collage.enabled && collageLoader.item ? collageLoader.item : wallpaper
                     wallpaperSafetyTriggered: bgRoot.wallpaperSafetyTriggered
                     visualizerHidden: bgRoot.visualizerHidden
+                }
+            }
+
+            /* Multiple wallpapers editor */
+            Loader {
+                anchors.fill: parent
+                active: Collage.enabled && !Config.options.background.widgetsLocked && !GlobalStates.screenLocked && !!collageLoader.item
+                sourceComponent: MultipleWallsEditor {
+                    collage: collageLoader.item
                 }
             }
 

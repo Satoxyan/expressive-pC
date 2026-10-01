@@ -560,6 +560,46 @@ Item {
                         modal: true
                         dim: false
                         closePolicy: Popup.CloseOnPressOutside | Popup.CloseOnEscape
+                        transformOrigin: Popup.BottomRight
+
+                        enter: Transition {
+                            ParallelAnimation {
+                                NumberAnimation {
+                                    property: "scale"
+                                    from: 0.6
+                                    to: 1
+                                    duration: 500
+                                    easing.type: Easing.BezierSpline
+                                    easing.bezierCurve: Appearance.animationCurves.expressiveFastSpatial
+                                }
+                                NumberAnimation {
+                                    property: "opacity"
+                                    from: 0
+                                    to: 1
+                                    duration: Appearance.animationCurves.expressiveEffectsDuration
+                                    easing.type: Easing.BezierSpline
+                                    easing.bezierCurve: Appearance.animationCurves.expressiveEffects
+                                }
+                            }
+                        }
+                        exit: Transition {
+                            ParallelAnimation {
+                                NumberAnimation {
+                                    property: "scale"
+                                    to: 0.6
+                                    duration: 220
+                                    easing.type: Easing.BezierSpline
+                                    easing.bezierCurve: Appearance.animationCurves.emphasizedAccel
+                                }
+                                NumberAnimation {
+                                    property: "opacity"
+                                    to: 0
+                                    duration: 120
+                                    easing.type: Easing.BezierSpline
+                                    easing.bezierCurve: Appearance.animationCurves.emphasizedAccel
+                                }
+                            }
+                        }
 
                         background: Rectangle {
                             color: Appearance.m3colors.m3surfaceContainer

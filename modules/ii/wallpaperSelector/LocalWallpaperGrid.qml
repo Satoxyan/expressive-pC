@@ -125,17 +125,17 @@ Item {
     // ─── Dismiss overlay for context menu ───
     MouseArea {
         anchors.fill: parent
-        visible: contextMenu.visible
+        visible: contextMenu.open
         z: 105
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
-        onClicked: contextMenu.visible = false
+        onClicked: contextMenu.open = false
     }
 
     // ─── Context menu ───
-    Item {
+    BouncyPopup {
         id: contextMenu
-        visible: false
+        transformOrigin: Item.TopLeft
         z: 110
 
         property string targetPath: ""
@@ -176,7 +176,7 @@ Item {
                         colBackground: Appearance.colors.colSecondaryContainer
                         onClicked: {
                             Wallpapers.moveToTop(contextMenu.targetIndex);
-                            contextMenu.visible = false;
+                            contextMenu.open = false;
                         }
                         contentItem: MaterialSymbol {
                             anchors.centerIn: parent
@@ -193,7 +193,7 @@ Item {
                         colBackground: Appearance.colors.colSecondaryContainer
                         onClicked: {
                             Wallpapers.moveWallpaper(contextMenu.targetIndex, Math.max(0, contextMenu.targetIndex - 1));
-                            contextMenu.visible = false;
+                            contextMenu.open = false;
                         }
                         contentItem: MaterialSymbol {
                             anchors.centerIn: parent
@@ -210,7 +210,7 @@ Item {
                         colBackground: Appearance.colors.colSecondaryContainer
                         onClicked: {
                             Wallpapers.moveWallpaper(contextMenu.targetIndex, Math.min(Wallpapers.wallpaperModel.count - 1, contextMenu.targetIndex + 1));
-                            contextMenu.visible = false;
+                            contextMenu.open = false;
                         }
                         contentItem: MaterialSymbol {
                             anchors.centerIn: parent
@@ -227,7 +227,7 @@ Item {
                         colBackground: Appearance.colors.colSecondaryContainer
                         onClicked: {
                             Wallpapers.moveToBottom(contextMenu.targetIndex);
-                            contextMenu.visible = false;
+                            contextMenu.open = false;
                         }
                         contentItem: MaterialSymbol {
                             anchors.centerIn: parent
@@ -248,7 +248,7 @@ Item {
                         buttonRadius: height / 2
                         colBackground: Appearance.colors.colErrorContainer
                         onClicked: {
-                            contextMenu.visible = false;
+                            contextMenu.open = false;
                             deleteProc.deleteFile(contextMenu.targetPath);
                         }
                         contentItem: MaterialSymbol {
@@ -264,7 +264,7 @@ Item {
                         implicitWidth: 32; implicitHeight: 32
                         buttonRadius: height / 2
                         colBackground: Appearance.colors.colLayer2
-                        onClicked: contextMenu.visible = false
+                        onClicked: contextMenu.open = false
                         contentItem: MaterialSymbol {
                             anchors.centerIn: parent
                             text: "close"
@@ -520,7 +520,7 @@ Item {
                         contextMenu.targetY = pos.y;
                         contextMenu.targetPath = delegateCell.modelData.filePath;
                         contextMenu.targetIndex = delegateCell.index;
-                        contextMenu.visible = true;
+                        contextMenu.open = true;
                         return;
                     }
                     if (root.isDragging) {

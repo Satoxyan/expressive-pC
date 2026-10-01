@@ -1,6 +1,7 @@
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
+import qs.modules.common.functions
 import QtQuick
 import QtQuick.Layouts
 import Qt5Compat.GraphicalEffects
@@ -263,5 +264,19 @@ AbstractQuickPanel {
                 Config.options.sidebar.quickToggles.android.columns = value;
             }
         }
+    }
+    Rectangle {
+        id: dropIndicator
+        visible: false
+        z: 99
+        radius: Appearance.rounding.large
+        color: ColorUtils.transparentize(Appearance.colors.colPrimary, 0.88)
+        border.width: 2
+        border.color: ColorUtils.transparentize(Appearance.colors.colPrimary, 0.35)
+
+        Behavior on x { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+        Behavior on y { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+        Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+        Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
     }
 }

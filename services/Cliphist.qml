@@ -48,6 +48,34 @@ Singleton {
         return !!(/^\d+\t\[\[.*binary data.*\d+x\d+.*\]\]$/.test(entry))
     }
 
+    function entryId(entry) {
+        return entry.split("\t")[0]
+    }
+
+    function entryText(entry) {
+        return entry.replace(/^\s*\S+\s+/, "")
+    }
+
+    function pinIndex(entry) {
+        const pins = Config.options.search.clipboardPins ?? []
+        const id = root.entryId(entry)
+        const text = root.entryText(entry)
+        const image = root.entryIsImage(entry)
+        return pins.findIndex(pin => pin.id === id || (!image && pin.text !== "" && pin.text === text))
+    }
+
+    function isPinned(entry) {
+        return root.pinIndex(entry) !== -1
+    }
+
+    function togglePin(entry) {
+        const pins = (Config.options.search.clipboardPins ?? []).slice()
+        const index = root.pinIndex(entry)
+        if (index !== -1) pins.splice(index, 1)
+        else pins.push({ id: root.entryId(entry), text: root.entryIsImage(entry) ? "" : root.entryText(entry) })
+        Config.options.search.clipboardPins = pins
+    }
+
     function refresh() {
         readProc.buffer = []
         readProc.running = true

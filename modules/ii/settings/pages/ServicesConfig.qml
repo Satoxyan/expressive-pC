@@ -143,6 +143,14 @@ ContentPage {
                         Config.options.search.sloppy = checked;
                     }
                 }
+                ConfigSwitch {
+                    buttonIcon: "preview"
+                    text: Translation.tr("Show clipboard preview popups")
+                    checked: Config.options.search.clipboardPreviewPopup
+                    onCheckedChanged: {
+                        Config.options.search.clipboardPreviewPopup = checked;
+                    }
+                }
             }
 
             ContentSubsection {

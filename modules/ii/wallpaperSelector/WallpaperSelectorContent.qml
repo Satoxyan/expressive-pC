@@ -476,16 +476,16 @@ MouseArea {
                     MouseArea {
                         id: sortMenuDismissArea
                         anchors.fill: parent
-                        visible: sortMenuPopup.visible
+                        visible: sortMenuPopup.open
                         z: 9
                         hoverEnabled: true
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
-                        onClicked: sortMenuPopup.visible = false
+                        onClicked: sortMenuPopup.open = false
                     }
 
-                    Item {
+                    BouncyPopup {
                         id: sortMenuPopup
-                        visible: false
+                        transformOrigin: Item.Bottom
                         z: 10
                         anchors.bottom: extraOptions.top
                         anchors.horizontalCenter: extraOptions.horizontalCenter
@@ -544,7 +544,7 @@ MouseArea {
                                         colRippleToggled: Appearance.colors.colSecondaryContainerActive
                                         onClicked: {
                                             Wallpapers.setSortMode(modelData.id);
-                                            sortMenuPopup.visible = false;
+                                            sortMenuPopup.open = false;
                                         }
 
                                         contentItem: RowLayout {
@@ -647,8 +647,8 @@ MouseArea {
                                 }
                                 IconToolbarButton {
                                     implicitWidth: height
-                                    toggled: sortMenuPopup.visible
-                                    onClicked: sortMenuPopup.visible = !sortMenuPopup.visible
+                                    toggled: sortMenuPopup.open
+                                    onClicked: sortMenuPopup.open = !sortMenuPopup.open
                                     text: "sort"
                                     StyledToolTip {
                                         text: Translation.tr("Sort wallpapers")
@@ -856,7 +856,7 @@ MouseArea {
                 else
                     root.forceActiveFocus()
             } else if (!GlobalStates.wallpaperSelectorOpen) {
-                sortMenuPopup.visible = false;
+                sortMenuPopup.open = false;
                 Wallpapers.stopPreview();
             }
         }

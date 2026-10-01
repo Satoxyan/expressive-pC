@@ -222,6 +222,12 @@ RippleButton {
                         url: modelData
                     }
                 }
+                MaterialSymbol {
+                    visible: root.entry?.pinned ?? false
+                    text: "keep"
+                    iconSize: Appearance.font.pixelSize.normal
+                    color: root.colForeground
+                }
                 StyledText { // Item name/content
                     Layout.fillWidth: true
                     id: nameText
@@ -243,7 +249,7 @@ RippleButton {
                 text: root.itemTags
             }
             Loader { // Clipboard image preview
-                active: root.cliphistRawString && Cliphist.entryIsImage(root.cliphistRawString)
+                active: !Config.options.search.clipboardPreviewPopup && root.cliphistRawString && Cliphist.entryIsImage(root.cliphistRawString)
                 sourceComponent: CliphistImage {
                     Layout.fillWidth: true
                     entry: root.cliphistRawString

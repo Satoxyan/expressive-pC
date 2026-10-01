@@ -221,27 +221,30 @@ Singleton {
         if (root.query.startsWith(Config.options.search.prefix.clipboard)) {
             // Clipboard
             const searchString = StringUtils.cleanPrefix(root.query, Config.options.search.prefix.clipboard);
-            return Cliphist.fuzzyQuery(searchString).map((entry, index, array) => {
+            const clipboardResults = Cliphist.fuzzyQuery(searchString).map((entry, index, array) => {
                 const mightBlurImage = Cliphist.entryIsImage(entry) && root.clipboardWorkSafetyActive;
                 let shouldBlurImage = mightBlurImage;
                 if (mightBlurImage) {
                     shouldBlurImage = shouldBlurImage && (root.containsUnsafeLink(array[index - 1]) || root.containsUnsafeLink(array[index + 1]));
                 }
                 const type = `#${entry.match(/^\s*(\S+)/)?.[1] || ""}`;
+                const pinned = Cliphist.isPinned(entry);
                 return resultComp.createObject(null, {
                     rawValue: entry,
                     name: StringUtils.cleanCliphistEntry(entry),
                     verb: "",
                     type: type,
+                    clipboard: true,
+                    pinned: pinned,
                     execute: () => {
                         Cliphist.copy(entry);
                     },
                     actions: [resultComp.createObject(null, {
-                            name: Translation.tr("Copy"),
-                            iconName: "content_copy",
+                            name: pinned ? Translation.tr("Unpin") : Translation.tr("Pin"),
+                            iconName: pinned ? "keep_off" : "keep",
                             iconType: LauncherSearchResult.IconType.Material,
                             execute: () => {
-                                Cliphist.copy(entry);
+                                Cliphist.togglePin(entry);
                             }
                         }), resultComp.createObject(null, {
                             name: Translation.tr("Delete"),
@@ -254,6 +257,7 @@ Singleton {
                     blurImage: shouldBlurImage
                 });
             }).filter(Boolean);
+            return [...clipboardResults.filter(result => result.pinned), ...clipboardResults.filter(result => !result.pinned)];
         } else if (root.query.startsWith(Config.options.search.prefix.emojis)) {
             // Emojis
             const searchString = StringUtils.cleanPrefix(root.query, Config.options.search.prefix.emojis);

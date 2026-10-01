@@ -40,13 +40,16 @@ Singleton {
     // Player position shifted by the offset, used for both the active line
     // and the word sweep so they stay in sync with each other.
     //
-    // This is a FUNCTION on purpose: Quickshell's MprisPlayer.position() is
-    // computed continuously (last DBus position + real elapsed time), but a
-    // QML binding on it would only re-evaluate when positionChanged fires
-    // (player DBus updates, often ~1/s). Reading a cached binding makes the
-    // word sweep jump in steps instead of gliding.
+    // Derived from upstream's currentPosition() instead of reading
+    // activePlayer.position directly so this line lookup and update()'s
+    // indexAt(currentPosition() + leadSeconds) are bit-identical — any gap
+    // between the two would make activeIndex flip-flop at every line
+    // boundary. A QML binding on position() would also only re-evaluate when
+    // positionChanged fires (often ~1/s) and make the word sweep step.
+    // syncTimer refreshes basePosition each tick, so the extrapolation never
+    // goes stale after a seek.
     function shiftedPos() {
-        return Math.max(0, (root.activePlayer?.position ?? 0) - root.lyricOffsetMs / 1000.0)
+        return Math.max(0, root.currentPosition() - root.lyricOffsetMs / 1000.0)
     }
 
     // Word-level karaoke state for the active line
@@ -119,6 +122,43 @@ Singleton {
         }
     }
 
+    readonly property bool playing: root.activePlayer?.isPlaying ?? false
+    readonly property bool synced: root.status === "ok" && root.lyricsLines.length > 0
+    // Derived from lyricOffsetMs: update()'s line lookup and syncTimer's word
+    // sweep must use the exact same offset or activeIndex flips back and forth
+    // for a tick at every line boundary.
+    readonly property real leadSeconds: -root.lyricOffsetMs / 1000
+
+    property real basePosition: 0
+    property real baseTime: Date.now()
+
+    function currentPosition() {
+        return root.playing ? root.basePosition + (Date.now() - root.baseTime) / 1000 : root.basePosition
+    }
+
+    function resync() {
+        if (!root.activePlayer) return
+        root.activePlayer.positionChanged()
+        readPositionTimer.restart()
+    }
+
+    function indexAt(pos) {
+        const lines = root.lyricsLines
+        let low = 0
+        let high = lines.length - 1
+        let result = -1
+        while (low <= high) {
+            const mid = (low + high) >> 1
+            if (lines[mid].time <= pos) {
+                result = mid
+                low = mid + 1
+            } else {
+                high = mid - 1
+            }
+        }
+        return result
+    }
+
     Timer {
         id: syncTimer
         // 50ms so the word sweep tracks the audio smoothly even for fast
@@ -126,20 +166,57 @@ Singleton {
         // a large progress and the glow looks choppy.
         interval: 50
         repeat: true
-        running: root.status === "ok" && root.lyricsLines.length > 0
+        running: root.synced
         onTriggered: {
-            const pos = root.shiftedPos()
-            let idx = -1
-            for (let i = 0; i < root.lyricsLines.length; i++) {
-                if (root.lyricsLines[i].time <= pos) idx = i
-                else break
-            }
+            // Keep upstream's extrapolation base fresh, so currentPosition()
+            // used by update() is never stale after a seek.
+            root.basePosition = root.activePlayer?.position ?? 0
+            root.baseTime = Date.now()
+            const idx = root.indexAt(root.shiftedPos())
             if (idx !== root.activeIndex) {
                 root.activeIndex = idx
                 root.slots = root.buildSlots(idx)
             }
             root.updateActiveWords()
         }
+    }
+
+    function update() {
+        boundaryTimer.stop()
+        if (!root.synced) return
+        const idx = root.indexAt(root.currentPosition() + root.leadSeconds)
+        if (idx !== root.activeIndex) {
+            root.activeIndex = idx
+            root.slots = root.buildSlots(idx)
+        }
+        const next = root.lyricsLines[idx + 1]
+        if (!root.playing || !next) return
+        const delay = (next.time - root.leadSeconds - root.currentPosition()) * 1000
+        boundaryTimer.interval = Math.max(1, Math.ceil(delay))
+        boundaryTimer.start()
+    }
+
+    Timer {
+        id: readPositionTimer
+        interval: 80
+        onTriggered: {
+            root.basePosition = root.activePlayer?.position ?? 0
+            root.baseTime = Date.now()
+            root.update()
+        }
+    }
+
+    Timer {
+        id: boundaryTimer
+        onTriggered: root.update()
+    }
+
+    Timer {
+        id: driftTimer
+        interval: 4000
+        repeat: true
+        running: root.synced && root.playing
+        onTriggered: root.resync()
     }
 
     Process {
@@ -177,6 +254,7 @@ Singleton {
                 root.activeIndex = -1
                 root.slots = root.buildSlots(-1)
                 root.status = "ok"
+                root.resync()
             }
         }
     }
@@ -201,6 +279,7 @@ Singleton {
 
     function restartLyrics() {
         lyricsProc.running = false
+        boundaryTimer.stop()
         root.lyricsLines = []
         root.activeIndex = -1
         root.providedBy = ""
@@ -239,6 +318,7 @@ Singleton {
         target: root.activePlayer
         function onTrackTitleChanged() { root.restartLyrics() }
         function onTrackArtistChanged() { root.restartLyrics() }
+        function onPlaybackStateChanged() { root.resync() }
     }
 
     Component.onCompleted: root.restartLyrics()
