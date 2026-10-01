@@ -41,7 +41,6 @@ Item {
     readonly property real centerPillHeight: centerPill.height
 
     function shouldPaintMaterialPill(name) {
-
         if (!root.isMaterial) return false;
         const blacklist = ["workspaces", "divisor", "powerButton", "media", "docktoPanel", "leftSidebarButton", "dynamicIsland", "avatar"];
         if (blacklist.includes(name)) {

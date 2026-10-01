@@ -29,6 +29,8 @@ RippleButton {
         default:
             return "main"
     }
+    readonly property var control: entry?.control ?? null
+    readonly property bool hasControl: control !== null && (control.type !== "select" || control.options.length < 5)
     property string itemClickActionName: entry?.verb ?? "Open"
     property string bigText: entry?.iconType === LauncherSearchResult.IconType.Text ? entry?.iconName ?? "" : ""
     property string materialSymbol: entry.iconType === LauncherSearchResult.IconType.Material ? entry?.iconName ?? "" : ""
@@ -183,9 +185,12 @@ RippleButton {
         ColumnLayout {
             id: contentColumn
             Layout.fillWidth: true
+            Layout.minimumWidth: 0
             Layout.alignment: Qt.AlignVCenter
             spacing: 0
             StyledText {
+                Layout.fillWidth: true
+                elide: Text.ElideRight
                 font.pixelSize: Appearance.font.pixelSize.smaller
                 color: root.selected ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colSubtext
                 visible: root.itemType && root.itemType != Translation.tr("App")
@@ -252,12 +257,91 @@ RippleButton {
         // Action text
         StyledText {
             Layout.fillWidth: false
-            visible: root.selected || root.itemType === Translation.tr("Keybind")
+            visible: !root.hasControl && (root.selected || root.itemType === Translation.tr("Keybind"))
             id: clickAction
             font.pixelSize: Appearance.font.pixelSize.normal
             color: Appearance.colors.colOnPrimaryContainer
             horizontalAlignment: Text.AlignRight
             text: root.itemClickActionName
+        }
+
+        Loader {
+            id: controlLoader
+            active: root.hasControl
+            visible: active
+            Layout.fillWidth: false
+            Layout.alignment: Qt.AlignVCenter
+            Layout.preferredWidth: root.control?.type === "slider" ? 180 : implicitWidth
+            sourceComponent: switch (root.control?.type) {
+                case "switch": return switchControl
+                case "spin": return spinControl
+                case "select": return selectControl
+                case "slider": return sliderControl
+                default: return null
+            }
+        }
+
+        Component {
+            id: switchControl
+            StyledSwitch {
+                id: toggleSwitch
+                onClicked: root.control.set(checked)
+
+                Binding {
+                    target: toggleSwitch
+                    property: "checked"
+                    value: root.control.get()
+                }
+            }
+        }
+
+        Component {
+            id: spinControl
+            StyledSpinBox {
+                id: spinBox
+                from: root.control.from
+                to: root.control.to
+                stepSize: root.control.stepSize
+                onValueChanged: {
+                    if (value !== root.control.get()) root.control.set(value)
+                }
+
+                Binding {
+                    target: spinBox
+                    property: "value"
+                    value: root.control.get()
+                }
+            }
+        }
+
+        Component {
+            id: sliderControl
+            ConfigSlider {
+                id: sliderWidget
+                showLabel: false
+                from: root.control.from
+                to: root.control.to
+                stopIndicatorValues: root.control.stopIndicatorValues
+                usePercentTooltip: root.control.usePercentTooltip
+                onMoved: root.control.set(value)
+
+                Binding {
+                    target: sliderWidget
+                    property: "value"
+                    value: root.control.get()
+                }
+            }
+        }
+
+        Component {
+            id: selectControl
+            ConfigSelectionArray {
+                id: selectionArray
+                options: root.control.options
+                textOnlyWhenActive: root.control.options.every(option => option.icon) && (root.control.options.length > 2 || root.control.options.reduce((total, option) => total + option.displayName.length, 0) > 16)
+                currentValue: root.control.get()
+                onSelected: newValue => root.control.set(newValue)
+            }
         }
 
         RowLayout {

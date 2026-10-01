@@ -1008,6 +1008,8 @@ Singleton {
             property JsonObject custom: JsonObject {
                 property string distroIcon: "google-gemini-symbolic"
                 property bool colorizeIcon: true
+                property string iconColor: "onLayer0"
+                property string iconsPath: ""
             }
 
             property JsonObject screenRecord: JsonObject {

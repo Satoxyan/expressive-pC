@@ -10,29 +10,9 @@ ContentPage {
     id: page
     forceWidth: true
 
-    function goTo(term) {
-        const t = term.toLowerCase().trim()
-
-        function findTarget(rootItem) {
-            for (let i = 0; i < rootItem.children.length; i++) {
-                let child = rootItem.children[i]
-                if (child.title && child.title.toLowerCase().includes(t)) {
-                    return child
-                }
-            }
-
-            for (let i = 0; i < rootItem.children.length; i++) {
-                let found = findTarget(rootItem.children[i])
-                if (found) return found
-            }
-            return null
-        }
-
-        let target = findTarget(mainLayout)
-        if (target) {
-            let pos = target.mapToItem(mainLayout, 0, 0)
-            page.contentY = Math.max(0, pos.y - 0)
-        }
+    readonly property color leftIconColor: {
+        const name = Config.options.custom.iconColor || "onLayer0"
+        return Appearance.colors[`col${name.charAt(0).toUpperCase()}${name.slice(1)}`] ?? Appearance.colors.colOnLayer0
     }
 
     property var allWidgets: [
@@ -236,6 +216,7 @@ ContentPage {
                     text: Translation.tr("Bar style")
                     icon: "style"
                     perRow: 3
+                    textOnlyWhenActive: true
                     currentValue: Config.options.bar.cornerStyle
                     onSelected: newValue => { Config.options.bar.cornerStyle = newValue; }
                     options: [
@@ -474,6 +455,76 @@ ContentPage {
                     buttonIcon: "colors"; text: Translation.tr("Tint icons")
                     checked: Config.options.tray.monochromeIcons
                     onCheckedChanged: { Config.options.tray.monochromeIcons = checked; }
+                }
+            }
+        }
+
+        ContentSection {
+            icon: "right_panel_open"
+            shape: MaterialShape.Shape.Pentagon
+            title: Translation.tr("Left sidebar button")
+
+            GroupedList {
+                ConfigRow {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 8
+                    Layout.rightMargin: 8
+                    spacing: 10
+
+                    CustomIcon {
+                        source: Config.options.custom.distroIcon || SystemInfo.distroIcon
+                        colorize: Config.options.custom.colorizeIcon
+                        color: page.leftIconColor
+                        customFolder: Config.options.custom.iconsPath
+                        width: Appearance.font.pixelSize.larger
+                        height: Appearance.font.pixelSize.larger
+                    }
+                    StyledText {
+                        Layout.fillWidth: true
+                        text: Translation.tr("Icon")
+                        color: Appearance.colors.colOnSecondaryContainer
+                    }
+                    StyledText {
+                        text: (Config.options.custom.distroIcon || SystemInfo.distroIcon).replace("-symbolic", "")
+                        color: Appearance.colors.colSubtext
+                    }
+                }
+                IconPickerGrid {
+                    customFolder: Config.options.custom.iconsPath
+                    currentValue: Config.options.custom.distroIcon
+                    colorize: Config.options.custom.colorizeIcon
+                    iconColor: page.leftIconColor
+                    onSelected: name => { Config.options.custom.distroIcon = name }
+                }
+                ConfigTextArea {
+                    id: iconsPathField
+                    Layout.fillWidth: true
+                    buttonIcon: "folder_open"
+                    text: Translation.tr("Custom icons folder")
+                    placeholderText: Translation.tr("Leave empty to use the built-in icons, e.g. ~/Pictures/icons")
+                    value: Config.options.custom.iconsPath
+                    onValueChanged: iconsPathDebounce.restart()
+
+                    Timer {
+                        id: iconsPathDebounce
+                        interval: 600
+                        onTriggered: Config.options.custom.iconsPath = iconsPathField.value
+                    }
+                }
+                ConfigSwitch {
+                    buttonIcon: "colors"
+                    text: Translation.tr("Colorize icon")
+                    checked: Config.options.custom.colorizeIcon
+                    onCheckedChanged: { Config.options.custom.colorizeIcon = checked }
+                }
+                ColorSelectionArray {
+                    enabled: Config.options.custom.colorizeIcon
+                    opacity: enabled ? 1 : 0.4
+                    icon: "palette"
+                    text: Translation.tr("Icon color")
+                    options: ["onLayer0", "primary", "secondary", "tertiary", "onPrimaryContainer", "onSecondaryContainer", "onTertiaryContainer"]
+                    currentValue: Config.options.custom.iconColor
+                    onSelected: newValue => { Config.options.custom.iconColor = newValue }
                 }
             }
         }
