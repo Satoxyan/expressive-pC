@@ -39,6 +39,18 @@ Item {
     readonly property bool animatedEntrance: WM.compositor !== "hyprland"
     readonly property bool sidebarOpen: GlobalStates.sidebarRightOpen
 
+    // ponytail: 3 panels + calendar expand → limit quick rows to 2
+    readonly property int activePanelCount: {
+        let c = 1
+        const sl = Config.options.sidebar.quickSliders
+        if (sl && sl.enable && (sl.showMic || sl.showVolume || sl.showBrightness)) c++
+        if (Config.options.sidebar.mediaPlayer && (root.activePlayer !== null || root.editMode)) c++
+        return c
+    }
+    readonly property bool threePanelsActive: root.activePanelCount >= 3
+    readonly property bool calendarExpanded: Config.options.sidebar.bottomGroup && !Persistent.states.sidebar.bottomGroup.collapsed
+    readonly property bool shouldLimitRows: root.threePanelsActive && root.calendarExpanded && !root.editMode
+
     readonly property MprisPlayer activePlayer: MprisController.activePlayer
     readonly property var realPlayers: MprisController.players
     readonly property var meaningfulPlayers: {
@@ -607,7 +619,7 @@ Item {
                 Layout.fillWidth: true
                 active: Config.options.sidebar.quickToggles.style === "android"
                 visible: active
-                sourceComponent: AndroidQuickPanel { editMode: root.editMode }
+                sourceComponent: AndroidQuickPanel { editMode: root.editMode; limitRows: root.shouldLimitRows }
             }
         }
     }
