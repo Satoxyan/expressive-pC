@@ -215,7 +215,6 @@ ContentPage {
                 ConfigSelectionArray {
                     text: Translation.tr("Bar style")
                     icon: "style"
-                    perRow: 3
                     textOnlyWhenActive: true
                     currentValue: Config.options.bar.cornerStyle
                     onSelected: newValue => { Config.options.bar.cornerStyle = newValue; }

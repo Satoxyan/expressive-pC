@@ -22,8 +22,6 @@ RowLayout {
         },
     ]
     property var currentValue: null
-    // >0 = pecah opsi jadi baris sepanjang itu (3 → dua baris). 0 = satu baris.
-    property int perRow: 0
     property bool textOnlyWhenActive: false
 
     signal selected(var newValue)
@@ -48,7 +46,7 @@ RowLayout {
         }
     }
 
-    Column {
+    Flow {
         id: buttonsFlow
         Layout.fillWidth: !root.text
         Layout.alignment: Qt.AlignRight
@@ -59,86 +57,63 @@ RowLayout {
         Layout.maximumHeight: root.textOnlyWhenActive ? Layout.preferredHeight : Number.POSITIVE_INFINITY
         clip: root.textOnlyWhenActive
 
-        // buttonsFlow = Column; anaknya bisa Repeater atau baris (Flow), dan
-        // tombolnya ada di tingkat dalam (delegate tiap baris). Kumpulkan dulu
-        // jadi daftar baris → daftar tombol, biar ukuran di bawah ikut struktur
-        // perRow, bukan asumsi satu baris datar.
-        function buttonRows() {
-            const rows = [];
-            for (let i = 0; i < children.length; i++) {
-                const kids = children[i].children;
-                if (kids === undefined) continue;
-                const btns = [];
-                for (let j = 0; j < kids.length; j++) {
-                    if (kids[j].count !== undefined) continue; // Repeater, bukan tombol
-                    btns.push(kids[j]);
-                }
-                if (btns.length > 0) rows.push(btns);
-            }
-            return rows;
-        }
-
         function singleRowHeight() {
-            const rows = buttonRows();
             let h = 0;
-            for (let i = 0; i < rows.length; i++) {
-                let rh = 0;
-                for (let j = 0; j < rows[i].length; j++)
-                    rh = Math.max(rh, rows[i][j].implicitHeight);
-                h += rh;
+            for (let i = 0; i < children.length; i++) {
+                const c = children[i];
+                if (c.modelData === undefined) continue;
+                h = Math.max(h, c.implicitHeight);
             }
-            return h + Math.max(0, rows.length - 1) * spacing;
+            return h;
         }
 
         function singleRowWidth() {
-            let widest = 0;
-            for (const r of buttonRows()) {
-                let w = 0;
-                for (const b of r) w += b.implicitWidth;
-                if (r.length > 1) w += (r.length - 1) * spacing;
-                widest = Math.max(widest, w);
+            let total = 0;
+            let count = 0;
+            for (let i = 0; i < children.length; i++) {
+                const c = children[i];
+                if (c.modelData === undefined) continue;
+                total += c.implicitWidth;
+                count++;
             }
-            return widest;
+            return total + Math.max(0, count - 1) * spacing;
         }
 
         Repeater {
-            model: root.perRow > 0 ? Math.ceil(root.options.length / root.perRow) : 1
-            delegate: Flow {
-                id: row
+            model: root.options
+            delegate: SelectionGroupButton {
+                id: paletteButton
+                required property var modelData
                 required property int index
-                readonly property int start: root.perRow > 0 ? index * root.perRow : 0
-                readonly property int end: root.perRow > 0
-                    ? Math.min(start + root.perRow, root.options.length)
-                    : root.options.length
-                spacing: 2
-
-                Repeater {
-                    model: row.end - row.start
-                    delegate: SelectionGroupButton {
-                        id: paletteButton
-                        required property int index
-                        readonly property int gindex: row.start + index
-                        enableImplicitWidthAnimation: !root.textOnlyWhenActive
-                        Behavior on implicitWidth {
-                            enabled: root.textOnlyWhenActive
-                            NumberAnimation {
-                                duration: Appearance.animation.elementMoveFast.duration
-                                easing.type: Appearance.animation.elementMoveFast.type
-                                easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve
-                            }
-                        }
-                        baseWidth: root.textOnlyWhenActive
-                            ? contentItem.children[0].implicitWidth + (buttonText.length > 0 ? contentItem.spacing + contentItem.children[1].children[0].implicitWidth : 0) + horizontalPadding * 2
-                            : contentItem.implicitWidth + horizontalPadding * 2
-                        leftmost: index === 0
-                        rightmost: index === row.end - row.start - 1
-                        buttonIcon: root.options[gindex].icon || ""
-                        buttonText: (!root.textOnlyWhenActive || toggled || hovered) ? root.options[gindex].displayName : ""
-                        toggled: root.currentValue == root.options[gindex].value
-                        onClicked: {
-                            root.selected(root.options[gindex].value);
-                        }
+                onYChanged: {
+                    if (index === 0) {
+                        paletteButton.leftmost = true
+                    } else {
+                        var prev = buttonsFlow.children[index - 1]
+                        var thisIsOnNewLine = prev && prev.y !== paletteButton.y
+                        paletteButton.leftmost = thisIsOnNewLine
+                        prev.rightmost = thisIsOnNewLine
                     }
+                }
+                enableImplicitWidthAnimation: !root.textOnlyWhenActive
+                Behavior on implicitWidth {
+                    enabled: root.textOnlyWhenActive
+                    NumberAnimation {
+                        duration: Appearance.animation.elementMoveFast.duration
+                        easing.type: Appearance.animation.elementMoveFast.type
+                        easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve
+                    }
+                }
+                baseWidth: root.textOnlyWhenActive
+                    ? contentItem.children[0].implicitWidth + (buttonText.length > 0 ? contentItem.spacing + contentItem.children[1].children[0].implicitWidth : 0) + horizontalPadding * 2
+                    : contentItem.implicitWidth + horizontalPadding * 2
+                leftmost: index === 0
+                rightmost: index === root.options.length - 1
+                buttonIcon: modelData.icon || ""
+                buttonText: (!root.textOnlyWhenActive || toggled || hovered) ? modelData.displayName : ""
+                toggled: root.currentValue == modelData.value
+                onClicked: {
+                    root.selected(modelData.value);
                 }
             }
         }
