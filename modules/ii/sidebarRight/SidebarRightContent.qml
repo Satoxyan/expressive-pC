@@ -470,6 +470,7 @@ Item {
                         id: distroIcon
                         anchors.fill: parent
                         source: Config.options.custom.distroIcon || SystemInfo.distroIcon
+                        customFolder: Config.options.custom.iconsPath
                         colorize: Config.options.custom.colorizeIcon
                         color: Appearance.colors.colOnLayer0
                     }

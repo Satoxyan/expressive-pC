@@ -24,53 +24,6 @@ Singleton {
         }
     }
     
-    Process {
-        id: keywordHarvester
-        property var pendingPages: []
-        property string currentPageName: ""
-        
-        function startHarvesting() {
-            root.settingsKeywordsCache = {}; 
-            pendingPages = root.settingsIndex.slice();
-            next();
-        }
-
-        function next() {
-            if (pendingPages.length === 0) {
-                return;
-            }
-            
-            let currentPage = pendingPages.shift();
-            let fullPath = FileUtils.trimFileProtocol(
-                Quickshell.shellPath("modules/ii/settings/pages/" + currentPage.path)
-            )
-
-            let rawCommand = "grep -oP \"title:\\s*Translation.tr\\(['\\\"].*?['\\\"]\\)\" " + fullPath + " | sed -E \"s/title:\\s*Translation.tr\\(['\\\"](.*)['\\\"]\\)/\\1/g\" | tr '\\n' ' '";
-            
-            command = ["bash", "-c", rawCommand];
-            
-            keywordHarvester.currentPageName = currentPage.page;
-            running = true;
-        }
-
-        onExited: (exitCode, exitStatus) => {
-            keywordHarvester.next();
-        }
-
-        stdout: SplitParser {
-            onRead: data => {
-                let cache = root.settingsKeywordsCache;
-                cache[keywordHarvester.currentPageName] = (cache[keywordHarvester.currentPageName] || "") + " " + data;
-                root.settingsKeywordsCache = cache;
-            }
-        }
-    }
-
-    Component.onCompleted: {
-        keywordHarvester.startHarvesting();
-    }
-
-
     // https://specifications.freedesktop.org/menu/latest/category-registry.html
     property list<string> mainRegisteredCategories: ["AudioVideo", "Development", "Education", "Game", "Graphics", "Network", "Office", "Science", "Settings", "System", "Utility"]
     property list<string> appCategories: DesktopEntries.applications.values.reduce((acc, entry) => {
@@ -81,19 +34,6 @@ Singleton {
         }
         return acc;
     }, []).sort()
-
-    property var settingsKeywordsCache: ({})
-
-    property var settingsIndex: [
-        { page: "General",   path: "GeneralConfig.qml" },
-        { page: "Bar",       path: "BarConfig.qml" },
-        { page: "Desktop",   path: "BackgroundConfig.qml" },
-        { page: "Interface", path: "InterfaceConfig.qml" },
-        { page: "Services",  path: "ServicesConfig.qml" },
-        { page: "Hyprland",  path: "HyprlandConfig.qml" },
-        { page: "About",     path: "About.qml" },
-        { page: "Quick",     path: "QuickConfig.qml" },
-    ]
 
     // Load user action scripts from ~/.config/illogical-impulse/actions/
     // Uses FolderListModel to auto-reload when scripts are added/removed
@@ -434,32 +374,22 @@ Singleton {
             });
         });
         ////////////////// Settings search //////////////////
-        const settingsQuery = root.query.toLowerCase().trim();
-
-        const settingsResults = root.settingsIndex.reduce((acc, page) => {
-            const dynamicKeywords = (root.settingsKeywordsCache[page.page] || "").toLowerCase();
-            const query = root.query.toLowerCase().trim();
-            if (query === "") return acc;
-
-            if (page.page.toLowerCase().includes(query) || dynamicKeywords.includes(query)) {
-                acc.push(resultComp.createObject(null, {
-                    name: page.page,
-                    comment: dynamicKeywords.includes(query) ? "Section: " + query : "Settings for " + page.page,
-                    verb: Translation.tr("Go"),
-                    type: Translation.tr("Settings"),
-                    iconName: "settings",
-                    iconType: LauncherSearchResult.IconType.Material,
-                    execute: () => {
-                        GlobalStates.settingsOpen = true;
-                        Qt.callLater(() => {
-                            GlobalStates.settingsPage = page.page + ":" + query;
-                        });
-                        root.query = "";
-                    }
-                }));
-            }
-            return acc;
-        }, []);
+        const settingsResults = SettingsSearchIndex.search(root.query, 8).map(entry => {
+            const breadcrumb = entry.kind === "page" ? Translation.tr("Settings") : [entry.pageName, entry.kind === "option" ? entry.section : "", entry.kind === "option" ? entry.subsection : ""].filter(part => part).join(" › ");
+            return resultComp.createObject(null, {
+                control: entry.kind === "option" ? SettingsQuickControls.find(entry.pageId, entry.rawSection, entry.rawSubsection, entry.rawLabel) : null,
+                name: entry.label,
+                comment: breadcrumb,
+                verb: Translation.tr("Go"),
+                type: [Translation.tr("Settings"), entry.pageName, entry.kind === "option" ? entry.section : "", entry.kind === "option" ? entry.subsection : ""].filter(part => part).join(" • "),
+                iconName: entry.icon,
+                iconType: LauncherSearchResult.IconType.Material,
+                execute: () => {
+                    root.query = "";
+                    GlobalStates.openSettingsAt(entry.pageId, entry.kind === "page" ? "" : entry.label, entry.section, entry.subsection);
+                }
+            });
+        });
         const commandResultObject = resultComp.createObject(null, {
             name: StringUtils.cleanPrefix(root.query, Config.options.search.prefix.shellCommand).replace("file://", ""),
             verb: Translation.tr("Run"),

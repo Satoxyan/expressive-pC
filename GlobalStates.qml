@@ -34,7 +34,14 @@ Singleton {
     property bool superReleaseMightTrigger: true
     property bool wallpaperSelectorOpen: false
     property bool workspaceShowNumbers: false
-    property string settingsPage: ""
+    property var settingsTarget: null
+
+    function openSettingsAt(pageId, label, section, subsection) {
+        root.settingsOpen = true;
+        Qt.callLater(() => {
+            root.settingsTarget = { page: pageId, label: label ?? "", section: section ?? "", subsection: subsection ?? "" };
+        });
+    }
     property Item currentPageInstance: null
     property list<real> visualizerPoints: []
     property bool desktopWidgetKeyboardFocus: false

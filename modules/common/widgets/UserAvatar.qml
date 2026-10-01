@@ -16,7 +16,7 @@ Rectangle {
     implicitWidth: 48
     implicitHeight: 48
     radius: width / 2
-    color: Appearance.colors.colPrimaryContainer
+    color: avatarImage.status !== Image.Ready ? Appearance.colors.colPrimaryContainer : Appearance.colors.colLayer1
 
     Image {
         id: avatarImage

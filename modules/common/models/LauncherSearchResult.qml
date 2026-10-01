@@ -18,6 +18,7 @@ QtObject {
         print("Not implemented");
     }
     property var actions: []
+    property var control: null
     
     // Stuff needed for DesktopEntry 
     property string id: ""
