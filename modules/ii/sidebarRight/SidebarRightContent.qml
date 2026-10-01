@@ -656,6 +656,9 @@ Item {
         Item {
             // same sizing as bar popup: lyrics view needs 290 (MediaControls.qml)
             implicitHeight: root.hasMedia ? (Config.options.bar.media.showLyrics ? 290 : Appearance.sizes.mediaControlsHeight) : 80
+            Behavior on implicitHeight {
+                NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+            }
             Loader {
                 anchors.fill: parent
                 active: root.hasMedia

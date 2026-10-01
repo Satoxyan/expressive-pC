@@ -179,7 +179,8 @@ Item {
     Player {
         id: mediaPlayer
         width: root.fullWidth
-        height: root.fullHeight
+        // ikut tinggi root yang beranimasi, supaya kartu ikut membesar/mengecil
+        height: root.height
         player: root.player
         visualizerPoints: root.visualizerPoints
         radius: root.radius

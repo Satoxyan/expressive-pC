@@ -29,6 +29,9 @@ Item {
     property int visualizerSmoothing: 2
     property real radius
     property bool showLyrics: Config.options.bar.media.showLyrics
+    // Ukuran decode dibekukan. Kalau ikut ukuran kartu, `cache: false` membuat Image
+    // reload tiap frame selama animasi resize → blank frame → flicker.
+    readonly property int artDecodeSize: Math.round(Appearance.sizes.mediaControlsHeight * 2)
 
     property string displayedArtFilePath: {
         if (!root.downloaded) return ""
@@ -105,8 +108,8 @@ Item {
             id: blurredArt
             anchors.fill: parent
             source: root.displayedArtFilePath
-            sourceSize.width: background.width
-            sourceSize.height: background.height
+            sourceSize.width: root.artDecodeSize
+            sourceSize.height: root.artDecodeSize
             fillMode: Image.PreserveAspectCrop
             cache: false
             antialiasing: true

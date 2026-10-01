@@ -44,6 +44,17 @@ Scope {
         if (!barVertical) return Config.options.bar.bottom ? "bottom" : "top"
         return Config.options.bar.bottom ? "right" : "left"
     }
+    // Tepi window mana yang dijadikan patokan kolom (atas/tengah/bawah), supaya
+    // posisi kartu tetap sama walau tinggi kartu beranimasi. Cabangnya harus
+    // sama persis dengan urutan perhitungan margins.top di PanelWindow.
+    readonly property string vAnchor: {
+        if (GlobalStates.mediaControlsAboveDock && !barVertical) return "bottom"
+        if (barEdge === "top") return "top"
+        if (barEdge === "bottom") return "bottom"
+        if (mediaPosition === "left") return "top"
+        if (mediaPosition === "right") return "bottom"
+        return "center"
+    }
     readonly property real gap: Config.options.bar.cornerStyle === 3 ? Appearance.sizes.hyprlandGapsOut : 0
     readonly property bool cornerStyleReducesGap: Config.options.bar.cornerStyle === 1 || Config.options.bar.cornerStyle === 2
     readonly property real barThickness: barVertical ? Appearance.sizes.verticalBarWidth : Appearance.sizes.barHeight
@@ -122,7 +133,13 @@ Scope {
             exclusionMode: ExclusionMode.Ignore
             exclusiveZone: 0
             implicitWidth: root.widgetWidth
-            implicitHeight: playerColumnLayout.implicitHeight
+            // Tinggi window dipegang konstan: N kartu × tinggi lyrics maksimum.
+            // Selama toggle lirik yang bergerak cuma kartu di dalamnya — window
+            // tidak pernah di-resize, jadi tak ada set_size+set_margin yang datang
+            // terpisah (itu penyebab popup "fling" lalu balik lagi).
+            implicitHeight: root.meaningfulPlayers.length > 0
+                ? root.meaningfulPlayers.length * 290
+                : playerColumnLayout.implicitHeight
             color: "transparent"
             WlrLayershell.namespace: "quickshell:mediaControls"
 
@@ -135,13 +152,13 @@ Scope {
                     if (GlobalStates.mediaControlsAboveDock && !root.barVertical) {
                         const dockHeight = (Config.options?.dock.height ?? 70)
                             + Appearance.sizes.elevationMargin + Appearance.sizes.hyprlandGapsOut
-                        return panelWindow.screen.height - dockHeight - playerColumnLayout.implicitHeight
+                        return panelWindow.screen.height - dockHeight - panelWindow.implicitHeight
                     }
                     if (root.barEdge === "top") return root.barThickness + (root.cornerStyleReducesGap ? -root.gap -6 : root.gap)
-                    if (root.barEdge === "bottom") return panelWindow.screen.height - root.barThickness - (root.cornerStyleReducesGap ? -root.gap : root.gap) - playerColumnLayout.implicitHeight
+                    if (root.barEdge === "bottom") return panelWindow.screen.height - root.barThickness - (root.cornerStyleReducesGap ? -root.gap : root.gap) - panelWindow.implicitHeight
                     if (root.mediaPosition === "left") return 0
-                    if (root.mediaPosition === "right") return panelWindow.screen.height - playerColumnLayout.implicitHeight - root.gap
-                    return (panelWindow.screen.height - playerColumnLayout.implicitHeight) / 2
+                    if (root.mediaPosition === "right") return panelWindow.screen.height - panelWindow.implicitHeight - root.gap
+                    return (panelWindow.screen.height - panelWindow.implicitHeight) / 2
                 }
                 left: {
                     if (GlobalStates.mediaControlsAboveDock && !root.barVertical) {
@@ -179,20 +196,43 @@ Scope {
 
             ColumnLayout {
                 id: playerColumnLayout
-                anchors.fill: parent
+                // Lebar ikut window, tinggi ikut isi (kartu). Tinggi yang mengikuti
+                // kartu bikin mask input cuma menutupi kartu — band transparan
+                // di atas window yang selalu tinggi itu tetap klik-tembus.
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: root.vAnchor === "top" ? parent.top : undefined
+                anchors.bottom: root.vAnchor === "bottom" ? parent.bottom : undefined
+                anchors.verticalCenter: root.vAnchor === "center" ? parent.verticalCenter : undefined
                 spacing: -Appearance.sizes.elevationMargin // Shadow overlap okay
 
                 Repeater {
                     model: ScriptModel {
                         values: root.meaningfulPlayers
                     }
-                    delegate: Player {
+                    delegate: Item {
+                        id: playerSlot
                         required property MprisPlayer modelData
-                        player: modelData
-                        visualizerPoints: GlobalStates.visualizerPoints  
+                        readonly property real targetHeight: Config.options.bar.media.showLyrics ? 290 : Appearance.sizes.mediaControlsHeight
                         implicitWidth: root.widgetWidth
-                        implicitHeight: showLyrics ? 290 : Appearance.sizes.mediaControlsHeight
-                        radius: root.popupRounding
+                        // tinggi slot = tinggi kartu (beranimasi) → tinggi kolom dan
+                        // mask input ikut, sementara tinggi window tetap konstan
+                        implicitHeight: card.height
+
+                        Item {
+                            id: card
+                            width: parent.width
+                            height: playerSlot.targetHeight
+                            Behavior on height {
+                                NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+                            }
+                            Player {
+                                anchors.fill: parent
+                                player: playerSlot.modelData
+                                visualizerPoints: GlobalStates.visualizerPoints
+                                radius: root.popupRounding
+                            }
+                        }
                     }
                 }
 
