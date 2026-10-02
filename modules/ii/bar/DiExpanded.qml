@@ -116,6 +116,9 @@ Scope {
             }
 
             screen: scope.di.QsWindow.window?.screen ?? null
+            // Mapped only while open or animating: at rest it would still be re-rendered (full 700 px surface,
+            // every frame) by whatever animates in the hidden compact ghost and views.
+            visible: scope.di.expanded || scope.openSpring.moving || scope.progress > 0.002
             color: "transparent"
             exclusionMode: ExclusionMode.Ignore
             exclusiveZone: 0
@@ -311,7 +314,9 @@ Scope {
 
                     readonly property bool shown: scope.progress > 0.02
                     readonly property bool coversPill: scope.progress > 0.2
-                    onCoversPillChanged: scope.di.overlayShown = island.coversPill
+                    // The bar pill only hides once this surface is actually on screen
+                    readonly property bool coverReady: island.coversPill && win.backingWindowVisible
+                    onCoverReadyChanged: scope.di.overlayShown = island.coverReady
                     Component.onDestruction: {
                         scope.di.overlayShown = false
                         scope.di.cardHovered = false
