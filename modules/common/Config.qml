@@ -898,7 +898,8 @@ Singleton {
                     property bool fullscreenGameQuiet: true
                     // "files": only a file landing in the downloads folder counts; "traffic": any sustained burst
                     property string downloadDetection: "files"
-                    property int shelfExpireDays: 14 // 0 keeps files in the drawer forever
+                    property int shelfExpireHours: 2 // unpinned files leave the drawer this long after last being touched; 0 keeps them
+                    property bool shelfClearOnBoot: true // unpinned files do not survive a reboot
                     property list<string> mutedConversations: []
                     property list<string> mutedConversationsUntil: [] // "<epoch ms>|App|Title": muted for a while (1 h, until tomorrow)
                     property list<string> priorityNotificationApps: ["whatsapp"]

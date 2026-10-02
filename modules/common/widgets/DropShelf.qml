@@ -10,11 +10,17 @@ import qs
 Singleton {
     id: root
     property var items: []
+    // Last time each item was added or used
     property var addedAt: ({})
+    property var pinned: ({})
     property int maxItems: 30
     readonly property string storeDir: FileUtils.trimFileProtocol(`${Directories.state}/user/dropshelf`)
     readonly property string storeFile: FileUtils.trimFileProtocol(`${Directories.state}/user/dropshelf.json`)
-    readonly property int expireDays: Config.options.bar.dynamicIsland.shelfExpireDays ?? 14
+    readonly property int expireHours: Config.options.bar.dynamicIsland.shelfExpireHours ?? 2
+    readonly property real expireMs: root.expireHours * 3600 * 1000
+    readonly property bool clearOnBoot: Config.options.bar.dynamicIsland.shelfClearOnBoot ?? true
+    property string bootId: ""
+    onExpireMsChanged: root.schedule()
     property string toolStatus: ""
 
     signal itemsAdded(var paths)
@@ -67,6 +73,7 @@ Singleton {
         root.addedAt = stamps
         root.items = arr
         root.save()
+        root.schedule()
         if (added.length > 0) root.itemsAdded(added)
         if (remote.length > 0) root.download(remote)
     }
@@ -90,36 +97,77 @@ Singleton {
 
     function remove(path) {
         const stamps = Object.assign({}, root.addedAt)
+        const pins = Object.assign({}, root.pinned)
         delete stamps[path]
+        delete pins[path]
         root.addedAt = stamps
+        root.pinned = pins
         root.items = root.items.filter(p => p !== path)
         root.save()
+        root.schedule()
+    }
+
+    function isPinned(path) {
+        return root.pinned[path] === true
+    }
+
+    function togglePin(path) {
+        const pins = Object.assign({}, root.pinned)
+        if (pins[path]) delete pins[path]
+        else pins[path] = true
+        root.pinned = pins
+        root.touch(path)
+    }
+
+    // Using an item restarts its clock
+    function touch(path) {
+        if (!root.items.includes(path)) return
+        root.addedAt = Object.assign({}, root.addedAt, { [path]: Date.now() })
+        root.save()
+        root.schedule()
+    }
+
+    function keepOnly(kept) {
+        const stamps = {}
+        const pins = {}
+        for (const path of kept) {
+            stamps[path] = root.addedAt[path] ?? Date.now()
+            if (root.pinned[path]) pins[path] = true
+        }
+        root.addedAt = stamps
+        root.pinned = pins
+        root.items = kept
     }
 
     function pruneExpired() {
-        if (root.expireDays <= 0) return
-        const cutoff = Date.now() - root.expireDays * 24 * 3600 * 1000
-        const stamps = Object.assign({}, root.addedAt)
-        let changed = false
-        for (const path of root.items) {
-            if (!stamps[path]) {
-                stamps[path] = Date.now()
-                changed = true
+        if (root.expireMs > 0) {
+            const cutoff = Date.now() - root.expireMs
+            const kept = root.items.filter(p => root.pinned[p] || (root.addedAt[p] ?? Date.now()) > cutoff)
+            if (kept.length !== root.items.length) {
+                root.keepOnly(kept)
+                root.save()
             }
         }
-        const kept = root.items.filter(p => stamps[p] >= cutoff)
-        if (kept.length !== root.items.length) {
-            for (const gone of root.items.filter(p => !kept.includes(p))) delete stamps[gone]
-            root.items = kept
-            changed = true
-        }
-        root.addedAt = stamps
-        if (changed) root.save()
+        root.schedule()
     }
 
-    function daysLeft(path) {
-        if (root.expireDays <= 0 || !root.addedAt[path]) return -1
-        return Math.max(0, Math.ceil((root.addedAt[path] + root.expireDays * 24 * 3600 * 1000 - Date.now()) / (24 * 3600 * 1000)))
+    // Milliseconds until `path` leaves the drawer; -1 when it stays
+    function timeLeft(path) {
+        if (root.expireMs <= 0 || root.pinned[path] || !root.addedAt[path]) return -1
+        return Math.max(0, root.addedAt[path] + root.expireMs - Date.now())
+    }
+
+    // One shot aimed at the next expiry: nothing ticks while the drawer is empty or all pinned
+    function schedule() {
+        expiryTimer.stop()
+        if (root.expireMs <= 0) return
+        let next = Infinity
+        for (const path of root.items) {
+            if (!root.pinned[path]) next = Math.min(next, (root.addedAt[path] ?? Date.now()) + root.expireMs)
+        }
+        if (next === Infinity) return
+        expiryTimer.interval = Math.max(1000, Math.min(2147483647, next - Date.now() + 500))
+        expiryTimer.start()
     }
 
     function mergePdfs(paths) {
@@ -179,10 +227,12 @@ Singleton {
         copyProc.running = true
     }
 
+    // Pinned items survive a clear, unless they are all that is left
     function clear() {
-        root.items = []
-        root.addedAt = ({})
+        const pinnedItems = root.items.filter(p => root.pinned[p])
+        root.keepOnly(pinnedItems.length < root.items.length ? pinnedItems : [])
         root.save()
+        root.schedule()
         GlobalStates.dropShelfOpen = false
     }
 
@@ -191,14 +241,18 @@ Singleton {
     }
 
     function save() {
-        shelfFile.setText(JSON.stringify({ items: root.items, addedAt: root.addedAt }))
+        shelfFile.setText(JSON.stringify({ items: root.items, addedAt: root.addedAt, pinned: root.pinned, bootId: root.bootId }))
     }
 
     Timer {
-        interval: 3600 * 1000
-        repeat: true
-        running: true
+        id: expiryTimer
         onTriggered: root.pruneExpired()
+    }
+
+    FileView {
+        id: bootFile
+        path: "/proc/sys/kernel/random/boot_id"
+        blockLoading: true
     }
 
     FileView {
@@ -212,7 +266,13 @@ Singleton {
                 } else if (parsed && Array.isArray(parsed.items)) {
                     root.items = parsed.items
                     root.addedAt = parsed.addedAt ?? ({})
+                    root.pinned = parsed.pinned ?? ({})
                 }
+                const boot = bootFile.text().trim()
+                const rebooted = boot !== "" && (parsed?.bootId ?? "") !== "" && parsed.bootId !== boot
+                root.bootId = boot
+                if (rebooted && root.clearOnBoot) root.keepOnly(root.items.filter(p => root.pinned[p]))
+                if (rebooted || (parsed?.bootId ?? "") !== boot) root.save()
                 root.pruneExpired()
             } catch (e) {
                 console.warn("[DropShelf] Could not read saved items:", e)

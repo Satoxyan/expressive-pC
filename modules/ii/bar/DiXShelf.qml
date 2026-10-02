@@ -163,6 +163,7 @@ ColumnLayout {
     component TileButton: Rectangle {
         id: tileButton
         property string icon
+        property real fill: 0
         property var onTap
         width: 20
         height: 20
@@ -173,6 +174,7 @@ ColumnLayout {
             anchors.centerIn: parent
             text: tileButton.icon
             iconSize: 13
+            fill: tileButton.fill
             color: "white"
         }
 
@@ -193,6 +195,7 @@ ColumnLayout {
         readonly property var meta: xshelf.info[tile.path]
         readonly property bool missing: xshelf.infoReady && tile.meta === undefined
         readonly property bool isImage: DropShelf.isImage(tile.path)
+        readonly property bool pinned: DropShelf.isPinned(tile.path)
         readonly property bool hovered: tileHover.hovered && !tileMouse.drag.active
         height: xshelf.tileHeight
         radius: 12
@@ -272,8 +275,13 @@ ColumnLayout {
             }
 
             Rectangle {
-                readonly property int days: DropShelf.daysLeft(tile.path)
-                visible: days >= 0 && days <= 2
+                // Read when the view opens or the item is touched; no ticking countdown
+                readonly property real remaining: {
+                    DropShelf.addedAt
+                    DropShelf.pinned
+                    return DropShelf.timeLeft(tile.path)
+                }
+                visible: remaining >= 0 && !tile.hovered
                 anchors {
                     left: parent.left
                     top: parent.top
@@ -286,7 +294,7 @@ ColumnLayout {
                 StyledText {
                     id: expiryText
                     anchors.centerIn: parent
-                    text: `${parent.days}d`
+                    text: parent.remaining >= 3600 * 1000 ? `${Math.round(parent.remaining / 3600000)}h` : `${Math.max(1, Math.round(parent.remaining / 60000))}min`
                     font.pixelSize: 9
                     color: "white"
                 }
@@ -342,7 +350,27 @@ ColumnLayout {
                 tileDragProxy.x = 0
                 tileDragProxy.y = 0
             }
-            onDoubleClicked: Qt.openUrlExternally(`file://${tile.path}`)
+            drag.onActiveChanged: if (drag.active) DropShelf.touch(tile.path)
+            onDoubleClicked: {
+                DropShelf.touch(tile.path)
+                Qt.openUrlExternally(`file://${tile.path}`)
+            }
+        }
+
+        TileButton {
+            anchors {
+                left: thumb.left
+                top: thumb.top
+                margins: 4
+            }
+            opacity: tile.hovered || tile.pinned ? 1 : 0
+            visible: opacity > 0
+            icon: "keep"
+            fill: tile.pinned ? 1 : 0
+            onTap: () => DropShelf.togglePin(tile.path)
+            Behavior on opacity {
+                NumberAnimation { duration: IslandMotion.micro }
+            }
         }
 
         TileButton {
@@ -376,7 +404,10 @@ ColumnLayout {
 
             TileButton {
                 icon: "open_in_new"
-                onTap: () => Qt.openUrlExternally(`file://${tile.path}`)
+                onTap: () => {
+                    DropShelf.touch(tile.path)
+                    Qt.openUrlExternally(`file://${tile.path}`)
+                }
             }
             TileButton {
                 icon: DropShelf.isPdf(tile.path) ? "compress" : DropShelf.isArchive(tile.path) ? "unarchive" : "folder_zip"
@@ -519,7 +550,7 @@ ColumnLayout {
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.Wrap
             text: Translation.tr("Drag files onto the island to keep them here")
-                + (DropShelf.expireDays > 0 ? `\n${Translation.tr("they stay for %1 days").arg(DropShelf.expireDays)}` : "")
+                + (DropShelf.expireHours > 0 ? `\n${Translation.tr("unpinned files leave after %1 h without use").arg(DropShelf.expireHours)}` : "")
             font.pixelSize: Appearance.font.pixelSize.smallest
             color: Appearance.colors.colOnLayer0
             opacity: 0.55

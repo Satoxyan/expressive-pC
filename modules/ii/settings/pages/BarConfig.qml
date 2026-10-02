@@ -898,12 +898,12 @@ ContentPage {
                     }
                     ConfigSpinBox {
                         icon: "auto_delete"
-                        text: Translation.tr("Drawer keeps files for (days)")
-                        value: Config.options.bar.dynamicIsland.shelfExpireDays
+                        text: Translation.tr("Drawer drops unpinned files after (hours unused)")
+                        value: Config.options.bar.dynamicIsland.shelfExpireHours
                         from: 0
-                        to: 90
+                        to: 72
                         stepSize: 1
-                        onValueChanged: { Config.options.bar.dynamicIsland.shelfExpireDays = value; }
+                        onValueChanged: { Config.options.bar.dynamicIsland.shelfExpireHours = value; }
                     }
                 }
             }
