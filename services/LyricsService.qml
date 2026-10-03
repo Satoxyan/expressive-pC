@@ -57,6 +57,11 @@ Singleton {
     property int activeWordIndex: -1
     property real activeWordProgress: 0
 
+    // Sentence-level sweep (0..1) across the active line, used when the
+    // source only carries line timing: line start -> next line start, so
+    // the glow tracks the real song instead of guessed per-word times.
+    property real activeLineProgress: 0
+
     function buildSlots(idx) {
         let result = []
         for (let i = 0; i < root.total; i++) {
@@ -77,13 +82,19 @@ Singleton {
     function updateActiveWords() {
         const line = root.lyricsLines[root.activeIndex]
         const words = line?.words ?? []
+        const pos = root.shiftedPos()
+        // The sentence sweep always follows the real line span, so a source
+        // with no word timings can still light the line over its own length.
+        const lineEnd = root.lyricsLines[root.activeIndex + 1]?.time
+        root.activeLineProgress = (line && lineEnd !== undefined && lineEnd > line.time)
+            ? Math.min(1, Math.max(0, (pos - line.time) / (lineEnd - line.time)))
+            : (line && pos >= line.time ? 1 : 0)
         if (!words || words.length === 0) {
             root.activeLineWords = []
             root.activeWordIndex = -1
             root.activeWordProgress = 0
             return
         }
-        const pos = root.shiftedPos()
         let idx = -1
         for (let i = 0; i < words.length; i++) {
             if (words[i].time <= pos) idx = i
@@ -288,6 +299,7 @@ Singleton {
         root.activeLineWords = []
         root.activeWordIndex = -1
         root.activeWordProgress = 0
+        root.activeLineProgress = 0
         root.status = "loading"
 
         const title    = root.activePlayer?.trackTitle  ?? ""

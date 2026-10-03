@@ -12,6 +12,7 @@ import threading
 import datetime
 import urllib.request
 import urllib.parse
+import uuid
 
 DEFAULT_PROVIDERS = "musixmatch,youlyplus,unison,paxsenix,betterlyric,simpmusic,lrclib,kugou"
 
@@ -236,9 +237,10 @@ def _ttml_line_words(p):
                 words.append({"t": _ttml_time(begin), "w": text, "_space": has_space})
 
     if not words:
-        text = _ttml_line_text(p)
-        if text:
-            return [{"t": _ttml_time(p.get("begin")), "w": text}]
+        # Sentence-level timing only. Return no words instead of one
+        # whole-line "word": a single word spanning the line renders every
+        # piece with the same index, so the whole sentence lights at once
+        # instead of sweeping word by word.
         return []
 
     # Merge syllables: if the previous word had NO space after it,
@@ -294,6 +296,39 @@ _MS_HEADERS = {
 _MS_SECRET_FALLBACK = "b3dc8788299f5806a70a6a20a0cb0ffc"
 _ms_secret_cache = [None]
 _ms_token_cache = [None]
+# token.get is the call Musixmatch challenges (401 hint=captcha) whenever it
+# arrives too often, so the guid+token pair is kept on disk and reused across
+# runs; without it every song would pay a fresh challenge and often lose.
+_MS_TOKEN_FILE = os.path.join(os.path.expanduser("~/.cache"),
+                              "expressive-pC-musixmatch-token.json")
+_ms_guid = str(uuid.uuid4())
+
+
+def _ms_token_read():
+    try:
+        with open(_MS_TOKEN_FILE) as f:
+            c = json.load(f)
+        if time.time() - c.get("ts", 0) < 1800 and c.get("token") and c.get("guid"):
+            return c
+    except Exception:
+        pass
+    return None
+
+
+def _ms_token_store(guid, token):
+    try:
+        os.makedirs(os.path.dirname(_MS_TOKEN_FILE), exist_ok=True)
+        with open(_MS_TOKEN_FILE, "w") as f:
+            json.dump({"guid": guid, "token": token, "ts": time.time()}, f)
+    except Exception:
+        pass
+
+
+def _ms_token_drop():
+    try:
+        os.remove(_MS_TOKEN_FILE)
+    except OSError:
+        pass
 
 
 def _ms_get_secret():
@@ -330,22 +365,31 @@ def _ms_sign(url, secret):
 
 
 def _ms_get_token(secret, force=False):
+    global _ms_guid
     if not force and _ms_token_cache[0]:
         return _ms_token_cache[0]
-    url = "https://apic.musixmatch.com/ws/1.1/token.get?app_id=web-desktop-app-v1.0&format=json"
+    if not force:
+        cached = _ms_token_read()
+        if cached:
+            _ms_guid = cached["guid"]
+            _ms_token_cache[0] = cached["token"]
+            return _ms_token_cache[0]
+    url = ("https://apic.musixmatch.com/ws/1.1/token.get"
+           f"?app_id=mobile-app-v1.0&guid={_ms_guid}&format=json")
     data = _http_json(_ms_sign(url, secret), headers=_MS_HEADERS)
     body = data.get("message", {}).get("body")
     if isinstance(body, dict):
         token = body.get("user_token")
         if token:
             _ms_token_cache[0] = token
+            _ms_token_store(_ms_guid, token)
             return token
     raise Exception("no user token")
 
 
 def _ms_fetch_lyric(track_id, token, secret, kind):
     ep = {"richsync": "track.richsync.get", "subtitle": "track.subtitle.get"}[kind]
-    url = (f"https://apic.musixmatch.com/ws/1.1/{ep}?app_id=web-desktop-app-v1.0&format=json"
+    url = (f"https://apic.musixmatch.com/ws/1.1/{ep}?app_id=mobile-app-v1.0&format=json"
            f"&track_id={track_id}&usertoken={token}")
     data = _http_json(_ms_sign(url, secret), headers=_MS_HEADERS)
     if data.get("message", {}).get("header", {}).get("status_code") in (401, 402):
@@ -404,7 +448,12 @@ def _ms_subtitle_to_lines(body):
     try:
         entries = json.loads(body)
     except Exception:
-        return []
+        entries = None
+    if not isinstance(entries, list):
+        # subtitle_body now comes back as plain LRC text instead of the
+        # JSON array handled below, so an unparseable body is LRC, not a
+        # failure.
+        return _parse_lrc(body)
     lines = []
     for e in entries:
         text = (e.get("text") or "").strip()
@@ -421,7 +470,7 @@ def fetch_musixmatch(title, artist, duration):
             secret = _ms_get_secret()
             token = _ms_get_token(secret, force=(attempt > 0))
             search_url = ("https://apic.musixmatch.com/ws/1.1/track.search?"
-                          "app_id=web-desktop-app-v1.0&format=json"
+                          "app_id=mobile-app-v1.0&format=json"
                           f"&q_track={_q(title)}&q_artist={_q(artist)}"
                           "&f_has_lyrics=true&page_size=10"
                           f"&usertoken={token}")
@@ -451,7 +500,11 @@ def fetch_musixmatch(title, artist, duration):
                     dd = 999
                 else:
                     dd = 1 << 31
-                return (ts << 32) + dd
+                # Title first, then prefer a track that actually has richsync
+                # (word timings) over one that only has line subtitles, then
+                # closest duration — a couple of seconds off on the duration
+                # costs nothing, losing the word timings costs the karaoke.
+                return (ts, 0 if t.get("has_richsync") == 1 else 1, dd)
 
             tracks.sort(key=keyfn)
             best = tracks[0]
@@ -465,9 +518,16 @@ def fetch_musixmatch(title, artist, duration):
                 if lines:
                     return lines
             return []
-        except Exception:
+        except Exception as e:
             _ms_token_cache[0] = None
-            _ms_secret_cache[0] = None
+            # "token expired" means the stored pair is dead, not slow:
+            # forget it so the next run fetches a fresh one instead of
+            # replaying the same 401 forever.
+            if "token expired" in str(e):
+                _ms_token_drop()
+            # A back-to-back token.get trips Musixmatch's rate limit
+            # (401 hint=captcha), so back off before retrying.
+            time.sleep(2)
     return []
 
 
@@ -1083,44 +1143,6 @@ def _provider_names(arg):
     return [p.strip() for p in arg.split(",") if p.strip()]
 
 
-_PAUSE_PUNCT = frozenset(",.;:!?—–…-()[]\"")
-
-
-def _synthesize_words(lines):
-    """Assign per-word timings to lines that lack them.
-
-    Distributes each line's time span (line start -> next line start) across
-    its words so the karaoke effect still works for plain LRC sources without
-    word-level timestamps. A word's share is proportional to its length, and
-    words ending in punctuation get extra time so phrasing/pauses feel natural
-    instead of a uniform sweep.
-    """
-    out = []
-    n = len(lines)
-    for i, line in enumerate(lines):
-        if line.get("words"):
-            out.append(line)
-            continue
-        text = line.get("text") or ""
-        words = text.split()
-        if not words:
-            out.append(line)
-            continue
-        start = line["time"]
-        end = lines[i + 1]["time"] if i + 1 < n else start + 5.0
-        span = max(0.25, end - start)
-        weights = [len(w) + (3 if w[-1] in _PAUSE_PUNCT else 0) for w in words]
-        total = sum(weights)
-        ws = []
-        t = start
-        for w, wt in zip(words, weights):
-            ws.append({"t": t, "w": w})
-            t += span * (wt / total)
-        line["words"] = ws
-        out.append(line)
-    return out
-
-
 def main():
     if len(sys.argv) < 4:
         print("no_info", flush=True)
@@ -1169,7 +1191,6 @@ def main():
             continue
         lines = run_with_timeout(fn)
         if lines:
-            lines = _synthesize_words(lines)
             payload = {
                 "ok": True,
                 "provider": name,

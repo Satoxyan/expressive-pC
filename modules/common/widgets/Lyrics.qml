@@ -292,9 +292,13 @@ Item {
                 readonly property bool isNoteSlot: index === LyricsService.noteSlot
                     && LyricsService.noteSlot >= 0
                     && LyricsService.providedBy.length > 0
+                // Karaoke layout drives the active slot for every source: a
+                // per-word sweep when the provider has real word timings, one
+                // sentence sweep across the whole line when it only has line
+                // timing. Empty slot text (loading) keeps the plain fallback.
                 readonly property bool useKaraoke: root.karaoke
                     && slotItem.isActiveSlot
-                    && (LyricsService.activeLineWords?.length ?? 0) > 0
+                    && (LyricsService.slots[slotItem.index] ?? "").length > 0
 
                 // Per-word karaoke line. Rows are computed manually instead
                 // of using a Flow, because a Flow fills the width and always
@@ -342,7 +346,13 @@ Item {
 
                 function buildKaraokeRows() {
                     const words = LyricsService.activeLineWords ?? []
-                    if (words.length === 0) return []
+                    // No word timings from the source: build the rows from the
+                    // slot text and give every piece a slice of the line's own
+                    // duration instead (index -1 marks the sentence sweep).
+                    const sentence = words.length === 0
+                    const source = sentence
+                        ? [{ text: LyricsService.slots[slotItem.index] ?? "" }]
+                        : words
                     const spacing = karaokeColumn.spacing
                     const maxWidth = Math.max(1, slotItem.width)
                     // Some providers return the whole line as a single "word"
@@ -350,15 +360,30 @@ Item {
                     // line can wrap instead of overflowing the slot; every piece
                     // keeps the original word index for the highlight sweep.
                     const pieces = []
-                    for (let i = 0; i < words.length; i++) {
-                        const parts = String(words[i].text ?? "").split(/\s+/).filter(s => s.length > 0)
-                        for (const part of parts) pieces.push({ index: i, text: part })
+                    for (let i = 0; i < source.length; i++) {
+                        const parts = String(source[i].text ?? "").split(/\s+/).filter(s => s.length > 0)
+                        for (const part of parts)
+                            pieces.push({ index: sentence ? -1 : i, text: part })
                     }
                     if (pieces.length === 0) return []
+                    // Share of the line each piece owns, accumulated in reading
+                    // order across wrapped rows, so the sentence sweep wipes
+                    // left to right instead of every word filling at once.
+                    let cum = 0
+                    for (const p of pieces) {
+                        p.w = karaokeMetrics.advanceWidth(p.text)
+                        p.start = cum
+                        cum += p.w + spacing
+                    }
+                    for (const p of pieces) {
+                        const s = p.start
+                        p.start = cum > 0 ? s / cum : 0
+                        p.end = cum > 0 ? (s + p.w) / cum : 1
+                    }
                     const rows = []
                     let cur = [], curWidth = 0
                     for (let i = 0; i < pieces.length; i++) {
-                        const w = karaokeMetrics.advanceWidth(pieces[i].text)
+                        const w = pieces[i].w
                         const need = cur.length === 0 ? w : curWidth + spacing + w
                         if (cur.length > 0 && need > maxWidth) {
                             rows.push(cur)
@@ -411,6 +436,14 @@ Item {
                                     fontSize: root.fontSizeFor(0)
                                     dimColor: root.dimColor
                                     progress: {
+                                        // Sentence-level source: one sweep
+                                        // across the whole line, each piece
+                                        // taking its own slice of it.
+                                        if (wordIndex < 0) {
+                                            const p = LyricsService.activeLineProgress
+                                            const span = Math.max(1e-4, modelData.end - modelData.start)
+                                            return Math.min(1, Math.max(0, (p - modelData.start) / span))
+                                        }
                                         const cur = LyricsService.activeWordIndex
                                         if (wordIndex < cur) return 1
                                         if (wordIndex === cur)
