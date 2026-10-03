@@ -11,7 +11,14 @@ import qs.modules.common.models.hyprland
 ContentPage {
     id: page
     forceWidth: true
-    property bool showMonitorAdvanced: false
+    // Dropdown menus tracked per monitor name, so several can be open at
+    // once and a hotplug reorder doesn't shuffle them.
+    property var openMonitors: ({})
+    function toggleAdvanced(monName) {
+        const next = Object.assign({}, page.openMonitors)
+        next[monName] = !next[monName]
+        page.openMonitors = next
+    }
 
     Component.onCompleted: {
         const h = Config.options.hyprland
@@ -66,142 +73,147 @@ ContentPage {
             }
 
             // One dropdown row per connected monitor. The chevron selects that
-            // monitor (same as clicking it on the canvas) and opens its
-            // advanced options below.
+            // monitor on the canvas and expands its options directly under the
+            // row, so several menus can be open at the same time.
             Repeater {
                 model: monitorConfig.monitors
-                delegate: GroupedList {
+                delegate: ColumnLayout {
+                    id: monCol
                     required property int index
+                    Layout.fillWidth: true
+                    spacing: 0
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-                        ConfigSwitch {
+                    readonly property string monName: monitorConfig.monitors[index]?.name ?? ""
+                    readonly property bool open: page.openMonitors[monName] === true
+
+                    GroupedList {
+                        RowLayout {
                             Layout.fillWidth: true
-                            buttonIcon: "tv_off"
-                            text: (monitorConfig.monitors[index]?.name ?? "")
-                                + (monitorConfig.monitors[index]?.description ? " · " + monitorConfig.monitors[index]?.description : "")
-                            checked: !(monitorConfig.monitors[index]?.disabled ?? false)
-                            enabled: monitorConfig.monitors.length > 1
-                            onCheckedChanged: {
-                                if (monitorConfig.monitors.length === 1 && !checked) return
-                                if (checked === !(monitorConfig.monitors[index]?.disabled ?? false)) return
-                                monitorConfig.updateMonitor(index, { disabled: !checked })
-                                monitorConfig.applyAndSave(index)
+                            spacing: 8
+                            ConfigSwitch {
+                                Layout.fillWidth: true
+                                buttonIcon: "tv_off"
+                                text: (monitorConfig.monitors[index]?.name ?? "")
+                                    + (monitorConfig.monitors[index]?.description ? " \u00b7 " + monitorConfig.monitors[index]?.description : "")
+                                checked: !(monitorConfig.monitors[index]?.disabled ?? false)
+                                enabled: monitorConfig.monitors.length > 1
+                                onCheckedChanged: {
+                                    if (monitorConfig.monitors.length === 1 && !checked) return
+                                    if (checked === !(monitorConfig.monitors[index]?.disabled ?? false)) return
+                                    monitorConfig.updateMonitor(index, { disabled: !checked })
+                                    monitorConfig.applyAndSave(index)
+                                }
                             }
-                        }
-                        RippleButton {
-                            implicitWidth: 36; implicitHeight: 36
-                            buttonRadius: Appearance.rounding.full
-                            colBackground: "transparent"
-                            onClicked: {
-                                const open = page.showMonitorAdvanced
-                                    && monitorCanvas.selectedIndex === index
-                                monitorCanvas.selectedIndex = index
-                                page.showMonitorAdvanced = !open
-                            }
-                            MaterialSymbol {
-                                anchors.centerIn: parent
-                                text: page.showMonitorAdvanced
-                                    && monitorCanvas.selectedIndex === index
-                                    ? "expand_less" : "expand_more"
-                                iconSize: 20
-                                color: Appearance.colors.colOnLayer1
+                            RippleButton {
+                                implicitWidth: 36; implicitHeight: 36
+                                buttonRadius: Appearance.rounding.full
+                                colBackground: "transparent"
+                                onClicked: {
+                                    monitorCanvas.selectedIndex = index
+                                    page.toggleAdvanced(monCol.monName)
+                                }
+                                MaterialSymbol {
+                                    anchors.centerIn: parent
+                                    text: monCol.open ? "expand_less" : "expand_more"
+                                    iconSize: 20
+                                    color: Appearance.colors.colOnLayer1
+                                }
                             }
                         }
                     }
-                }
-            }
-            // Advanced options — outside GroupedList, scroll-down animation, no empty column when collapsed
-            GroupedList {
-                visible: page.showMonitorAdvanced || implicitHeight > 0
-                Layout.fillWidth: true
-                Layout.topMargin: 1
-                Layout.bottomMargin: page.showMonitorAdvanced ? 24 : 0
-                implicitHeight: page.showMonitorAdvanced ? advancedCol.implicitHeight : 0
-                opacity: page.showMonitorAdvanced ? 1 : 0
-                clip: false
-                Behavior on implicitHeight { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
-                Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                Behavior on Layout.bottomMargin { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
 
-                ColumnLayout {
-                    id: advancedCol
-                    anchors.fill: parent
-                    anchors.margins: 8
-                    spacing: 8
+                    // Advanced options for this monitor, right under its row.
+                    // Scroll-down animation, no empty column when collapsed.
+                    GroupedList {
+                        visible: monCol.open || implicitHeight > 0
+                        Layout.topMargin: 1
+                        Layout.bottomMargin: monCol.open ? 24 : 0
+                        implicitHeight: monCol.open ? advancedCol.implicitHeight : 0
+                        opacity: monCol.open ? 1 : 0
+                        clip: false
+                        Behavior on implicitHeight { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
+                        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                        Behavior on Layout.bottomMargin { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
+
+                        ColumnLayout {
+                            id: advancedCol
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            spacing: 8
 
                             ConfigComboBox {
-                        Layout.fillWidth: true
-                        buttonIcon: "aspect_ratio"
-                        text: Translation.tr("Resolution & Refresh Rate")
-                        textRole: "display"
-                        model: (monitorConfig.monitors[monitorCanvas.selectedIndex]?.availableModes ?? [])
-                            .map(mode => ({ display: mode, value: mode }))
-                        currentValue: monitorConfig.monitors[monitorCanvas.selectedIndex]?.currentMode ?? ""
-                        onSelected: newValue => {
-                            const mode = newValue
-                            const parts = mode.match(/(\d+)x(\d+)@([\d.]+)Hz/)
-                            monitorConfig.updateMonitor(monitorCanvas.selectedIndex, {
-                                currentMode: mode,
-                                width: parseInt(parts[1]),
-                                height: parseInt(parts[2]),
-                                refreshRate: parseFloat(parts[3])
-                            })
-                            monitorConfig.applyAndSave(monitorCanvas.selectedIndex)
-                        }
-                    }
+                                Layout.fillWidth: true
+                                buttonIcon: "aspect_ratio"
+                                text: Translation.tr("Resolution & Refresh Rate")
+                                textRole: "display"
+                                model: (monitorConfig.monitors[index]?.availableModes ?? [])
+                                    .map(mode => ({ display: mode, value: mode }))
+                                currentValue: monitorConfig.monitors[index]?.currentMode ?? ""
+                                onSelected: newValue => {
+                                    const mode = newValue
+                                    const parts = mode.match(/(\d+)x(\d+)@([\d.]+)Hz/)
+                                    monitorConfig.updateMonitor(index, {
+                                        currentMode: mode,
+                                        width: parseInt(parts[1]),
+                                        height: parseInt(parts[2]),
+                                        refreshRate: parseFloat(parts[3])
+                                    })
+                                    monitorConfig.applyAndSave(index)
+                                }
+                            }
 
-                    ConfigSelectionArray {
-                        text: Translation.tr("Orientation")
-                        icon: "mobile_rotate"
-                        currentValue: monitorConfig.monitors[monitorCanvas.selectedIndex]?.transform ?? 0
-                        onSelected: newValue => {
-                            monitorConfig.updateMonitor(monitorCanvas.selectedIndex, { transform: newValue })
-                            monitorConfig.applyAndSave(monitorCanvas.selectedIndex)
-                        }
-                        options: [
-                            { displayName: Translation.tr("Normal"), icon: "screen_rotation_alt", value: 0 },
-                            { displayName: "90°",                    icon: "rotate_90_degrees_cw",  value: 1 },
-                            { displayName: "180°",                   icon: "screen_rotation",       value: 2 },
-                            { displayName: "270°",                   icon: "rotate_90_degrees_ccw", value: 3 },
-                        ]
-                    }
-    
-                    ConfigSpinBox {
-                        icon: "zoom_in"
-                        text: Translation.tr("Scale")
-                        value: Math.round((monitorConfig.monitors[monitorCanvas.selectedIndex]?.scale ?? 1.0) * 100)
-                        from: 50; to: 300; stepSize: 25
-                        onValueChanged: {
-                            const newVal = value / 100.0
-                            if (newVal === (monitorConfig.monitors[monitorCanvas.selectedIndex]?.scale ?? 1.0)) return
-                            monitorConfig.updateMonitor(monitorCanvas.selectedIndex, { scale: newVal })
-                            monitorConfig.applyAndSave(monitorCanvas.selectedIndex)
-                        }
-                    }
+                            ConfigSelectionArray {
+                                text: Translation.tr("Orientation")
+                                icon: "mobile_rotate"
+                                currentValue: monitorConfig.monitors[index]?.transform ?? 0
+                                onSelected: newValue => {
+                                    monitorConfig.updateMonitor(index, { transform: newValue })
+                                    monitorConfig.applyAndSave(index)
+                                }
+                                options: [
+                                    { displayName: Translation.tr("Normal"), icon: "screen_rotation_alt", value: 0 },
+                                    { displayName: "90\u00b0",                    icon: "rotate_90_degrees_cw",  value: 1 },
+                                    { displayName: "180\u00b0",                   icon: "screen_rotation",       value: 2 },
+                                    { displayName: "270\u00b0",                   icon: "rotate_90_degrees_ccw", value: 3 },
+                                ]
+                            }
 
-                    ConfigSpinBox {
-                        icon: "swap_horiz"
-                        text: Translation.tr("Position X")
-                        value: monitorConfig.monitors[monitorCanvas.selectedIndex]?.x ?? 0
-                        from: 0; to: 7680; stepSize: 1
-                        onValueChanged: {
-                            if (value === (monitorConfig.monitors[monitorCanvas.selectedIndex]?.x ?? 0)) return
-                            monitorConfig.updateMonitor(monitorCanvas.selectedIndex, { x: value })
-                            monitorConfig.applyAndSave(monitorCanvas.selectedIndex)
-                        }
-                    }
+                            ConfigSpinBox {
+                                icon: "zoom_in"
+                                text: Translation.tr("Scale")
+                                value: Math.round((monitorConfig.monitors[index]?.scale ?? 1.0) * 100)
+                                from: 50; to: 300; stepSize: 25
+                                onValueChanged: {
+                                    const newVal = value / 100.0
+                                    if (newVal === (monitorConfig.monitors[index]?.scale ?? 1.0)) return
+                                    monitorConfig.updateMonitor(index, { scale: newVal })
+                                    monitorConfig.applyAndSave(index)
+                                }
+                            }
 
-                    ConfigSpinBox {
-                        icon: "swap_vert"
-                        text: Translation.tr("Position Y")
-                        value: monitorConfig.monitors[monitorCanvas.selectedIndex]?.y ?? 0
-                        from: 0; to: 4320; stepSize: 1
-                        onValueChanged: {
-                            if (value === (monitorConfig.monitors[monitorCanvas.selectedIndex]?.y ?? 0)) return
-                            monitorConfig.updateMonitor(monitorCanvas.selectedIndex, { y: value })
-                            monitorConfig.applyAndSave(monitorCanvas.selectedIndex)
+                            ConfigSpinBox {
+                                icon: "swap_horiz"
+                                text: Translation.tr("Position X")
+                                value: monitorConfig.monitors[index]?.x ?? 0
+                                from: 0; to: 7680; stepSize: 1
+                                onValueChanged: {
+                                    if (value === (monitorConfig.monitors[index]?.x ?? 0)) return
+                                    monitorConfig.updateMonitor(index, { x: value })
+                                    monitorConfig.applyAndSave(index)
+                                }
+                            }
+
+                            ConfigSpinBox {
+                                icon: "swap_vert"
+                                text: Translation.tr("Position Y")
+                                value: monitorConfig.monitors[index]?.y ?? 0
+                                from: 0; to: 4320; stepSize: 1
+                                onValueChanged: {
+                                    if (value === (monitorConfig.monitors[index]?.y ?? 0)) return
+                                    monitorConfig.updateMonitor(index, { y: value })
+                                    monitorConfig.applyAndSave(index)
+                                }
+                            }
                         }
                     }
                 }
