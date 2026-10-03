@@ -14,6 +14,15 @@ NestableObject {
 
     property var monitors: []
     property var _pendingChanges: ({})
+    property var _applyQueue: []
+    property var _baseline: null
+
+    // Staged edits versus what is already written to monitors.lua. Editing an
+    // option back to its saved value clears this again.
+    readonly property bool dirty: root._baseline !== null
+        && JSON.stringify(root.monitors) !== root._baseline
+
+    function _rebaseline() { root._baseline = JSON.stringify(root.monitors) }
 
     readonly property string configuratorScriptPath: Quickshell.shellPath("scripts/hyprland/monitor_configurator.py")
     readonly property string capsScriptPath: Quickshell.shellPath("scripts/hyprland/monitor_caps.py")
@@ -107,7 +116,7 @@ NestableObject {
         const changedKeys = new Set(Object.keys(changed))
         const { setPairs, resetKeys } = root._fieldsToWrite(m, changedKeys)
 
-        if (Object.keys(setPairs).length === 0 && resetKeys.length === 0) return
+        if (Object.keys(setPairs).length === 0 && resetKeys.length === 0) return false
 
         let args = ["python3", root.configuratorScriptPath, "--file", root.monitorsLuaPath, "--output", m.name]
         for (const key in setPairs) args.push("--set", key, String(setPairs[key]))
@@ -119,6 +128,7 @@ NestableObject {
         let pending = Object.assign({}, root._pendingChanges)
         delete pending[index]
         root._pendingChanges = pending
+        return true
     }
 
     function applyMonitor(m) {
@@ -134,12 +144,24 @@ NestableObject {
         applyProc.running = true
     }
 
-    function applyAndSave(index) {
-        root.save(index)
+    // Option edits are staged in _pendingChanges only: nothing is written to
+    // monitors.lua until the page's Apply button runs applyAll().
+    function applyAndSave(index) {}
+    function saveHdr(index) {}
+
+    function applyAll() {
+        root._applyQueue = Object.keys(root._pendingChanges).map(Number)
+        root._drainApplyQueue()
     }
 
-    function saveHdr(index) {
-        root.save(index)
+    // saveProc is shared, so pending monitors are written one after another
+    // instead of overwriting each other's command.
+    function _drainApplyQueue() {
+        while (root._applyQueue.length > 0) {
+            if (root.save(root._applyQueue.shift())) return
+        }
+        reloadProc.running = true
+        root._rebaseline()
     }
 
     function logicalWidth(m) {
@@ -183,6 +205,7 @@ NestableObject {
                         hdrSupported: null,
                         maxBpc:       null,
                     }))
+                    root._rebaseline()
                     if (root.monitors.length > 0) {
                         capsProc.command = ["python3", root.capsScriptPath].concat(root.monitors.map(mon => mon.name))
                         capsProc.running = true
@@ -207,6 +230,7 @@ NestableObject {
                         patch[name] = { hdrSupported: caps[name].hdr, maxBpc: caps[name].maxBpc }
                     }
                     root._mergeByName(patch)
+                    root._rebaseline()
                 } catch(e) {
                     console.log("[MonitorConfig] Error parsing caps JSON:", e)
                 }
@@ -231,6 +255,7 @@ NestableObject {
                         }
                     }
                     root._mergeByName(patch)
+                    root._rebaseline()
                 } catch(e) {
                     console.log("[MonitorConfig] Error parsing monitors.lua dump JSON:", e)
                 }
@@ -242,7 +267,7 @@ NestableObject {
 
     Process {
         id: saveProc
-        onRunningChanged: if (!running) reloadProc.running = true
+        onRunningChanged: if (!running) root._drainApplyQueue()
     }
 
     Process {
