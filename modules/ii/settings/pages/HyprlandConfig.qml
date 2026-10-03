@@ -66,38 +66,52 @@ ContentPage {
                 monitorConfig: monitorConfig
             }
 
-            // ponytail: per-monitor dropdown — Enabled row shows monitor name, advanced separate (no empty column)
-            GroupedList {
+            // One dropdown row per connected monitor. The chevron selects that
+            // monitor (same as clicking it on the canvas) and opens its
+            // advanced options below.
+            Repeater {
+                model: monitorConfig.monitors
+                delegate: GroupedList {
+                    required property int index
+
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 8
                         ConfigSwitch {
                             Layout.fillWidth: true
                             buttonIcon: "tv_off"
-                            text: (monitorConfig.monitors[monitorCanvas.selectedIndex]?.name ?? Translation.tr("Enabled"))
-                                + (monitorConfig.monitors[monitorCanvas.selectedIndex]?.description ? " · " + monitorConfig.monitors[monitorCanvas.selectedIndex]?.description : "")
-                            checked: !(monitorConfig.monitors[monitorCanvas.selectedIndex]?.disabled ?? false)
+                            text: (monitorConfig.monitors[index]?.name ?? "")
+                                + (monitorConfig.monitors[index]?.description ? " · " + monitorConfig.monitors[index]?.description : "")
+                            checked: !(monitorConfig.monitors[index]?.disabled ?? false)
                             enabled: monitorConfig.monitors.length > 1
                             onCheckedChanged: {
                                 if (monitorConfig.monitors.length === 1 && !checked) return
-                                if (checked === !(monitorConfig.monitors[monitorCanvas.selectedIndex]?.disabled ?? false)) return
-                                monitorConfig.updateMonitor(monitorCanvas.selectedIndex, { disabled: !checked })
-                                monitorConfig.applyAndSave(monitorCanvas.selectedIndex)
+                                if (checked === !(monitorConfig.monitors[index]?.disabled ?? false)) return
+                                monitorConfig.updateMonitor(index, { disabled: !checked })
+                                monitorConfig.applyAndSave(index)
                             }
                         }
                         RippleButton {
                             implicitWidth: 36; implicitHeight: 36
                             buttonRadius: Appearance.rounding.full
                             colBackground: "transparent"
-                            onClicked: page.showMonitorAdvanced = !page.showMonitorAdvanced
+                            onClicked: {
+                                const open = page.showMonitorAdvanced
+                                    && monitorCanvas.selectedIndex === index
+                                monitorCanvas.selectedIndex = index
+                                page.showMonitorAdvanced = !open
+                            }
                             MaterialSymbol {
                                 anchors.centerIn: parent
-                                text: page.showMonitorAdvanced ? "expand_less" : "expand_more"
+                                text: page.showMonitorAdvanced
+                                    && monitorCanvas.selectedIndex === index
+                                    ? "expand_less" : "expand_more"
                                 iconSize: 20
                                 color: Appearance.colors.colOnLayer1
                             }
                         }
                     }
+                }
             }
             // Advanced options — outside GroupedList, scroll-down animation, no empty column when collapsed
             GroupedList {
@@ -191,6 +205,27 @@ ContentPage {
                             monitorConfig.applyAndSave(monitorCanvas.selectedIndex)
                         }
                     }
+                }
+            }
+
+            // Staged edits only: sits right under the options, before the HDR
+            // block, and vanishes once reverted or applied so the section
+            // tightens again.
+            RippleButton {
+                visible: monitorConfig.dirty
+                Layout.fillWidth: true
+                Layout.topMargin: 4
+                Layout.preferredHeight: monitorConfig.dirty ? 44 : 0
+                buttonText: Translation.tr("Apply")
+                buttonRadius: Appearance.rounding.full
+                colBackground: Appearance.colors.colPrimary
+                colBackgroundHover: Appearance.colors.colPrimaryHover
+                colRipple: Appearance.colors.colPrimaryActive
+                downAction: () => monitorConfig.applyAll()
+                contentItem: StyledText {
+                    text: parent.buttonText
+                    horizontalAlignment: Text.AlignHCenter
+                    color: Appearance.colors.colOnPrimary
                 }
             }
 
@@ -364,6 +399,7 @@ ContentPage {
                     }
                 }
             }
+
         }
 
         // Layout
