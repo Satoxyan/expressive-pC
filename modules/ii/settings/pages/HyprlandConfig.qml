@@ -121,6 +121,23 @@ ContentPage {
                                     }
                                 }
                             }
+                            // The pin marks the one monitor every Mirror
+                            // display copies. Only one can hold it.
+                            RippleButton {
+                                implicitWidth: 36; implicitHeight: 36
+                                buttonRadius: Appearance.rounding.full
+                                colBackground: "transparent"
+                                onClicked: monitorConfig.pinSource(monCol.monName)
+                                StyledToolTip { text: Translation.tr("set as main monitor") }
+                                MaterialSymbol {
+                                    anchors.centerIn: parent
+                                    text: "keep"
+                                    iconSize: 20
+                                    // Filled when pinned, outline otherwise — same colour either way.
+                                    fill: monCol.monName === monitorConfig.mirrorSource ? 1 : 0
+                                    color: Appearance.colors.colPrimary
+                                }
+                            }
                             StyledSwitch {
                                 checked: !(monitorConfig.monitors[index]?.disabled ?? false)
                                 enabled: monitorConfig.monitors.length > 1
@@ -187,6 +204,21 @@ ContentPage {
                                     })
                                     monitorConfig.applyAndSave(index)
                                 }
+                            }
+
+                            ConfigSelectionArray {
+                                visible: monitorConfig.monitors.length > 1
+                                text: Translation.tr("Display mode")
+                                icon: "screenshot_monitor"
+                                currentValue: (monitorConfig.monitors[index]?.mirror ?? "") !== "" ? "mirror" : "extended"
+                                onSelected: newValue => {
+                                    monitorConfig.setMirroring(index, newValue === "mirror")
+                                    monitorConfig.applyAndSave(index)
+                                }
+                                options: [
+                                    { displayName: Translation.tr("Mirror"),   icon: "screenshot_monitor", value: "mirror" },
+                                    { displayName: Translation.tr("Extended"), icon: "desktop_windows",   value: "extended" },
+                                ]
                             }
 
                             ConfigSelectionArray {

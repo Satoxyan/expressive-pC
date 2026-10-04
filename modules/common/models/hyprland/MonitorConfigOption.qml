@@ -16,6 +16,10 @@ NestableObject {
     property var _pendingChanges: ({})
     property var _applyQueue: []
     property var _baseline: null
+    // The single monitor every display in Mirror mode copies. Written through
+    // to each mirroring monitor in monitors.lua, so it survives a restart as
+    // long as something is mirroring.
+    property string mirrorSource: ""
 
     // Staged edits versus what is already written to monitors.lua. Editing an
     // option back to its saved value clears this again.
@@ -54,6 +58,38 @@ NestableObject {
         let pending = Object.assign({}, root._pendingChanges)
         pending[index] = Object.assign({}, pending[index] || {}, changes)
         root._pendingChanges = pending
+    }
+
+    // Pin: one monitor is the mirror reference. Every display already
+    // mirroring follows the pin; the pinned one itself stops mirroring.
+    function pinSource(name) {
+        if (!name || root.mirrorSource === name) return
+        root.mirrorSource = name
+        root.monitors.forEach((m, i) => {
+            if (m.name === name) {
+                if (m.mirror) root.updateMonitor(i, { mirror: "" })
+            } else if (m.mirror && m.mirror !== name) {
+                root.updateMonitor(i, { mirror: name })
+            }
+        })
+    }
+
+    // Mirror / Extended for one display. A display cannot mirror itself, so
+    // picking Mirror while it holds the pin moves the pin (and every display
+    // already mirroring it) onto another display first.
+    function setMirroring(index, mirror) {
+        const name = root.monitors[index]?.name
+        if (!name) return
+        if (!mirror) {
+            root.updateMonitor(index, { mirror: "" })
+            return
+        }
+        const source = root.mirrorSource
+        if (!source || source === name || !root.monitors.some(m => m.name === source)) {
+            const other = root.monitors.find(m => m.name !== name)?.name ?? ""
+            if (other) root.pinSource(other)
+        }
+        root.updateMonitor(index, { mirror: root.mirrorSource })
     }
 
     function _mergeByName(patchByName) {
@@ -103,6 +139,10 @@ NestableObject {
         if (changedKeys.has("sdrMinLuminance")) setPairs["sdr_min_luminance"] = m.sdrMinLuminance
         if (changedKeys.has("sdrMaxLuminance")) setPairs["sdr_max_luminance"] = m.sdrMaxLuminance
         if (changedKeys.has("vrr")) setPairs["vrr"] = m.vrr ? "1" : "0"
+        if (changedKeys.has("mirror")) {
+            if (m.mirror) setPairs["mirror"] = m.mirror
+            else resetKeys.push("mirror")
+        }
 
         return { setPairs, resetKeys }
     }
@@ -189,6 +229,7 @@ NestableObject {
                         scale:         m.scale,
                         transform:     m.transform ?? 0,
                         disabled:      m.disabled,
+                        mirror:        "",
                         availableModes: m.availableModes,
                         currentMode:   `${m.width}x${m.height}@${m.refreshRate.toFixed(2)}Hz`,
                         cm:            m.colorManagementPreset ?? "auto",
@@ -252,10 +293,15 @@ NestableObject {
                             minLuminance:    d.min_luminance ?? null,
                             maxLuminance:    d.max_luminance ?? null,
                             maxAvgLuminance: d.max_avg_luminance ?? null,
+                            mirror:          typeof d.mirror === "string" ? d.mirror : "",
                         }
                     }
                     root._mergeByName(patch)
                     root._rebaseline()
+                    // Whoever the saved file is mirrored from holds the pin.
+                    const src = root.monitors.find(m => m.mirror && m.mirror !== m.name)?.mirror
+                    root.mirrorSource = src && root.monitors.some(m => m.name === src)
+                        ? src : (root.monitors[0]?.name ?? "")
                 } catch(e) {
                     console.log("[MonitorConfig] Error parsing monitors.lua dump JSON:", e)
                 }
