@@ -43,6 +43,20 @@ Customized and maintained by **Satoxyan**
 
 ---
 
+## 🎨 Community Presets
+
+Share your whole desktop with one button, or try someone else's in a click.
+
+**[end4-pCpresets](https://github.com/pctrade/end4-pCpresets)** is the community gallery for this shell. Open **Dashboard → Presets**, pick a preset and press **Download** to try it or **Install** to keep it. Made your own? Press **Upload**, choose a screenshot and send it with a pull request. No git needed.
+
+- 🔒 **Private by design:** nothing is collected from you. The shell only reads public files from GitHub.
+- 🧹 **Clean exports:** personal paths, keys and commands are removed before anything is shared.
+- ✅ **Every preset is checked** automatically and merged by hand.
+
+[Browse the gallery](https://github.com/pctrade/end4-pCpresets) · [How to share yours](https://github.com/pctrade/end4-pCpresets#share-your-preset)
+
+---
+
 ## ⚡ Installation
 
 > [!NOTE]

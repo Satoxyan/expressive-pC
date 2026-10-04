@@ -1449,6 +1449,8 @@ ContentPage {
             icon: "widgets"
             shape: MaterialShape.Shape.Pill
             title: Translation.tr("Widgets")
+            hint: Translation.tr("Widgets with a star are shown in the desktop menu")
+            hintIcon: "info"
 
             ContentSubsection {
                 title: Translation.tr("Show widgets on")
@@ -1469,6 +1471,7 @@ ContentPage {
                     model: [
                         {
                             icon: "weather_mix",
+                            key: "weather",
                             name: Translation.tr("Weather"),
                             configKey: "weather",
                         },
@@ -1479,16 +1482,19 @@ ContentPage {
                         },
                         {
                             icon: "image",
+                            key: "images",
                             name: Translation.tr("Image converter"),
                             configKey: "images",
                         },
                         {
                             icon: "music_note",
+                            key: "media",
                             name: Translation.tr("Media Player"),
                             configKey: "media",
                         },
                         {
                             icon: "memory",
+                            key: "resources",
                             name: Translation.tr("Resources"),
                             configKey: "resources",
                         },
@@ -1499,33 +1505,46 @@ ContentPage {
                         },
                         {
                             icon: "calendar_month",
+                            key: "calendar",
                             name: Translation.tr("Calendar"),
                             configKey: "calendar",
                         },
                         {
                             icon: "public",
+                            key: "worldClock",
                             name: Translation.tr("World Clock"),
                             configKey: "worldClock",
                         },
                         {
                             icon: "person",
+                            key: "userCard",
                             name: Translation.tr("User Card"),
                             configKey: "userCard",
                         },
                         {
                             icon: "note_stack_add",
+                            key: "notes",
                             name: Translation.tr("Notes"),
                             configKey: "notes",
                         },
                         {
                             icon: "add_task",
+                            key: "todo",
                             name: Translation.tr("To-Do"),
                             configKey: "todo",
                         },
                         {
                             icon: "timer",
+                            key: "timers",
                             name: Translation.tr("Timers"),
                             configKey: "timers",
+                        },
+                        {
+                            icon: "sticker",
+                            key: "sticker",
+                            configKey: "sticker",
+                            name: Translation.tr("Sticker"),
+                            enabled: Config.options.background.widgets.sticker.enable
                         },
                     ]
                     delegate: Rectangle {
@@ -1625,6 +1644,55 @@ ContentPage {
                                 }
                             }
                         }
+                        RippleButton {
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            anchors.margins: 8
+                            implicitWidth: 30
+                            implicitHeight: 30
+                            buttonRadius: 15
+                            colBackground: "transparent"
+                            downAction: () => DesktopWidgets.toggleStar(modelData.key)
+                            contentItem: MaterialSymbol {
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                text: "star"
+                                fill: DesktopWidgets.isStarred(modelData.key) ? 1 : 0
+                                iconSize: Appearance.font.pixelSize.larger
+                                color: DesktopWidgets.isStarred(modelData.key) ? Appearance.colors.colTertiary : Appearance.colors.colSubtext
+                            }
+                            StyledToolTip {
+                                text: DesktopWidgets.isStarred(modelData.key) ? Translation.tr("Shown in the desktop menu") : Translation.tr("Hidden from the desktop menu")
+                            }
+                        }
+                    }
+                }
+            }
+            ContentSubsection {
+                title: Translation.tr("Also in the desktop menu")
+                Layout.bottomMargin: 10
+
+                GroupedList {
+                    ConfigSwitch {
+                        Layout.fillWidth: true
+                        buttonIcon: "schedule"
+                        text: Translation.tr("Clock")
+                        checked: DesktopWidgets.isStarred("clock")
+                        onCheckedChanged: DesktopWidgets.setStarred("clock", checked)
+                    }
+                    ConfigSwitch {
+                        Layout.fillWidth: true
+                        buttonIcon: "graphic_eq"
+                        text: Translation.tr("Visualizer")
+                        checked: DesktopWidgets.isStarred("visualizer")
+                        onCheckedChanged: DesktopWidgets.setStarred("visualizer", checked)
+                    }
+                    ConfigSwitch {
+                        Layout.fillWidth: true
+                        buttonIcon: "image"
+                        text: Translation.tr("Custom Image")
+                        checked: DesktopWidgets.isStarred("customImage")
+                        onCheckedChanged: DesktopWidgets.setStarred("customImage", checked)
                     }
                 }
             }

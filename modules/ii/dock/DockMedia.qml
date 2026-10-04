@@ -16,7 +16,7 @@ import Quickshell.Services.Mpris
 Item {
     id: root
 
-    property real cardWidth:     240
+    property real cardLength:    DockStyle.vertical ? mediaGrid.implicitHeight + Appearance.sizes.hyprlandGapsOut * 2 : DockStyle.mediaLength
     property real buttonPadding: 5
     property real artMargin:     5
 
@@ -82,10 +82,14 @@ Item {
     }
 
     visible:        root.hasTrack
-    implicitWidth:  root.hasTrack ? root.cardWidth : 0
-    implicitHeight: parent?.height ?? 46
+    implicitWidth:  DockStyle.vertical ? (parent?.width ?? 46) : (root.hasTrack ? root.cardLength : 0)
+    implicitHeight: DockStyle.vertical ? (root.hasTrack ? root.cardLength : 0) : (parent?.height ?? 46)
 
     Behavior on implicitWidth {
+        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+    }
+
+    Behavior on implicitHeight {
         animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
     }
 
@@ -100,7 +104,7 @@ Item {
         anchors.topMargin:    Appearance.sizes.hyprlandGapsOut
         anchors.bottomMargin: Appearance.sizes.hyprlandGapsOut
         anchors.leftMargin:   Appearance.sizes.hyprlandGapsOut
-        anchors.rightMargin:  Appearance.sizes.hyprlandGapsOut - 2
+        anchors.rightMargin:  Appearance.sizes.hyprlandGapsOut - (DockStyle.vertical ? 0 : 2)
         radius: Appearance.rounding.normal
         color:  "transparent"
 
@@ -154,18 +158,22 @@ Item {
             }
         }
 
-        RowLayout {
+        GridLayout {
+            id: mediaGrid
             width:  card.width
             height: card.height
             clip:   true
-            spacing: 8
+            columns: DockStyle.vertical ? 1 : -1
+            rowSpacing: 8
+            columnSpacing: 8
             z: 3
 
             // Art
             Rectangle {
                 id: artRect
-                Layout.alignment:  Qt.AlignVCenter
-                Layout.leftMargin: root.artMargin + 2
+                Layout.alignment:  DockStyle.vertical ? Qt.AlignHCenter : Qt.AlignVCenter
+                Layout.leftMargin: DockStyle.vertical ? 0 : root.artMargin + 2
+                Layout.topMargin:  DockStyle.vertical ? root.artMargin + 2 : 0
                 implicitWidth:     36
                 implicitHeight:    36
                 color:  ColorUtils.transparentize(root.blendedColors.colLayer1, 0.5)
@@ -193,6 +201,7 @@ Item {
 
             // Artist + Title
             ColumnLayout {
+                visible: !DockStyle.vertical
                 Layout.fillWidth:  true
                 Layout.fillHeight: true
                 spacing: -2
@@ -220,10 +229,13 @@ Item {
             }
 
             // Buttons
-            RowLayout {
-                Layout.rightMargin: 4
-                Layout.alignment:   Qt.AlignVCenter
-                spacing: 3
+            GridLayout {
+                Layout.rightMargin:  DockStyle.vertical ? 0 : 4
+                Layout.alignment:    DockStyle.vertical ? Qt.AlignHCenter : Qt.AlignVCenter
+                Layout.bottomMargin: DockStyle.vertical ? 4 : 0
+                columns: DockStyle.vertical ? 1 : -1
+                rowSpacing: 3
+                columnSpacing: 3
 
                 // Play / Pause
                 RippleButton {

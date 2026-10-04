@@ -311,6 +311,7 @@ Singleton {
             property JsonObject settings: JsonObject {
                 property string style: "default" // default - minimal - dashboard
                 property real borderSize: 1
+                property real animationSpeed: 1
                 property string borderColor: "layer0Border"
                 property list<string> collapsedSections: []
             }
@@ -338,6 +339,7 @@ Singleton {
                     property bool tintBlur: true
                     property real blurRadius: 32
                     property bool shadow: true
+                    property list<string> menuHidden: []
                     property JsonObject clock: JsonObject {
                         property bool enable: true
                         property bool blur: true
@@ -740,6 +742,17 @@ Singleton {
             property JsonObject dock: JsonObject {
                 property bool enable: false
                 property bool showBackground: true
+                property string style: "float" // float | hug
+                property string position: "bottom" // bottom | left | right
+                property bool showBorder: true
+                property real borderWidth: 1
+                property string borderColor: "layer0Border"
+                property string backgroundColor: "layer0"
+                property real radius: 23
+                property bool followFrameColor: false
+                property bool showPreviews: true
+                property real iconSize: 33
+                property real iconSpacing: 0
                 property bool showPinButton: true
                 property bool showAppsButton: true
                 property bool showMedia: true

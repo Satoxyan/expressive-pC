@@ -29,20 +29,40 @@ BLACKLIST_FILTER='del(._presetMeta)
   | del(.appearance.fonts)
   | del(.hyprland.input, .hyprland.autostartApps, .hyprland.general.layout)'
 
+SHARE_FILTER='with_entries(select(.key as $k | ["appearance","background","bar","calendar","crosshair","dock","interactions","launcher","light","lock","media","notifications","osd","osk","overlay","overview","panelFamily","profile","regionSelector","resources","settings","sidebar","tray","wallpaperSelector","windows","hyprland"] | index($k)))
+  | if (.hyprland | type) == "object" then .hyprland |= with_entries(select(.key as $k | ["decoration","gaps","animations","general"] | index($k))) else . end'
+
 action="$1"
 shift
 
 online=false
 args=()
 imported=false
-for arg in "$@"; do
+preview=""
+origin=""
+display=""
+folder_out=false
+while [ $# -gt 0 ]; do
+    arg="$1"
     if [ "$arg" = "--online" ]; then
         online=true
     elif [ "$arg" = "--imported" ]; then
         imported=true
+    elif [ "$arg" = "--folder" ]; then
+        folder_out=true
+    elif [ "$arg" = "--preview" ]; then
+        shift
+        preview="$1"
+    elif [ "$arg" = "--origin" ]; then
+        shift
+        origin="$1"
+    elif [ "$arg" = "--as" ]; then
+        shift
+        display="$1"
     else
         args+=("$arg")
     fi
+    shift
 done
 
 name="${args[0]}"
@@ -142,17 +162,30 @@ case "$action" in
         rm -f "$tmp"
         "$SWITCHWALL" --noswitch
         ;;
+    --install)
+        preset_file="$PRESETS_DIR/${name}.json"
+        if [ ! -f "$preset_file" ]; then
+            echo "Error: preset not found: $name" >&2
+            exit 1
+        fi
+        python3 "$SCRIPT_DIR/preset_install.py" "$preset_file" "$PRESETS_DIR/assets/$name" "$LOCAL_PRESETS_DIR" "${origin:-$($imported && echo imported || echo gallery)}" "${display:-$name}"
+        ;;
     --export-zip)
         preset_file="$PRESETS_DIR/${name}.json"
         if [ ! -f "$preset_file" ]; then
             echo "Error: preset not found: $name" >&2
             exit 1
         fi
+        origin_tag=$(jq -r '._presetMeta.origin // empty' "$preset_file")
+        if [ -n "$origin_tag" ]; then
+            echo "Error: this preset comes from $origin_tag and can't be exported" >&2
+            exit 3
+        fi
         tmpdir=$(mktemp -d)
         trap 'rm -rf "$tmpdir"' EXIT
         # Use filtered preset for export
         filtered="$tmpdir/${name}.json"
-        jq "$BLACKLIST_FILTER" "$preset_file" > "$filtered"
+        jq "$BLACKLIST_FILTER | $SHARE_FILTER" "$preset_file" > "$filtered"
         # Build meta.json + collect all image assets like online presets (ahri/meta.json)
         collect_asset() {
             local src="$1"; local key="$2"
@@ -194,8 +227,53 @@ case "$action" in
                + (if $banner != "" then {banner: $banner} else {} end)
                + (if $custom != "" then {customImage: $custom} else {} end)
                + (if $lock != "" then {lockWall: $lock} else {} end)' > "$tmpdir/meta.json"
+        jq -r '([.. | strings] + ((.background.collage.tree? // "") | try (fromjson | [.. | strings]) catch [])) | unique | .[]' "$filtered" | while IFS= read -r ref; do
+            case "${ref,,}" in
+                *.png|*.jpg|*.jpeg|*.webp) ;;
+                *) continue ;;
+            esac
+            ref="${ref/#\~/$HOME}"
+            [ -f "$ref" ] && cp -L "$ref" "$tmpdir/" 2>/dev/null
+        done
+        if [ -n "$preview" ] && [ -f "$preview" ] && command -v magick >/dev/null 2>&1; then
+            if magick "$preview" -auto-orient -resize '1920x1080>' "png:$tmpdir/preview.png"; then
+                jq '.preview = "preview.png"' "$tmpdir/meta.json" > "$tmpdir/.meta.tmp" && mv "$tmpdir/.meta.tmp" "$tmpdir/meta.json"
+            fi
+        fi
+        scrubbed="$tmpdir/.scrubbed.json"
+        jq 'def scrub: walk(if type == "string" and test("^(/|~/)") then (sub("/+$"; "") | split("/") | last) else . end);
+            scrub
+            | walk(if type == "string" and test("^[A-Za-z][A-Za-z0-9+.-]*://") then "" else . end)
+            | if (.background.collage.tree? // null) != null then .background.collage.tree |= (try (fromjson | scrub | tojson) catch .) else . end' \
+            "$filtered" > "$scrubbed" && mv "$scrubbed" "$filtered"
         # preview: try to generate or copy existing preview if exists in assets
         # Just include filtered json + meta + wallpaper basename
+        size_limit=$((9 * 1024 * 1024 + 512 * 1024))
+        for img in "$tmpdir"/*.png "$tmpdir"/*.jpg "$tmpdir"/*.jpeg "$tmpdir"/*.webp; do
+            [ -f "$img" ] || continue
+            [ "$(stat -c %s "$img")" -le "$size_limit" ] && continue
+            command -v magick >/dev/null 2>&1 || continue
+            case "${img##*.}" in
+                png) fmt=png ;;
+                webp) fmt=webp ;;
+                *) fmt=jpeg ;;
+            esac
+            for width in 3840 2560 1920; do
+                magick "$img" -auto-orient -resize "${width}x>" -quality 88 "$fmt:$img.shrunk" 2>/dev/null && mv -f "$img.shrunk" "$img"
+                [ "$(stat -c %s "$img")" -le "$size_limit" ] && break
+            done
+            rm -f "$img.shrunk"
+        done
+        if $folder_out; then
+            share_dir="$HOME/.cache/quickshell/presets_share/$name"
+            rm -rf "$share_dir"
+            mkdir -p "$share_dir"
+            cp -a "$tmpdir"/. "$share_dir"/
+            echo "Prepared $share_dir"
+            trap - EXIT
+            rm -rf "$tmpdir"
+            exit 0
+        fi
         zip_name="${name}.zip"
         if command -v zip >/dev/null 2>&1; then
             (cd "$tmpdir" && zip -r "$LOCAL_PRESETS_DIR/$zip_name" . >/dev/null)

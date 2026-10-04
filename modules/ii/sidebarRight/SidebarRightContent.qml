@@ -19,6 +19,7 @@ import qs.modules.ii.sidebarRight.bluetoothDevices
 import qs.modules.ii.sidebarRight.nightLight
 import qs.modules.ii.sidebarRight.volumeMixer
 import qs.modules.ii.sidebarRight.wifiNetworks
+import qs.modules.ii.sidebarRight.vpn
 import qs.modules.ii.sidebarRight.iconPicker
 
 Item {
@@ -30,6 +31,7 @@ Item {
     property bool showBluetoothDialog: false
     property bool showNightLightDialog: false
     property bool showWifiDialog: false
+    property bool showVpnDialog: false
     property bool editMode: false
     property bool showIconPickerDialog: false
     property string draggingType: ""
@@ -97,6 +99,11 @@ Item {
     }
 
     Connections {
+        target: Vpn
+        function onDialogRequested() { root.showVpnDialog = true; }
+    }
+
+    Connections {
         target: GlobalStates
         function onRequestBluetoothDialog() {
             if (!BluetoothStatus.available) return;
@@ -107,6 +114,7 @@ Item {
         function onSidebarRightOpenChanged() {
             if (!GlobalStates.sidebarRightOpen) {
                 root.showWifiDialog = false;
+                root.showVpnDialog = false;
                 root.showBluetoothDialog = false;
                 root.showAudioOutputDialog = false;
                 root.showAudioInputDialog = false;
@@ -481,6 +489,12 @@ Item {
     }
 
     ToggleDialog {
+        shownPropertyString: "showVpnDialog"
+        dialog: VpnDialog {}
+        onShownChanged: if (shown) Vpn.refresh()
+    }
+
+    ToggleDialog {
         shownPropertyString: "showIconPickerDialog"
         dialog: IconPickerDialog {}
     }
@@ -738,6 +752,7 @@ Item {
             function onOpenBluetoothDialog() { root.showBluetoothDialog = true; }
             function onOpenNightLightDialog() { root.showNightLightDialog = true; }
             function onOpenWifiDialog() { root.showWifiDialog = true; }
+            function onOpenVpnDialog() { root.showVpnDialog = true; }
         }
     }
 

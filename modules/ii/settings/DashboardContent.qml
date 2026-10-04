@@ -13,10 +13,10 @@ Item {
 
     signal pageExitRequested()
 
-    property int currentPage: 0
-    property int pendingPage: 0
-    property int staggerMs: 45
-    property var pageBoxes: buildPage(0)
+    property int currentPage: GlobalStates.dashboardPage
+    property int pendingPage: GlobalStates.dashboardPage
+    property int staggerMs: 45 / Math.max(0.5, Config.options.settings.animationSpeed ?? 1)
+    property var pageBoxes: buildPage(GlobalStates.dashboardPage)
     property int selectedIndex: 0
     property bool searchOpen: false
     property var thumbsRequested: ({})
@@ -139,8 +139,11 @@ Item {
             goToPage((pendingPage + 1) % pageNames.length);
         } else if (event.key === Qt.Key_Backtab) {
             goToPage((pendingPage - 1 + pageNames.length) % pageNames.length);
-        } else if (isSearchablePage && typedCharacter(event)) {
+        } else if (currentPage === homePage && homeLoader.item?.typing) {
+            return;
+        } else if ((isSearchablePage || currentPage === homePage) && typedCharacter(event)) {
             typeIntoSearch(event.text);
+            if (currentPage === homePage) goToPage(settingsPage);
         } else {
             return;
         }
@@ -236,6 +239,7 @@ Item {
 
     function goToPage(index) {
         if (index === currentPage || switchTimer.running) return;
+        if (currentPage !== homePage && searchInput.text !== "") searchInput.text = "";
         pendingPage = index;
         pageExitRequested();
         forceActiveFocus();
@@ -244,9 +248,10 @@ Item {
 
     Timer {
         id: switchTimer
-        interval: 320 + Math.max(root.pageBoxes.length, 6) * (root.staggerMs - 4)
+        interval: (320 / Math.max(0.5, Config.options.settings.animationSpeed ?? 1)) + Math.max(root.pageBoxes.length, 6) * (root.staggerMs - 4)
         onTriggered: {
             root.currentPage = root.pendingPage;
+            GlobalStates.dashboardPage = root.currentPage;
             root.selectedIndex = 0;
             root.pageBoxes = root.buildPage(root.currentPage);
         }
@@ -652,6 +657,7 @@ Item {
         }
 
         Loader {
+            id: homeLoader
             Layout.fillWidth: true
             Layout.fillHeight: true
             visible: active

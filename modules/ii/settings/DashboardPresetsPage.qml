@@ -64,6 +64,7 @@ Item {
         const clockStyle = data?.background?.widgets?.clock?.style ?? "";
         return {
             description: data?._presetMeta?.description ?? "",
+            origin: data?._presetMeta?.origin ?? "",
             wallpaper: Presets.previewImage(data),
             vertical: bar.vertical ?? false,
             bottom: bar.bottom ?? false,
@@ -422,7 +423,7 @@ Item {
 
                             StyledText {
                                 Layout.fillWidth: true
-                                text: cell.presetName.replace(/_/g, " ")
+                                text: PresetsOnline.displayName(cell.presetName).replace(/_/g, " ")
                                 font.pixelSize: Appearance.font.pixelSize.larger
                                 font.weight: Font.DemiBold
                                 color: "white"
@@ -699,6 +700,8 @@ Item {
             }
             onOverwriteRequested: Presets.overwrite(root.selected.name)
             onExportRequested: Presets.exportZip(root.selected.name)
+            onUploadRequested: Presets.publish(root.selected.name)
+            onInstallRequested: Presets.install(root.selected.name, root.selected.source)
             onDeleteRequested: {
                 root.removePreset(root.selected);
                 root.back();

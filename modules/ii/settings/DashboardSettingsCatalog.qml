@@ -95,6 +95,17 @@ QtObject {
         "hyprland:Idle lock": { type: "duration", get: () => Config.options.hyprland.idle.lock, set: v => { Config.options.hyprland.idle.lock = v; HyprlandConfig.setIdle(Config.options.hyprland.idle.lock, Config.options.hyprland.idle.screenOff, Config.options.hyprland.idle.suspend); } },
         "hyprland:Idle screen off": { type: "duration", get: () => Config.options.hyprland.idle.screenOff, set: v => { Config.options.hyprland.idle.screenOff = v; HyprlandConfig.setIdle(Config.options.hyprland.idle.lock, Config.options.hyprland.idle.screenOff, Config.options.hyprland.idle.suspend); } },
         "hyprland:Idle standby": { type: "duration", get: () => Config.options.hyprland.idle.suspend, set: v => { Config.options.hyprland.idle.suspend = v; HyprlandConfig.setIdle(Config.options.hyprland.idle.lock, Config.options.hyprland.idle.screenOff, Config.options.hyprland.idle.suspend); } },
+        "interface:Dock/Style": { type: "select", get: () => Config.options.dock.style, set: v => { Config.options.dock.style = v; }, options: [{ displayName: Translation.tr("Float"), icon: "call_to_action", value: "float" }, { displayName: Translation.tr("Hug"), icon: "dock_to_bottom", value: "hug" }] },
+        "interface:Dock/Position": { type: "select", get: () => Config.options.dock.position, set: v => { Config.options.dock.position = v; }, options: [{ displayName: Translation.tr("Left"), icon: "dock_to_left", value: "left" }, { displayName: Translation.tr("Bottom"), icon: "dock_to_bottom", value: "bottom" }, { displayName: Translation.tr("Right"), icon: "dock_to_right", value: "right" }] },
+        "interface:Dock/Previews": { type: "switch", get: () => Config.options.dock.showPreviews, set: v => { Config.options.dock.showPreviews = v; } },
+        "interface:Dock/Icon size": { type: "spin", get: () => Config.options.dock.iconSize, set: v => { Config.options.dock.iconSize = v; }, from: 20, to: 48, stepSize: 1 },
+        "interface:Dock/Icon spacing": { type: "spin", get: () => Config.options.dock.iconSpacing, set: v => { Config.options.dock.iconSpacing = v; }, from: 0, to: 12, stepSize: 1 },
+        "interface:Dock/Radius": { type: "spin", get: () => Config.options.dock.radius, set: v => { Config.options.dock.radius = v; }, from: 0, to: 40, stepSize: 1 },
+        "interface:Dock/Background color": { type: "select", get: () => Config.options.dock.backgroundColor, set: v => { Config.options.dock.backgroundColor = v; }, get options() { return ["layer0", "layer1", "primaryContainer", "secondaryContainer", "tertiaryContainer", "primary", "secondary", "tertiary", "black"].map(name => ({ value: name, color: roleColor(name) })); } },
+        "interface:Dock/Follow frame color": { type: "switch", get: () => Config.options.dock.followFrameColor, set: v => { Config.options.dock.followFrameColor = v; } },
+        "interface:Dock/Border": { type: "switch", get: () => Config.options.dock.showBorder, set: v => { Config.options.dock.showBorder = v; } },
+        "interface:Dock/Border width": { type: "spin", get: () => Config.options.dock.borderWidth, set: v => { Config.options.dock.borderWidth = v; }, from: 1, to: 10, stepSize: 1 },
+        "interface:Dock/Border color": { type: "select", get: () => Config.options.dock.borderColor, set: v => { Config.options.dock.borderColor = v; }, get options() { return ["layer0Border", "primary", "secondary", "tertiary", "primaryContainer", "secondaryContainer", "tertiaryContainer", "layer1", "black"].map(name => ({ value: name, color: roleColor(name) })); } },
         "interface:Palette type": { type: "select", get: () => Config.options.appearance.palette.type, set: v => { Config.options.appearance.palette.type = v; Quickshell.execDetached(["bash", "-c", `${Directories.wallpaperSwitchScriptPath} --noswitch`]); }, options: [{ displayName: Translation.tr("Auto"), icon: "auto_awesome", value: "auto" }, { displayName: Translation.tr("Content"), icon: "image", value: "scheme-content" }, { displayName: Translation.tr("Expressive"), icon: "palette", value: "scheme-expressive" }, { displayName: Translation.tr("Fidelity"), icon: "equal", value: "scheme-fidelity" }, { displayName: Translation.tr("Fruit Salad"), icon: "nutrition", value: "scheme-fruit-salad" }, { displayName: Translation.tr("Monochrome"), icon: "invert_colors", value: "scheme-monochrome" }, { displayName: Translation.tr("Neutral"), icon: "tonality", value: "scheme-neutral" }, { displayName: Translation.tr("Rainbow"), icon: "gradient", value: "scheme-rainbow" }, { displayName: Translation.tr("Tonal Spot"), icon: "lens", value: "scheme-tonal-spot" }] },
         "desktop:Same wallpaper": { type: "switch", get: () => Config.options.background.lockWall === "", set: v => { if (v) Config.options.background.lockWall = ""; } },
         "desktop:Transitions": { type: "select", get: () => Config.options.background.wallpaperAnimation, set: v => { Config.options.background.wallpaperAnimation = v; }, options: [{ displayName: Translation.tr("None"), icon: "block", value: "" }, { displayName: Translation.tr("Circle"), icon: "circle", value: "circleSelect" }, { displayName: Translation.tr("Circle Pit"), icon: "blur_circular", value: "circlePit" }, { displayName: Translation.tr("Magic"), icon: "auto_awesome", value: "magic" }, { displayName: Translation.tr("Doom"), icon: "whatshot", value: "Doom" }, { displayName: Translation.tr("Peel"), icon: "layers", value: "Peel" }, { displayName: Translation.tr("Fade"), icon: "gradient", value: "transition" }, { displayName: Translation.tr("Pixelate"), icon: "grain", value: "pixelate" }, { displayName: Translation.tr("Stripes"), icon: "texture_minus", value: "stripes" }, { displayName: Translation.tr("CRT"), icon: "tv", value: "crt" }, { displayName: Translation.tr("Dissolve"), icon: "blur_on", value: "dissolve" }, { displayName: Translation.tr("Glitch"), icon: "bug_report", value: "glitch" }, { displayName: Translation.tr("Ripple"), icon: "water", value: "ripple" }, { displayName: Translation.tr("Shatter"), icon: "broken_image", value: "shatter" }, { displayName: Translation.tr("Random"), icon: "shuffle", value: "random" }] },
@@ -257,22 +268,10 @@ QtObject {
             ]
         },
         {
-            page: Translation.tr("Bar"), title: Translation.tr("Tooltips"), icon: "tooltip", cards: [
-                { type: "toggle", key: "bar:Tooltips/Enable", title: Translation.tr("Enable"), icon: "tooltip" },
-                { type: "toggle", key: "bar:Click to show", title: Translation.tr("Click to show"), icon: "ads_click" }
-            ]
-        },
-        {
             page: Translation.tr("Interface"), title: Translation.tr("Transparency"), icon: "opacity", cards: [
                 { type: "toggle", key: "interface:Automatic (from wallpaper)", title: Translation.tr("Auto transparency"), icon: "auto_awesome" },
                 { type: "slider", key: "interface:Transparency/Background", title: Translation.tr("Background"), icon: "opacity" },
                 { type: "slider", key: "interface:Transparency/Content", title: Translation.tr("Content"), icon: "opacity" }
-            ]
-        },
-        {
-            page: Translation.tr("Interface"), title: Translation.tr("Settings Panel"), icon: "settings", cards: [
-                { type: "spin", key: "interface:Border width", title: Translation.tr("Border width"), icon: "border_style" },
-                { type: "swatch", key: "interface:Border color", title: Translation.tr("Border color"), icon: "format_paint", w: 2 }
             ]
         },
         {
@@ -334,7 +333,22 @@ QtObject {
                 { type: "toggle", key: "interface:Dock/Media Player", title: Translation.tr("Media player"), icon: "music_note" },
                 { type: "toggle", key: "interface:Show Pin Button", title: Translation.tr("Pin button"), icon: "push_pin" },
                 { type: "toggle", key: "interface:Show Apps Button", title: Translation.tr("Apps button"), icon: "apps" },
-                { type: "toggle", key: "interface:Tint app icons", title: Translation.tr("Tint app icons"), icon: "palette" }
+                { type: "toggle", key: "interface:Tint app icons", title: Translation.tr("Tint app icons"), icon: "palette" },
+                { type: "toggle", key: "interface:Dock/Previews", title: Translation.tr("Window previews"), icon: "preview" },
+                { type: "spin", key: "interface:Dock/Icon size", title: Translation.tr("Icon size"), icon: "photo_size_select_large" },
+                { type: "spin", key: "interface:Dock/Icon spacing", title: Translation.tr("Icon spacing"), icon: "space_bar" }
+            ]
+        },
+        {
+            page: Translation.tr("Interface"), title: Translation.tr("Dock style"), icon: "call_to_action", cards: [
+                { type: "select", key: "interface:Dock/Style", title: Translation.tr("Style"), icon: "dock_to_bottom", kw: "dock hug float attached screen edge frame" },
+                { type: "select", key: "interface:Dock/Position", title: Translation.tr("Position"), icon: "dock_to_bottom", kw: "dock position left right bottom side edge" },
+                { type: "spin", key: "interface:Dock/Radius", title: Translation.tr("Corner radius"), icon: "rounded_corner" },
+                { type: "toggle", when: "dockhug", key: "interface:Dock/Follow frame color", title: Translation.tr("Follow frame color"), icon: "filter_frames" },
+                { type: "toggle", when: "dockfloat", key: "interface:Dock/Border", title: Translation.tr("Border"), icon: "border_style" },
+                { type: "spin", when: "dockfloat", key: "interface:Dock/Border width", title: Translation.tr("Border width"), icon: "line_weight" },
+                { type: "swatch", w: 2, when: "dockfloat", key: "interface:Dock/Border color", title: Translation.tr("Border color"), icon: "format_paint" },
+                { type: "swatch", w: 2, key: "interface:Dock/Background color", title: Translation.tr("Background color"), icon: "palette" }
             ]
         },
         {
@@ -402,6 +416,11 @@ QtObject {
                 { type: "spin", key: "desktop:Collage gap", title: Translation.tr("Spacing"), icon: "space_bar" },
                 { type: "spin", key: "desktop:Collage margin", title: Translation.tr("Outer margin"), icon: "padding" },
                 { type: "spin", key: "desktop:Collage radius", title: Translation.tr("Corner radius"), icon: "rounded_corner" }
+            ]
+        },
+        {
+            page: Translation.tr("Desktop"), title: Translation.tr("Desktop widgets"), icon: "widgets", cards: [
+                { type: "widgets", key: "desktop:Widgets", title: Translation.tr("Desktop widgets"), icon: "widgets", kw: "widgets desktop menu star favorite clock weather calendar media resources todo notes timers sticker visualizer" }
             ]
         },
         {

@@ -21,6 +21,7 @@ Item {
     readonly property string avatarPath: Config.options.profile.avatarPath !== "" && Config.options.profile.avatarPicture !== ""
         ? Config.options.profile.avatarPicture
         : `${FileUtils.trimFileProtocol(Directories.home)}/.face`
+    readonly property bool typing: flip.showBack || tasksCard.adding
     readonly property int pendingTasks: Todo.list.filter(t => !t.done).length
 
     readonly property string greeting: {
