@@ -38,8 +38,10 @@ NestableObject {
         target: Hyprland
         enabled: WM.compositor === "hyprland"
         function onRawEvent(event) {
-            if (["monitoradded", "monitoraddedv2", "monitorremoved", "monitorlayout", "configreloaded"].includes(event.name))
+            if (["monitoradded", "monitoraddedv2", "monitorremoved", "monitorlayout", "configreloaded"].includes(event.name)) {
+                console.log(`[mc] refresh by ${event.name}`)
                 refreshTimer.restart()
+            }
         }
     }
 
@@ -168,6 +170,8 @@ NestableObject {
         for (const key in setPairs) args.push("--set", key, String(setPairs[key]))
         for (const key of resetKeys) args.push("--reset", key)
 
+        console.log(`[mc] save ${m.name} pos=${m.x}x${m.y}`)
+
         saveProc.command = args
         saveProc.running = true
 
@@ -177,19 +181,6 @@ NestableObject {
         return true
     }
 
-    function applyMonitor(m) {
-        if (!m.name) return
-
-        const base = `${m.name},${m.currentMode},${m.x}x${m.y},${m.scale}`
-        applyProc.command = ["hyprctl", "keyword", "monitor",
-            m.disabled
-                ? `${m.name},disable`
-                : (m.transform && m.transform !== 0)
-                    ? `${base},transform,${m.transform}`
-                    : base]
-        applyProc.running = true
-    }
-
     // Option edits are staged in _pendingChanges only: nothing is written to
     // monitors.lua until the page's Apply button runs applyAll().
     function applyAndSave(index) {}
@@ -197,6 +188,7 @@ NestableObject {
 
     function applyAll() {
         root._applyQueue = Object.keys(root._pendingChanges).map(Number)
+        console.log(`[mc] applyAll queue=[${root._applyQueue}]`)
         root._drainApplyQueue()
     }
 
@@ -206,6 +198,7 @@ NestableObject {
         while (root._applyQueue.length > 0) {
             if (root.save(root._applyQueue.shift())) return
         }
+        console.log("[mc] queue drained -> reload")
         reloadProc.running = true
         root._rebaseline()
     }
@@ -253,6 +246,17 @@ NestableObject {
                         maxBpc:       null,
                     }))
                     root._rebaseline()
+                    console.log("[mc] fetch " + root.monitors.map(m => `${m.name}@${m.x},${m.y}`).join(" "))
+                    // Put staged edits back on top of the fresh baseline: any
+                    // monitor event refreshes from the desktop, and without
+                    // this merge it silently dropped a staged drag — Apply
+                    // then wrote the old positions back and the canvas jumped.
+                    const pend = root._pendingChanges
+                    for (const key in pend) {
+                        const i = Number(key)
+                        if (root.monitors[i])
+                            root.monitors[i] = Object.assign({}, root.monitors[i], pend[key])
+                    }
                     if (root.monitors.length > 0) {
                         capsProc.command = ["python3", root.capsScriptPath].concat(root.monitors.map(mon => mon.name))
                         capsProc.running = true
@@ -314,8 +318,6 @@ NestableObject {
             }
         }
     }
-
-    Process { id: applyProc }
 
     Process {
         id: saveProc
