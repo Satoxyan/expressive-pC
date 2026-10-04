@@ -51,6 +51,12 @@ NestableObject {
     }
 
     function updateMonitor(index, changes) {
+        // Never blank the desktop: whatever is left showing it stays on,
+        // no matter which page tries to turn the last one off.
+        const lastOneOn = changes.disabled === true
+            && !root.monitors.some((m, i) => i !== index && !(m.disabled ?? false))
+        if (lastOneOn) return
+
         let m = root.monitors.slice()
         m[index] = Object.assign({}, m[index], changes)
         root.monitors = m

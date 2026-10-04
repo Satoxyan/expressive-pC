@@ -86,6 +86,11 @@ ContentPage {
 
                     readonly property string monName: monitorConfig.monitors[index]?.name ?? ""
                     readonly property bool open: page.openMonitors[monName] === true
+                    // The last display still showing the desktop can never be
+                    // switched off, so there is always something to look at.
+                    readonly property bool monOn: !(monitorConfig.monitors[index]?.disabled ?? false)
+                    readonly property bool canTurnOff: monitorConfig.monitors
+                        .some((m, i) => i !== index && !(m.disabled ?? false))
 
                     GroupedList {
                         RowLayout {
@@ -110,7 +115,7 @@ ContentPage {
                                         text: "tv_off"
                                         iconSize: Appearance.font.pixelSize.larger
                                         color: Appearance.colors.colOnSecondaryContainer
-                                        opacity: (monitorConfig.monitors[index]?.disabled ?? false) ? 0.4 : 1
+                                        opacity: monCol.monOn ? 1 : 0.4
                                     }
                                     StyledText {
                                         Layout.fillWidth: true
@@ -139,11 +144,11 @@ ContentPage {
                                 }
                             }
                             StyledSwitch {
-                                checked: !(monitorConfig.monitors[index]?.disabled ?? false)
-                                enabled: monitorConfig.monitors.length > 1
+                                checked: monCol.monOn
+                                enabled: !monCol.monOn || monCol.canTurnOff
                                 onClicked: {
-                                    if (monitorConfig.monitors.length === 1 && !checked) return
-                                    if (checked === !(monitorConfig.monitors[index]?.disabled ?? false)) return
+                                    if (!checked && !monCol.canTurnOff) return
+                                    if (checked === monCol.monOn) return
                                     monitorConfig.updateMonitor(index, { disabled: !checked })
                                     monitorConfig.applyAndSave(index)
                                 }
