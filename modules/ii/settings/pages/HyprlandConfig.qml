@@ -91,14 +91,40 @@ ContentPage {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 8
-                            ConfigSwitch {
+                            // The label row opens this monitor's options; only
+                            // the switch changes the monitor's state.
+                            RippleButton {
+                                id: monRow
                                 Layout.fillWidth: true
-                                buttonIcon: "tv_off"
-                                text: (monitorConfig.monitors[index]?.name ?? "")
-                                    + (monitorConfig.monitors[index]?.description ? " \u00b7 " + monitorConfig.monitors[index]?.description : "")
+                                Layout.bottomMargin: 6
+                                implicitHeight: contentItem.implicitHeight + 8
+                                font.pixelSize: Appearance.font.pixelSize.small
+                                colBackgroundHover: "transparent"
+                                onClicked: {
+                                    monitorCanvas.selectedIndex = index
+                                    page.toggleAdvanced(monCol.monName)
+                                }
+                                contentItem: RowLayout {
+                                    spacing: 10
+                                    MaterialSymbol {
+                                        text: "tv_off"
+                                        iconSize: Appearance.font.pixelSize.larger
+                                        color: Appearance.colors.colOnSecondaryContainer
+                                        opacity: (monitorConfig.monitors[index]?.disabled ?? false) ? 0.4 : 1
+                                    }
+                                    StyledText {
+                                        Layout.fillWidth: true
+                                        text: (monitorConfig.monitors[index]?.name ?? "")
+                                            + (monitorConfig.monitors[index]?.description ? " \u00b7 " + monitorConfig.monitors[index]?.description : "")
+                                        font: monRow.font
+                                        color: Appearance.colors.colOnSecondaryContainer
+                                    }
+                                }
+                            }
+                            StyledSwitch {
                                 checked: !(monitorConfig.monitors[index]?.disabled ?? false)
                                 enabled: monitorConfig.monitors.length > 1
-                                onCheckedChanged: {
+                                onClicked: {
                                     if (monitorConfig.monitors.length === 1 && !checked) return
                                     if (checked === !(monitorConfig.monitors[index]?.disabled ?? false)) return
                                     monitorConfig.updateMonitor(index, { disabled: !checked })
