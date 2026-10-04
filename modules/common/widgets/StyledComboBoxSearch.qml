@@ -17,13 +17,24 @@ ComboBox {
     property color colBackgroundActive: Appearance.colors.colSecondaryContainerActive
     property string searchText: ""
 
-    property int visibleCount: {
-        if (!root.searchText || root.searchText.length === 0) 
-            return root.model?.length ?? 0
-        return (root.model ?? []).filter(item => {
-            const display = typeof item === "object" ? (item[root.textRole] ?? "") : String(item)
-            return display.toLowerCase().includes(root.searchText.toLowerCase())
-        }).length
+    readonly property var filteredItems: {
+        const query = root.searchText.toLowerCase()
+        const source = root.model ?? []
+        const result = []
+        for (let i = 0; i < source.length; i++) {
+            const item = source[i]
+            const isObject = typeof item === "object"
+            const label = isObject ? (item[root.textRole] ?? "") : String(item)
+            if (query.length === 0 || label.toLowerCase().includes(query))
+                result.push({ realIndex: i, label: label, icon: isObject ? (item.icon ?? "") : "" })
+        }
+        return result
+    }
+    readonly property int visibleCount: root.filteredItems.length
+
+    function pick(realIndex) {
+        root.activated(realIndex)
+        root.popup.close()
     }
 
     implicitHeight: 40
@@ -70,7 +81,7 @@ ComboBox {
 
             Loader {
                 Layout.alignment: Qt.AlignVCenter
-                active: root.buttonIcon.length > 0 || (root.currentIndex >= 0 && typeof root.model[root.currentIndex] === 'object' && root.model[root.currentIndex]?.icon)
+                active: root.buttonIcon.length > 0 || !!(root.currentIndex >= 0 && typeof root.model[root.currentIndex] === 'object' && root.model[root.currentIndex]?.icon)
                 visible: active
                 sourceComponent: MaterialSymbol {
                     text: {
@@ -95,76 +106,78 @@ ComboBox {
         }
     }
 
-    delegate: ItemDelegate {
-        id: itemDelegate
-        width: ListView.view ? ListView.view.width : root.width
-        implicitHeight: visible ? 40 : 0
-        visible: {
-            if (!root.searchText || root.searchText.length === 0) return true
-            const display = typeof model === "object" ? (model[root.textRole] ?? "") : String(model)
-            return display.toLowerCase().includes(root.searchText.toLowerCase())
-        }
+    Component {
+        id: entryDelegate
 
-        required property var model
-        required property int index
+        ItemDelegate {
+            id: itemDelegate
+            required property var modelData
+            required property int index
+            readonly property bool selected: root.currentIndex === itemDelegate.modelData.realIndex
 
-        property color color: {
-            if (root.currentIndex === itemDelegate.index) {
-                if (itemDelegate.down) return Appearance.colors.colSecondaryContainerActive;
-                if (itemDelegate.hovered) return Appearance.colors.colSecondaryContainerHover;
-                return Appearance.colors.colSecondaryContainer;
-            } else {
-                if (itemDelegate.down) return Appearance.colors.colLayer3Active;
-                if (itemDelegate.hovered) return Appearance.colors.colLayer3Hover;
-                return ColorUtils.transparentize(Appearance.colors.colLayer3);
+            width: ListView.view ? ListView.view.width : root.width
+            implicitHeight: 42
+            onClicked: root.pick(itemDelegate.modelData.realIndex)
+
+            property color color: {
+                if (itemDelegate.selected) {
+                    if (itemDelegate.down) return Appearance.colors.colSecondaryContainerActive;
+                    if (itemDelegate.hovered) return Appearance.colors.colSecondaryContainerHover;
+                    return Appearance.colors.colSecondaryContainer;
+                } else {
+                    if (itemDelegate.down) return Appearance.colors.colLayer3Active;
+                    if (itemDelegate.hovered) return Appearance.colors.colLayer3Hover;
+                    return ColorUtils.transparentize(Appearance.colors.colLayer3);
+                }
             }
-        }
-        property color colText: (root.currentIndex === itemDelegate.index) ? Appearance.colors.colOnSecondaryContainer : Appearance.colors.colOnLayer3
+            property color colText: itemDelegate.selected ? Appearance.colors.colOnSecondaryContainer : Appearance.colors.colOnLayer3
 
-        background: Rectangle {
-            anchors.fill: parent
-            radius: Appearance.rounding.small
-            color: itemDelegate.color
-            Behavior on color {
-                animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
-            }
-            MouseArea {
+            background: Rectangle {
                 anchors.fill: parent
-                acceptedButtons: Qt.NoButton
-                cursorShape: Qt.PointingHandCursor
-            }
-        }
-
-        contentItem: RowLayout {
-            spacing: 8
-            anchors.leftMargin: 12
-            anchors.rightMargin: 12
-
-            Loader {
-                Layout.alignment: Qt.AlignVCenter
-                Layout.preferredHeight: Appearance.font.pixelSize.larger
-                active: typeof itemDelegate.model === 'object' && itemDelegate.model?.icon?.length > 0
-                visible: active
-                sourceComponent: Item {
-                    implicitWidth: icon.implicitWidth
-                    implicitHeight: Appearance.font.pixelSize.larger
-                    MaterialSymbol {
-                        id: icon
-                        anchors.centerIn: parent
-                        text: itemDelegate.model?.icon ?? ""
-                        iconSize: Appearance.font.pixelSize.larger
-                        color: itemDelegate.colText
-                    }
+                anchors.bottomMargin: 2
+                radius: Appearance.rounding.small
+                color: itemDelegate.color
+                Behavior on color {
+                    animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.NoButton
+                    cursorShape: Qt.PointingHandCursor
                 }
             }
 
-            StyledText {
-                Layout.fillWidth: true
-                Layout.preferredHeight: Appearance.font.pixelSize.larger
-                color: itemDelegate.colText
-                text: itemDelegate.model[root.textRole]
-                elide: Text.ElideRight
-                verticalAlignment: Text.AlignVCenter
+            contentItem: RowLayout {
+                spacing: 8
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+
+                Loader {
+                    Layout.alignment: Qt.AlignVCenter
+                    Layout.preferredHeight: Appearance.font.pixelSize.larger
+                    active: itemDelegate.modelData.icon.length > 0
+                    visible: active
+                    sourceComponent: Item {
+                        implicitWidth: icon.implicitWidth
+                        implicitHeight: Appearance.font.pixelSize.larger
+                        MaterialSymbol {
+                            id: icon
+                            anchors.centerIn: parent
+                            text: itemDelegate.modelData.icon
+                            iconSize: Appearance.font.pixelSize.larger
+                            color: itemDelegate.colText
+                        }
+                    }
+                }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Appearance.font.pixelSize.larger
+                    color: itemDelegate.colText
+                    text: itemDelegate.modelData.label
+                    elide: Text.ElideRight
+                    verticalAlignment: Text.AlignVCenter
+                }
             }
         }
     }
@@ -174,7 +187,7 @@ ComboBox {
         width: root.width
         clip: true
         height: Math.min(
-            searchField.implicitHeight + 20 + (visibleCount * 42) + topPadding + bottomPadding,
+            searchField.implicitHeight + 12 + (root.visibleCount * 42) + topPadding + bottomPadding,
             320
         )
         padding: 8
@@ -182,6 +195,10 @@ ComboBox {
         onVisibleChanged: {
             if (visible) {
                 searchField.forceActiveFocus()
+                Qt.callLater(() => {
+                    const position = root.filteredItems.findIndex(entry => entry.realIndex === root.currentIndex)
+                    if (position >= 0) listView.positionViewAtIndex(position, ListView.Center)
+                })
             } else {
                 root.searchText = ""
                 searchField.text = ""
@@ -248,10 +265,8 @@ ComboBox {
                         Keys.onDownPressed: listView.incrementCurrentIndex()
                         Keys.onUpPressed: listView.decrementCurrentIndex()
                         Keys.onReturnPressed: {
-                            if (listView.currentIndex >= 0) {
-                                root.currentIndex = listView.currentIndex
-                                root.popup.close()
-                            }
+                            const entry = root.filteredItems[Math.max(listView.currentIndex, 0)]
+                            if (entry) root.pick(entry.realIndex)
                         }
                     }
 
@@ -276,11 +291,13 @@ ComboBox {
             StyledListView {
                 id: listView
                 Layout.fillWidth: true
-                Layout.preferredHeight: Math.min(contentHeight, 320 - searchField.implicitHeight - 8 - 46)
+                Layout.preferredHeight: Math.min(contentHeight, 320 - root.popup.topPadding - root.popup.bottomPadding - searchField.implicitHeight - 12)
                 clip: true
-                spacing: 2
-                model: root.popup.visible ? root.delegateModel : null
-                currentIndex: root.highlightedIndex
+                spacing: 0
+                popin: false
+                animateAppearance: false
+                model: root.popup.visible ? root.filteredItems : null
+                delegate: entryDelegate
             }
         }
     }

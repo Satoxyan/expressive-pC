@@ -13,6 +13,7 @@ ContentSubsection {
     property var getWidgetName: (id) => id
     property var availableWidgets: []
     property var onUpdate: (list) => {}
+    signal widgetContextRequested(string widgetId)
 
     property bool liveReflow: false
     property bool reflowAnimate: true
@@ -85,6 +86,7 @@ ContentSubsection {
                         buttonIcon: "close"
                         buttonText: root.getWidgetName(modelData)
                         toggled: !dragHandler.active
+                        altAction: () => root.widgetContextRequested(modelData)
 
                         property real dragOffsetX: 0
                         property real dragOffsetY: 0

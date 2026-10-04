@@ -18,8 +18,11 @@ AbstractBackgroundWidget {
     readonly property int clockCount: Math.min(Math.max(root.configEntry.clockCount ?? 4, 1), 4)
     readonly property real fourByOneWidth: root.clockCount * 132 + (root.clockCount - 1) * 12
 
-    property real widgetWidth:  sizeMode === "2x2" ? 276 : root.fourByOneWidth
-    property real widgetHeight: sizeMode === "2x2" ? 252 : 120
+    property bool isVertical: root.configEntry.vertical ?? false
+    readonly property real stackedHeight: root.clockCount * 120 + (root.clockCount - 1) * 12
+
+    property real widgetWidth:  sizeMode === "2x2" ? 276 : (root.isVertical ? 132 : root.fourByOneWidth)
+    property real widgetHeight: sizeMode === "2x2" ? 252 : (root.isVertical ? root.stackedHeight : 120)
 
     function modeForWidth(width) {
         return Math.abs(width - root.fourByOneWidth) < Math.abs(width - 276) ? "4x1" : "2x2"
@@ -272,9 +275,11 @@ AbstractBackgroundWidget {
             }
 
             // 4x1
-            RowLayout {
+            GridLayout {
                 anchors { fill: parent; margins: 0 }
-                spacing: 12
+                rowSpacing: 12
+                columnSpacing: 12
+                columns: root.isVertical ? 1 : Math.max(1, root.clockCount)
                 visible: sizeMode === "4x1"
 
                 Repeater {
@@ -343,6 +348,17 @@ AbstractBackgroundWidget {
                             }
                         }
                     }
+                }
+            }
+
+            WidgetFlipHandle {
+                anchorItem: contentRect
+                corner: "topRight"
+                hoverActive: root.containsMouse
+                locked: Config.options.background.widgetsLocked || root.showingSettings || root.sizeMode !== "4x1" || root.clockCount < 2
+                onClicked: {
+                    root.isVertical = !root.isVertical
+                    root.configEntry.vertical = root.isVertical
                 }
             }
 

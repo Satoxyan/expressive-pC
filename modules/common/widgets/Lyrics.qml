@@ -22,6 +22,9 @@ Item {
     property color indicatorColor: Appearance.colors.colPrimaryContainer
     property color indicatorShapeColor: Appearance.colors.colOnPrimaryContainer
     property int textAlignment: Text.AlignLeft
+    property real fontScale: 1.0
+    property bool animateTransitions: false
+    property real lineSpacing: 6
 
     // When true, the past/future lines keep only their natural line height
     // and cluster tightly around the active line (extra space becomes

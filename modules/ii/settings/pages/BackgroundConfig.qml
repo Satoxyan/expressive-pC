@@ -689,20 +689,16 @@ ContentPage {
                 }
 
                 GroupedList {
-                    ConfigTextArea {
-                        id: clockFontFamilyField
+                    ConfigComboBox {
                         Layout.fillWidth: true
                         buttonIcon: "font_download"
                         text: Translation.tr("Font family")
-                        placeholderText: Translation.tr("e.g., Google Sans Flex")
-                        value: Config.options.background.widgets.clock.digital.font.family
-                        onValueChanged: clockFontDebounce.restart()
-
-                        Timer {
-                            id: clockFontDebounce
-                            interval: 500
-                            onTriggered: Config.options.background.widgets.clock.digital.font.family = clockFontFamilyField.value
-                        }
+                        fieldWidth: 260
+                        fixedWidth: true
+                        searchable: true
+                        model: SystemAppearance.fontOptions(Config.options.background.widgets.clock.digital.font.family)
+                        currentValue: Config.options.background.widgets.clock.digital.font.family
+                        onSelected: newValue => { Config.options.background.widgets.clock.digital.font.family = newValue }
                     }
                     ConfigSlider {
                         text: Translation.tr("Font weight")
@@ -1312,31 +1308,27 @@ ContentPage {
                         settingsCustomText.entry.shadow = checked;
                     }
                 }
-            }
+                ConfigTextArea {
+                    id: customTextContentField
+                    Layout.fillWidth: true
+                    buttonIcon: "edit_note"
+                    text: Translation.tr("Text to display")
+                    description: Translation.tr("Double-click the text on your desktop to edit it, drag its corner to resize it")
+                    placeholderText: Translation.tr("Text to display")
+                    multiline: true
+                    fieldWidth: 280
+                    fieldHeight: 76
+                    value: settingsCustomText.entry.content
+                    onValueChanged: customTextContentDebounce.restart()
 
-            NoticeBox {
-                Layout.fillWidth: true
-                materialIcon: "touch_app"
-                text: Translation.tr("Double-click the text on your desktop to edit it, drag its corner to resize it")
-            }
-
-            MaterialTextArea {
-                Layout.fillWidth: true
-                placeholderText: Translation.tr("Text to display")
-                text: settingsCustomText.entry.content
-                wrapMode: TextEdit.Wrap
-
-                Timer {
-                    id: customTextContentDebounce
-                    interval: 500
-                    repeat: false
-                    onTriggered: {
-                        settingsCustomText.entry.content = parent.text
+                    Timer {
+                        id: customTextContentDebounce
+                        interval: 500
+                        onTriggered: {
+                            if (customTextContentField.value !== settingsCustomText.entry.content)
+                                settingsCustomText.entry.content = customTextContentField.value
+                        }
                     }
-                }
-
-                onTextChanged: {
-                    if (activeFocus) customTextContentDebounce.restart()
                 }
             }
 

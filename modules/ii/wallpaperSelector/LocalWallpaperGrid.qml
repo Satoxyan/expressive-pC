@@ -382,6 +382,16 @@ Item {
         model: Wallpapers.wallpaperModel
         onModelChanged: { currentIndex = 0; Wallpapers.stopPreview(); }
 
+        Connections {
+            target: Wallpapers
+            function onResultsUpdated() {
+                if (Wallpapers.searchQuery.trim().length > 0) {
+                    grid.currentIndex = 0;
+                    Wallpapers.stopPreview();
+                }
+            }
+        }
+
         delegate: Item {
             id: delegateCell
             required property var modelData
@@ -432,7 +442,7 @@ Item {
             SequentialAnimation {
                 id: introAnim
                 PauseAnimation {
-                    duration: Math.min(wallpaperItem.introOrder, 20) * 16
+                    duration: Math.max(0, Math.min(wallpaperItem.introOrder, 20)) * 16
                 }
                 ParallelAnimation {
                     NumberAnimation {

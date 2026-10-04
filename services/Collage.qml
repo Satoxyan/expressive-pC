@@ -31,6 +31,46 @@ Singleton {
     property bool dragging: false
     property var liveRatios: ({})
 
+    property bool armed: false
+    property bool entranceActive: false
+    property int entranceSerial: 0
+
+    function armEntrance() {
+        root.armed = true
+        armTimer.restart()
+    }
+
+    function startEntrance(reason) {
+        if (!root.armed || !root.enabled) return
+        root.armed = false
+        armTimer.stop()
+        root.entranceActive = true
+        root.entranceSerial += 1
+        activeTimer.restart()
+    }
+
+    Timer {
+        id: armTimer
+        interval: 8000
+        onTriggered: {
+            root.armed = false
+        }
+    }
+
+    Timer {
+        id: activeTimer
+        interval: 6000
+        onTriggered: {
+            root.entranceActive = false
+        }
+    }
+
+    Connections {
+        target: root.settings
+        function onTreeChanged() { root.startEntrance("tree changed") }
+        function onEnableChanged() { root.startEntrance("enabled") }
+    }
+
     function countLeaves(node) {
         return node.t === "leaf" ? 1 : root.countLeaves(node.a) + root.countLeaves(node.b)
     }
@@ -189,6 +229,14 @@ Singleton {
         const path = FileUtils.trimFileProtocol(decodeURIComponent(urls[0].toString()))
         if (!root.isImagePath(path)) return false
         root.setImage(id, path)
+        return true
+    }
+
+    function dropShapeImage(urls) {
+        if (!urls || urls.length !== 1) return false
+        const path = FileUtils.trimFileProtocol(decodeURIComponent(urls[0].toString()))
+        if (!root.isImagePath(path)) return false
+        Config.options.background.centeredWallpaperImage = path
         return true
     }
 

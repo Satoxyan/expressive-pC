@@ -21,8 +21,9 @@ Rectangle {
 
     FastBlurred {
         anchors.fill: parent
+        anchors.margins: root.blurred ? -1 : 0
         blurSource: root.widget.wallpaperItem
-        cardRadius: root.radius
+        cardRadius: root.radius + (root.blurred ? 1 : 0)
         tint: root.tint
         tintOpacity: root.tintOpacity
         tintEnabled: root.tintEnabled

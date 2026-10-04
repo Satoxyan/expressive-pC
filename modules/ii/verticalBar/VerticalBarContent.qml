@@ -143,8 +143,8 @@ Item {
                 radius: root.isMaterialHug ? 0 : Appearance.rounding.full
                 color: root.materialPillBgColor
 
-                topLeftRadius: 0
-                topRightRadius: 0
+                topLeftRadius: root.isMaterialHug ? 0 : radius
+                topRightRadius: root.isMaterialHug ? 0 : radius
                 bottomLeftRadius: (root.isMaterialHug && Config.options.bar.bottom) ? Appearance.rounding.screenRounding : (root.isMaterialHug ? 0 : radius)
                 bottomRightRadius: (root.isMaterialHug && !Config.options.bar.bottom) ? Appearance.rounding.screenRounding : (root.isMaterialHug ? 0 : radius)
 
@@ -383,8 +383,8 @@ Item {
                 radius: root.isMaterialHug ? 0 : Appearance.rounding.full
                 color: root.materialPillBgColor
 
-                bottomLeftRadius: 0
-                bottomRightRadius: 0
+                bottomLeftRadius: root.isMaterialHug ? 0 : radius
+                bottomRightRadius: root.isMaterialHug ? 0 : radius
                 topLeftRadius: (root.isMaterialHug && Config.options.bar.bottom) ? Appearance.rounding.screenRounding : (root.isMaterialHug ? 0 : radius)
                 topRightRadius: (root.isMaterialHug && !Config.options.bar.bottom) ? Appearance.rounding.screenRounding : (root.isMaterialHug ? 0 : radius)
 

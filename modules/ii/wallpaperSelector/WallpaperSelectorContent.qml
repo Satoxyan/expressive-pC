@@ -21,6 +21,7 @@ MouseArea {
     property string selectedColorGroup: ""
     property bool toolbarVisible: showControls || Config.options.wallpaperSelector.showSearchbar
     property bool filterFieldFocused: false
+    property Item activeFilterField: null
 
     property var quickDirs: [
         { icon: "home",       name: "Home   ",       path: `${Directories.home}`,                alwaysVisible: Config.options.wallpaperSelector.showHomePath },
@@ -140,20 +141,21 @@ MouseArea {
             event.accepted = true;
         } else if (event.key === Qt.Key_Backspace) {
             if (!root.filterFieldFocused) {
-                filterField.forceActiveFocus();
+                root.activeFilterField?.forceActiveFocus();
             }
             event.accepted = true;
         } else if (event.modifiers & Qt.ControlModifier && event.key === Qt.Key_L) {
             addressBar.focusBreadcrumb();
             event.accepted = true;
         } else if (event.key === Qt.Key_Slash) {
-            filterField.forceActiveFocus();
+            root.activeFilterField?.forceActiveFocus();
             event.accepted = true;
         } else {
-            if (event.text.length > 0 && !root.filterFieldFocused) {
-                filterField.text += event.text;
-                filterField.cursorPosition = filterField.text.length;
-                filterField.forceActiveFocus();
+            const field = root.activeFilterField;
+            if (field && event.text.length > 0 && !root.filterFieldFocused) {
+                field.text += event.text;
+                field.cursorPosition = field.text.length;
+                field.forceActiveFocus();
             }
             event.accepted = true;
         }
@@ -175,7 +177,7 @@ MouseArea {
         focus: true
         border.width: 1
         border.color: Appearance.colors.colLayer0Border
-        color: Appearance.colors.colLayer0
+        color: ColorSchemes.current !== "" ? Qt.rgba(Appearance.colors.colLayer0.r, Appearance.colors.colLayer0.g, Appearance.colors.colLayer0.b, 1) : Appearance.colors.colLayer0
         radius: Appearance.rounding.screenRounding + 5
 
         implicitWidth: gridColumnLayout.implicitWidth
@@ -188,7 +190,7 @@ MouseArea {
             Rectangle {
                 anchors.fill: parent
                 radius: wallpaperGridBackground.radius - 4
-                color: Appearance.colors.colLayer2
+                color: ColorSchemes.current !== "" ? wallpaperGridBackground.color : Appearance.colors.colLayer2
                 visible: !Config.options.wallpaperSelector.showBlurBackground
             }
 
@@ -656,6 +658,11 @@ MouseArea {
                                 }
                                 ToolbarTextField {
                                     id: filterField
+                                    Component.onCompleted: {
+                                        root.activeFilterField = filterField
+                                        Wallpapers.searchQuery = text
+                                    }
+                                    Component.onDestruction: if (root.activeFilterField === filterField) root.activeFilterField = null
                                     placeholderText: focus
                                         ? Translation.tr("Search wallpapers")
                                         : Translation.tr("Search wallpapers")
@@ -689,6 +696,11 @@ MouseArea {
                             sourceComponent: Toolbar {
                                 ToolbarTextField {
                                     id: onlineSearchField
+                                    Component.onCompleted: {
+                                        root.activeFilterField = onlineSearchField
+                                        OnlineWallpapers.query = text
+                                    }
+                                    Component.onDestruction: if (root.activeFilterField === onlineSearchField) root.activeFilterField = null
                                     placeholderText: Translation.tr("Search online wallpapers")
                                     clip: true
                                     font.pixelSize: Appearance.font.pixelSize.small
@@ -733,6 +745,7 @@ MouseArea {
 
                                 ToolbarTextField {
                                     id: wallhavenSearchField
+                                    Component.onDestruction: if (root.activeFilterField === wallhavenSearchField) root.activeFilterField = null
                                     text: WallhavenSearch.currentQuery
                                     placeholderText: Translation.tr("Search Wallhaven...")
                                     Layout.preferredWidth: 220
@@ -752,7 +765,10 @@ MouseArea {
                                         }
                                         event.accepted = false
                                     }
-                                    Component.onCompleted: Qt.callLater(() => wallhavenToolbar._searchFieldReady = true)
+                                    Component.onCompleted: {
+                                        root.activeFilterField = wallhavenSearchField
+                                        Qt.callLater(() => wallhavenToolbar._searchFieldReady = true)
+                                    }
                                 }
 
                                 RowLayout {
@@ -852,12 +868,13 @@ MouseArea {
         function onWallpaperSelectorOpenChanged() {
             if (GlobalStates.wallpaperSelectorOpen && monitorIsFocused) {
                 if (root.source === "local")
-                    filterField.forceActiveFocus()
+                    root.activeFilterField?.forceActiveFocus()
                 else
                     root.forceActiveFocus()
             } else if (!GlobalStates.wallpaperSelectorOpen) {
                 sortMenuPopup.open = false;
                 Wallpapers.stopPreview();
+                WallhavenSearch.clearQuery();
             }
         }
     }

@@ -8,7 +8,11 @@ Item {
     property var action
     property var selectionMode
 
-    property string description: {
+    property string description: root.selectionMode === RegionSelection.SelectionMode.ScreenTarget
+        ? Translation.tr("Click to use this screen")
+        : root.actionDescription
+
+    property string actionDescription: {
         const isFullscreen = root.selectionMode === RegionSelection.SelectionMode.Fullscreen;
         switch (root.action) {
         case RegionSelection.SnipAction.Copy:

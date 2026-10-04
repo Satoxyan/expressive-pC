@@ -37,6 +37,20 @@ Singleton {
         nameFilters: ["*.json"]
     }
 
+    function previewImage(data) {
+        const background = data?.background
+        const raw = background?.wallpaperPath ?? ""
+        if (/\.(mp4|webm|mkv|avi|mov)$/i.test(raw)) return background?.thumbnailPath ?? ""
+        if (background?.collage?.enable) {
+            try {
+                let node = JSON.parse(background.collage.tree)
+                while (node.t !== "leaf") node = node.a
+                if (node.img) return node.img
+            } catch (e) {}
+        }
+        return raw
+    }
+
     function refresh() {
         const current = presetsFolderModel.folder
         presetsFolderModel.folder = ""
@@ -111,6 +125,7 @@ Singleton {
 
     function apply(name) {
         GlobalStates.settingsOpen = false
+        Collage.armEntrance()
         Wallpapers.confirmedPath = ""
         Wallpapers.previewPath = ""
         Quickshell.execDetached(["bash", Directories.presetsScriptPath, "--apply", name])
@@ -118,6 +133,7 @@ Singleton {
 
     function applyOnline(name) {
         GlobalStates.settingsOpen = false
+        Collage.armEntrance()
         Wallpapers.confirmedPath = ""
         Wallpapers.previewPath = ""
         Quickshell.execDetached(["bash", Directories.presetsScriptPath, "--apply", name, "--online"])
@@ -140,6 +156,7 @@ Singleton {
 
     function applyImported(name) {
         GlobalStates.settingsOpen = false
+        Collage.armEntrance()
         Wallpapers.confirmedPath = ""
         Wallpapers.previewPath = ""
         Quickshell.execDetached(["bash", Directories.presetsScriptPath, "--apply", name, "--imported"])

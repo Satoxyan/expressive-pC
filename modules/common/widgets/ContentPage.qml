@@ -46,6 +46,48 @@ Item {
             }
             spacing: 30
         }
+
+        ClippingRectangle {
+            id: highlight
+            z: 10
+            radius: Appearance.rounding.small
+            color: Qt.rgba(Appearance.colors.colPrimary.r, Appearance.colors.colPrimary.g, Appearance.colors.colPrimary.b, 0.12)
+            opacity: 0
+            visible: opacity > 0
+
+            property real sweep: 0
+
+            Rectangle {
+                width: highlight.width * 0.45
+                height: highlight.height
+                x: highlight.sweep * (highlight.width - width)
+                gradient: Gradient {
+                    orientation: Gradient.Horizontal
+                    GradientStop { position: 0.0; color: "transparent" }
+                    GradientStop { position: 0.5; color: Qt.rgba(Appearance.colors.colPrimary.r, Appearance.colors.colPrimary.g, Appearance.colors.colPrimary.b, 0.4) }
+                    GradientStop { position: 1.0; color: "transparent" }
+                }
+            }
+
+            ParallelAnimation {
+                id: flash
+
+                SequentialAnimation {
+                    NumberAnimation { target: highlight; property: "opacity"; to: 1; duration: 150 }
+                    PauseAnimation { duration: 1500 }
+                    NumberAnimation { target: highlight; property: "opacity"; to: 0; duration: 500 }
+                }
+
+                SequentialAnimation {
+                    PropertyAction { target: highlight; property: "sweep"; value: 0 }
+                    SequentialAnimation {
+                        loops: 2
+                        NumberAnimation { target: highlight; property: "sweep"; to: 1; duration: 450; easing.type: Easing.InOutSine }
+                        NumberAnimation { target: highlight; property: "sweep"; to: 0; duration: 450; easing.type: Easing.InOutSine }
+                    }
+                }
+            }
+        }
     }
 
     // =========================================================
@@ -262,49 +304,6 @@ Item {
         repeat: true
         running: highlight.visible
         onTriggered: root._syncHighlight()
-    }
-
-    ClippingRectangle {
-        id: highlight
-        parent: flickable.contentItem
-        z: 10
-        radius: Appearance.rounding.small
-        color: Qt.rgba(Appearance.colors.colPrimary.r, Appearance.colors.colPrimary.g, Appearance.colors.colPrimary.b, 0.12)
-        opacity: 0
-        visible: opacity > 0
-
-        property real sweep: 0
-
-        Rectangle {
-            width: highlight.width * 0.45
-            height: highlight.height
-            x: highlight.sweep * (highlight.width - width)
-            gradient: Gradient {
-                orientation: Gradient.Horizontal
-                GradientStop { position: 0.0; color: "transparent" }
-                GradientStop { position: 0.5; color: Qt.rgba(Appearance.colors.colPrimary.r, Appearance.colors.colPrimary.g, Appearance.colors.colPrimary.b, 0.4) }
-                GradientStop { position: 1.0; color: "transparent" }
-            }
-        }
-
-        ParallelAnimation {
-            id: flash
-
-            SequentialAnimation {
-                NumberAnimation { target: highlight; property: "opacity"; to: 1; duration: 150 }
-                PauseAnimation { duration: 1500 }
-                NumberAnimation { target: highlight; property: "opacity"; to: 0; duration: 500 }
-            }
-
-            SequentialAnimation {
-                PropertyAction { target: highlight; property: "sweep"; value: 0 }
-                SequentialAnimation {
-                    loops: 2
-                    NumberAnimation { target: highlight; property: "sweep"; to: 1; duration: 450; easing.type: Easing.InOutSine }
-                    NumberAnimation { target: highlight; property: "sweep"; to: 0; duration: 450; easing.type: Easing.InOutSine }
-                }
-            }
-        }
     }
 
     function _handleMouseWheel(dy) {

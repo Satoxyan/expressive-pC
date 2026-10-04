@@ -393,6 +393,31 @@ Variants {
                 }
             }
 
+            /* Multiple wallpapers */
+            Loader {
+                id: collageLoader
+                anchors.fill: parent
+                active: Collage.enabled
+                sourceComponent: MultipleWalls {
+                    screen: bgRoot.screen
+                    transitionDone: !bgRoot.transitionPending && bgRoot.transitionProgress >= 1.0
+                }
+            }
+
+            /* Wallpaper Drop Area */
+            WallpaperDropArea {
+                anchors.fill: parent
+            }
+
+            /* Multiple wallpapers drop targets (below widgets so their drop areas win =) */
+            Loader {
+                anchors.fill: parent
+                active: Collage.enabled && !Config.options.background.widgetsLocked && !GlobalStates.screenLocked && !!collageLoader.item
+                sourceComponent: MultipleWallsDrop {
+                    collage: collageLoader.item
+                }
+            }
+
             /* Centered Wallpaper */
             CenteredWallpaper {
                 id: centeredWallpaper
@@ -401,21 +426,6 @@ Variants {
                 wallpaperPath: bgRoot.wallpaperPath
                 effectiveWallpaperPath: bgRoot.effectiveWallpaperPath
                 wallpaperIsVideo: bgRoot.wallpaperIsVideo
-            }
-
-            /* Multiple wallpapers */
-            Loader {
-                id: collageLoader
-                anchors.fill: parent
-                active: Collage.enabled
-                sourceComponent: MultipleWalls {
-                    screen: bgRoot.screen
-                }
-            }
-
-            /* Wallpaper Drop Area */
-            WallpaperDropArea {
-                anchors.fill: parent
             }
 
             /* Widgets Loader */

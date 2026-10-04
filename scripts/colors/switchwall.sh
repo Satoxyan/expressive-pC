@@ -64,6 +64,35 @@ post_process() {
     "$SCRIPT_DIR/code/material-code-set-color.sh" &
 }
 
+apply_named_scheme() {
+    local mode_flag="$1"
+    local wallpaper_path="$2"
+    python3 "$SCRIPT_DIR/named_scheme.py" \
+        --scheme "$named_scheme" \
+        --mode "$mode_flag" \
+        --image "$wallpaper_path" \
+        --primary "$named_primary" \
+        --secondary "$named_secondary" \
+        --scss "$STATE_DIR/user/generated/material_colors.scss" \
+        --cache "$STATE_DIR/user/generated/color.txt" || {
+            notify-send "Color scheme" "'$named_scheme' is invalid, going back to Material colors" -a "Shell"
+            config_json_update "$SHELL_CONFIG_FILE" '.appearance.palette.namedScheme = ""'
+            return 1
+        }
+    "$SCRIPT_DIR"/applycolor.sh
+    apply_named_qt &
+    "$SCRIPT_DIR/code/material-code-set-color.sh" &
+}
+
+apply_named_qt() {
+    if [ -f "$SHELL_CONFIG_FILE" ] && [ "$(jq -r '.appearance.wallpaperTheming.enableQtApps' "$SHELL_CONFIG_FILE")" == "false" ]; then
+        return
+    fi
+    command -v plasma-apply-colorscheme >/dev/null || return
+    plasma-apply-colorscheme IllogicalNamed2 >/dev/null 2>&1
+    plasma-apply-colorscheme IllogicalNamed >/dev/null 2>&1
+}
+
 check_and_prompt_upscale() {
     local img="$1"
     min_width_desired="$(hyprctl monitors -j | jq '([.[].width] | max)' | xargs)"
@@ -332,6 +361,10 @@ switch() {
     generate_colors_material_args+=(--termscheme "$terminalscheme" --blend_bg_fg)
     generate_colors_material_args+=(--cache "$STATE_DIR/user/generated/color.txt")
 
+    if [[ -n "$named_scheme" && -z "$noswitch_flag" && -z "$colors_lock_flag" ]]; then
+        return
+    fi
+
     pre_process "$mode_flag"
 
     if [ -f "$SHELL_CONFIG_FILE" ]; then
@@ -352,6 +385,11 @@ switch() {
     fi
 
     colors_json_path="$STATE_DIR/user/generated/colors.json"
+    if [[ -n "$named_scheme" && -z "$colors_lock_flag" ]]; then
+        apply_named_scheme "$mode_flag" "$imgpath"
+        return
+    fi
+
     colors_lock_json_path="$STATE_DIR/user/generated/colors-lock.json"
     colors_lock_watch_paths=(
         "$colors_json_path"
@@ -421,6 +459,26 @@ main() {
     get_type_from_config() {
         jq -r '.appearance.palette.type' "$SHELL_CONFIG_FILE" 2>/dev/null || echo "auto"
     }
+    get_named_scheme_from_config() {
+        jq -r '.appearance.palette.namedScheme // ""' "$SHELL_CONFIG_FILE" 2>/dev/null || echo ""
+    }
+    set_named_scheme() {
+        local previous
+        previous="$(get_named_scheme_from_config)"
+        if [[ "$previous" != "$1" ]]; then
+            config_json_update "$SHELL_CONFIG_FILE" --arg name "$1" \
+                '.appearance.palette.namedScheme = $name | .appearance.palette.namedSchemePrimary = "" | .appearance.palette.namedSchemeSecondary = ""'
+        fi
+    }
+    set_named_accent() {
+        local slot="$1" value="$2"
+        [[ "$value" == "clear" ]] && value=""
+        config_json_update "$SHELL_CONFIG_FILE" --arg slot "$slot" --arg value "$value" \
+            '.appearance.palette["namedScheme" + $slot] = $value'
+    }
+    get_named_accent_from_config() {
+        jq -r --arg key "namedScheme$1" '.appearance.palette[$key] // ""' "$SHELL_CONFIG_FILE" 2>/dev/null || echo ""
+    }
     get_accent_color_from_config() {
         jq -r '.appearance.palette.accentColor' "$SHELL_CONFIG_FILE" 2>/dev/null || echo ""
     }
@@ -457,6 +515,22 @@ main() {
                     set_accent_color $(hyprpicker --no-fancy)
                     shift
                 fi
+                ;;
+            --scheme-name)
+                if [[ "$2" == "clear" ]]; then
+                    set_named_scheme ""
+                else
+                    set_named_scheme "$2"
+                fi
+                shift 2
+                ;;
+            --scheme-primary)
+                set_named_accent Primary "$2"
+                shift 2
+                ;;
+            --scheme-secondary)
+                set_named_accent Secondary "$2"
+                shift 2
                 ;;
             --image)
                 imgpath="$2"
@@ -495,6 +569,15 @@ main() {
     if [[ -n "$noswitch_flag" && -n "$explicit_image" ]]; then
         colors_only_flag="1"
     fi
+
+    named_scheme="$(get_named_scheme_from_config)"
+    if [[ -n "$named_scheme" && ! -f "$SCRIPT_DIR/schemes/$named_scheme.json" && ! -f "$(dirname "$SHELL_CONFIG_FILE")/schemes/$named_scheme.json" ]]; then
+        echo "[switchwall.sh] Warning: Unknown named scheme '$named_scheme', ignoring" >&2
+        named_scheme=""
+    fi
+
+    named_primary="$(get_named_accent_from_config Primary)"
+    named_secondary="$(get_named_accent_from_config Secondary)"
 
     config_color="$(get_accent_color_from_config)"
     if [[ "$config_color" =~ ^#?[A-Fa-f0-9]{6}$ ]]; then

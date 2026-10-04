@@ -8,6 +8,7 @@ import Quickshell.Hyprland
 
 ContentPage {
     id: page
+    readonly property bool defaultWorkspacesDesign: (Config.options.bar.workspaces.style ?? "default") === "default"
     forceWidth: true
 
     readonly property color leftIconColor: {
@@ -61,6 +62,35 @@ ContentPage {
             if (w.id === "dynamicIsland" && (Config.options.bar.vertical || section !== "middle")) return false
             return !used.includes(w.id) || multipleAllowed.includes(w.id)
         })
+    }
+
+    readonly property var usedWidgets: {
+        const layouts = Config.options.bar.layouts
+        const used = [...layouts.leftLayout, ...layouts.middleLayout, ...layouts.rightLayout]
+        if (used.includes("dynamicIsland")) {
+            used.push(Config.options.bar.dynamicIsland.leftWidget, Config.options.bar.dynamicIsland.rightWidget)
+        }
+        return used
+    }
+
+    function isUsed(id) {
+        return page.usedWidgets.includes(id)
+    }
+
+    readonly property var widgetSections: ({
+        dynamicIsland: Translation.tr("Dynamic Island"),
+        sysTray: Translation.tr("Tray"),
+        leftSidebarButton: Translation.tr("Left sidebar button"),
+        divisor: Translation.tr("Divider"),
+        utilButtons: Translation.tr("Utility buttons"),
+        workspaces: Translation.tr("Workspaces"),
+        resources: Translation.tr("Resources"),
+        media: Translation.tr("Media")
+    })
+
+    function openWidgetSettings(id) {
+        const title = page.widgetSections[id]
+        if (title) page.goTo(title, title)
     }
 
     function getWidgetName(id) {
@@ -164,6 +194,8 @@ ContentPage {
             icon: "splitscreen_add"
             shape: MaterialShape.Shape.Cookie6Sided
             title: Translation.tr("Bar layout")
+            hint: Translation.tr("Right-click a widget to open its settings (not every widget has settings here)")
+            hintIcon: "info"
 
             GroupedList {
                 LayoutSection {
@@ -172,6 +204,7 @@ ContentPage {
                     availableWidgets: page.availableFor("left")
                     getWidgetName: page.getWidgetName
                     onUpdate: list => Config.options.bar.layouts.leftLayout = list
+                    onWidgetContextRequested: id => page.openWidgetSettings(id)
                 }
 
                 LayoutSection {
@@ -180,6 +213,7 @@ ContentPage {
                     availableWidgets: page.availableFor("middle")
                     getWidgetName: page.getWidgetName
                     onUpdate: list => Config.options.bar.layouts.middleLayout = list
+                    onWidgetContextRequested: id => page.openWidgetSettings(id)
                 }
 
                 LayoutSection {
@@ -188,6 +222,7 @@ ContentPage {
                     availableWidgets: page.availableFor("right")
                     getWidgetName: page.getWidgetName
                     onUpdate: list => Config.options.bar.layouts.rightLayout = list
+                    onWidgetContextRequested: id => page.openWidgetSettings(id)
                 }
             }
         }
@@ -326,6 +361,7 @@ ContentPage {
             icon: "nest_wifi_pro"
             shape: MaterialShape.Shape.Cookie4Sided
             title: Translation.tr("Dynamic Island")
+            visible: page.isUsed("dynamicIsland")
 
             GroupedList {
                 ConfigSelectionArray {
@@ -444,6 +480,7 @@ ContentPage {
             shape: MaterialShape.Shape.Square
             icon: "inbox_customize"
             title: Translation.tr("Tray")
+            visible: page.isUsed("sysTray")
             GroupedList {
                 ConfigSwitch {
                     buttonIcon: "keep"; text: Translation.tr("Make icons pinned by default")
@@ -462,6 +499,7 @@ ContentPage {
             icon: "right_panel_open"
             shape: MaterialShape.Shape.Pentagon
             title: Translation.tr("Left sidebar button")
+            visible: page.isUsed("leftSidebarButton")
 
             GroupedList {
                 ConfigRow {
@@ -532,6 +570,7 @@ ContentPage {
             icon: "vertical_align_center"
             shape: MaterialShape.Shape.Diamond
             title: Translation.tr("Divider")
+            visible: page.isUsed("divisor")
 
             GroupedList {
                 ConfigSelectionArray {
@@ -564,6 +603,7 @@ ContentPage {
             icon: "buttons_alt"
             shape: MaterialShape.Shape.SoftBurst
             title: Translation.tr("Utility buttons")
+            visible: page.isUsed("utilButtons")
 
             GroupedList {
                 ConfigRow {
@@ -632,13 +672,37 @@ ContentPage {
         ContentSection {
             shape: MaterialShape.Shape.Cookie12Sided
             icon: "steppers"; title: Translation.tr("Workspaces")
+            visible: page.isUsed("workspaces")
             GroupedList {
+                ConfigSelectionArray {
+                    text: Translation.tr("Style")
+                    icon: "style"
+                    currentValue: Config.options.bar.workspaces.style ?? "default"
+                    onSelected: newValue => {
+                        Config.options.bar.workspaces.style = newValue
+                    }
+                    options: [
+                        { displayName: Translation.tr("Default"), icon: "view_carousel",         value: "default" },
+                        { displayName: Translation.tr("GNOME"),   icon: "more_horiz",            value: "gnome" },
+                        { displayName: Translation.tr("Dots"),    icon: "hdr_weak",               value: "dots" },
+                        { displayName: Translation.tr("Ticks"),   icon: "more_vert",             value: "ticks" }
+                    ]
+                }
+                ConfigSpinBox {
+                    icon: "view_column"; text: Translation.tr("Workspaces shown")
+                    value: Config.options.bar.workspaces.shown
+                    from: 1; to: 30
+                    onValueChanged: { Config.options.bar.workspaces.shown = value; }
+                }
                 ConfigSwitch {
+                    enabled: page.defaultWorkspacesDesign
                     buttonIcon: "counter_1"; text: Translation.tr("Always show numbers")
                     checked: Config.options.bar.workspaces.alwaysShowNumbers
                     onCheckedChanged: { Config.options.bar.workspaces.alwaysShowNumbers = checked; }
                 }
                 ConfigSelectionArray {
+                    enabled: page.defaultWorkspacesDesign
+                    opacity: page.defaultWorkspacesDesign ? 1 : 0.5
                     text: Translation.tr("Numbers style")
                     icon: "looks_3"
                     currentValue: JSON.stringify(Config.options.bar.workspaces.numberMap)
@@ -652,17 +716,14 @@ ContentPage {
                     ]
                 }
                 ConfigSwitch {
+                    enabled: page.defaultWorkspacesDesign
                     buttonIcon: "award_star"; text: Translation.tr("Show app icons")
                     checked: Config.options.bar.workspaces.showAppIcons
                     onCheckedChanged: { Config.options.bar.workspaces.showAppIcons = checked; }
                 }
-                ConfigSpinBox {
-                    icon: "view_column"; text: Translation.tr("Workspaces shown")
-                    value: Config.options.bar.workspaces.shown
-                    from: 1; to: 30
-                    onValueChanged: { Config.options.bar.workspaces.shown = value; }
-                }
                 ConfigSelectionArray {
+                    enabled: page.defaultWorkspacesDesign
+                    opacity: page.defaultWorkspacesDesign ? 1 : 0.5
                     text: Translation.tr("Indicator style")
                     icon: "page_control"
                     currentValue: Config.options.bar.workspaces.indicatorStyle ?? "icon"
@@ -681,6 +742,7 @@ ContentPage {
             icon: "empty_dashboard"
             shape: MaterialShape.Shape.Burst
             title: Translation.tr("Resources")
+            visible: page.isUsed("resources")
 
             GroupedList {
                 ConfigRow {
@@ -755,6 +817,7 @@ ContentPage {
             icon: "music_note"
             shape: MaterialShape.Shape.Sunny
             title: Translation.tr("Media")
+            visible: page.isUsed("media")
 
             GroupedList {
                 ConfigTextArea {

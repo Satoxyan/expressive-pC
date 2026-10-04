@@ -5,6 +5,8 @@ import QtQuick
 import QtQuick.Layouts
 
 BarWidgetSwitcherArea {
+    Component.onCompleted: ResourceUsage.consumers++
+    Component.onDestruction: ResourceUsage.consumers--
     id: root
     property color contentColor: Appearance.colors.colOnSecondaryContainer
     property bool contentColorOverridden: false

@@ -19,13 +19,14 @@ source "$SCRIPT_DIR/lib/config.sh"
 
 mkdir -p "$LOCAL_PRESETS_DIR" "$ONLINE_PRESETS_DIR" "$IMPORTED_PRESETS_DIR"
 
-# Blacklist: General (time/battery/audio/sounds/language/workSafety) + Services (ai/networking/musicRecognition/search/screenRecord/screenSnip/updates/bar.weather) + Hyprland non-styling
+# Blacklist: appearance.fonts (UI font families can break the layout) + General (time/battery/audio/sounds/language/workSafety) + Services (ai/networking/musicRecognition/search/screenRecord/screenSnip/updates/bar.weather) + Hyprland non-styling
 # Keep: appearance/background/bar(non-weather)/dock/lock/overview/panelFamily etc. + hyprland.decoration/gaps/animations
 # Note: apps/profile/wallpaperSelector are NOT blacklisted here (would make preset look empty) - only General+Services per Settings tabs
 BLACKLIST_FILTER='del(._presetMeta)
   | del(.time, .battery, .audio, .sounds, .language, .workSafety)
   | del(.ai, .networking, .musicRecognition, .search, .screenRecord, .screenSnip, .updates)
   | del(.bar.weather)
+  | del(.appearance.fonts)
   | del(.hyprland.input, .hyprland.autostartApps, .hyprland.general.layout)'
 
 action="$1"
@@ -83,6 +84,13 @@ if [ "$action" = "--import-zip" ]; then
     # Rewrite json paths to point to cached assets (reuse online jqFilter Profile.qml:250)
     jq --arg dir "$asset_cache" --argjson files "$asset_files" '
       $files as $files | walk(if type == "string" then ((split("/") | last) as $base | if ($files | index($base)) then ($dir + "/" + $base) else . end) else . end)
+      | if (.background.collage.tree? // null) != null then
+          .background.collage.tree |= (try (fromjson
+            | walk(if type == "object" and .t == "leaf" and (.img | type) == "string" and .img != ""
+                   then ((.img | split("/") | last) as $base | if ($files | index($base)) then .img = ($dir + "/" + $base) else . end)
+                   else . end)
+            | tojson) catch .)
+        else . end
       | del(._presetMeta) | ._presetMeta.source = "imported"
     ' "$json_file" | jq "$BLACKLIST_FILTER" > "$IMPORTED_PRESETS_DIR/${base}.json"
     echo "Imported $base to $IMPORTED_PRESETS_DIR/${base}.json with assets in $asset_cache"
@@ -161,6 +169,15 @@ case "$action" in
         # avatar path may be empty or not a file
         wallpapers="[]"
         if [ -n "$wallpaper" ] && [ -f "$wallpaper" ]; then wallpapers=$(jq -n --arg b "$(basename "$wallpaper")" '[$b]'); fi
+
+        if [ "$(jq -r '.background.collage.enable // false' "$filtered")" = "true" ]; then
+            while IFS= read -r collage_img; do
+                if [ -f "$collage_img" ]; then
+                    collect_asset "$collage_img" >/dev/null
+                    wallpapers=$(jq -c --arg b "$(basename "$collage_img")" '. + [$b] | unique' <<< "$wallpapers")
+                fi
+            done < <(jq -r '.background.collage.tree | try (fromjson | [.. | objects | select(.t == "leaf") | .img] | map(select(type == "string" and . != "")) | .[]) catch empty' "$filtered")
+        fi
 
         # copy assets and build meta fields
         meta_avatar=""; meta_banner=""; meta_custom=""; meta_lock=""
