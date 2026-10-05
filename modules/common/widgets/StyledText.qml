@@ -7,6 +7,13 @@ Text {
     property real animationDistanceX: 0
     property real animationDistanceY: 6
 
+    // Slide via transform, NOT x/y — writing x/y from an animation destroys
+    // position bindings (e.g. PlayerContent's lyrics-title y), snapping text
+    // back to its creation-time position on the next text change.
+    transform: Translate {
+        id: shift
+    }
+
     renderType: Text.NativeRendering
     verticalAlignment: Text.AlignVCenter
     property bool shouldUseNumberFont: /^\d+$/.test(root.text)
@@ -28,28 +35,23 @@ Text {
         easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve
     }
 
-    Component.onCompleted: {
-        textAnimationBehavior.originalX = root.x;
-        textAnimationBehavior.originalY = root.y;
-    }
-
     Behavior on text {
         id: textAnimationBehavior
-        property real originalX: root.x
-        property real originalY: root.y
         enabled: root.animateChange
 
         SequentialAnimation {
             alwaysRunToEnd: true
             ParallelAnimation {
                 Anim {
+                    target: shift
                     property: "x"
-                    to: textAnimationBehavior.originalX - root.animationDistanceX
+                    to: -root.animationDistanceX
                     easing.type: Easing.InSine
                 }
                 Anim {
+                    target: shift
                     property: "y"
-                    to: textAnimationBehavior.originalY - root.animationDistanceY
+                    to: -root.animationDistanceY
                     easing.type: Easing.InSine
                 }
                 Anim {
@@ -60,24 +62,26 @@ Text {
             }
             PropertyAction {} // Tie the text update to this point (we don't want it to happen during the first slide+fade)
             PropertyAction {
-                target: root
+                target: shift
                 property: "x"
-                value: textAnimationBehavior.originalX + root.animationDistanceX
+                value: root.animationDistanceX
             }
             PropertyAction {
-                target: root
+                target: shift
                 property: "y"
-                value: textAnimationBehavior.originalY + root.animationDistanceY
+                value: root.animationDistanceY
             }
             ParallelAnimation {
                 Anim {
+                    target: shift
                     property: "x"
-                    to: textAnimationBehavior.originalX
+                    to: 0
                     easing.type: Easing.OutSine
                 }
                 Anim {
+                    target: shift
                     property: "y"
-                    to: textAnimationBehavior.originalY
+                    to: 0
                     easing.type: Easing.OutSine
                 }
                 Anim {
