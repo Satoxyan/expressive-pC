@@ -28,10 +28,55 @@ Item {
     property real maxVisualizerValue: 1000
     property int visualizerSmoothing: 2
     property real radius
-    property bool showLyrics: Config.options.bar.media.showLyrics
+    property bool allowLyrics: true
+    property bool animateResize: false
+    property string growFrom: "top"
+    property bool showLyrics: allowLyrics && Config.options.bar.media.showLyrics
+
     // Ukuran decode dibekukan. Kalau ikut ukuran kartu, `cache: false` membuat Image
     // reload tiap frame selama animasi resize → blank frame → flicker.
     readonly property int artDecodeSize: Math.round(Appearance.sizes.mediaControlsHeight * 2)
+
+    readonly property real cardMargin: Appearance.sizes.elevationMargin
+    property real designHeight: root.height
+    property real cardHeight: root.designHeight - cardMargin * 2
+    property bool resizeReady: false
+    property real artReveal: 1
+
+    Behavior on artReveal {
+        SpringAnimation {
+            spring: 3.4
+            damping: 0.3
+            epsilon: 0.002
+        }
+    }
+
+    Timer {
+        id: artRevealTimer
+        interval: 520
+        onTriggered: root.artReveal = 1
+    }
+
+    onDesignHeightChanged: {
+        if (!root.animateResize || !root.resizeReady) return
+        root.artReveal = 0
+        artRevealTimer.restart()
+    }
+    property alias cardItem: background
+
+    Behavior on cardHeight {
+        enabled: root.animateResize && root.resizeReady
+        NumberAnimation {
+            duration: 460
+            easing.type: Easing.OutCubic
+        }
+    }
+
+    Timer {
+        running: true
+        interval: 200
+        onTriggered: root.resizeReady = true
+    }
 
     property string displayedArtFilePath: {
         if (!root.downloaded) return ""
@@ -90,8 +135,18 @@ Item {
 
     Rectangle {
         id: background
-        anchors.fill: parent
-        anchors.margins: Appearance.sizes.elevationMargin
+        anchors {
+            left: parent.left
+            right: parent.right
+            leftMargin: root.cardMargin
+            rightMargin: root.cardMargin
+            top: root.growFrom === "top" ? parent.top : undefined
+            topMargin: root.cardMargin
+            bottom: root.growFrom === "bottom" ? parent.bottom : undefined
+            bottomMargin: root.cardMargin
+            verticalCenter: root.growFrom === "center" ? parent.verticalCenter : undefined
+        }
+        height: root.cardHeight
         color: ColorUtils.applyAlpha(blendedColors.colLayer0, 1)
         radius: root.radius
 
@@ -114,6 +169,8 @@ Item {
             cache: false
             antialiasing: true
             asynchronous: true
+            opacity: Math.max(0, Math.min(1, root.artReveal))
+            scale: 0.88 + 0.12 * root.artReveal
 
             layer.enabled: true
             layer.effect: StyledBlurEffect {
@@ -137,35 +194,16 @@ Item {
             color: blendedColors.colPrimary
         }
 
-        Loader {
-            id: layoutLoader
+        PlayerContent {
             anchors.fill: parent
-
-            sourceComponent: root.showLyrics ? lyricsComponent : controlsComponent
-
-            Component {
-                id: controlsComponent
-                PlayerControls {
-                    player: root.player
-                    blendedColors: root.blendedColors
-                    displayedArtFilePath: root.displayedArtFilePath
-                    radius: root.radius
-                    // write config only: assigning to root.showLyrics would break the binding above
-                    onToggleLyrics: Config.options.bar.media.showLyrics = !Config.options.bar.media.showLyrics
-                }
-            }
-
-            Component {
-                id: lyricsComponent
-                PlayerControlsLyrics {
-                    player: root.player
-                    blendedColors: root.blendedColors
-                    displayedArtFilePath: root.displayedArtFilePath
-                    radius: root.radius
-                    artDominantColor: root.artDominantColor
-                    onToggleLyrics: Config.options.bar.media.showLyrics = !Config.options.bar.media.showLyrics
-                }
-            }
+            player: root.player
+            blendedColors: root.blendedColors
+            displayedArtFilePath: root.displayedArtFilePath
+            artDominantColor: root.artDominantColor
+            lyricsMode: root.showLyrics
+            lyricsAllowed: root.allowLyrics
+            // write config only: assigning to root.showLyrics would break the binding above
+            onToggleLyrics: Config.options.bar.media.showLyrics = !Config.options.bar.media.showLyrics
         }
     }
 }

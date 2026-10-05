@@ -4,6 +4,7 @@
 #   presets.sh --save <name> [description]
 #   presets.sh --remove <name> [--online]
 #   presets.sh --apply <name> [--online]
+#   presets.sh --rename <name> <new_name>
 #   presets.sh --export-zip <name>
 #   presets.sh --import-zip <zip_path>
 
@@ -148,6 +149,14 @@ case "$action" in
         elif $imported; then
             rm -rf "$IMPORTED_PRESETS_DIR/assets/${name}"
         fi
+        ;;
+    --rename)
+        new_name="${description//[[:space:]]/_}"
+        if [ -z "$new_name" ] || [ ! -f "$PRESETS_DIR/${name}.json" ] || [ -e "$PRESETS_DIR/${new_name}.json" ]; then
+            exit 1
+        fi
+        mv "$PRESETS_DIR/${name}.json" "$PRESETS_DIR/${new_name}.json"
+        echo "$new_name"
         ;;
     --apply)
         preset_file="$PRESETS_DIR/${name}.json"

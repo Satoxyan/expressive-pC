@@ -40,6 +40,13 @@ Scope {
     }
 
     readonly property bool barVertical: Config.options.bar.vertical
+    readonly property string growFrom: {
+        if (barEdge === "bottom") return "bottom"
+        if (barEdge === "top") return "top"
+        if (mediaPosition === "left") return "top"
+        if (mediaPosition === "right") return "bottom"
+        return "center"
+    }
     readonly property string barEdge: {
         if (!barVertical) return Config.options.bar.bottom ? "bottom" : "top"
         return Config.options.bar.bottom ? "right" : "left"
@@ -175,7 +182,7 @@ Scope {
             }
 
             mask: Region {
-                item: playerColumnLayout
+                item: root.meaningfulPlayers.length === 1 && playerColumnLayout.firstCard ? playerColumnLayout.firstCard : playerColumnLayout
             }
 
             Component.onCompleted: {
@@ -196,6 +203,7 @@ Scope {
 
             ColumnLayout {
                 id: playerColumnLayout
+                property Item firstCard: null
                 // Lebar ikut window, tinggi ikut isi (kartu). Tinggi yang mengikuti
                 // kartu bikin mask input cuma menutupi kartu — band transparan
                 // di atas window yang selalu tinggi itu tetap klik-tembus.
@@ -207,13 +215,16 @@ Scope {
                 spacing: -Appearance.sizes.elevationMargin // Shadow overlap okay
 
                 Repeater {
+                    id: playersRepeater
+                    onItemAdded: playerColumnLayout.firstCard = playersRepeater.itemAt(0)?.cardItem ?? null
+                    onItemRemoved: playerColumnLayout.firstCard = playersRepeater.itemAt(0)?.cardItem ?? null
                     model: ScriptModel {
                         values: root.meaningfulPlayers
                     }
                     delegate: Item {
                         id: playerSlot
                         required property MprisPlayer modelData
-                        readonly property real targetHeight: Config.options.bar.media.showLyrics ? 290 : Appearance.sizes.mediaControlsHeight
+                        readonly property real targetHeight: (root.meaningfulPlayers.length === 1 || Config.options.bar.media.showLyrics) ? 290 : Appearance.sizes.mediaControlsHeight
                         implicitWidth: root.widgetWidth
                         // tinggi slot = tinggi kartu (beranimasi) → tinggi kolom dan
                         // mask input ikut, sementara tinggi window tetap konstan

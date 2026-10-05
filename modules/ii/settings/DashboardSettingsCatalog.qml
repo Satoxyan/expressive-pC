@@ -502,7 +502,7 @@ QtObject {
             ]
         },
         {
-            page: Translation.tr("Desktop"), title: Translation.tr("Digital clock"), icon: "timer_10", cards: [
+            page: Translation.tr("Desktop"), title: Translation.tr("Digital clock"), when: "clockdigital", icon: "timer_10", cards: [
                 { type: "toggle", key: "desktop:Vertical", title: Translation.tr("Vertical"), icon: "vertical_align_center" },
                 { type: "toggle", key: "desktop:Animate time change", title: Translation.tr("Animate change"), icon: "animation" },
                 { type: "toggle", key: "desktop:Show date", title: Translation.tr("Show date"), icon: "calendar_today" },
@@ -522,7 +522,7 @@ QtObject {
             ]
         },
         {
-            page: Translation.tr("Desktop"), title: Translation.tr("Cookie clock"), icon: "cookie", cards: [
+            page: Translation.tr("Desktop"), title: Translation.tr("Cookie clock"), when: "clockcookie", icon: "cookie", cards: [
                 { type: "toggle", key: "desktop:Auto styling with Gemini", title: Translation.tr("Auto styling (Gemini)"), icon: "auto_awesome" },
                 { type: "toggle", key: "desktop:Use old sine wave cookie implementation", title: Translation.tr("Old sine cookie"), icon: "waves" },
                 { type: "toggle", key: "desktop:Constantly rotate", title: Translation.tr("Constantly rotate"), icon: "autorenew" },
@@ -537,7 +537,7 @@ QtObject {
             ]
         },
         {
-            page: Translation.tr("Desktop"), title: Translation.tr("Pixel clock"), icon: "grid_view", cards: [
+            page: Translation.tr("Desktop"), title: Translation.tr("Pixel clock"), when: "clockpixel", icon: "grid_view", cards: [
                 { type: "select", key: "desktop:Pixel clock orientation", title: Translation.tr("Orientation"), icon: "screen_rotation" },
                 { type: "toggle", key: "desktop:Show date (lock screen)", title: Translation.tr("Show date (lock screen)"), icon: "date_range" },
                 { type: "slider", key: "desktop:Pixel size", title: Translation.tr("Size"), icon: "format_size", percent: false },

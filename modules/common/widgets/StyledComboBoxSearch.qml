@@ -16,6 +16,7 @@ ComboBox {
     property color colBackgroundHover: Appearance.colors.colSecondaryContainerHover
     property color colBackgroundActive: Appearance.colors.colSecondaryContainerActive
     property string searchText: ""
+    property bool splitIndicator: false
 
     readonly property var filteredItems: {
         const query = root.searchText.toLowerCase()
@@ -41,7 +42,12 @@ ComboBox {
     Layout.fillWidth: true
 
     background: Rectangle {
-        radius: root.buttonRadius
+        anchors.fill: parent
+        anchors.rightMargin: root.splitIndicator ? root.indicator.width + 2 : 0
+        topLeftRadius: root.buttonRadius
+        bottomLeftRadius: root.buttonRadius
+        topRightRadius: root.splitIndicator ? Appearance.rounding.unsharpenmore : root.buttonRadius
+        bottomRightRadius: topRightRadius
         color: (root.down && !root.popup.visible) ? root.colBackgroundActive : root.hovered ? root.colBackgroundHover : root.colBackground
 
         Behavior on color {
@@ -55,16 +61,33 @@ ComboBox {
         }
     }
 
-    indicator: MaterialSymbol {
-        x: root.width - width - 16
-        y: root.height / 2 - height / 2
-        text: "keyboard_arrow_down"
-        iconSize: Appearance.font.pixelSize.larger
-        color: Appearance.colors.colOnSecondaryContainer
+    indicator: Item {
+        x: root.width - width
+        width: root.splitIndicator ? badge.width : chevron.width + 32
+        height: root.height
 
-        rotation: root.popup.visible ? 180 : 0
-        Behavior on rotation {
-            animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+        ComboChevronBadge {
+            id: badge
+            visible: root.splitIndicator
+            anchors.right: parent.right
+            height: parent.height
+            open: root.popup.visible
+            colClosed: (root.down && !root.popup.visible) ? root.colBackgroundActive : root.hovered ? root.colBackgroundHover : root.colBackground
+        }
+
+        MaterialSymbol {
+            id: chevron
+            visible: !root.splitIndicator
+            x: parent.width - width - 16
+            y: parent.height / 2 - height / 2
+            text: "keyboard_arrow_down"
+            iconSize: Appearance.font.pixelSize.larger
+            color: Appearance.colors.colOnSecondaryContainer
+
+            rotation: root.popup.visible ? 180 : 0
+            Behavior on rotation {
+                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+            }
         }
     }
 
@@ -77,7 +100,7 @@ ComboBox {
             anchors.fill: parent
             spacing: 8
             anchors.leftMargin: 16
-            anchors.rightMargin: 16
+            anchors.rightMargin: root.splitIndicator ? root.indicator.width + 12 : 16
 
             Loader {
                 Layout.alignment: Qt.AlignVCenter

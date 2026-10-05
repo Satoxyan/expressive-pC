@@ -33,14 +33,21 @@ Item {
     property bool showWifiDialog: false
     property bool showVpnDialog: false
     property bool editMode: false
+    property string editTab: Config.options.sidebar.quickToggles.style === "android" ? "toggles" : "layout"
+    readonly property var editTabs: Config.options.sidebar.quickToggles.style === "android"
+        ? [
+            { id: "toggles", name: Translation.tr("Toggles"), icon: "toggle_on" },
+            { id: "layout", name: Translation.tr("Layout"), icon: "dashboard_customize" }
+        ]
+        : [{ id: "layout", name: Translation.tr("Layout"), icon: "dashboard_customize" }]
     property bool showIconPickerDialog: false
-    property string draggingType: ""
-    property int hoverPos: -1
-    property point dragPosition
 
     readonly property bool animatedEntrance: WM.compositor !== "hyprland"
     readonly property bool sidebarOpen: GlobalStates.sidebarRightOpen
 
+    readonly property MprisPlayer activePlayer: MprisController.activePlayer
+    // phantom MPRIS (kdeconnect/playerctld with empty metadata) ≠ media
+    readonly property bool hasMedia: root.activePlayer !== null && ((root.activePlayer.trackTitle ?? "") !== "" || root.activePlayer.isPlaying)
     // ponytail: 3 panels + calendar expand → limit quick rows to 2
     readonly property int activePanelCount: {
         let c = 1
@@ -52,10 +59,6 @@ Item {
     readonly property bool threePanelsActive: root.activePanelCount >= 3
     readonly property bool calendarExpanded: Config.options.sidebar.bottomGroup && !Persistent.states.sidebar.bottomGroup.collapsed
     readonly property bool shouldLimitRows: root.threePanelsActive && root.calendarExpanded && !root.editMode
-
-    readonly property MprisPlayer activePlayer: MprisController.activePlayer
-    // phantom MPRIS (kdeconnect/playerctld with empty metadata) ≠ media
-    readonly property bool hasMedia: root.activePlayer !== null && ((root.activePlayer.trackTitle ?? "") !== "" || root.activePlayer.isPlaying)
     readonly property var realPlayers: MprisController.players
     readonly property var meaningfulPlayers: {
         const preferred = Config.options.bar.media.preferredPlayer.trim().toLowerCase()
@@ -113,12 +116,12 @@ Item {
 
         function onSidebarRightOpenChanged() {
             if (!GlobalStates.sidebarRightOpen) {
+                root.editMode = false;
                 root.showWifiDialog = false;
                 root.showVpnDialog = false;
                 root.showBluetoothDialog = false;
                 root.showAudioOutputDialog = false;
                 root.showAudioInputDialog = false;
-                root.editMode = false;
             }
         }
     }
@@ -158,289 +161,433 @@ Item {
         border.color: ColorUtils.transparentize(Appearance.colors.colLayer0Border, 0.8) 
         radius: Appearance.rounding.screenRounding - Appearance.sizes.hyprlandGapsOut + 5
 
-        ColumnLayout {
+        ReorderableColumn {
+            id: sectionColumn
             anchors.fill: parent
             anchors.margins: sidebarPadding
-            spacing: sidebarPadding
+            itemSpacing: sidebarPadding
+            order: root.sectionOrder
+            editMode: root.editMode && root.editTab === "layout"
+            fillKey: "notifications"
+            fillMinHeight: 120
+            onReordered: newOrder => Config.options.sidebar.sectionOrder = newOrder
+            componentForKey: key => root.sectionComponents[key] ?? null
+            isKeyActive: key => root.sectionActive(key)
+        }
+    }
 
-            // Banner
-            Loader {
-                Layout.fillWidth: true
-                Layout.fillHeight: false
-                sourceComponent: Config.options.sidebar.banner ? bannerComponent : normalComponent
+    readonly property var sectionComponents: ({
+        "banner": bannerSection,
+        "quickToggles": quickTogglesSection,
+        "sliders": slidersSection,
+        "media": mediaSection,
+        "notifications": notificationsSection,
+        "bottom": bottomSection
+    })
 
-                Component {
-                    id: bannerComponent
-                    Item {
-                        implicitHeight: 180
-                        implicitWidth: parent?.width ?? 0
+    function sectionActive(key) {
+        const sidebar = Config.options.sidebar
+        switch (key) {
+        case "sliders":
+            return sidebar.quickSliders.enable && (sidebar.quickSliders.showMic || sidebar.quickSliders.showVolume || sidebar.quickSliders.showBrightness)
+        case "media":
+            return root.hasMedia && sidebar.mediaPlayer
+        case "bottom":
+            return sidebar.bottomGroup
+        default:
+            return true
+        }
+    }
+
+    readonly property var defaultSectionOrder: ["banner", "quickToggles", "sliders", "media", "notifications", "bottom"]
+    readonly property var sectionOrder: {
+        const saved = Array.from(Config.options.sidebar.sectionOrder).filter(key => defaultSectionOrder.includes(key))
+        const unique = saved.filter((key, i) => saved.indexOf(key) === i)
+        return unique.concat(defaultSectionOrder.filter(key => !unique.includes(key)))
+    }
+
+    Component {
+        id: bannerSection
+        Loader {
+            sourceComponent: Config.options.sidebar.banner ? bannerComponent : normalComponent
+        }
+    }
+
+        Component {
+            id: bannerComponent
+            Item {
+                implicitHeight: 180
+                implicitWidth: parent?.width ?? 0
+
+                Rectangle {
+                    id: sysRect
+                    readonly property real inset: 5
+                    anchors.fill: parent
+                    radius: Appearance.rounding.normal
+                    color: Appearance.colors.colLayer1
+
+                    Rectangle {
+                        id: wallpaperRect
+                        property bool panning: false
+                        property real dragDX: 0
+                        property real dragDY: 0
+                        readonly property real aspect: bannerImage.implicitHeight > 0 ? bannerImage.implicitWidth / bannerImage.implicitHeight : 1
+                        readonly property real coverWidth: aspect > width / height ? height * aspect : width
+                        readonly property real coverHeight: aspect > width / height ? height : width / aspect
+                        readonly property real overflowX: Math.max(0, coverWidth - width)
+                        readonly property real overflowY: Math.max(0, coverHeight - height)
+                        readonly property real focusX: overflowX > 0 ? Math.max(0, Math.min(1, Config.options.sidebar.bannerFocusX - dragDX / overflowX)) : 0.5
+                        readonly property real focusY: overflowY > 0 ? Math.max(0, Math.min(1, Config.options.sidebar.bannerFocusY - dragDY / overflowY)) : 0.5
+
+                        anchors {
+                            top: parent.top
+                            left: parent.left
+                            right: parent.right
+                            topMargin: sysRect.inset
+                            leftMargin: sysRect.inset
+                            rightMargin: sysRect.inset
+                        }
+                        height: 120
+                        radius: Math.max(0, sysRect.radius - sysRect.inset)
+                        color: "transparent"
+
+                        Item {
+                            anchors.fill: parent
+                            layer.enabled: true
+                            layer.effect: OpacityMask {
+                                maskSource: Rectangle {
+                                    width: wallpaperRect.width
+                                    height: wallpaperRect.height
+                                    radius: wallpaperRect.radius
+                                }
+                            }
+
+                            // aspect probe: id bannerImage dipakai kalkulasi panning (wallpaperRect.aspect)
+                            StyledImage {
+                                id: bannerImage
+                                visible: false
+                                source: Config.options.sidebar.bannerImage !== "" 
+                                    ? Config.options.sidebar.bannerImage 
+                                    : Config.options.background.wallpaperPath
+                            }
+                            LiveWallpaperPreview {
+                                x: -wallpaperRect.overflowX * wallpaperRect.focusX
+                                y: -wallpaperRect.overflowY * wallpaperRect.focusY
+                                width: wallpaperRect.coverWidth
+                                height: wallpaperRect.coverHeight
+                                source: Config.options.sidebar.bannerImage !== "" 
+                                    ? Config.options.sidebar.bannerImage 
+                                    : Config.options.background.wallpaperPath
+                                thumbnail: Config.options.background.thumbnailPath
+                                radius: wallpaperRect.radius
+                                active: true
+                            }
+                        }
 
                         Rectangle {
-                            id: sysRect
                             anchors.fill: parent
-                            radius: Config.options.hyprland.decoration.rounding - 2
-                            color: Appearance.colors.colLayer1
+                            radius: wallpaperRect.radius
+                            color: ColorUtils.transparentize(Appearance.colors.colPrimary, 0.8)
+                            border.width: 2
+                            border.color: Appearance.colors.colPrimary
+                            opacity: wallpaperRect.panning ? 1 : 0
+                            visible: opacity > 0
+
+                            Behavior on opacity {
+                                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                            }
 
                             Rectangle {
-                                id: wallpaperRect
-                                anchors {
-                                    top: parent.top
-                                    left: parent.left
-                                    right: parent.right
-                                    topMargin: 2
-                                    leftMargin: 2
-                                    rightMargin: 2
-                                }
-                                height: 120
-                                radius: sysRect.radius
-                                color: "transparent"
+                                anchors.centerIn: parent
+                                width: 44
+                                height: 44
+                                radius: height / 2
+                                color: Appearance.colors.colPrimary
 
-                                LiveWallpaperPreview {
-                                    anchors.fill: parent
-                                    source: Config.options.sidebar.bannerImage !== "" 
-                                        ? Config.options.sidebar.bannerImage 
-                                        : Config.options.background.wallpaperPath
-                                    thumbnail: Config.options.background.thumbnailPath
-                                    radius: wallpaperRect.radius
-                                    active: true
-                                }
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
-                                    onClicked: (event) => {
-                                        if (event.button === Qt.LeftButton) {
-                                            fileChooser.running = true
-                                            GlobalStates.sidebarRightOpen = false
-                                        } else if (event.button === Qt.RightButton) {
-                                            Config.options.sidebar.bannerImage = ""
-                                        }
-                                    }
+                                MaterialSymbol {
+                                    anchors.centerIn: parent
+                                    text: "open_with"
+                                    iconSize: 24
+                                    color: Appearance.colors.colOnPrimary
                                 }
                             }
+                        }
 
-                            Column {
-                                anchors {
-                                    left: parent.left
-                                    bottom: parent.bottom
-                                    leftMargin: 13
-                                    bottomMargin: 8
-                                }
-                                spacing: 1
-
-
-                                Process {
-                                    id: avatarCropProc
-                                    property string outputPath: ""
-                                    onExited: (code) => {
-                                        if (code === 0 && avatarCropProc.outputPath !== "") {
-                                            Config.options.profile.avatarPath = ""
-                                            Config.options.profile.avatarPicture = avatarCropProc.outputPath
-                                        }
-                                    }
-                                }
-
-                                UserAvatar {
-                                    width: 48
-                                    height: 48
-
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            GlobalStates.sidebarRightOpen = false
-                                            FilePicker.pickImage(function(path) {
-                                                if (path && path !== "") {
-                                                    const faceDir = FileUtils.trimFileProtocol(Directories.home) + "/.face"
-                                                    const outputPath = faceDir + "/avatar.png"
-                                                    const srcPath = FileUtils.trimFileProtocol(path)
-                                                    avatarCropProc.command = ["bash", "-c",
-                                                        `mkdir -p '${faceDir}' && convert '${srcPath}' -resize 512x512^ -gravity center -extent 512x512 PNG:'${outputPath}'`]
-                                                    avatarCropProc.outputPath = outputPath
-                                                    avatarCropProc.running = true
-                                                }
-                                            })
-                                        }
-                                    }
-                                }
-
-                                StyledText {
-                                    text: (Config.options.profile.displayName === "" ? SystemInfo.username : Config.options.profile.displayName) + "@" + SystemInfo.hostname
-                                    font.pixelSize: Appearance.font.pixelSize.small
-                                    font.weight: Font.DemiBold
-                                    color: Appearance.colors.colOnLayer1
-                                }
-
-                                StyledText {
-                                    text: Translation.tr("Up • %1").arg(DateTime.uptime)
-                                    font.pixelSize: Appearance.font.pixelSize.smaller
-                                    color: Appearance.colors.colOnLayer1
-                                    opacity: 0.6
-                                }
+                        MouseArea {
+                            property real lastX: 0
+                            property real lastY: 0
+                            anchors.fill: parent
+                            cursorShape: wallpaperRect.panning ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            onPressed: mouse => {
+                                lastX = mouse.x
+                                lastY = mouse.y
                             }
-
-                            ButtonGroup {
-                                anchors {
-                                    right: parent.right
-                                    bottom: parent.bottom
-                                    margins: 4
-                                }
-                                color: "transparent"
-                                padding: 4
-
-                                QuickToggleButton {
-                                    toggled: root.editMode
-                                    visible: Config.options.sidebar.quickToggles.style === "android"
-                                    buttonIcon: "edit"
-                                    onClicked: root.editMode = !root.editMode
-                                    StyledToolTip {
-                                        text: Translation.tr("Edit quick toggles") + (root.editMode ? Translation.tr("\nLMB to enable/disable\nRMB to toggle size\nScroll to swap position") : "")
-                                    }
-                                }
-                                QuickToggleButton {
-                                    toggled: false
-                                    buttonIcon: "restart_alt"
-                                    onClicked: {
-                                        Quickshell.execDetached(["hyprctl", "reload"])
-                                        Quickshell.reload(true);
-                                    }
-                                    StyledToolTip {
-                                        text: Translation.tr("Reload Hyprland & Quickshell")
-                                    }
-                                }
-                                QuickToggleButton {
-                                    toggled: GlobalStates.settingsOpen
-                                    buttonIcon: "settings"
-                                    onClicked: {
-                                        GlobalStates.sidebarRightOpen = false;
-                                        GlobalStates.settingsOpen = !GlobalStates.settingsOpen
-                                    }
-                                    StyledToolTip {
-                                        text: Translation.tr("Settings")
-                                    }
-                                }
-                                QuickToggleButton {
-                                    toggled: false
-                                    buttonIcon: "mode_off_on"
-                                    onClicked: GlobalStates.sessionOpen = true
-                                    StyledToolTip {
-                                        text: Translation.tr("Session")
-                                    }
+                            onPressAndHold: mouse => {
+                                if (mouse.button === Qt.LeftButton) wallpaperRect.panning = true
+                            }
+                            onPositionChanged: mouse => {
+                                if (!wallpaperRect.panning) return
+                                wallpaperRect.dragDX += mouse.x - lastX
+                                wallpaperRect.dragDY += mouse.y - lastY
+                                lastX = mouse.x
+                                lastY = mouse.y
+                            }
+                            onReleased: {
+                                if (!wallpaperRect.panning) return
+                                Config.options.sidebar.bannerFocusX = wallpaperRect.focusX
+                                Config.options.sidebar.bannerFocusY = wallpaperRect.focusY
+                                wallpaperRect.dragDX = 0
+                                wallpaperRect.dragDY = 0
+                                wallpaperRect.panning = false
+                            }
+                            onCanceled: {
+                                wallpaperRect.dragDX = 0
+                                wallpaperRect.dragDY = 0
+                                wallpaperRect.panning = false
+                            }
+                            onClicked: (event) => {
+                                if (event.button === Qt.LeftButton) {
+                                    fileChooser.running = true
+                                    GlobalStates.sidebarRightOpen = false
+                                } else if (event.button === Qt.RightButton) {
+                                    Config.options.sidebar.bannerImage = ""
+                                    Config.options.sidebar.bannerFocusX = 0.5
+                                    Config.options.sidebar.bannerFocusY = 0.5
                                 }
                             }
                         }
                     }
-                }
 
-                Component {
-                    id: normalComponent
-                    SystemButtonRow {}
+                    Column {
+                        anchors {
+                            left: parent.left
+                            bottom: parent.bottom
+                            leftMargin: sysRect.inset + 8
+                            bottomMargin: 8
+                        }
+                        spacing: 1
+
+                        Process {
+                            id: avatarCropProc
+                            property string outputPath: ""
+                            onExited: (code) => {
+                                if (code === 0 && avatarCropProc.outputPath !== "") {
+                                    Config.options.profile.avatarPath = ""
+                                    Config.options.profile.avatarPicture = avatarCropProc.outputPath
+                                }
+                            }
+                        }
+
+                        UserAvatar {
+                            width: 48
+                            height: 48
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    GlobalStates.sidebarRightOpen = false
+                                    FilePicker.pickImage(function(path) {
+                                        if (path && path !== "") {
+                                            const faceDir = FileUtils.trimFileProtocol(Directories.home) + "/.face"
+                                            const outputPath = faceDir + "/avatar.png"
+                                            const srcPath = FileUtils.trimFileProtocol(path)
+                                            avatarCropProc.command = ["bash", "-c",
+                                                `mkdir -p '${faceDir}' && convert '${srcPath}' -resize 512x512^ -gravity center -extent 512x512 PNG:'${outputPath}'`]
+                                            avatarCropProc.outputPath = outputPath
+                                            avatarCropProc.running = true
+                                        }
+                                    })
+                                }
+                            }
+                        }
+
+                        StyledText {
+                            text: (Config.options.profile.displayName === "" ? SystemInfo.username : Config.options.profile.displayName) + "@" + SystemInfo.hostname
+                            font.pixelSize: Appearance.font.pixelSize.small
+                            font.weight: Font.DemiBold
+                            color: Appearance.colors.colOnLayer1
+                        }
+
+                        StyledText {
+                            text: Translation.tr("Up • %1").arg(DateTime.uptime)
+                            font.pixelSize: Appearance.font.pixelSize.smaller
+                            color: Appearance.colors.colOnLayer1
+                            opacity: 0.6
+                        }
+                    }
+
+                    ButtonGroup {
+                        anchors {
+                            right: parent.right
+                            bottom: parent.bottom
+                            margins: 4
+                        }
+                        color: "transparent"
+                        padding: 4
+
+                        QuickToggleButton {
+                            toggled: root.editMode
+                                        buttonIcon: "edit"
+                            onClicked: root.editMode = !root.editMode
+                            StyledToolTip {
+                                text: Translation.tr("Edit sidebar")
+                            }
+                        }
+                        QuickToggleButton {
+                            toggled: false
+                            buttonIcon: "restart_alt"
+                            onClicked: {
+                                Quickshell.execDetached(["hyprctl", "reload"])
+                                Quickshell.reload(true);
+                            }
+                            StyledToolTip {
+                                text: Translation.tr("Reload Hyprland & Quickshell")
+                            }
+                        }
+                        QuickToggleButton {
+                            toggled: GlobalStates.settingsOpen
+                            buttonIcon: "settings"
+                            onClicked: {
+                                GlobalStates.sidebarRightOpen = false;
+                                GlobalStates.settingsOpen = !GlobalStates.settingsOpen
+                            }
+                            StyledToolTip {
+                                text: Translation.tr("Settings")
+                            }
+                        }
+                        QuickToggleButton {
+                            toggled: false
+                            buttonIcon: "mode_off_on"
+                            onClicked: GlobalStates.sessionOpen = true
+                            StyledToolTip {
+                                text: Translation.tr("Session")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+    Component {
+        id: normalComponent
+        SystemButtonRow {}
+    }
+
+    Component {
+        id: quickTogglesSection
+        Item {
+            implicitHeight: (classicLoader.item?.implicitHeight ?? 0) + (androidLoader.item?.implicitHeight ?? 0)
+
+            Loader {
+                id: classicLoader
+                anchors.left: parent.left
+                anchors.right: parent.right
+                active: Config.options.sidebar.quickToggles.style === "classic"
+                sourceComponent: ClassicQuickPanel {}
+            }
+
+            Loader {
+                id: androidLoader
+                anchors.left: parent.left
+                anchors.right: parent.right
+                active: Config.options.sidebar.quickToggles.style === "android"
+                sourceComponent: AndroidQuickPanel {
+                    editMode: root.editMode && root.editTab === "toggles"
+                    limitRows: root.shouldLimitRows
                 }
             }
 
-            // ponytail: 3 reorderable panels — hold one, the others make room live
-            Item {
-                id: panelArea
-                Layout.fillWidth: true
-                implicitHeight: panelArea.totalHeight
-
-                readonly property int gap: root.editMode ? 8 : sidebarPadding
-                readonly property var baseOrder: {
-                    const o = Config.options.sidebar.panelOrder
-                    return (o && o.length === 3) ? o.map(String) : ["quickToggles", "sliders", "media"]
-                }
-                // urutan tampil selama drag: panel yang dipegang ditempatkan di posisi hover
-                readonly property var displayOrder: {
-                    const b = panelArea.baseOrder
-                    const d = root.draggingType
-                    if (d === "" || root.hoverPos < 0 || b.indexOf(d) === root.hoverPos) return b
-                    const a = [...b]
-                    a.splice(a.indexOf(d), 1)
-                    a.splice(root.hoverPos, 0, d)
-                    return a
-                }
-                readonly property real totalHeight: {
-                    let h = 0
-                    let n = 0
-                    for (const t of panelArea.displayOrder) {
-                        const hs = panelArea.hostOf(t)
-                        if (!hs || !hs.visible) continue
-                        h += hs.stackHeight + (n > 0 ? panelArea.gap : 0)
-                        n++
-                    }
-                    return h
-                }
-
-                function panelSource(type) {
-                    if (type === "quickToggles") return quickTogglesPanel
-                    if (type === "sliders") return slidersPanel
-                    if (type === "media") return mediaPanel
-                    return null
-                }
-                function panelVisible(type) {
-                    if (type === "quickToggles") return true
-                    if (type === "sliders") {
-                        const c = Config.options.sidebar.quickSliders
-                        return c.enable && (c.showMic || c.showVolume || c.showBrightness)
-                    }
-                    if (type === "media") return Config.options.sidebar.mediaPlayer && (root.hasMedia || root.editMode)
-                    return false
-                }
-                function hostOf(type) {
-                    if (type === "quickToggles") return qtPanel
-                    if (type === "sliders") return slPanel
-                    return mdPanel
-                }
-                function yFor(type) {
-                    let y = 0
-                    for (const t of panelArea.displayOrder) {
-                        if (t === type) break
-                        const hs = panelArea.hostOf(t)
-                        if (!hs || !hs.visible) continue
-                        y += hs.stackHeight + panelArea.gap
-                    }
-                    return y
-                }
-                // indeks jatuh dari kursor: berapa panel lain yang tengahnya sudah di atas kursor
-                function hoverAt(scenePos) {
-                    const local = panelArea.mapFromItem(null, scenePos.x, scenePos.y)
-                    const seq = panelArea.displayOrder.filter(t => t !== root.draggingType)
-                    let above = 0
-                    for (const t of seq) {
-                        const hs = panelArea.hostOf(t)
-                        if (!hs || !hs.visible) continue
-                        if (hs.y + hs.height / 2 <= local.y) above++
-                    }
-                    // sisip tepat setelah `above` panel terlihat (panel tersembunyi dihitung nol tinggi)
-                    let seen = 0
-                    for (let i = 0; i < seq.length; i++) {
-                        const hs = panelArea.hostOf(seq[i])
-                        if (!hs || !hs.visible) continue
-                        if (seen === above) return i
-                        seen++
-                    }
-                    return seq.length
-                }
-
-                PanelHost { id: qtPanel; panelType: "quickToggles" }
-                PanelHost { id: slPanel; panelType: "sliders" }
-                PanelHost { id: mdPanel; panelType: "media" }
+            Connections {
+                target: classicLoader.item
+                function onOpenAudioOutputDialog() { root.showAudioOutputDialog = true; }
+                function onOpenAudioInputDialog() { root.showAudioInputDialog = true; }
+                function onOpenBluetoothDialog() { root.showBluetoothDialog = true; }
+                function onOpenNightLightDialog() { root.showNightLightDialog = true; }
+                function onOpenWifiDialog() { root.showWifiDialog = true; }
+                function onOpenVpnDialog() { root.showVpnDialog = true; }
             }
 
-            CenterWidgetGroup {
-                Layout.alignment: Qt.AlignHCenter
-                Layout.fillHeight: true
-                Layout.fillWidth: true
-                Layout.minimumHeight: 47 // ponytail: bottom bar (ring/count/clean) height, not shrink through
+            Connections {
+                target: androidLoader.item
+                function onOpenAudioOutputDialog() { root.showAudioOutputDialog = true; }
+                function onOpenAudioInputDialog() { root.showAudioInputDialog = true; }
+                function onOpenBluetoothDialog() { root.showBluetoothDialog = true; }
+                function onOpenNightLightDialog() { root.showNightLightDialog = true; }
+                function onOpenWifiDialog() { root.showWifiDialog = true; }
+                function onOpenVpnDialog() { root.showVpnDialog = true; }
             }
+        }
+    }
 
-            BottomWidgetGroup {
-                visible: Config.options.sidebar.bottomGroup
-                id: bottomWidgetGroup
-                Layout.alignment: Qt.AlignHCenter
-                Layout.fillHeight: false
-                Layout.fillWidth: true
+    Component {
+        id: slidersSection
+        Loader {
+            active: root.sectionActive("sliders")
+            sourceComponent: QuickSliders {}
+        }
+    }
+
+    Component {
+        id: mediaSection
+        Loader {
+            active: root.sectionActive("media") && GlobalStates.sidebarRightOpen
+            sourceComponent: Item {
+                implicitHeight: (Config.options.bar.media.showLyrics ? 290 : (160 - Appearance.sizes.elevationMargin * 2))
+                Behavior on implicitHeight {
+                    NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+                }
+
+                Player {
+                    anchors.fill: parent
+                    anchors.margins: -Appearance.sizes.elevationMargin
+                    player: root.activePlayer
+                    visualizerPoints: GlobalStates.visualizerPoints
+                    radius: Appearance.rounding.normal
+                }
             }
+        }
+    }
+
+    Component {
+        id: notificationsSection
+        CenterWidgetGroup {}
+    }
+
+    Component {
+        id: bottomSection
+        Loader {
+            active: root.sectionActive("bottom")
+            sourceComponent: BottomWidgetGroup {}
+        }
+    }
+
+    Toolbar {
+        id: editToolbar
+        z: 60
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: root.editMode ? 22 : -height - 30
+        opacity: root.editMode ? 1 : 0
+
+        Behavior on anchors.bottomMargin {
+            animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
+        }
+        Behavior on opacity {
+            animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+        }
+
+        ToolbarTabBar {
+            id: editTabBar
+            tabButtonList: root.editTabs
+            currentIndex: Math.max(0, root.editTabs.findIndex(tab => tab.id === root.editTab))
+            onCurrentIndexChanged: root.editTab = root.editTabs[Math.max(0, currentIndex)]?.id ?? "layout"
+        }
+
+        IconToolbarButton {
+            text: "check"
+            onClicked: root.editMode = false
         }
     }
 
@@ -499,217 +646,6 @@ Item {
         dialog: IconPickerDialog {}
     }
 
-    // Drag ghost — panel yang dipegang terangkat di atas panel lain
-    Item {
-        id: dragGhost
-        visible: root.draggingType !== ""
-        z: 999
-        width: sidebarWidth + 30
-        height: dragGhostContent.implicitHeight + 16
-        x: root.dragPosition.x - width / 2
-        y: root.dragPosition.y - 40
-
-        // ponytail: no Behavior on x/y — ghost harus nempel 1:1 di kursor,
-        // animasi di sini yang bikin "fling" dari posisi lama ke kursor
-        Behavior on opacity { animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this) }
-
-        layer.enabled: true
-        layer.effect: DropShadow {
-            horizontalOffset: 0
-            verticalOffset: 8
-            radius: 24
-            color: Qt.rgba(0, 0, 0, 0.35)
-            samples: 33
-        }
-
-        Rectangle {
-            anchors.fill: parent
-            radius: Appearance.rounding.normal
-            color: Appearance.colors.colLayer1
-            border.width: 1
-            border.color: Appearance.colors.colLayer0Border
-        }
-
-        ColumnLayout {
-            id: dragGhostContent
-            anchors.fill: parent
-            anchors.margins: 8
-            spacing: 0
-            Loader {
-                id: dragGhostLoader
-                Layout.fillWidth: true
-                active: root.draggingType !== ""
-                property string panelType: root.draggingType
-                sourceComponent: panelArea.panelSource(panelType)
-            }
-        }
-    }
-
-    // ponytail: satu item stabil per panel — urutan datang dari panelArea.displayOrder
-    component PanelHost: Item {
-        id: host
-        property string panelType: ""
-        readonly property bool bleed: panelType === "media"
-        readonly property real stackHeight: height - (bleed ? 20 : 0)
-
-        x: bleed ? -10 : 0
-        width: panelArea.width + (bleed ? 20 : 0)
-        y: panelArea.yFor(panelType) + (bleed ? -10 : 0)
-        height: hostColumn.implicitHeight
-        visible: panelArea.panelVisible(panelType)
-        opacity: root.draggingType === panelType ? 0
-            : (root.editMode && !panelArea.panelVisible(panelType) ? 0.4 : 1)
-
-        Behavior on y {
-            enabled: root.draggingType !== ""
-            animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(host)
-        }
-
-        ColumnLayout {
-            id: hostColumn
-            width: parent.width
-            spacing: 0
-            ReorderDragHandle { panelType: host.panelType }
-            Loader {
-                Layout.fillWidth: true
-                active: panelArea.panelVisible(host.panelType)
-                asynchronous: true
-                sourceComponent: panelArea.panelSource(host.panelType)
-            }
-        }
-    }
-
-    // ponytail: reorder drag handle for panel slots
-    component ReorderDragHandle: Rectangle {
-        id: reorderHandle
-        visible: root.editMode && !(reorderHandle.panelType === "media" && !Config.options.sidebar.mediaPlayer)
-        Layout.fillWidth: true
-        implicitHeight: 28
-        radius: Appearance.rounding.small
-        color: reorderDragHandler.active ? Appearance.colors.colLayer1Active : Appearance.colors.colLayer1
-        border.width: 1
-        border.color: Appearance.colors.colLayer0Border
-        property string panelType: ""
-        Behavior on color { animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this) }
-
-        RowLayout {
-            anchors.fill: parent
-            anchors.leftMargin: 8
-            anchors.rightMargin: 8
-            spacing: 8
-            MaterialSymbol { text: "drag_indicator"; iconSize: 18; color: Appearance.colors.colSubtext }
-            StyledText {
-                Layout.fillWidth: true
-                text: reorderHandle.panelType === "quickToggles" ? Translation.tr("Quick toggles")
-                    : reorderHandle.panelType === "sliders" ? Translation.tr("Sliders")
-                    : reorderHandle.panelType === "media" ? Translation.tr("Media")
-                    : reorderHandle.panelType
-                font.pixelSize: Appearance.font.pixelSize.small
-                color: Appearance.colors.colOnLayer1
-            }
-            MaterialSymbol { text: "drag_indicator"; iconSize: 18; color: Appearance.colors.colSubtext }
-        }
-
-        DragHandler {
-            id: reorderDragHandler
-            target: null
-            acceptedButtons: Qt.LeftButton
-            onActiveChanged: {
-                if (active) {
-                    // seed dulu: centroid cuma dihitung ulang pada gerakan pertama,
-                    // kalau tidak ghost muncul dari posisi drag sebelumnya (atau 0,0)
-                    const sc = centroid.scenePosition
-                    const lp = root.mapFromItem(null, sc.x, sc.y)
-                    root.dragPosition = Qt.point(lp.x, lp.y)
-                    root.draggingType = reorderHandle.panelType
-                    root.hoverPos = panelArea.baseOrder.indexOf(reorderHandle.panelType)
-                } else {
-                    // preview sudah sesuai: tulis jadi urutan baru
-                    const cur = Config.options.sidebar.panelOrder
-                    const next = panelArea.displayOrder
-                    if (cur && cur.length === 3 && next.some((t, i) => String(cur[i]) !== t))
-                        Config.options.sidebar.panelOrder = next
-                    root.draggingType = ""
-                    root.hoverPos = -1
-                }
-            }
-            onCentroidChanged: {
-                if (!active) return
-                const sc = centroid.scenePosition
-                const localPos = root.mapFromItem(null, sc.x, sc.y)
-                root.dragPosition = Qt.point(localPos.x, localPos.y)
-                root.hoverPos = panelArea.hoverAt(sc)
-            }
-        }
-        HoverHandler { cursorShape: reorderDragHandler.active ? Qt.ClosedHandCursor : Qt.OpenHandCursor }
-    }
-
-    Component {
-        id: quickTogglesPanel
-        ColumnLayout {
-            spacing: 0
-            Loader {
-                id: classicQuickLoader
-                Layout.fillWidth: true
-                active: Config.options.sidebar.quickToggles.style === "classic"
-                visible: active
-                sourceComponent: ClassicQuickPanel {}
-            }
-            Loader {
-                id: androidQuickLoader
-                Layout.fillWidth: true
-                active: Config.options.sidebar.quickToggles.style === "android"
-                visible: active
-                sourceComponent: AndroidQuickPanel { editMode: root.editMode; limitRows: root.shouldLimitRows }
-            }
-            Connections { target: classicQuickLoader.item; function onOpenAudioOutputDialog() { root.showAudioOutputDialog = true } function onOpenAudioInputDialog() { root.showAudioInputDialog = true } function onOpenBluetoothDialog() { root.showBluetoothDialog = true } function onOpenNightLightDialog() { root.showNightLightDialog = true } function onOpenWifiDialog() { root.showWifiDialog = true } }
-            Connections { target: androidQuickLoader.item; function onOpenAudioOutputDialog() { root.showAudioOutputDialog = true } function onOpenAudioInputDialog() { root.showAudioInputDialog = true } function onOpenBluetoothDialog() { root.showBluetoothDialog = true } function onOpenNightLightDialog() { root.showNightLightDialog = true } function onOpenWifiDialog() { root.showWifiDialog = true } }
-        }
-    }
-    Component {
-        id: slidersPanel
-        QuickSliders {}
-    }
-    Component {
-        id: mediaPanel
-        Item {
-            // same sizing as bar popup: lyrics view needs 290 (MediaControls.qml)
-            implicitHeight: root.hasMedia ? (Config.options.bar.media.showLyrics ? 290 : Appearance.sizes.mediaControlsHeight) : 80
-            Behavior on implicitHeight {
-                NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
-            }
-            Loader {
-                anchors.fill: parent
-                active: root.hasMedia
-                sourceComponent: Player {
-                    player: root.activePlayer
-                    visualizerPoints: GlobalStates.visualizerPoints
-                    implicitHeight: Config.options.bar.media.showLyrics ? 290 : Appearance.sizes.mediaControlsHeight
-                    radius: Appearance.rounding.normal
-                }
-            }
-            ColumnLayout {
-                anchors.fill: parent
-                visible: !root.hasMedia
-                spacing: 8
-                Item { Layout.fillHeight: true }
-                MaterialSymbol {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: "music_note"
-                    iconSize: 32
-                    color: Appearance.colors.colSubtext
-                }
-                StyledText {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: Translation.tr("No media playing")
-                    font.pixelSize: Appearance.font.pixelSize.small
-                    color: Appearance.colors.colSubtext
-                }
-                Item { Layout.fillHeight: true }
-            }
-        }
-    }
-
     component ToggleDialog: Loader {
         id: toggleDialogLoader
         required property string shownPropertyString
@@ -735,24 +671,6 @@ Item {
                 if (toggleDialogLoader.item && !toggleDialogLoader.item.visible && !root[toggleDialogLoader.shownPropertyString])
                     toggleDialogLoader.active = false;
             }
-        }
-    }
-
-    component LoaderedQuickPanelImplementation: Loader {
-        id: quickPanelImplLoader
-        required property string styleName
-        Layout.alignment: item?.Layout.alignment ?? Qt.AlignHCenter
-        Layout.fillWidth: item?.Layout.fillWidth ?? false
-        visible: active
-        active: Config.options.sidebar.quickToggles.style === styleName
-        Connections {
-            target: quickPanelImplLoader.item
-            function onOpenAudioOutputDialog() { root.showAudioOutputDialog = true; }
-            function onOpenAudioInputDialog() { root.showAudioInputDialog = true; }
-            function onOpenBluetoothDialog() { root.showBluetoothDialog = true; }
-            function onOpenNightLightDialog() { root.showNightLightDialog = true; }
-            function onOpenWifiDialog() { root.showWifiDialog = true; }
-            function onOpenVpnDialog() { root.showVpnDialog = true; }
         }
     }
 
@@ -817,11 +735,10 @@ Item {
 
             QuickToggleButton {
                 toggled: root.editMode
-                visible: Config.options.sidebar.quickToggles.style === "android"
                 buttonIcon: "edit"
                 onClicked: root.editMode = !root.editMode
                 StyledToolTip {
-                    text: Translation.tr("Edit quick toggles") + (root.editMode ? Translation.tr("\nLMB to enable/disable\nRMB to toggle size\nScroll to swap position") : "")
+                    text: Translation.tr("Edit sidebar")
                 }
             }
             QuickToggleButton {

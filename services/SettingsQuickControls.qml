@@ -370,7 +370,8 @@ Singleton {
         ]),
         "bar:Resources/Style": root.optionSelect("bar.resources.style", [
             { displayName: Translation.tr("Filled"), icon: "incomplete_circle", value: "filled" },
-            { displayName: Translation.tr("Outline"), icon: "circles", value: "outline" }
+            { displayName: Translation.tr("Outline"), icon: "circles", value: "outline" },
+            { displayName: Translation.tr("Text"), icon: "text_fields", value: "text" }
         ]),
         "bar:Bar position": root.select(
             () => (Config.options.bar.bottom ? 1 : 0) | (Config.options.bar.vertical ? 2 : 0),

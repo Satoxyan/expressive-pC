@@ -16,6 +16,8 @@ Singleton {
     property alias onlineFolderModel: onlinePresetsFolderModel
     property alias importedFolderModel: importedPresetsFolderModel
 
+    signal renamed(string oldName, string newName)
+
     FolderListModel {
         id: presetsFolderModel
         folder: Qt.resolvedUrl(Directories.userPresetsPath)
@@ -77,6 +79,16 @@ Singleton {
     Process {
         id: deleteProc
         onExited: root.refresh()
+    }
+
+    Process {
+        id: renameProc
+        property string oldName: ""
+        stdout: StdioCollector { id: renameOut }
+        onExited: code => {
+            root.refresh()
+            root.renamed(renameProc.oldName, code === 0 ? renameOut.text.trim() : "")
+        }
     }
 
     Process {
@@ -196,6 +208,12 @@ Singleton {
     function remove(name) {
         deleteProc.command = ["bash", Directories.presetsScriptPath, "--remove", name]
         deleteProc.running = true
+    }
+
+    function rename(name, newName) {
+        renameProc.oldName = name
+        renameProc.command = ["bash", Directories.presetsScriptPath, "--rename", name, newName.trim()]
+        renameProc.running = true
     }
 
     function removeOnline(name) {

@@ -43,6 +43,7 @@ Item {
         description: Translation.tr("Nothing")
         shape: MaterialShape.Shape.Ghostish
         descriptionHorizontalAlignment: Text.AlignHCenter
+        minIconHeight: 130
     }
 
     ButtonGroup {

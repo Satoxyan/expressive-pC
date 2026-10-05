@@ -707,7 +707,8 @@ ContentPage {
                     onSelected: newValue => { Config.options.bar.resources.style = newValue; }
                     options: [
                         { displayName: Translation.tr("Filled"),    icon: "incomplete_circle",  value: "filled" },
-                        { displayName: Translation.tr("Outline"),   icon: "circles",            value: "outline" }
+                        { displayName: Translation.tr("Outline"),   icon: "circles",            value: "outline" },
+                        { displayName: Translation.tr("Text"),      icon: "text_fields",        value: "text" }
                     ]
                 }
                 ConfigSwitch {

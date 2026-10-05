@@ -142,6 +142,9 @@ Item {
         if (e.when === "hyprland" && WM.compositor !== "hyprland") return false;
         if (e.when === "dockhug" && Config.options.dock.style !== "hug") return false;
         if (e.when === "dockfloat" && Config.options.dock.style === "hug") return false;
+        if (e.when === "clockdigital" && Config.options.background.widgets.clock.style !== "digital") return false;
+        if (e.when === "clockcookie" && Config.options.background.widgets.clock.style !== "cookie") return false;
+        if (e.when === "clockpixel" && Config.options.background.widgets.clock.style !== "pixel") return false;
         return !e.requires || usedWidgets.includes(e.requires);
     }
 
@@ -155,7 +158,9 @@ Item {
             if (e.kind !== "card" || (e.hero && e.type === "toggle" && !e.searchable) || !isVisibleEntry(e)) return;
             const key = normalized([e.title, e.section, e.kw, e.key ?? ""].join(" "));
             const score = Wallpapers.scoreItem(key, tokens);
-            if (score >= 0) scored.push({ entry: e, score: score });
+            if (score < 0) return;
+            const sectionScore = Wallpapers.scoreItem(normalized(e.section ?? ""), tokens);
+            scored.push({ entry: e, score: sectionScore >= 0 ? score + 1000 : score });
         });
         scored.sort((a, b) => b.score - a.score);
         return scored.map(s => s.entry);

@@ -700,12 +700,21 @@ Item {
             }
             onOverwriteRequested: Presets.overwrite(root.selected.name)
             onExportRequested: Presets.exportZip(root.selected.name)
+            onRenameRequested: newName => Presets.rename(root.selected.name, newName)
             onUploadRequested: Presets.publish(root.selected.name)
             onInstallRequested: Presets.install(root.selected.name, root.selected.source)
             onDeleteRequested: {
                 root.removePreset(root.selected);
                 root.back();
             }
+        }
+    }
+
+    Connections {
+        target: Presets
+        function onRenamed(oldName, newName) {
+            if (newName === "" || root.selected === null || root.selected.name !== oldName) return;
+            root.selected = Object.assign({}, root.selected, { name: newName });
         }
     }
 
