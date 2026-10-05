@@ -166,10 +166,33 @@ QtObject {
         "general:Cursor size": { type: "spin", get: () => SystemAppearance.cursorSize, set: v => SystemAppearance.setCursor(SystemAppearance.cursorTheme, v), from: 16, to: 64, stepSize: 2 },
         "general:System font size": { type: "spin", get: () => SystemAppearance.fontSize, set: v => SystemAppearance.setFont("ui", SystemAppearance.fontFamily, v), from: 8, to: 20, stepSize: 1 },
         "general:Monospace font size": { type: "spin", get: () => SystemAppearance.monoSize, set: v => SystemAppearance.setFont("mono", SystemAppearance.monoFamily, v), from: 8, to: 20, stepSize: 1 },
-        "general:Interface language": { type: "select", get: () => Config.options.language.ui, set: v => { Config.options.language.ui = v; }, get options() { return [{ displayName: Translation.tr("Auto (System)"), value: "auto" }].concat(Translation.allAvailableLanguages.map(lang => ({ displayName: lang, value: lang }))); } }
+        "general:Interface language": { type: "select", get: () => Config.options.language.ui, set: v => { Config.options.language.ui = v; }, get options() { return [{ displayName: Translation.tr("Auto (System)"), value: "auto" }].concat(Translation.allAvailableLanguages.map(lang => ({ displayName: lang, value: lang }))); } },
+        // Digital clock lock-screen colors
+        "desktop:Light color": { type: "select", get: () => Config.options.background.widgets.clock.digital.colorLight, set: v => { Config.options.background.widgets.clock.digital.colorLight = v; }, get options() { return ["primary", "secondary", "tertiary", "primaryContainer", "secondaryContainer", "tertiaryContainer", "layer0Border", "adaptive"].map(name => ({ value: name, color: roleColor(name) })); } },
+        "desktop:Dark color": { type: "select", get: () => Config.options.background.widgets.clock.digital.colorDark, set: v => { Config.options.background.widgets.clock.digital.colorDark = v; }, get options() { return ["primary", "secondary", "tertiary", "primaryContainer", "secondaryContainer", "tertiaryContainer", "layer0Border", "adaptive"].map(name => ({ value: name, color: roleColor(name) })); } },
+        // Visualizer extras
+        "desktop:Hide when fullscreen": { type: "switch", get: () => Config.options.background.widgets.visualizer.hideWhenFullscreen, set: v => { Config.options.background.widgets.visualizer.hideWhenFullscreen = v; if (!v) Config.options.background.widgets.visualizer.hideWhenCovered = false; } },
+        "desktop:Hide when covered": { type: "switch", get: () => Config.options.background.widgets.visualizer.hideWhenCovered, set: v => { Config.options.background.widgets.visualizer.hideWhenCovered = v; } },
+        "desktop:Show when locked": { type: "switch", get: () => Config.options.background.widgets.visualizer.showWhenLocked, set: v => { Config.options.background.widgets.visualizer.showWhenLocked = v; } },
+        "desktop:Mono / Mirrored": { type: "switch", get: () => Config.options.background.widgets.visualizer.mono, set: v => { Config.options.background.widgets.visualizer.mono = v; } },
+        "desktop:Data Averaging": { type: "slider", get: () => (Config.options.background.widgets.visualizer.dataSmoothing ?? 0.5) * 100, set: v => { Config.options.background.widgets.visualizer.dataSmoothing = v / 100; }, from: 0, to: 100, stopIndicatorValues: [50], usePercentTooltip: false },
+        "desktop:Master Opacity": { type: "slider", get: () => Config.options.background.widgets.visualizer.opacity * 100, set: v => { Config.options.background.widgets.visualizer.opacity = v / 100; }, from: 0, to: 100, stopIndicatorValues: [50], usePercentTooltip: false },
+        "desktop:Smoothing": { type: "slider", get: () => Config.options.background.widgets.visualizer.smoothing * 100, set: v => { Config.options.background.widgets.visualizer.smoothing = v / 100; }, from: 0, to: 20, stopIndicatorValues: [5], usePercentTooltip: false },
+        "desktop:Fill Opacity": { type: "slider", get: () => Config.options.background.widgets.visualizer.waveFillOpacity * 100, set: v => { Config.options.background.widgets.visualizer.waveFillOpacity = v / 100; }, from: 0, to: 100, stopIndicatorValues: [50], usePercentTooltip: false },
+        "desktop:Bar Roundness": { type: "slider", get: () => Config.options.background.widgets.visualizer.barRounding * 100, set: v => { Config.options.background.widgets.visualizer.barRounding = v / 100; }, from: 0, to: 50, stopIndicatorValues: [25], usePercentTooltip: false },
+        // Hyprland border color management
+        "hyprland:Active border": { type: "select", get: () => Config.options.hyprland.general.borderColor.activeRole, set: v => { Config.options.hyprland.general.borderColor.activeRole = v; HyprlandConfig.applyBorderColors(); }, get options() { return ["primary", "secondary", "tertiary", "primaryContainer", "secondaryContainer", "tertiaryContainer", "layer0Border"].map(name => ({ value: name, color: roleColor(name) })); } },
+        "hyprland:Active border opacity": { type: "spin", get: () => Math.round(Config.options.hyprland.general.borderColor.activeOpacity * 100), set: v => { Config.options.hyprland.general.borderColor.activeOpacity = v / 100; HyprlandConfig.applyBorderColors(); }, from: 0, to: 100, stepSize: 5 },
+        "hyprland:Inactive border": { type: "select", get: () => Config.options.hyprland.general.borderColor.inactiveRole, set: v => { Config.options.hyprland.general.borderColor.inactiveRole = v; HyprlandConfig.applyBorderColors(); }, get options() { return ["primary", "secondary", "tertiary", "primaryContainer", "secondaryContainer", "tertiaryContainer", "layer0Border"].map(name => ({ value: name, color: roleColor(name) })); } },
+        "hyprland:Inactive border opacity": { type: "spin", get: () => Math.round(Config.options.hyprland.general.borderColor.inactiveOpacity * 100), set: v => { Config.options.hyprland.general.borderColor.inactiveOpacity = v / 100; HyprlandConfig.applyBorderColors(); }, from: 0, to: 100, stepSize: 5 }
     })
 
     readonly property var sections: [
+        {
+            page: Translation.tr("Bar"), title: Translation.tr("Screens"), icon: "tv_displays", cards: [
+                { type: "barscreens", key: "bar:Screens", title: Translation.tr("Show bar on"), icon: "tv_displays" }
+            ]
+        },
         {
             page: Translation.tr("Bar"), title: Translation.tr("Bar layout"), icon: "view_week", cards: [
                 { type: "barlayout", key: "bar:Layout editor", title: Translation.tr("Bar layout"), icon: "view_week" }
@@ -275,6 +298,13 @@ QtObject {
             ]
         },
         {
+            page: Translation.tr("Interface"), title: Translation.tr("Settings Panel"), icon: "settings", cards: [
+                { type: "select", key: "interface:Dashboard animation speed", title: Translation.tr("Dashboard animation speed"), icon: "speed" },
+                { type: "spin", key: "interface:Border width", title: Translation.tr("Border width"), icon: "border_style" },
+                { type: "swatch", key: "interface:Border color", title: Translation.tr("Border color"), icon: "format_paint", w: 2 }
+            ]
+        },
+        {
             page: Translation.tr("Interface"), title: Translation.tr("Left Sidebar"), icon: "splitscreen_left", cards: [
                 { type: "toggle", key: "interface:Left Sidebar/Enable", title: Translation.tr("Media player"), icon: "music_note" },
                 { type: "toggle", key: "interface:Follow Album Colors", title: Translation.tr("Album colors"), icon: "palette" },
@@ -336,7 +366,8 @@ QtObject {
                 { type: "toggle", key: "interface:Tint app icons", title: Translation.tr("Tint app icons"), icon: "palette" },
                 { type: "toggle", key: "interface:Dock/Previews", title: Translation.tr("Window previews"), icon: "preview" },
                 { type: "spin", key: "interface:Dock/Icon size", title: Translation.tr("Icon size"), icon: "photo_size_select_large" },
-                { type: "spin", key: "interface:Dock/Icon spacing", title: Translation.tr("Icon spacing"), icon: "space_bar" }
+                { type: "spin", key: "interface:Dock/Icon spacing", title: Translation.tr("Icon spacing"), icon: "space_bar" },
+                { type: "select", key: "interface:Dock launch animation", title: Translation.tr("Launch animation"), icon: "animation" }
             ]
         },
         {
@@ -364,7 +395,10 @@ QtObject {
                 { type: "toggle", key: "interface:Use varying shapes for password characters", title: Translation.tr("Password shapes"), icon: "shapes" },
                 { type: "toggle", key: "interface:Enable blur", title: Translation.tr("Blur"), icon: "blur_on" },
                 { type: "spin", key: "interface:Samples", title: Translation.tr("Blur samples"), icon: "grain" },
-                { type: "spin", key: "interface:Extra wallpaper zoom (%)", title: Translation.tr("Wallpaper zoom (%)"), icon: "zoom_in" }
+                { type: "spin", key: "interface:Extra wallpaper zoom (%)", title: Translation.tr("Wallpaper zoom (%)"), icon: "zoom_in" },
+                { type: "spin", key: "interface:Blur strength (radius)", title: Translation.tr("Blur strength (radius)"), icon: "blur_on" },
+                { type: "toggle", key: "interface:Dim lockscreen", title: Translation.tr("Dim lockscreen"), icon: "brightness_6" },
+                { type: "slider", key: "interface:Dim strength", title: Translation.tr("Dim strength"), icon: "contrast" }
             ]
         },
         {
@@ -374,6 +408,17 @@ QtObject {
                 { type: "text", key: "interface:Floating image source", title: Translation.tr("Floating image source"), icon: "imagesmode", w: 2 },
                 { type: "text", key: "interface:Crosshair code", title: Translation.tr("Crosshair code"), icon: "point_scan", w: 2 },
                 { type: "spin", key: "interface:Timeout (ms)", title: Translation.tr("OSD timeout (ms)"), icon: "timer" }
+            ]
+        },
+        {
+            page: Translation.tr("Interface"), title: Translation.tr("Region selector"), icon: "crop_free", cards: [
+                { type: "toggle", key: "interface:Region selector (screen snipping/Google Lens)/Windows", title: Translation.tr("Windows"), icon: "select_window" },
+                { type: "toggle", key: "interface:Region selector (screen snipping/Google Lens)/Layers", title: Translation.tr("Layers"), icon: "layers" },
+                { type: "toggle", key: "interface:Region selector (screen snipping/Google Lens)/Content", title: Translation.tr("Content"), icon: "image" },
+                { type: "select", key: "interface:Selection Type", title: Translation.tr("Selection type"), icon: "gesture" },
+                { type: "toggle", key: "interface:Show aim lines", title: Translation.tr("Show aim lines"), icon: "crop_free" },
+                { type: "spin", key: "interface:Stroke width", title: Translation.tr("Stroke width"), icon: "border_style" },
+                { type: "spin", key: "interface:Padding", title: Translation.tr("Padding"), icon: "padding" }
             ]
         },
         {
@@ -387,6 +432,28 @@ QtObject {
                 { type: "spin", key: "interface:Wallpaper change interval (min)", title: Translation.tr("Change interval (min)"), icon: "timer" },
                 { type: "text", key: "interface:Custom wallpaper folder", title: Translation.tr("Custom wallpaper folder"), icon: "folder", w: 2 },
                 { type: "text", key: "interface:Live wallpaper folder", title: Translation.tr("Live wallpaper folder"), icon: "video_template", w: 2 }
+            ]
+        },
+        {
+            page: Translation.tr("Interface"), title: Translation.tr("Fonts"), icon: "text_format", cards: [
+                { type: "combo", key: "interface:Main font", title: Translation.tr("Main font"), icon: "text_format" },
+                { type: "combo", key: "interface:Numbers font", title: Translation.tr("Numbers font"), icon: "pin" },
+                { type: "combo", key: "interface:Title font", title: Translation.tr("Title font"), icon: "title" },
+                { type: "combo", key: "interface:Monospace font", title: Translation.tr("Monospace font"), icon: "terminal" },
+                { type: "combo", key: "interface:Nerd Fonts icons", title: Translation.tr("Nerd Fonts icons"), icon: "emoticon" },
+                { type: "combo", key: "interface:Reading font", title: Translation.tr("Reading font"), icon: "book_2" },
+                { type: "combo", key: "interface:Expressive font", title: Translation.tr("Expressive font"), icon: "mood" }
+            ]
+        },
+        {
+            page: Translation.tr("Interface"), title: Translation.tr("Color generation"), icon: "palette", cards: [
+                { type: "toggle", key: "interface:Shell & utilities", title: Translation.tr("Shell & utilities"), icon: "apps" },
+                { type: "toggle", key: "interface:Qt apps", title: Translation.tr("Qt apps"), icon: "widgets" },
+                { type: "toggle", key: "interface:Terminal", title: Translation.tr("Terminal"), icon: "terminal" },
+                { type: "toggle", key: "interface:Force dark mode in terminal", title: Translation.tr("Force dark mode in terminal"), icon: "dark_mode" },
+                { type: "spin", key: "interface:Terminal: Harmony (%)", title: Translation.tr("Harmony (%)"), icon: "contrast" },
+                { type: "spin", key: "interface:Terminal: Harmonize threshold", title: Translation.tr("Harmonize threshold"), icon: "adjust" },
+                { type: "spin", key: "interface:Terminal: Foreground boost (%)", title: Translation.tr("Foreground boost (%)"), icon: "brightness_high" }
             ]
         },
         {
@@ -420,7 +487,8 @@ QtObject {
         },
         {
             page: Translation.tr("Desktop"), title: Translation.tr("Desktop widgets"), icon: "widgets", cards: [
-                { type: "widgets", key: "desktop:Widgets", title: Translation.tr("Desktop widgets"), icon: "widgets", kw: "widgets desktop menu star favorite clock weather calendar media resources todo notes timers sticker visualizer" }
+                { type: "widgets", key: "desktop:Widgets", title: Translation.tr("Desktop widgets"), icon: "widgets", kw: "widgets desktop menu star favorite clock weather calendar media resources todo notes timers sticker visualizer" },
+                { type: "widgetsscreens", key: "desktop:Show widgets on", title: Translation.tr("Show widgets on"), icon: "tv_displays", kw: "monitor screen show widgets display" }
             ]
         },
         {
@@ -429,7 +497,8 @@ QtObject {
                 { type: "toggle", key: "desktop:Clock/Show only when locked", title: Translation.tr("Only when locked"), icon: "lock" },
                 { type: "select", key: "desktop:Placement strategy", title: Translation.tr("Placement"), icon: "drag_pan" },
                 { type: "select", key: "desktop:Clock style", title: Translation.tr("Style"), icon: "schedule" },
-                { type: "select", key: "desktop:Clock style (locked)", title: Translation.tr("Style (locked)"), icon: "lock_clock" }
+                { type: "select", key: "desktop:Clock style (locked)", title: Translation.tr("Style (locked)"), icon: "lock_clock" },
+                { type: "toggle", key: "desktop:Blur in lockscreen", title: Translation.tr("Blur in lockscreen"), icon: "blur_on" }
             ]
         },
         {
@@ -444,7 +513,12 @@ QtObject {
                 { type: "slider", key: "desktop:Font weight", title: Translation.tr("Weight"), icon: "format_bold", percent: false },
                 { type: "slider", key: "desktop:Font size", title: Translation.tr("Size"), icon: "format_size", percent: false },
                 { type: "slider", key: "desktop:Font width", title: Translation.tr("Width"), icon: "width", percent: false },
-                { type: "slider", key: "desktop:Font roundness", title: Translation.tr("Roundness"), icon: "rounded_corner", percent: false }
+                { type: "slider", key: "desktop:Font roundness", title: Translation.tr("Roundness"), icon: "rounded_corner", percent: false },
+                { type: "toggle", key: "desktop:Vertical (lock)", title: Translation.tr("Vertical (lock)"), icon: "vertical_distribute" },
+                { type: "select", key: "desktop:Clock color mode", title: Translation.tr("Clock color"), icon: "light_mode" },
+                { type: "select", key: "desktop:Clock color (locked)", title: Translation.tr("Clock color (locked)"), icon: "lock_clock" },
+                { type: "swatch", key: "desktop:Light color", title: Translation.tr("Light color"), icon: "light_mode", w: 2 },
+                { type: "swatch", key: "desktop:Dark color", title: Translation.tr("Dark color"), icon: "dark_mode", w: 2 }
             ]
         },
         {
@@ -464,7 +538,10 @@ QtObject {
         },
         {
             page: Translation.tr("Desktop"), title: Translation.tr("Pixel clock"), icon: "grid_view", cards: [
-                { type: "select", key: "desktop:Pixel clock orientation", title: Translation.tr("Orientation"), icon: "screen_rotation" }
+                { type: "select", key: "desktop:Pixel clock orientation", title: Translation.tr("Orientation"), icon: "screen_rotation" },
+                { type: "toggle", key: "desktop:Show date (lock screen)", title: Translation.tr("Show date (lock screen)"), icon: "date_range" },
+                { type: "slider", key: "desktop:Pixel size", title: Translation.tr("Size"), icon: "format_size", percent: false },
+                { type: "slider", key: "desktop:Pixel weight", title: Translation.tr("Weight"), icon: "format_bold", percent: false }
             ]
         },
         {
@@ -487,7 +564,21 @@ QtObject {
                 { type: "select", key: "desktop:Visualizer colors", title: Translation.tr("Colors"), icon: "palette" },
                 { type: "slider", key: "desktop:Visualizer sensitivity", title: Translation.tr("Sensitivity (%)"), icon: "speed", percent: false },
                 { type: "slider", key: "desktop:Visualizer height", title: Translation.tr("Height"), icon: "height", percent: false },
-                { type: "slider", key: "desktop:Visualizer size", title: Translation.tr("Ring size"), icon: "radio_button_unchecked", percent: false }
+                { type: "slider", key: "desktop:Visualizer size", title: Translation.tr("Ring size"), icon: "radio_button_unchecked", percent: false },
+                { type: "toggle", key: "desktop:Hide when fullscreen", title: Translation.tr("Hide when fullscreen/maximized"), icon: "fullscreen_exit" },
+                { type: "toggle", key: "desktop:Hide when covered", title: Translation.tr("Also hide when covered"), icon: "layers" },
+                { type: "toggle", key: "desktop:Show when locked", title: Translation.tr("Show when locked"), icon: "lock" },
+                { type: "toggle", key: "desktop:Mono / Mirrored", title: Translation.tr("Mono / Mirrored"), icon: "flip" },
+                { type: "slider", key: "desktop:Data Averaging", title: Translation.tr("Data Averaging"), icon: "analytics" },
+                { type: "slider", key: "desktop:Master Opacity", title: Translation.tr("Master Opacity"), icon: "opacity" },
+                { type: "slider", key: "desktop:Smoothing", title: Translation.tr("Smoothing"), icon: "waves" },
+                { type: "slider", key: "desktop:Fill Opacity", title: Translation.tr("Fill Opacity"), icon: "format_color_fill" },
+                { type: "slider", key: "desktop:Bar Roundness", title: Translation.tr("Bar Roundness"), icon: "rounded_corner" }
+            ]
+        },
+        {
+            page: Translation.tr("Desktop"), title: Translation.tr("Stickers"), icon: "sticker", cards: [
+                { type: "stickers", key: "desktop:Stickers", title: Translation.tr("Stickers"), icon: "sticker" }
             ]
         },
         {
@@ -510,6 +601,12 @@ QtObject {
             ]
         },
         {
+            page: Translation.tr("Desktop"), title: Translation.tr("Weather widget"), icon: "partly_cloudy_day", cards: [
+                { type: "select", key: "desktop:Weather style", title: Translation.tr("Weather style"), icon: "shapes" },
+                { type: "select", key: "desktop:Weather placement", title: Translation.tr("Placement"), icon: "move" }
+            ]
+        },
+        {
             page: Translation.tr("General"), title: Translation.tr("System Appearance"), icon: "palette", cards: [
                 { type: "combo", key: "general:Icon theme", title: Translation.tr("Icon theme"), icon: "category", kw: "icons" },
                 { type: "combo", key: "general:Cursor theme", title: Translation.tr("Cursor theme"), icon: "mouse" },
@@ -524,7 +621,8 @@ QtObject {
             page: Translation.tr("General"), title: Translation.tr("Time"), icon: "nest_clock_farsight_analog", cards: [
                 { type: "select", key: "general:Format", title: Translation.tr("Time format"), icon: "schedule", kw: "clock 24h 12h" },
                 { type: "toggle", key: "general:Second precision", title: Translation.tr("Second precision"), icon: "pace" },
-                { type: "toggle", key: "general:Show date", title: Translation.tr("Show date"), icon: "date_range" }
+                { type: "toggle", key: "general:Show date", title: Translation.tr("Show date"), icon: "date_range" },
+                { type: "text", key: "general:Date String Format", title: Translation.tr("Date format"), icon: "date_range", w: 2, placeholder: "%Y-%m-%d" }
             ]
         },
         {
@@ -533,6 +631,13 @@ QtObject {
                 { type: "spin", key: "general:Critical warning", title: Translation.tr("Critical warning"), icon: "dangerous" },
                 { type: "spin", key: "general:Full warning", title: Translation.tr("Full warning"), icon: "charger" },
                 { type: "toggle", key: "general:Automatic suspend", title: Translation.tr("Automatic suspend"), icon: "pause" }
+            ]
+        },
+        {
+            page: Translation.tr("General"), title: Translation.tr("Device batteries"), icon: "battery_android_full", cards: [
+                { type: "spin", key: "general:Device low warning", title: Translation.tr("Low warning"), icon: "warning" },
+                { type: "spin", key: "general:Device critical warning", title: Translation.tr("Critical warning"), icon: "dangerous" },
+                { type: "toggle", key: "general:Device notify", title: Translation.tr("Notify when low"), icon: "notifications" }
             ]
         },
         {
@@ -554,9 +659,22 @@ QtObject {
             ]
         },
         {
+            page: Translation.tr("General"), title: Translation.tr("Profile"), icon: "account_box", cards: [
+                { type: "text", key: "profile:Display name", title: Translation.tr("Display name"), icon: "badge" },
+                { type: "text", key: "profile:Avatar path", title: Translation.tr("Avatar path"), icon: "account_circle" },
+                { type: "select", key: "profile:Description text", title: Translation.tr("Description text"), icon: "subtitles" },
+                { type: "toggle", key: "profile:Show online presets", title: Translation.tr("Show online presets"), icon: "cloud" }
+            ]
+        },
+        {
             page: Translation.tr("General"), title: Translation.tr("Work safety"), icon: "work_alert", cards: [
                 { type: "toggle", key: "general:Hide clipboard images copied from sussy sources", title: Translation.tr("Hide clipboard images"), icon: "assignment" },
                 { type: "toggle", key: "general:Hide sussy/anime wallpapers", title: Translation.tr("Hide sussy wallpapers"), icon: "wallpaper" }
+            ]
+        },
+        {
+            page: Translation.tr("Hyprland"), title: Translation.tr("Displays"), icon: "monitor", when: "hyprland", cards: [
+                { type: "displays", key: "hyprland:Displays", title: Translation.tr("Displays"), icon: "monitor" }
             ]
         },
         {
@@ -587,7 +705,8 @@ QtObject {
                 { type: "spin", key: "hyprland:Repeat delay (ms)", title: Translation.tr("Repeat delay (ms)"), icon: "timer" },
                 { type: "spin", key: "hyprland:Repeat rate", title: Translation.tr("Repeat rate"), icon: "speed" },
                 { type: "text", key: "hyprland:opt:input:kb_variant", title: Translation.tr("Keyboard variant"), icon: "keyboard_alt", w: 2 },
-                { type: "text", key: "hyprland:opt:input:kb_options", title: Translation.tr("Keyboard options"), icon: "keyboard_command_key", w: 2 }
+                { type: "text", key: "hyprland:opt:input:kb_options", title: Translation.tr("Keyboard options"), icon: "keyboard_command_key", w: 2 },
+                { type: "text", key: "hyprland:Keyboard layout", title: Translation.tr("Keyboard layout"), icon: "keyboard", w: 2 }
             ]
         },
         {
@@ -624,7 +743,11 @@ QtObject {
                 { type: "spin", key: "hyprland:Border Size", title: Translation.tr("Border size"), icon: "border_style" },
                 { type: "spin", key: "hyprland:Active Opacity", title: Translation.tr("Active opacity"), icon: "opacity" },
                 { type: "spin", key: "hyprland:Inactive Opacity", title: Translation.tr("Inactive opacity"), icon: "opacity" },
-                { type: "toggle", key: "hyprland:Custom border colors", title: Translation.tr("Custom border colors"), icon: "format_paint" }
+                { type: "toggle", key: "hyprland:Custom border colors", title: Translation.tr("Custom border colors"), icon: "format_paint" },
+                { type: "swatch", key: "hyprland:Active border", title: Translation.tr("Active border"), icon: "border_color", w: 2 },
+                { type: "spin", key: "hyprland:Active border opacity", title: Translation.tr("Active border opacity"), icon: "opacity" },
+                { type: "swatch", key: "hyprland:Inactive border", title: Translation.tr("Inactive border"), icon: "border_color", w: 2 },
+                { type: "spin", key: "hyprland:Inactive border opacity", title: Translation.tr("Inactive border opacity"), icon: "opacity" }
             ]
         },
         {
@@ -674,9 +797,24 @@ QtObject {
             ]
         },
         {
+            page: Translation.tr("Hyprland"), title: Translation.tr("Autostart Apps"), icon: "rocket_launch", when: "hyprland", cards: [
+                { type: "autostart", key: "hyprland:Autostart Apps", title: Translation.tr("Autostart Apps"), icon: "rocket_launch" }
+            ]
+        },
+        {
             page: Translation.tr("Hyprland"), title: Translation.tr("Animations"), icon: "animation", when: "hyprland", cards: [
                 { type: "toggle", key: "hyprland:Enable", title: Translation.tr("Animations"), icon: "animation" },
                 { type: "select", key: "hyprland:Presets", title: Translation.tr("Animation presets"), icon: "auto_awesome" }
+            ]
+        },
+        {
+            page: Translation.tr("Services"), title: Translation.tr("AI"), icon: "neurology", cards: [
+                { type: "text", key: "services:System prompt", title: Translation.tr("System prompt"), icon: "neurology", w: 4 }
+            ]
+        },
+        {
+            page: Translation.tr("Services"), title: Translation.tr("Networking"), icon: "cell_tower", cards: [
+                { type: "text", key: "services:User agent", title: Translation.tr("User agent"), icon: "cell_tower", w: 4 }
             ]
         },
         {
@@ -719,6 +857,17 @@ QtObject {
                 { type: "toggle", key: "services:Fahrenheit unit", title: Translation.tr("Fahrenheit"), icon: "thermometer" },
                 { type: "spin", key: "services:Polling interval (m)", title: Translation.tr("Polling interval (m)"), icon: "av_timer" },
                 { type: "text", w: 2, key: "services:City name", title: Translation.tr("City name"), icon: "location_city" }
+            ]
+        },
+        {
+            page: Translation.tr("Services"), title: Translation.tr("Booru"), icon: "image_search", cards: [
+                { type: "text", w: 2, key: "services:Zerochan username", title: Translation.tr("Zerochan username"), icon: "person" },
+                { type: "text", w: 2, key: "services:Gelbooru user ID", title: Translation.tr("Gelbooru user ID"), icon: "pin" },
+                { type: "text", w: 2, key: "services:Gelbooru API key", title: Translation.tr("Gelbooru API key"), icon: "key" },
+                { type: "text", w: 2, key: "services:Rule34 user ID", title: Translation.tr("Rule34 user ID"), icon: "pin" },
+                { type: "text", w: 2, key: "services:Rule34 API key", title: Translation.tr("Rule34 API key"), icon: "key" },
+                { type: "text", w: 2, key: "services:Danbooru login", title: Translation.tr("Danbooru login"), icon: "person" },
+                { type: "text", w: 2, key: "services:Danbooru API key", title: Translation.tr("Danbooru API key"), icon: "key" }
             ]
         }
     ]

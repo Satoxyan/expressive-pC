@@ -3,6 +3,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import qs.modules.common
+import qs.modules.common.widgets
 import qs
 import qs.modules.common.functions
 import qs.services
@@ -76,6 +77,25 @@ Singleton {
     function optionSelect(path, options) {
         const access = root.optionAccessors(path);
         return root.select(access.get, access.set, options);
+    }
+
+    function fontSelect(path) {
+        const access = root.optionAccessors(path);
+        return {
+            type: "select",
+            get: access.get,
+            set: access.set,
+            get options() { return SystemAppearance.fontOptions(access.get()); }
+        };
+    }
+
+    function optionText(path, unsetValue) {
+        const access = root.optionAccessors(path);
+        return {
+            type: "text",
+            get: () => { const v = access.get(); return v === unsetValue ? "" : String(v ?? ""); },
+            set: v => { access.set(unsetValue !== undefined && v.length === 0 ? unsetValue : v); }
+        };
     }
 
     readonly property var controls: ({
@@ -479,7 +499,95 @@ Singleton {
                 { displayName: Translation.tr("Normal"),    icon: "animation",            value: "normal" },
                 { displayName: Translation.tr("Niri Like"), icon: "mobiledata_arrows",    value: "niri"   }
             ]
-        )
+        ),
+        // Desktop — clock (lock-screen variants, pixel clock)
+        "desktop:Blur in lockscreen": root.optionSwitch("background.widgets.clock.blurWhenLocked"),
+        "desktop:Vertical (lock)": root.optionSwitch("background.widgets.clock.digital.verticalLocked"),
+        "desktop:Clock color mode": root.optionSelect("background.widgets.clock.digital.colorMode", [
+            { displayName: Translation.tr("Auto"),  icon: "auto_fix_high", value: "auto" },
+            { displayName: Translation.tr("Light"), icon: "light_mode",     value: "light" },
+            { displayName: Translation.tr("Dark"),  icon: "dark_mode",      value: "dark" }
+        ]),
+        "desktop:Clock color (locked)": root.optionSelect("background.widgets.clock.digital.colorModeLocked", [
+            { displayName: Translation.tr("Auto"),  icon: "auto_fix_high", value: "auto" },
+            { displayName: Translation.tr("Light"), icon: "light_mode",     value: "light" },
+            { displayName: Translation.tr("Dark"),  icon: "dark_mode",      value: "dark" }
+        ]),
+        "desktop:Show date (lock screen)": root.optionSwitch("background.widgets.clock.pixel.showDate"),
+        "desktop:Pixel size": root.optionSlider("background.widgets.clock.pixel.size", 0.5, 2, [1], false),
+        "desktop:Pixel weight": root.optionSlider("background.widgets.clock.pixel.weight", 100, 1000, [350], false),
+        // Desktop — weather widget
+        "desktop:Weather style": root.optionSelect("background.widgets.weather.style", [
+            { displayName: Translation.tr("Card"), icon: "square",  value: "card" },
+            { displayName: Translation.tr("Pill"), icon: "padding", value: "pill" }
+        ]),
+        "desktop:Weather placement": root.optionSelect("background.widgets.weather.placementStrategy", [
+            { displayName: Translation.tr("Draggable"), icon: "drag_pan",  value: "free" },
+            { displayName: Translation.tr("Least busy"), icon: "category", value: "leastBusy" },
+            { displayName: Translation.tr("Most busy"),  icon: "shapes",   value: "mostBusy" }
+        ]),
+        // General — device batteries + date format
+        "general:Device low warning": root.optionSpin("battery.peripheralLow", 0, 100, 5),
+        "general:Device critical warning": root.optionSpin("battery.peripheralCritical", 0, 100, 5),
+        "general:Device notify": root.optionSwitch("battery.peripheralNotify"),
+        "general:Date String Format": {
+            type: "text",
+            get: () => String(Config.options.time.dateFormat ?? ""),
+            set: v => { Config.options.time.dateFormat = v }
+        },
+        // Interface — settings panel / lock screen / fonts / dock
+        "interface:Dashboard animation speed": root.optionSelect("settings.animationSpeed", [
+            { displayName: "1x",   icon: "slow_motion_video", value: 1 },
+            { displayName: "1.5x", icon: "play_arrow",        value: 1.5 },
+            { displayName: "2x",   icon: "fast_forward",      value: 2 },
+            { displayName: "3x",   icon: "bolt",              value: 3 }
+        ]),
+        "interface:Blur strength (radius)": root.optionSpin("lock.blur.radius", 5, 200, 5),
+        "interface:Dim lockscreen": root.optionSwitch("lock.dim.enable"),
+        "interface:Dim strength": root.optionSlider("lock.dim.strength", 0, 100, [10], true),
+        "interface:Main font": root.fontSelect("appearance.fonts.main"),
+        "interface:Numbers font": root.fontSelect("appearance.fonts.numbers"),
+        "interface:Title font": root.fontSelect("appearance.fonts.title"),
+        "interface:Monospace font": root.fontSelect("appearance.fonts.monospace"),
+        "interface:Nerd Fonts icons": root.fontSelect("appearance.fonts.iconNerd"),
+        "interface:Reading font": root.fontSelect("appearance.fonts.reading"),
+        "interface:Expressive font": root.fontSelect("appearance.fonts.expressive"),
+        "interface:Dock launch animation": root.optionSelect("dock.launchAnimation", [
+            { displayName: Translation.tr("None"),   icon: "block",       value: DockLaunchAnims.AnimType.None },
+            { displayName: Translation.tr("Bounce"), icon: "swap_vert",   value: DockLaunchAnims.AnimType.Bounce },
+            { displayName: Translation.tr("Pulse"),  icon: "open_in_new", value: DockLaunchAnims.AnimType.Pulse },
+            { displayName: Translation.tr("Pop"),    icon: "album",       value: DockLaunchAnims.AnimType.Pop },
+            { displayName: Translation.tr("Wobble"), icon: "wave_sine",   value: DockLaunchAnims.AnimType.Wobble }
+        ]),
+        // Hyprland — keyboard layout
+        "hyprland:Keyboard layout": {
+            type: "text",
+            get: () => String(root.hypr.input.kbLayout ?? ""),
+            set: v => { root.hypr.input.kbLayout = v; HyprlandConfig.set("input:kb_layout", v); }
+        },
+        // Services — Booru credentials / AI prompt / user agent
+        "services:Zerochan username": root.optionText("sidebar.booru.zerochan.username", "[unset]"),
+        "services:Gelbooru user ID": root.optionText("sidebar.booru.gelbooru.userId"),
+        "services:Gelbooru API key": root.optionText("sidebar.booru.gelbooru.apiKey"),
+        "services:Rule34 user ID": root.optionText("sidebar.booru.rule34.userId"),
+        "services:Rule34 API key": root.optionText("sidebar.booru.rule34.apiKey"),
+        "services:Danbooru login": root.optionText("sidebar.booru.danbooru.login"),
+        "services:Danbooru API key": root.optionText("sidebar.booru.danbooru.apiKey"),
+        "services:System prompt": root.optionText("ai.systemPrompt"),
+        "services:User agent": root.optionText("networking.userAgent"),
+        // Profile — identity
+        "profile:Avatar path": root.optionText("profile.avatarPath"),
+        "profile:Display name": root.optionText("profile.displayName"),
+        "profile:Show online presets": root.optionSwitch("profile.onlinePresets"),
+        "profile:Description text": {
+            type: "select",
+            get: () => Config.options.profile.descriptionText === "::uptime::" ? "uptime" : "distro",
+            set: v => { Config.options.profile.descriptionText = v === "uptime" ? "::uptime::" : "::distro::"; },
+            options: [
+                { displayName: Translation.tr("Distro"), icon: "deployed_code", value: "distro" },
+                { displayName: Translation.tr("Uptime"), icon: "timelapse", value: "uptime" }
+            ]
+        }
     })
 
     function find(pageId, rawSection, rawSubsection, rawLabel) {

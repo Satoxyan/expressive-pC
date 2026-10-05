@@ -9,17 +9,30 @@ import qs.modules.common.functions
 Singleton {
     id: root
 
-    property var entriesByPage: ({})
+    property var entriesByFile: ({})
+
+    // Files that hold settings for a page but aren't the page file itself
+    // (shared sections reused by both modes).
+    readonly property var extraIndexFiles: [
+        { id: "hyprland", path: "modules/ii/settings/pages/DisplaysSection.qml" },
+        { id: "desktop", path: "modules/ii/settings/pages/StickersSection.qml" },
+        { id: "bar", path: "modules/ii/settings/pages/BarScreensSection.qml" },
+        { id: "hyprland", path: "modules/common/widgets/AutostartApps.qml" }
+    ]
+
+    readonly property var indexTargets: SettingsPages.pages.concat(root.extraIndexFiles)
 
     readonly property var labelledTypes: [
         "ConfigSwitch", "ConfigSpinBox", "ConfigTextArea", "ConfigSelectionArray",
         "ConfigComboBox", "ConfigSlider", "ConfigSelectionShapeArray", "ConfigRow",
-        "ColorSelectionArray", "ContentSubsection"
+        "ColorSelectionArray", "ContentSubsection",
+        "MaterialTextArea", "HyprOptionSwitch", "HyprOptionSpinBox",
+        "HyprOptionSelection", "HyprOptionText"
     ]
 
     function parsePage(source) {
         const typeOpen = /^\s*([A-Z][\w.]*)\s*\{/;
-        const labelProp = /^\s*(title|text):\s*Translation\.tr\(\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')\s*\)/;
+        const labelProp = /^\s*(title|text|placeholderText):\s*Translation\.tr\(\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')\s*\)/;
         const entries = [];
         const stack = [];
         let section = "";
@@ -27,7 +40,8 @@ Singleton {
         for (const line of source.split("\n")) {
             const prop = line.match(labelProp);
             const type = stack.length > 0 ? stack[stack.length - 1] : null;
-            if (prop && type) {
+            // placeholderText is only the label for MaterialTextArea; elsewhere it's a hint
+            if (prop && type && (prop[1] !== "placeholderText" || type === "MaterialTextArea")) {
                 const label = (prop[2] ?? prop[3]).replace(/\\(["'])/g, "$1");
                 if (type === "ContentSection" && prop[1] === "title") {
                     section = label;
@@ -47,10 +61,19 @@ Singleton {
         return entries;
     }
 
-    function indexPage(pageId, source) {
-        const next = Object.assign({}, root.entriesByPage);
-        next[pageId] = root.parsePage(source);
-        root.entriesByPage = next;
+    function indexFile(path, pageId, source) {
+        const next = Object.assign({}, root.entriesByFile);
+        next[path] = { pageId: pageId, entries: root.parsePage(source) };
+        root.entriesByFile = next;
+    }
+
+    function entriesFor(pageId) {
+        const out = [];
+        for (const key of Object.keys(root.entriesByFile)) {
+            const file = root.entriesByFile[key];
+            if (file.pageId === pageId) out.push(...file.entries);
+        }
+        return out;
     }
 
     function search(query, limit) {
@@ -67,7 +90,7 @@ Singleton {
                     kind: "page", section: "", label: page.name, score: pageScore + 50
                 });
             }
-            for (const entry of (root.entriesByPage[page.id] ?? [])) {
+            for (const entry of root.entriesFor(page.id)) {
                 const label = Translation.tr(entry.label);
                 const section = Translation.tr(entry.section);
                 const haystack = (label + " " + entry.label + " " + section + " " + pageName).toLowerCase();
@@ -101,11 +124,11 @@ Singleton {
     }
 
     Instantiator {
-        model: SettingsPages.pages
+        model: root.indexTargets
         delegate: FileView {
             required property var modelData
             path: FileUtils.trimFileProtocol(Quickshell.shellPath(modelData.path))
-            onLoaded: root.indexPage(modelData.id, text())
+            onLoaded: root.indexFile(modelData.path, modelData.id, text())
         }
     }
 }

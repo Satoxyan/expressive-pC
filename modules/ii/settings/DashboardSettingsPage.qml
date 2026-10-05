@@ -5,6 +5,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
+import qs.modules.ii.settings.pages
 
 Item {
     id: root
@@ -85,6 +86,10 @@ Item {
         if (type === "widgets") return [4, 3];
         if (type === "shape") return [2, 2];
         if (type === "barlayout") return [4, 3];
+        if (type === "displays") return [4, 4];
+        if (type === "stickers" || type === "autostart") return [4, 4];
+        if (type === "barscreens") return [4, 2];
+        if (type === "widgetsscreens") return [4, 1];
         if (type === "palette") return [4, 1];
         if (type === "iconpicker") return [2, 2];
         if (type === "toggle" || type === "spin") return [1, 1];
@@ -542,6 +547,11 @@ Item {
                             : modelData.type === "swatch" ? swatchComponent
                             : modelData.type === "shape" ? shapeComponent
                             : modelData.type === "barlayout" ? barLayoutComponent
+                            : modelData.type === "displays" ? displaysComponent
+                            : modelData.type === "stickers" ? stickersComponent
+                            : modelData.type === "barscreens" ? barScreensComponent
+                            : modelData.type === "autostart" ? autostartComponent
+                            : modelData.type === "widgetsscreens" ? widgetScreensComponent
                             : modelData.type === "palette" ? paletteComponent
                             : modelData.type === "duration" ? durationComponent
                             : modelData.type === "iconpicker" ? iconPickerComponent
@@ -808,6 +818,100 @@ Item {
                                 animIndex: slot.index % 6
                                 travelX: slot.modelData.travelX
                                 travelY: slot.modelData.travelY
+                            }
+                        }
+
+                        Component {
+                            id: displaysComponent
+                            DashboardDisplaysCard {
+                                anchors.fill: parent
+                                title: slot.modelData.title
+                                icon: slot.modelData.icon
+                                tileShape: slot.modelData.shape
+                                pager: root.pager
+                                staggerMs: root.staggerMs
+                                animIndex: slot.index % 6
+                                travelX: slot.modelData.travelX
+                                travelY: slot.modelData.travelY
+                            }
+                        }
+
+                        Component {
+                            id: stickersComponent
+                            DashboardSectionCard {
+                                anchors.fill: parent
+                                title: slot.modelData.title
+                                icon: slot.modelData.icon
+                                tileShape: slot.modelData.shape
+                                pager: root.pager
+                                staggerMs: root.staggerMs
+                                animIndex: slot.index % 6
+                                travelX: slot.modelData.travelX
+                                travelY: slot.modelData.travelY
+                                content: Component { StickersSection {} }
+                            }
+                        }
+
+                        Component {
+                            id: barScreensComponent
+                            DashboardSectionCard {
+                                anchors.fill: parent
+                                title: slot.modelData.title
+                                icon: slot.modelData.icon
+                                tileShape: slot.modelData.shape
+                                pager: root.pager
+                                staggerMs: root.staggerMs
+                                animIndex: slot.index % 6
+                                travelX: slot.modelData.travelX
+                                travelY: slot.modelData.travelY
+                                content: Component { BarScreensSection {} }
+                            }
+                        }
+
+                        Component {
+                            id: autostartComponent
+                            DashboardSectionCard {
+                                anchors.fill: parent
+                                title: slot.modelData.title
+                                icon: slot.modelData.icon
+                                tileShape: slot.modelData.shape
+                                pager: root.pager
+                                staggerMs: root.staggerMs
+                                animIndex: slot.index % 6
+                                travelX: slot.modelData.travelX
+                                travelY: slot.modelData.travelY
+                                content: Component { AutostartApps { Layout.fillWidth: true } }
+                            }
+                        }
+
+                        Component {
+                            id: widgetScreensComponent
+                            DashboardSectionCard {
+                                anchors.fill: parent
+                                title: slot.modelData.title
+                                icon: slot.modelData.icon
+                                tileShape: slot.modelData.shape
+                                pager: root.pager
+                                staggerMs: root.staggerMs
+                                animIndex: slot.index % 6
+                                travelX: slot.modelData.travelX
+                                travelY: slot.modelData.travelY
+                                content: Component {
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 6
+
+                                        StyledText {
+                                            text: Translation.tr("Show widgets on")
+                                            font.pixelSize: Appearance.font.pixelSize.smaller
+                                            color: Appearance.colors.colSubtext
+                                        }
+
+                                        WidgetsMonitorSelector {
+                                            configEntry: Config.options.background
+                                        }
+                                    }
+                                }
                             }
                         }
 
