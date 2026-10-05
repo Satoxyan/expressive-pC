@@ -224,7 +224,7 @@ Scope {
                     delegate: Item {
                         id: playerSlot
                         required property MprisPlayer modelData
-                        readonly property real targetHeight: (root.meaningfulPlayers.length === 1 || Config.options.bar.media.showLyrics) ? 290 : Appearance.sizes.mediaControlsHeight
+                        readonly property real targetHeight: Config.options.bar.media.showLyrics ? 290 : Appearance.sizes.mediaControlsHeight
                         implicitWidth: root.widgetWidth
                         // tinggi slot = tinggi kartu (beranimasi) → tinggi kolom dan
                         // mask input ikut, sementara tinggi window tetap konstan

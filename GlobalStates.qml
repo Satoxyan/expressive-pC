@@ -21,7 +21,6 @@ Singleton {
     property bool mediaControlsAboveDock: false
     property real mediaControlsAnchorX: 0
     property bool lockMediaOpen: false
-    property bool lockMediaCompact: false
     property bool osdBrightnessOpen: false
     property bool settingsOpen: false
     property bool osdVolumeOpen: false

@@ -169,7 +169,8 @@ Item {
             order: root.sectionOrder
             editMode: root.editMode && root.editTab === "layout"
             fillKey: "notifications"
-            fillMinHeight: 120
+            // logika lama: kalender buka → notif boleh menggulung sampai 47px (prioritas kalender)
+            fillMinHeight: root.calendarExpanded ? 47 : 120
             onReordered: newOrder => Config.options.sidebar.sectionOrder = newOrder
             componentForKey: key => root.sectionComponents[key] ?? null
             isKeyActive: key => root.sectionActive(key)
