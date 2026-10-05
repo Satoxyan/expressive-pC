@@ -129,47 +129,55 @@ DashboardCard {
                         Qt.callLater(() => { Config.options.settings.style = value; });
                     }
 
-                    contentItem: ColumnLayout {
-                        spacing: 8
+                    contentItem: Item {
+                        // ponytail: check pinned to button bottom — text-wrap height differences
+                        // must not shift it (was in ColumnLayout flow; active option's 2-line
+                        // detail overflowed and pushed it past the card edge)
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.bottomMargin: 34 // check 26 + margin 8
+                            spacing: 8
 
-                        Item { Layout.fillHeight: true }
+                            Item { Layout.fillHeight: true }
 
-                        MaterialShapeWrappedMaterialSymbol {
-                            Layout.alignment: Qt.AlignHCenter
-                            shape: option.modelData.shape
-                            text: option.modelData.icon
-                            iconSize: 34
-                            fill: 1
-                            padding: 16
-                            color: option.selected ? Appearance.colors.colOnPrimary : Appearance.colors.colPrimary
-                            colSymbol: option.selected ? Appearance.colors.colPrimary : Appearance.colors.colOnPrimary
+                            MaterialShapeWrappedMaterialSymbol {
+                                Layout.alignment: Qt.AlignHCenter
+                                shape: option.modelData.shape
+                                text: option.modelData.icon
+                                iconSize: 34
+                                fill: 1
+                                padding: 16
+                                color: option.selected ? Appearance.colors.colOnPrimary : Appearance.colors.colPrimary
+                                colSymbol: option.selected ? Appearance.colors.colPrimary : Appearance.colors.colOnPrimary
+                            }
+
+                            StyledText {
+                                Layout.alignment: Qt.AlignHCenter
+                                text: option.modelData.name
+                                font.pixelSize: Appearance.font.pixelSize.larger
+                                font.weight: Font.DemiBold
+                                color: option.selected ? Appearance.colors.colOnPrimary : Appearance.colors.colOnSecondaryContainer
+                            }
+
+                            StyledText {
+                                Layout.fillWidth: true
+                                horizontalAlignment: Text.AlignHCenter
+                                wrapMode: Text.WordWrap
+                                text: option.modelData.detail
+                                font.pixelSize: Appearance.font.pixelSize.smaller
+                                color: option.selected ? Appearance.colors.colOnPrimary : Appearance.colors.colOnSecondaryContainer
+                                opacity: 0.8
+                            }
+
+                            Item { Layout.fillHeight: true }
                         }
-
-                        StyledText {
-                            Layout.alignment: Qt.AlignHCenter
-                            text: option.modelData.name
-                            font.pixelSize: Appearance.font.pixelSize.larger
-                            font.weight: Font.DemiBold
-                            color: option.selected ? Appearance.colors.colOnPrimary : Appearance.colors.colOnSecondaryContainer
-                        }
-
-                        StyledText {
-                            Layout.fillWidth: true
-                            horizontalAlignment: Text.AlignHCenter
-                            wrapMode: Text.WordWrap
-                            text: option.modelData.detail
-                            font.pixelSize: Appearance.font.pixelSize.smaller
-                            color: option.selected ? Appearance.colors.colOnPrimary : Appearance.colors.colOnSecondaryContainer
-                            opacity: 0.8
-                        }
-
-                        Item { Layout.fillHeight: true }
 
                         Rectangle {
-                            Layout.alignment: Qt.AlignHCenter
-                            Layout.bottomMargin: 8
-                            implicitWidth: 26
-                            implicitHeight: 26
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: 8
+                            width: 26
+                            height: 26
                             radius: 13
                             color: option.selected ? Appearance.colors.colOnPrimary : "transparent"
                             border.width: option.selected ? 0 : 2

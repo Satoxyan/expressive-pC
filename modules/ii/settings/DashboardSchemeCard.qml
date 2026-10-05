@@ -164,7 +164,15 @@ DashboardCard {
                 contentHeight: height
                 boundsBehavior: Flickable.StopAtBounds
 
+                // Horizontal inertial engine: touchpad swipe tracking + fling
+                InertialScrollEngine {
+                    id: stripEngine
+                    flickable: chipsFlick
+                    horizontal: true
+                }
+
                 Behavior on contentX {
+                    enabled: !stripEngine.active
                     NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
                 }
 
@@ -270,9 +278,16 @@ DashboardCard {
                     }
                 }
 
+                // Vertical events: mouse wheel scrolls the strip (original
+                // behavior). Touchpad vertical is rejected here so it falls
+                // through to the page's inertial engine instead.
                 WheelHandler {
                     acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                     onWheel: event => {
+                        if (Math.abs(event.angleDelta.y) % 120 !== 0) {
+                            event.accepted = false;
+                            return;
+                        }
                         const maxX = Math.max(0, chipsFlick.contentWidth - chipsFlick.width);
                         const raw = event.angleDelta.x !== 0 ? event.angleDelta.x : event.angleDelta.y;
                         const dx = -raw;
@@ -280,6 +295,17 @@ DashboardCard {
                         if (canScroll) chipsFlick.contentX = Math.max(0, Math.min(maxX, chipsFlick.contentX + dx * 0.8));
                         else if (root.pager) root.pager.scrollSettingsBy(-event.angleDelta.y);
                         event.accepted = true;
+                    }
+                }
+                // Horizontal touchpad swipe (orientation default Qt.Vertical
+                // rejects these). Routed through the horizontal engine for
+                // finger-tracking + fling.
+                WheelHandler {
+                    orientation: Qt.Horizontal
+                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                    onWheel: event => {
+                        event.accepted = false; // native fallback when engine declines
+                        stripEngine.handleWheel(event);
                     }
                 }
             }

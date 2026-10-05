@@ -465,8 +465,25 @@ Item {
             flickDeceleration: 4000
             maximumFlickVelocity: 2500
 
+            InertialScrollEngine {
+                id: _engine
+                flickable: flick
+            }
+
+            // Handler on the flickable itself: wheel handlers run before the
+            // item's own C++ wheelEvent in Qt 6 (ancestor handler never fired).
+            // Inner strips have their own handlers deeper in the chain, so
+            // they keep priority (leaf → root).
+            WheelHandler {
+                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                onWheel: event => {
+                    event.accepted = false; // native flick fallback when engine declines
+                    _engine.handleWheel(event);
+                }
+            }
+
             Behavior on contentY {
-                enabled: !flick.moving && !flick.dragging
+                enabled: !flick.moving && !flick.dragging && !_engine.active
                 NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
             }
 
