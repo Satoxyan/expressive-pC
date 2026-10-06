@@ -11,7 +11,6 @@ import Quickshell.Hyprland
 ContentSection {
     icon: "monitor"
     shape: MaterialShape.Shape.ClamShell
-    visible: Hyprland.monitors.values.length > 1
     title: Translation.tr("Screens")
     ContentSubsection {
         title: Translation.tr("Show bar on")

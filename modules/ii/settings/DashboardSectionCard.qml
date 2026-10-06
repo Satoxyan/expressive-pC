@@ -18,6 +18,10 @@ DashboardCard {
 
     tint: Appearance.colors.colLayer1
 
+    // Natural content height (+12 = Flickable margins); lets the page grid
+    // size this card's rows to fit — no empty space, no inner scrolling.
+    readonly property real measuredHeight: col.implicitHeight + 12
+
     Flickable {
         id: flick
         anchors.fill: parent
@@ -26,7 +30,7 @@ DashboardCard {
         contentWidth: width
         contentHeight: col.implicitHeight
         boundsBehavior: Flickable.StopAtBounds
-        interactive: contentHeight > height
+        interactive: contentHeight > height + 2
 
         ScrollBar.vertical: StyledScrollBar {}
 

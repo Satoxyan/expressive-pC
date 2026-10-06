@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import qs
 import qs.services
 import qs.modules.common
@@ -108,6 +109,7 @@ QtObject {
         "interface:Dock/Border color": { type: "select", get: () => Config.options.dock.borderColor, set: v => { Config.options.dock.borderColor = v; }, get options() { return ["layer0Border", "primary", "secondary", "tertiary", "primaryContainer", "secondaryContainer", "tertiaryContainer", "layer1", "black"].map(name => ({ value: name, color: roleColor(name) })); } },
         "interface:Palette type": { type: "select", get: () => Config.options.appearance.palette.type, set: v => { Config.options.appearance.palette.type = v; Quickshell.execDetached(["bash", "-c", `${Directories.wallpaperSwitchScriptPath} --noswitch`]); }, options: [{ displayName: Translation.tr("Auto"), icon: "auto_awesome", value: "auto" }, { displayName: Translation.tr("Content"), icon: "image", value: "scheme-content" }, { displayName: Translation.tr("Expressive"), icon: "palette", value: "scheme-expressive" }, { displayName: Translation.tr("Fidelity"), icon: "equal", value: "scheme-fidelity" }, { displayName: Translation.tr("Fruit Salad"), icon: "nutrition", value: "scheme-fruit-salad" }, { displayName: Translation.tr("Monochrome"), icon: "invert_colors", value: "scheme-monochrome" }, { displayName: Translation.tr("Neutral"), icon: "tonality", value: "scheme-neutral" }, { displayName: Translation.tr("Rainbow"), icon: "gradient", value: "scheme-rainbow" }, { displayName: Translation.tr("Tonal Spot"), icon: "lens", value: "scheme-tonal-spot" }] },
         "desktop:Same wallpaper": { type: "switch", get: () => Config.options.background.lockWall === "", set: v => { if (v) Config.options.background.lockWall = ""; } },
+        "desktop:Show widgets on": { type: "select", get: () => Config.options.background.screenList.length === 0 ? null : Config.options.background.screenList[0], set: v => { Config.options.background.screenList = v ? [v] : []; }, get options() { return [{ displayName: Translation.tr("All"), icon: "tv_displays", value: null }].concat(Hyprland.monitors.values.map(m => ({ displayName: m.name, icon: "monitor", value: m.name }))); } },
         "desktop:Transitions": { type: "select", get: () => Config.options.background.wallpaperAnimation, set: v => { Config.options.background.wallpaperAnimation = v; }, options: [{ displayName: Translation.tr("None"), icon: "block", value: "" }, { displayName: Translation.tr("Circle"), icon: "circle", value: "circleSelect" }, { displayName: Translation.tr("Circle Pit"), icon: "blur_circular", value: "circlePit" }, { displayName: Translation.tr("Magic"), icon: "auto_awesome", value: "magic" }, { displayName: Translation.tr("Doom"), icon: "whatshot", value: "Doom" }, { displayName: Translation.tr("Peel"), icon: "layers", value: "Peel" }, { displayName: Translation.tr("Fade"), icon: "gradient", value: "transition" }, { displayName: Translation.tr("Pixelate"), icon: "grain", value: "pixelate" }, { displayName: Translation.tr("Stripes"), icon: "texture_minus", value: "stripes" }, { displayName: Translation.tr("CRT"), icon: "tv", value: "crt" }, { displayName: Translation.tr("Dissolve"), icon: "blur_on", value: "dissolve" }, { displayName: Translation.tr("Glitch"), icon: "bug_report", value: "glitch" }, { displayName: Translation.tr("Ripple"), icon: "water", value: "ripple" }, { displayName: Translation.tr("Shatter"), icon: "broken_image", value: "shatter" }, { displayName: Translation.tr("Random"), icon: "shuffle", value: "random" }] },
         "desktop:Centered shape": { type: "select", get: () => Config.options.background.centeredWallpaperShape, set: v => { Config.options.background.centeredWallpaperShape = v; }, options: ["Circle", "Square", "Slanted", "Arch", "Arrow", "SemiCircle", "Oval", "Pill", "Triangle", "Diamond", "ClamShell", "Pentagon", "Gem", "Sunny", "VerySunny", "Cookie4Sided", "Cookie6Sided", "Cookie7Sided", "Cookie9Sided", "Cookie12Sided", "Ghostish", "Clover4Leaf", "Clover8Leaf", "Burst", "SoftBurst", "Flower", "Puffy", "PuffyDiamond", "PixelCircle", "Bun", "Heart"] },
         "desktop:Image shape": { type: "select", get: () => Config.options.background.widgets.customImage.shape, set: v => { Config.options.background.widgets.customImage.shape = v; }, options: ["Circle", "Square", "Slanted", "Arch", "Arrow", "SemiCircle", "Oval", "Pill", "Triangle", "Diamond", "ClamShell", "Pentagon", "Gem", "Sunny", "VerySunny", "Cookie4Sided", "Cookie6Sided", "Cookie7Sided", "Cookie9Sided", "Cookie12Sided", "Ghostish", "Clover4Leaf", "Clover8Leaf", "Burst", "SoftBurst", "Flower", "Puffy", "PuffyDiamond", "PixelCircle", "Bun", "Heart"] },
@@ -488,7 +490,7 @@ QtObject {
         {
             page: Translation.tr("Desktop"), title: Translation.tr("Desktop widgets"), icon: "widgets", cards: [
                 { type: "widgets", key: "desktop:Widgets", title: Translation.tr("Desktop widgets"), icon: "widgets", kw: "widgets desktop menu star favorite clock weather calendar media resources todo notes timers sticker visualizer" },
-                { type: "widgetsscreens", key: "desktop:Show widgets on", title: Translation.tr("Show widgets on"), icon: "tv_displays", kw: "monitor screen show widgets display" }
+                { type: "select", key: "desktop:Show widgets on", title: Translation.tr("Show widgets on"), icon: "tv_displays", kw: "monitor screen show widgets display" }
             ]
         },
         {
@@ -553,8 +555,8 @@ QtObject {
         },
         {
             page: Translation.tr("Desktop"), title: Translation.tr("Custom image"), icon: "imagesmode", cards: [
-                { type: "toggle", key: "desktop:Custom Image/Enable", title: Translation.tr("Enable"), icon: "imagesmode" },
-                { type: "shape", key: "desktop:Image shape", title: Translation.tr("Shape"), icon: "shapes" }
+                { type: "shape", w: 4, key: "desktop:Image shape", title: Translation.tr("Shape"), icon: "shapes" },
+                { type: "customimages", key: "desktop:Custom Images", title: Translation.tr("Custom images"), icon: "add_photo_alternate", kw: "custom image photo picture add multiple" }
             ]
         },
         {
@@ -861,13 +863,13 @@ QtObject {
         },
         {
             page: Translation.tr("Services"), title: Translation.tr("Booru"), icon: "image_search", cards: [
-                { type: "text", w: 2, key: "services:Zerochan username", title: Translation.tr("Zerochan username"), icon: "person" },
                 { type: "text", w: 2, key: "services:Gelbooru user ID", title: Translation.tr("Gelbooru user ID"), icon: "pin" },
                 { type: "text", w: 2, key: "services:Gelbooru API key", title: Translation.tr("Gelbooru API key"), icon: "key" },
                 { type: "text", w: 2, key: "services:Rule34 user ID", title: Translation.tr("Rule34 user ID"), icon: "pin" },
                 { type: "text", w: 2, key: "services:Rule34 API key", title: Translation.tr("Rule34 API key"), icon: "key" },
                 { type: "text", w: 2, key: "services:Danbooru login", title: Translation.tr("Danbooru login"), icon: "person" },
-                { type: "text", w: 2, key: "services:Danbooru API key", title: Translation.tr("Danbooru API key"), icon: "key" }
+                { type: "text", w: 2, key: "services:Danbooru API key", title: Translation.tr("Danbooru API key"), icon: "key" },
+                { type: "text", w: 2, key: "services:Zerochan username", title: Translation.tr("Zerochan username"), icon: "person" }
             ]
         }
     ]

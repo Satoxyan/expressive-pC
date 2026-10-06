@@ -18,6 +18,16 @@ Item {
     readonly property real headerHeight: 36
     readonly property real gap: 12
 
+    // Natural heights (px) reported by content cards, keyed by entry id.
+    // computeLayout shrinks/expands full-width cards' rows to fit them.
+    property var measuredHeights: ({})
+    function reportHeight(id, h) {
+        if (!(h > 1) || Math.abs((measuredHeights[id] ?? -1) - h) < 0.5) return;
+        const next = Object.assign({}, measuredHeights);
+        next[id] = h;
+        measuredHeights = next;
+    }
+
     readonly property var shapePool: [
         MaterialShape.Shape.Cookie6Sided, MaterialShape.Shape.Gem, MaterialShape.Shape.Pentagon,
         MaterialShape.Shape.Flower, MaterialShape.Shape.Puffy, MaterialShape.Shape.Clover8Leaf, MaterialShape.Shape.Sunny
@@ -88,8 +98,8 @@ Item {
         if (type === "barlayout") return [4, 3];
         if (type === "displays") return [4, 4];
         if (type === "stickers" || type === "autostart") return [4, 4];
+        if (type === "customimages") return [4, 1];
         if (type === "barscreens") return [4, 2];
-        if (type === "widgetsscreens") return [4, 1];
         if (type === "palette") return [4, 1];
         if (type === "iconpicker") return [2, 2];
         if (type === "toggle" || type === "spin") return [1, 1];
@@ -197,6 +207,7 @@ Item {
     }
 
     function computeLayout(tokens) {
+        const mh = measuredHeights;
         const items = [];
         if (tokens.length > 0) {
             const groups = {};
@@ -317,6 +328,17 @@ Item {
                 mark(p.row + p.h, p.col, p.w, 1);
                 p.h++;
             }
+        });
+
+        // Content-driven sizing: a full-width card owns its rows exclusively,
+        // so fit those rows to its reported natural height (px).
+        Object.keys(map).forEach(id => {
+            const p = map[id];
+            if (p.header || p.w < 4) return;
+            const m = mh[id];
+            if (!(m > 1)) return;
+            const perRow = Math.max(0.01, (m - (p.h - 1) * gap) / p.h);
+            for (let dr = 0; dr < p.h; dr++) rowH[p.row + dr] = perRow;
         });
 
         const rowY = [];
@@ -513,6 +535,9 @@ Item {
                         readonly property var place: root.layoutMap[modelData.id] ?? null
                         property var lastPlace: null
                         property bool ready: false
+                        // Report the loaded card's natural height to the grid.
+                        readonly property var _measure: item && item.measuredHeight !== undefined
+                            ? root.reportHeight(modelData.id, item.measuredHeight) : undefined
                         readonly property var shown: place ?? lastPlace
                         readonly property real colW: (canvas.width - root.gap * 3) / 4
                         readonly property bool inView: place !== null
@@ -556,7 +581,7 @@ Item {
                             : modelData.type === "stickers" ? stickersComponent
                             : modelData.type === "barscreens" ? barScreensComponent
                             : modelData.type === "autostart" ? autostartComponent
-                            : modelData.type === "widgetsscreens" ? widgetScreensComponent
+                            : modelData.type === "customimages" ? customImagesComponent
                             : modelData.type === "palette" ? paletteComponent
                             : modelData.type === "duration" ? durationComponent
                             : modelData.type === "iconpicker" ? iconPickerComponent
@@ -890,7 +915,7 @@ Item {
                         }
 
                         Component {
-                            id: widgetScreensComponent
+                            id: customImagesComponent
                             DashboardSectionCard {
                                 anchors.fill: parent
                                 title: slot.modelData.title
@@ -904,16 +929,52 @@ Item {
                                 content: Component {
                                     ColumnLayout {
                                         Layout.fillWidth: true
-                                        spacing: 6
+                                        spacing: 8
 
-                                        StyledText {
-                                            text: Translation.tr("Show widgets on")
-                                            font.pixelSize: Appearance.font.pixelSize.smaller
-                                            color: Appearance.colors.colSubtext
+                                        Repeater {
+                                            model: Config.customImages
+
+                                            delegate: GroupedList {
+                                                required property int index
+                                                Layout.fillWidth: true
+
+                                                RowLayout {
+                                                    Layout.fillWidth: true
+                                                    spacing: 8
+
+                                                    MaterialSymbol {
+                                                        text: "image"
+                                                        iconSize: Appearance.font.pixelSize.large
+                                                        color: Appearance.colors.colOnSurfaceVariant
+                                                    }
+                                                    StyledText {
+                                                        Layout.fillWidth: true
+                                                        text: Translation.tr("Image %1").arg(index + 1)
+                                                        font.pixelSize: Appearance.font.pixelSize.normal
+                                                        elide: Text.ElideRight
+                                                    }
+                                                    RippleButtonWithIcon {
+                                                        materialIcon: "image"
+                                                        mainText: Translation.tr("Choose")
+                                                        onClicked: FilePicker.pickImage(path => Config.updateCustomImage(index, { path }))
+                                                    }
+                                                    RippleButtonWithIcon {
+                                                        materialIcon: "delete"
+                                                        mainText: Translation.tr("Remove")
+                                                        onClicked: Config.removeCustomImage(index)
+                                                    }
+                                                }
+                                            }
                                         }
 
-                                        WidgetsMonitorSelector {
-                                            configEntry: Config.options.background
+                                        GroupedList {
+                                            Layout.fillWidth: true
+                                            RippleButtonWithIcon {
+                                                Layout.fillWidth: true
+                                                materialIcon: "add"
+                                                mainText: Translation.tr("Add Image")
+                                                onClicked: Config.addCustomImage()
+                                            }
                                         }
                                     }
                                 }

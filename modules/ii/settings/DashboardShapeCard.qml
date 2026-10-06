@@ -19,12 +19,17 @@ DashboardCard {
 
     tint: Appearance.colors.colPrimaryContainer
 
+    // Natural content height (+28 = ColumnLayout margins); lets the page grid
+    // size this card's rows to fit — no empty space, no inner scrolling.
+    readonly property real measuredHeight: 14 + head.implicitHeight + 10 + grid.implicitHeight + 14
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 14
         spacing: 10
 
         RowLayout {
+            id: head
             Layout.fillWidth: true
             spacing: 12
 
