@@ -387,6 +387,8 @@ Item {
                 fontScale: 1.8
                 animateTransitions: true
                 lineSpacing: 28
+                contextBefore: 4
+                contextAfter: 4
                 textAlignment: Text.AlignHCenter
                 textColor: root.fg
                 activeColor: root.colors.colPrimary

@@ -24,7 +24,27 @@ Item {
     property int textAlignment: Text.AlignLeft
     property real fontScale: 1.0
     property bool animateTransitions: false
-    property real lineSpacing: 6
+    // Default = jarak yang selama ini dipakai semua instance non-dashboard
+    // (dulu konstan slotSpacing 5); dashboard membukanya jadi 28.
+    property real lineSpacing: 5
+
+    // Jumlah baris sebelum/sesudah baris aktif untuk instance ini. Service
+    // membangun jendela terlebar (4/4); instance lebih sempit memotongnya,
+    // jadi sidebar/media tetap 2/2 seperti semula.
+    property int contextBefore: 2
+    property int contextAfter: 2
+
+    readonly property int slotCount: root.contextBefore + root.contextAfter + 1
+    readonly property int activeSlot: root.contextBefore
+    readonly property int sliceOffset: LyricsService.before - root.contextBefore
+    readonly property int localNoteSlot: LyricsService.noteSlot >= 0
+        ? LyricsService.noteSlot - root.sliceOffset
+        : -1
+
+    function slotText(i) {
+        const s = i + root.sliceOffset
+        return (s >= 0 && s < LyricsService.slots.length) ? LyricsService.slots[s] : ""
+    }
 
     // When true, the past/future lines keep only their natural line height
     // and cluster tightly around the active line (extra space becomes
@@ -43,8 +63,9 @@ Item {
 
     function fontSizeFor(dist) {
         // Big (active) to small (far) gradient, stepping every slot so the
-        // past/future lines visibly shrink away from the highlighted one.
-        return Math.max(root.farFontSize, root.activeFontSize - dist * 2)
+        // past/future lines visibly shrink away from the highlighted one;
+        // the whole gradient scales with fontScale (dashboard asks 1.8).
+        return Math.max(root.farFontSize, root.activeFontSize - dist * 2) * root.fontScale
     }
     function opacityFor(dist) {
         if (dist === 0) return 1.0
@@ -67,7 +88,7 @@ Item {
         id: activeRowMetrics
         font {
             family: Appearance.font.family.main
-            pixelSize: root.activeFontSize
+            pixelSize: root.fontSizeFor(0)
             variableAxes: Appearance.font.variableAxes.main
         }
     }
@@ -82,7 +103,7 @@ Item {
         height: implicitHeight
         font {
             family: Appearance.font.family.main
-            pixelSize: root.activeFontSize
+            pixelSize: root.fontSizeFor(0)
             variableAxes: Appearance.font.variableAxes.main
         }
         text: "Ag"
@@ -116,7 +137,6 @@ Item {
     readonly property real rowHeight:
         rowMeter.implicitHeight > 0 ? rowMeter.implicitHeight : activeRowMetrics.height
     readonly property real rowSpacing: 4
-    readonly property int slotSpacing: 5
 
     function comfortableHeightFor(dist) {
         if (dist === 1) return Math.max(8, nearLineMetrics.height - root.lineSlack)
@@ -128,9 +148,9 @@ Item {
     // Computed over the actual slot distances so it tracks before/after.
     readonly property real comfortableReserve: {
         let sum = 0
-        for (let i = 0; i < LyricsService.total; i++) {
-            if (i === LyricsService.before) continue
-            sum += root.comfortableHeightFor(Math.abs(i - LyricsService.before))
+        for (let i = 0; i < root.slotCount; i++) {
+            if (i === root.activeSlot) continue
+            sum += root.comfortableHeightFor(Math.abs(i - root.activeSlot))
         }
         return sum
     }
@@ -139,7 +159,7 @@ Item {
     // the widget height minus the layout gaps and the others' reserves.
     readonly property real activeRoom:
         Math.max(root.rowHeight, root.height
-            - (LyricsService.total - 1) * root.slotSpacing - root.comfortableReserve)
+            - (root.slotCount - 1) * root.lineSpacing - root.comfortableReserve)
 
     // Largest whole number of active rows that fit in that room; the cap is
     // that many rows (not the room itself), so the active slot never ends on
@@ -254,14 +274,14 @@ Item {
         anchors.fill: parent
         // Compact mode keeps lines clustered, but with a bit more air
         // between slots so it doesn't look cramped.
-        spacing: root.slotSpacing + (root.compactNeighbors ? 6 : 0)
+        spacing: root.lineSpacing + (root.compactNeighbors ? 6 : 0)
 
         // Compact mode: symmetric padding so the line cluster hugs the
         // active line in the middle instead of stretching edge to edge.
         Item { Layout.fillWidth: true; Layout.fillHeight: root.compactNeighbors }
 
         Repeater {
-            model: LyricsService.total
+            model: root.slotCount
             delegate: Item {
                 id: slotItem
                 required property int index
@@ -288,12 +308,12 @@ Item {
                         : Math.min(slotItem.fallbackContentHeight, root.activeCap)
                     : 0
 
-                readonly property int dist: Math.abs(index - LyricsService.before)
-                readonly property bool isActiveSlot: index === LyricsService.before
+                readonly property int dist: Math.abs(index - root.activeSlot)
+                readonly property bool isActiveSlot: index === root.activeSlot
                 readonly property real comfortableHeight:
                     slotItem.isActiveSlot ? 0 : root.comfortableHeightFor(slotItem.dist)
-                readonly property bool isNoteSlot: index === LyricsService.noteSlot
-                    && LyricsService.noteSlot >= 0
+                readonly property bool isNoteSlot: index === root.localNoteSlot
+                    && root.localNoteSlot >= 0
                     && LyricsService.providedBy.length > 0
                 // Karaoke layout drives the active slot for every source: a
                 // per-word sweep when the provider has real word timings, one
@@ -301,7 +321,7 @@ Item {
                 // timing. Empty slot text (loading) keeps the plain fallback.
                 readonly property bool useKaraoke: root.karaoke
                     && slotItem.isActiveSlot
-                    && (LyricsService.slots[slotItem.index] ?? "").length > 0
+                    && root.slotText(slotItem.index).length > 0
 
                 // Per-word karaoke line. Rows are computed manually instead
                 // of using a Flow, because a Flow fills the width and always
@@ -327,15 +347,17 @@ Item {
 
                 // Invisible meter: same width/font/wrapping as the active
                 // line, so its height is exactly what the slot must reserve.
+                // WrapAtWordBoundaryOrAnywhere (sama dengan lyricSlot): Wrap
+                // biasa kadang tak memecah lari tanpa spasi seperti CJK.
                 StyledText {
                     id: fallbackMeter
                     opacity: 0
                     width: slotItem.width
                     font.pixelSize: root.fontSizeFor(0)
-                    wrapMode: Text.WordWrap
+                    wrapMode: Text.WrapAtWordBoundaryOrAnywhere
                     maximumLineCount: Math.max(2, root.fitRows)
                     elide: Text.ElideRight
-                    text: LyricsService.slots[slotItem.index] ?? ""
+                    text: root.slotText(slotItem.index)
                 }
 
                 FontMetrics {
@@ -354,7 +376,7 @@ Item {
                     // duration instead (index -1 marks the sentence sweep).
                     const sentence = words.length === 0
                     const source = sentence
-                        ? [{ text: LyricsService.slots[slotItem.index] ?? "" }]
+                        ? [{ text: root.slotText(slotItem.index) }]
                         : words
                     const spacing = karaokeColumn.spacing
                     const maxWidth = Math.max(1, slotItem.width)
@@ -363,10 +385,31 @@ Item {
                     // line can wrap instead of overflowing the slot; every piece
                     // keeps the original word index for the highlight sweep.
                     const pieces = []
+                    // Pemecahan manual baris tidak pernah memecah sebuah
+                    // potongan — potongan tanpa spasi (lari aksara CJK, atau
+                    // provider yang mengirim satu baris sebagai satu "word")
+                    // melebar keluar slot dan terpotong di kanan. Pecah dulu
+                    // jadi potongan yang muat, per karakter bila perlu.
+                    const fitChunks = (text, idx) => {
+                        if (karaokeMetrics.advanceWidth(text) <= maxWidth)
+                            return [{ index: idx, text: text }]
+                        const out = []
+                        let cur = ""
+                        for (const ch of String(text)) {
+                            if (cur !== "" && karaokeMetrics.advanceWidth(cur + ch) > maxWidth) {
+                                out.push({ index: idx, text: cur })
+                                cur = ch
+                            } else {
+                                cur += ch
+                            }
+                        }
+                        if (cur !== "") out.push({ index: idx, text: cur })
+                        return out
+                    }
                     for (let i = 0; i < source.length; i++) {
                         const parts = String(source[i].text ?? "").split(/\s+/).filter(s => s.length > 0)
                         for (const part of parts)
-                            pieces.push({ index: sentence ? -1 : i, text: part })
+                            pieces.push(...fitChunks(part, sentence ? -1 : i))
                     }
                     if (pieces.length === 0) return []
                     // Share of the line each piece owns, accumulated in reading
@@ -473,10 +516,10 @@ Item {
                     anchors.fill: parent
                     horizontalAlignment: root.textAlignment
                     verticalAlignment: Text.AlignVCenter
-                    wrapMode: slotItem.isActiveSlot ? Text.WordWrap : Text.NoWrap
+                    wrapMode: slotItem.isActiveSlot ? Text.WrapAtWordBoundaryOrAnywhere : Text.NoWrap
                     maximumLineCount: slotItem.isActiveSlot ? Math.max(2, root.fitRows) : 1
                     elide: Text.ElideRight
-                    text: LyricsService.slots[index] ?? ""
+                    text: root.slotText(index)
                     font.pixelSize: root.fontSizeFor(slotItem.dist)
                     opacity: root.opacityFor(slotItem.dist)
                     color: slotItem.dist === 0 ? root.activeColor : root.textColor

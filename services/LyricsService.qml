@@ -17,16 +17,19 @@ Singleton {
     property int activeIndex: -1
     property string status: "loading"
     property string providedBy: ""
-    property var slots: ["", "", "", "", ""]
+    property var slots: []
 
     // Slot index (0..total-1) where the "Lyrics provided by …" note sits,
     // right after the last lyric line once it scrolls into the window.
     // -1 = not visible yet.
     property int noteSlot: -1
 
-    readonly property int before: 2
-    readonly property int after:  2
-    readonly property int total:  5
+    // Jendela baris di sekitar baris aktif yang dibangun service. Tiap
+    // instance Lyrics memotong sesuai contextBefore/After masing-masing;
+    // harus >= instance terlebar (dashboard: 4/4).
+    readonly property int before: 4
+    readonly property int after:  4
+    readonly property int total:  before + after + 1
 
     // Fixed lyric sync offset (ms). Negative = words/lines light up EARLIER,
     // positive = later. Hardcoded so it can't disturb the lyric logic.
@@ -294,7 +297,7 @@ Singleton {
         root.lyricsLines = []
         root.activeIndex = -1
         root.providedBy = ""
-        root.slots = ["", "", "", "", ""]
+        root.slots = root.buildSlots(-1)
         root.noteSlot = -1
         root.activeLineWords = []
         root.activeWordIndex = -1
