@@ -171,6 +171,9 @@ Item {
             fillKey: "notifications"
             // logika lama: kalender buka → notif boleh menggulung sampai 47px (prioritas kalender)
             fillMinHeight: root.calendarExpanded ? 47 : 120
+            // Mode edit: notifikasi di-cap tipis supaya semua section muat
+            // dan tetap bisa digeser tanpa keluar area.
+            fillMaxHeight: root.editMode ? 100 : 0
             onReordered: newOrder => Config.options.sidebar.sectionOrder = newOrder
             componentForKey: key => root.sectionComponents[key] ?? null
             isKeyActive: key => root.sectionActive(key)
@@ -192,7 +195,9 @@ Item {
         case "sliders":
             return sidebar.quickSliders.enable && (sidebar.quickSliders.showMic || sidebar.quickSliders.showVolume || sidebar.quickSliders.showBrightness)
         case "media":
-            return root.hasMedia && sidebar.mediaPlayer
+            // Saat edit layout, panel media tetap tampil walau tidak ada
+            // pemutar — supaya urutannya bisa diubah tanpa memutar musik.
+            return sidebar.mediaPlayer && (root.hasMedia || root.editMode)
         case "bottom":
             return sidebar.bottomGroup
         default:
@@ -533,7 +538,11 @@ Item {
     Component {
         id: mediaSection
         Loader {
-            active: root.sectionActive("media") && GlobalStates.sidebarRightOpen
+            // Jangan diikat ke status panel: membangun ulang Player (decode
+            // artwork + blur) tiap klik = freeze saat dibuka, dan spam klik
+            // = storm buat/hancur. Buat sekali saat media ada, seperti
+            // section sliders/bottom.
+            active: root.sectionActive("media")
             sourceComponent: Item {
                 implicitHeight: (Config.options.bar.media.showLyrics ? 290 : (160 - Appearance.sizes.elevationMargin * 2))
                 Behavior on implicitHeight {
@@ -560,7 +569,7 @@ Item {
         id: bottomSection
         Loader {
             active: root.sectionActive("bottom")
-            sourceComponent: BottomWidgetGroup {}
+            sourceComponent: BottomWidgetGroup { editMode: root.editMode }
         }
     }
 

@@ -15,6 +15,7 @@ Item {
 
     property string fillKey: ""
     property real fillMinHeight: 60
+    property real fillMaxHeight: 0 // 0 = tanpa batas; >0 men-cap tinggi section fill
 
     signal reordered(var newOrder)
     property var componentForKey: function(key) { return null }
@@ -67,7 +68,8 @@ Item {
             if (keys[i] !== root.fillKey) others += root.naturalHeight(keys[i])
         }
         const remaining = root.height - others - Math.max(0, keys.length - 1) * root.itemSpacing
-        return Math.max(root.fillMinHeight, remaining)
+        const h = Math.max(root.fillMinHeight, remaining)
+        return root.fillMaxHeight > 0 ? Math.min(h, root.fillMaxHeight) : h
     }
 
     function yForKey(key) {

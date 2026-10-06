@@ -13,10 +13,14 @@ Rectangle {
     radius: Appearance.rounding.normal
     color: Appearance.colors.colLayer1
     clip: true
-    implicitHeight: collapsed ? collapsedBottomWidgetGroupRow.implicitHeight : 350
+    implicitHeight: viewCollapsed ? collapsedBottomWidgetGroupRow.implicitHeight : 350
     property int selectedTab: Persistent.states.sidebar.bottomGroup.tab
     property int previousIndex: -1
     property bool collapsed: Persistent.states.sidebar.bottomGroup.collapsed
+    property bool editMode: false
+    // Di mode edit panel dipaksa tampil collapse (tanpa mengubah state
+    // persisten) supaya tidak memakan tempat sampai keluar area.
+    readonly property bool viewCollapsed: collapsed || editMode
     property var tabs: [
         {
             "type": "calendar",
@@ -47,25 +51,9 @@ Rectangle {
     }
 
     function setCollapsed(state) {
+        // Cukup tulis state — binding opacity + Behavior sudah menganimasikan
+        // crossfade-nya (cara imperatif lama memutus binding opacity).
         Persistent.states.sidebar.bottomGroup.collapsed = state;
-        if (collapsed) {
-            bottomWidgetGroupRow.opacity = 0;
-        } else {
-            collapsedBottomWidgetGroupRow.opacity = 0;
-        }
-        collapseCleanFadeTimer.start();
-    }
-
-    Timer {
-        id: collapseCleanFadeTimer
-        interval: Appearance.animation.elementMove.duration / 2
-        repeat: false
-        onTriggered: {
-            if (collapsed)
-                collapsedBottomWidgetGroupRow.opacity = 1;
-            else
-                bottomWidgetGroupRow.opacity = 1;
-        }
     }
 
     Keys.onPressed: event => {
@@ -82,7 +70,7 @@ Rectangle {
     // The thing when collapsed
     RowLayout {
         id: collapsedBottomWidgetGroupRow
-        opacity: collapsed ? 1 : 0
+        opacity: viewCollapsed ? 1 : 0
         visible: opacity > 0
         Behavior on opacity {
             NumberAnimation {
@@ -125,7 +113,7 @@ Rectangle {
     RowLayout {
         id: bottomWidgetGroupRow
 
-        opacity: collapsed ? 0 : 1
+        opacity: viewCollapsed ? 0 : 1
         visible: opacity > 0
         Behavior on opacity {
             NumberAnimation {

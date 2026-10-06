@@ -97,7 +97,8 @@ Scope {
 
      Process {
         id: cavaProc
-        running: (GlobalStates.mediaControlsOpen ||
+        // Pemicu: overlay/panel yang butuh visualizer.
+        readonly property bool trigger: GlobalStates.mediaControlsOpen ||
             GlobalStates.lockMediaOpen ||
             GlobalStates.sidebarRightOpen ||
             (GlobalStates.sidebarLeftOpen && !GlobalStates.mediaLyricsVisible) ||
@@ -108,8 +109,14 @@ Scope {
                 (Config.options.bar.dynamicIsland.visualizerStyle === "wave" ||
                 (Config.options.bar.dynamicIsland.visualizerStyle === "dots" && !Config.options.bar.dynamicIsland.showMediaControls))) ||
             Config.options.bar.layouts.rightLayout.includes("visualizer") ||
-            Config.options.background.widgets.visualizer.enable)
-            && (MprisController.activePlayer?.isPlaying ?? false)
+            Config.options.background.widgets.visualizer.enable
+        readonly property bool playing: MprisController.activePlayer?.isPlaying ?? false
+        // Tahan cava beberapa detik setelah pemicu terakhir mati, supaya
+        // spam toggle panel kanan tidak spawn/kill cava berulang (storm
+        // proses + buka/tutup device audio yang memperlambat UI).
+        onTriggerChanged: if (trigger && playing) holdTimer.restart()
+        onPlayingChanged: if (trigger && playing) holdTimer.restart()
+        running: playing && (trigger || holdTimer.running)
         onRunningChanged: {
             if (!cavaProc.running) {
                 GlobalStates.visualizerPoints = [];
@@ -123,6 +130,9 @@ Scope {
             }
         }
     }
+
+    // Sibling cavaProc (Process tidak boleh punya child object).
+    Timer { id: holdTimer; interval: 4000 }
 
     Loader {
         id: mediaControlsLoader
