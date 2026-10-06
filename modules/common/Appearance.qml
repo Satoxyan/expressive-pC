@@ -234,7 +234,7 @@ Singleton {
             property string main: Config.options.appearance.fonts.main
             property string numbers: Config.options.appearance.fonts.numbers
             property string title: Config.options.appearance.fonts.title
-            property string iconMaterial: "Material Symbols Rounded"
+            property string iconMaterial: "Material Symbols Lite"
             property string iconNerd: Config.options.appearance.fonts.iconNerd
             property string monospace: Config.options.appearance.fonts.monospace
             property string reading: Config.options.appearance.fonts.reading

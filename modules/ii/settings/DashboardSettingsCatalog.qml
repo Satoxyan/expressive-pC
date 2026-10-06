@@ -93,6 +93,10 @@ QtObject {
         "bar:Icon color": { type: "select", get: () => Config.options.custom.iconColor, set: v => { Config.options.custom.iconColor = v; }, get options() { return ["onLayer0", "primary", "secondary", "tertiary", "onPrimaryContainer", "onSecondaryContainer", "onTertiaryContainer"].map(name => ({ value: name, color: roleColor(name) })); } },
         "bar:Icons folder": { type: "text", get: () => Config.options.custom.iconsPath, set: v => { Config.options.custom.iconsPath = v; } },
         "bar:Preferred player": { type: "text", get: () => Config.options.bar.media.preferredPlayer, set: v => { Config.options.bar.media.preferredPlayer = v; } },
+        "hyprland:Active border color": { type: "select", get: () => Config.options.hyprland.general.borderColor.activeRole, set: v => { Config.options.hyprland.general.borderColor.activeRole = v; HyprlandConfig.applyBorderColors(); }, get options() { return ["primary", "secondary", "tertiary", "primaryContainer", "secondaryContainer", "tertiaryContainer", "layer0Border"].map(name => ({ value: name, color: roleColor(name) })); } },
+        "hyprland:Active border opacity": { type: "spin", get: () => Math.round(Config.options.hyprland.general.borderColor.activeOpacity * 100), set: v => { Config.options.hyprland.general.borderColor.activeOpacity = v / 100.0; HyprlandConfig.applyBorderColors(); }, from: 0, to: 100, stepSize: 5 },
+        "hyprland:Inactive border color": { type: "select", get: () => Config.options.hyprland.general.borderColor.inactiveRole, set: v => { Config.options.hyprland.general.borderColor.inactiveRole = v; HyprlandConfig.applyBorderColors(); }, get options() { return ["primary", "secondary", "tertiary", "primaryContainer", "secondaryContainer", "tertiaryContainer", "layer0Border"].map(name => ({ value: name, color: roleColor(name) })); } },
+        "hyprland:Inactive border opacity": { type: "spin", get: () => Math.round(Config.options.hyprland.general.borderColor.inactiveOpacity * 100), set: v => { Config.options.hyprland.general.borderColor.inactiveOpacity = v / 100.0; HyprlandConfig.applyBorderColors(); }, from: 0, to: 100, stepSize: 5 },
         "hyprland:Idle lock": { type: "duration", get: () => Config.options.hyprland.idle.lock, set: v => { Config.options.hyprland.idle.lock = v; HyprlandConfig.setIdle(Config.options.hyprland.idle.lock, Config.options.hyprland.idle.screenOff, Config.options.hyprland.idle.suspend); } },
         "hyprland:Idle screen off": { type: "duration", get: () => Config.options.hyprland.idle.screenOff, set: v => { Config.options.hyprland.idle.screenOff = v; HyprlandConfig.setIdle(Config.options.hyprland.idle.lock, Config.options.hyprland.idle.screenOff, Config.options.hyprland.idle.suspend); } },
         "hyprland:Idle standby": { type: "duration", get: () => Config.options.hyprland.idle.suspend, set: v => { Config.options.hyprland.idle.suspend = v; HyprlandConfig.setIdle(Config.options.hyprland.idle.lock, Config.options.hyprland.idle.screenOff, Config.options.hyprland.idle.suspend); } },
@@ -482,6 +486,7 @@ QtObject {
         {
             page: Translation.tr("Desktop"), title: Translation.tr("Multiple wallpapers"), icon: "grid_view", cards: [
                 { type: "toggle", key: "desktop:Collage enable", title: Translation.tr("Enable"), icon: "grid_view" },
+                { type: "collagelayouts", key: "desktop:Collage layouts", title: Translation.tr("Layouts"), icon: "dashboard_customize", kw: "collage multiple wallpapers layout preset grid mosaic" },
                 { type: "spin", key: "desktop:Collage gap", title: Translation.tr("Spacing"), icon: "space_bar" },
                 { type: "spin", key: "desktop:Collage margin", title: Translation.tr("Outer margin"), icon: "padding" },
                 { type: "spin", key: "desktop:Collage radius", title: Translation.tr("Corner radius"), icon: "rounded_corner" }
@@ -621,9 +626,10 @@ QtObject {
         },
         {
             page: Translation.tr("General"), title: Translation.tr("Time"), icon: "nest_clock_farsight_analog", cards: [
-                { type: "select", key: "general:Format", title: Translation.tr("Time format"), icon: "schedule", kw: "clock 24h 12h" },
+                { type: "timepreview", key: "general:Time preview", title: Translation.tr("Preview"), icon: "schedule", kw: "clock time preview" },
                 { type: "toggle", key: "general:Second precision", title: Translation.tr("Second precision"), icon: "pace" },
                 { type: "toggle", key: "general:Show date", title: Translation.tr("Show date"), icon: "date_range" },
+                { type: "select", w: 4, key: "general:Format", title: Translation.tr("Time format"), icon: "schedule", kw: "clock 24h 12h" },
                 { type: "text", key: "general:Date String Format", title: Translation.tr("Date format"), icon: "date_range", w: 2, placeholder: "%Y-%m-%d" }
             ]
         },
@@ -687,7 +693,7 @@ QtObject {
             ]
         },
         {
-            page: Translation.tr("Hyprland"), title: Translation.tr("Dwindle"), icon: "browse", when: "hyprland", cards: [
+            page: Translation.tr("Hyprland"), title: Translation.tr("Dwindle"), icon: "browse", when: "layoutdwindle", cards: [
                 { type: "toggle", key: "hyprland:opt:dwindle:preserve_split", title: Translation.tr("Preserve split direction"), icon: "call_split" },
                 { type: "toggle", key: "hyprland:opt:dwindle:smart_split", title: Translation.tr("Smart split (follow cursor)"), icon: "smart_toy" },
                 { type: "select", key: "hyprland:opt:dwindle:force_split", title: Translation.tr("Force split side"), icon: "splitscreen" },
@@ -695,7 +701,7 @@ QtObject {
             ]
         },
         {
-            page: Translation.tr("Hyprland"), title: Translation.tr("Master"), icon: "auto_awesome_mosaic", when: "hyprland", cards: [
+            page: Translation.tr("Hyprland"), title: Translation.tr("Master"), icon: "auto_awesome_mosaic", when: "layoutmaster", cards: [
                 { type: "select", key: "hyprland:opt:master:new_status", title: Translation.tr("New windows become"), icon: "add_box" },
                 { type: "select", key: "hyprland:opt:master:orientation", title: Translation.tr("Master position"), icon: "screen_rotation" },
                 { type: "spin", key: "hyprland:opt:master:mfact", title: Translation.tr("Master size"), icon: "aspect_ratio" }
@@ -749,6 +755,14 @@ QtObject {
                 { type: "swatch", key: "hyprland:Active border", title: Translation.tr("Active border"), icon: "border_color", w: 2 },
                 { type: "spin", key: "hyprland:Active border opacity", title: Translation.tr("Active border opacity"), icon: "opacity" },
                 { type: "swatch", key: "hyprland:Inactive border", title: Translation.tr("Inactive border"), icon: "border_color", w: 2 },
+                { type: "spin", key: "hyprland:Inactive border opacity", title: Translation.tr("Inactive border opacity"), icon: "opacity" }
+            ]
+        },
+        {
+            page: Translation.tr("Hyprland"), title: Translation.tr("Border colors"), icon: "border_color", when: "hyprbordercolor", cards: [
+                { type: "swatch", w: 2, key: "hyprland:Active border color", title: Translation.tr("Active border"), icon: "border_color" },
+                { type: "swatch", w: 2, key: "hyprland:Inactive border color", title: Translation.tr("Inactive border"), icon: "border_color" },
+                { type: "spin", key: "hyprland:Active border opacity", title: Translation.tr("Active border opacity"), icon: "opacity" },
                 { type: "spin", key: "hyprland:Inactive border opacity", title: Translation.tr("Inactive border opacity"), icon: "opacity" }
             ]
         },

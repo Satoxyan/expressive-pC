@@ -93,6 +93,8 @@ Item {
         if (type === "style") return [2, 2];
         if (type === "schemes" || type === "barpos") return [2, 2];
         if (type === "weathermap") return [4, 2];
+        if (type === "collagelayouts") return [4, 2];
+        if (type === "timepreview") return [3, 2];
         if (type === "widgets") return [4, 3];
         if (type === "shape") return [2, 2];
         if (type === "barlayout") return [4, 3];
@@ -150,6 +152,9 @@ Item {
     function isVisibleEntry(e) {
         if (e.when === "material" && ColorSchemes.current !== "") return false;
         if (e.when === "hyprland" && WM.compositor !== "hyprland") return false;
+        if (e.when === "layoutdwindle" && (WM.compositor !== "hyprland" || Config.options.hyprland.general.layout !== "dwindle")) return false;
+        if (e.when === "layoutmaster" && (WM.compositor !== "hyprland" || Config.options.hyprland.general.layout !== "master")) return false;
+        if (e.when === "hyprbordercolor" && (WM.compositor !== "hyprland" || !Config.options.hyprland.general.borderColor.enable)) return false;
         if (e.when === "dockhug" && Config.options.dock.style !== "hug") return false;
         if (e.when === "dockfloat" && Config.options.dock.style === "hug") return false;
         if (e.when === "clockdigital" && Config.options.background.widgets.clock.style !== "digital") return false;
@@ -176,20 +181,33 @@ Item {
         return scored.map(s => s.entry);
     }
 
-    function packRows(cards, capacity) {
+    function isEnableCard(card) {
+        return card.type === "toggle" && !card.keepOrder && card.title === Translation.tr("Enable");
+    }
+
+    function packRows(allCards, capacity) {
+        const enables = allCards.filter(c => isEnableCard(c));
+        const cards = allCards.filter(c => !isEnableCard(c));
         const fulls = cards.filter(c => spanOf(c)[0] === 4);
         const wides = cards.filter(c => spanOf(c)[0] === 2);
-        const smalls = cards.filter(c => spanOf(c)[0] === 1);
+        const allSmalls = cards.filter(c => spanOf(c)[0] === 1);
+        const tall = cards.filter(c => spanOf(c)[0] === 3);
+        const side = tall.length > 0 ? allSmalls.slice(0, 2) : [];
+        const smalls = allSmalls.slice(side.length);
         const placed = [];
+        enables.forEach(card => placed.push({ entry: card, w: 1, h: 1 }));
+        tall.forEach(card => placed.push({ entry: card, w: 3, h: spanOf(card)[1] }));
+        side.forEach(card => placed.push({ entry: card, w: 1, h: 1 }));
         let remaining = capacity;
-        let rowStart = 0;
-        fulls.concat(wides, smalls).forEach(card => {
-            const span = spanOf(card)[0];
+        let rowStart = placed.length;
+        const ghosts = wides.length === 0 ? enables.map(() => ({ ghost: true })) : [];
+        fulls.concat(ghosts, wides, smalls).forEach(card => {
+            const span = card.ghost ? 1 : spanOf(card)[0];
             if (span > remaining) {
                 remaining = capacity;
                 rowStart = placed.length;
             }
-            placed.push({ entry: card, w: span, h: spanOf(card)[1] });
+            if (!card.ghost) placed.push({ entry: card, w: span, h: spanOf(card)[1] });
             remaining -= span;
             if (remaining === 0) {
                 remaining = capacity;
@@ -585,6 +603,8 @@ Item {
                             : modelData.type === "palette" ? paletteComponent
                             : modelData.type === "duration" ? durationComponent
                             : modelData.type === "iconpicker" ? iconPickerComponent
+                            : modelData.type === "timepreview" ? timePreviewComponent
+                            : modelData.type === "collagelayouts" ? collageLayoutsComponent
                             : modelData.type === "weathermap" ? weatherMapComponent
                             : modelData.type === "widgets" ? widgetsComponent
                             : selectComponent
@@ -778,6 +798,36 @@ Item {
                         Component {
                             id: widgetsComponent
                             DashboardWidgetsCard {
+                                anchors.fill: parent
+                                title: slot.modelData.title
+                                icon: slot.modelData.icon
+                                tileShape: slot.modelData.shape
+                                pager: root.pager
+                                staggerMs: root.staggerMs
+                                animIndex: slot.index % 6
+                                travelX: slot.modelData.travelX
+                                travelY: slot.modelData.travelY
+                            }
+                        }
+
+                        Component {
+                            id: timePreviewComponent
+                            DashboardTimeCard {
+                                anchors.fill: parent
+                                title: slot.modelData.title
+                                icon: slot.modelData.icon
+                                tileShape: slot.modelData.shape
+                                pager: root.pager
+                                staggerMs: root.staggerMs
+                                animIndex: slot.index % 6
+                                travelX: slot.modelData.travelX
+                                travelY: slot.modelData.travelY
+                            }
+                        }
+
+                        Component {
+                            id: collageLayoutsComponent
+                            DashboardCollageLayoutsCard {
                                 anchors.fill: parent
                                 title: slot.modelData.title
                                 icon: slot.modelData.icon

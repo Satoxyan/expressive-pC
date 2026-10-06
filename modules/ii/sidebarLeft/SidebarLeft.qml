@@ -63,14 +63,56 @@ Scope { // Scope
         else root.pin = !root.pin;
     }
 
+    property bool loaded: false
+
+    function ensureContent() {
+        if (!root.sidebarContent) {
+            root.sidebarContent = contentComponent.createObject(null, {
+                "scopeRoot": root,
+            });
+        }
+        return root.sidebarContent;
+    }
+
+    function load() {
+        unloadTimer.stop();
+        root.loaded = true;
+        if (root.detach) detachedSidebarLoader.active = true;
+        else sidebarLoader.active = true;
+    }
+
+    function unload() {
+        root.loaded = false;
+        if (sidebarLoader.item) GlobalFocusGrab.removeDismissable(sidebarLoader.item);
+        if (root.sidebarContent) {
+            root.sidebarContent.parent = null;
+            root.sidebarContent.destroy();
+            root.sidebarContent = null;
+        }
+        sidebarLoader.active = false;
+        detachedSidebarLoader.active = false;
+    }
+
+    Timer {
+        id: unloadTimer
+        interval: 3000
+        onTriggered: root.unload()
+    }
+
+    Connections {
+        target: GlobalStates
+        function onSidebarLeftOpenChanged() {
+            if (GlobalStates.sidebarLeftOpen) root.load();
+            else unloadTimer.restart();
+        }
+    }
+
     Component.onCompleted: {
-        root.sidebarContent = contentComponent.createObject(null, {
-            "scopeRoot": root,
-        });
-        sidebarLoader.item.contentParent.children = [root.sidebarContent];
+        if (GlobalStates.sidebarLeftOpen) root.load();
     }
 
     onDetachChanged: {
+        if (!root.loaded) return;
         if (root.detach) {
             GlobalFocusGrab.removeDismissable(sidebarLoader.item) // Remove sidebar from the focus grab system
             sidebarContent.parent = null; // Detach content from sidebar
@@ -87,8 +129,8 @@ Scope { // Scope
 
     Loader {
         id: sidebarLoader
-        active: true
-        
+        active: false
+        onLoaded: item.contentParent.children = [root.ensureContent()]
         sourceComponent: PanelWindow { // Window
             id: panelWindow
 
@@ -267,6 +309,7 @@ Scope { // Scope
     Loader {
         id: detachedSidebarLoader
         active: false
+        onLoaded: item.contentParent.children = [root.ensureContent()]
 
         sourceComponent: FloatingWindow {
             id: detachedSidebarRoot

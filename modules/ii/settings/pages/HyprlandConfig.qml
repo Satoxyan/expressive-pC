@@ -79,6 +79,7 @@ ContentPage {
 
             ContentSubsection {
                 Layout.topMargin: 10
+                visible: Config.options.hyprland.general.layout === "dwindle"
                 title: Translation.tr("Dwindle")
 
                 GroupedList {
@@ -115,6 +116,7 @@ ContentPage {
 
             ContentSubsection {
                 Layout.topMargin: 10
+                visible: Config.options.hyprland.general.layout === "master"
                 title: Translation.tr("Master")
 
                 GroupedList {

@@ -392,6 +392,16 @@ ContentPage {
                         Config.options.background.collage.enable = checked
                     }
                 }
+                ConfigComboBox {
+                    Layout.fillWidth: true
+                    buttonIcon: "dashboard_customize"
+                    text: Translation.tr("Layout")
+                    fieldWidth: 220
+                    fixedWidth: true
+                    model: Collage.presetOptions
+                    currentValue: Collage.currentPreset
+                    onSelected: newValue => Collage.applyPresetByName(newValue)
+                }
                 ConfigSpinBox {
                     icon: "space_bar"
                     text: Translation.tr("Spacing")
