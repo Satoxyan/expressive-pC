@@ -11,6 +11,7 @@ Menu {
 
     readonly property bool hasSelection: root.editor.selectedText.length > 0
     readonly property bool editable: !root.editor.readOnly
+    readonly property bool copyable: root.hasSelection && (root.editor.echoMode ?? TextInput.Normal) === TextInput.Normal
 
     padding: 6
     topPadding: 6
@@ -84,13 +85,13 @@ Menu {
     Entry {
         text: Translation.tr("Cut")
         iconName: "content_cut"
-        enabled: root.editable && root.hasSelection
+        enabled: root.editable && root.copyable
         onTriggered: root.editor.cut()
     }
     Entry {
         text: Translation.tr("Copy")
         iconName: "content_copy"
-        enabled: root.hasSelection
+        enabled: root.copyable
         onTriggered: root.editor.copy()
     }
     Entry {
