@@ -130,10 +130,10 @@ QtObject {
         "desktop:Minute hand": { type: "select", get: () => Config.options.background.widgets.clock.cookie.minuteHandStyle, set: v => { Config.options.background.widgets.clock.cookie.minuteHandStyle = v; }, options: [{ displayName: "", icon: "block", value: "hide" }, { displayName: Translation.tr("Classic"), icon: "show_chart", value: "classic" }, { displayName: Translation.tr("Thin"), icon: "horizontal_rule", value: "thin" }, { displayName: Translation.tr("Medium"), icon: "remove", value: "medium" }, { displayName: Translation.tr("Bold"), icon: "format_bold", value: "bold" }] },
         "desktop:Quote text": { type: "text", get: () => Config.options.background.widgets.clock.quote.text, set: v => { Config.options.background.widgets.clock.quote.text = v; } },
         "desktop:Visualizer enable": { type: "switch", get: () => Config.options.background.widgets.visualizer.enable, set: v => { Config.options.background.widgets.visualizer.enable = v; } },
-        "desktop:Visualizer style": { type: "select", get: () => Config.options.background.widgets.visualizer.style, set: v => { Config.options.background.widgets.visualizer.style = v; }, options: [{ displayName: Translation.tr("Classic"), icon: "equalizer", value: "bars" }, { displayName: Translation.tr("Mirror"), icon: "flip", value: "mirror" }, { displayName: Translation.tr("Aurora"), icon: "auto_awesome", value: "aurora" }, { displayName: Translation.tr("Ring"), icon: "radio_button_unchecked", value: "ring" }, { displayName: Translation.tr("Dots"), icon: "more_horiz", value: "dots" }] },
+        "desktop:Visualizer style": { type: "select", get: () => Config.options.background.widgets.visualizer.style, set: v => { Config.options.background.widgets.visualizer.style = v; }, options: [{ displayName: Translation.tr("Default"), icon: "equalizer", value: "default" }, { displayName: Translation.tr("Bars"), icon: "equalizer", value: "bars" }, { displayName: Translation.tr("Wave"), icon: "airwave", value: "wave" }, { displayName: Translation.tr("Aurora"), icon: "auto_awesome", value: "aurora" }, { displayName: Translation.tr("Ring"), icon: "radio_button_checked", value: "ring" }, { displayName: Translation.tr("Dots"), icon: "grain", value: "dots" }, { displayName: Translation.tr("Mirror"), icon: "filter_drama", value: "mirror" }] },
         "desktop:Visualizer colors": { type: "select", get: () => Config.options.background.widgets.visualizer.colorSource, set: v => { Config.options.background.widgets.visualizer.colorSource = v; }, options: [{ displayName: Translation.tr("Theme"), icon: "palette", value: "theme" }, { displayName: Translation.tr("Album cover"), icon: "album", value: "cover" }] },
         "desktop:Visualizer sensitivity": { type: "slider", get: () => Config.options.background.widgets.visualizer.sensitivity * 100, set: v => { Config.options.background.widgets.visualizer.sensitivity = Math.round(v) / 100; }, from: 50, to: 300, stopIndicatorValues: [], usePercentTooltip: false },
-        "desktop:Visualizer height": { type: "slider", get: () => Config.options.background.widgets.visualizer.height, set: v => { Config.options.background.widgets.visualizer.height = Math.round(v); }, from: 120, to: 600, stopIndicatorValues: [], usePercentTooltip: false },
+        "desktop:Visualizer height": { type: "slider", get: () => Config.options.background.widgets.visualizer.height, set: v => { Config.options.background.widgets.visualizer.height = Math.round(v); }, from: 60, to: 1080, stopIndicatorValues: [], usePercentTooltip: false },
         "desktop:Visualizer size": { type: "slider", get: () => Config.options.background.widgets.visualizer.ringSize, set: v => { Config.options.background.widgets.visualizer.ringSize = Math.round(v); }, from: 200, to: 900, stopIndicatorValues: [], usePercentTooltip: false },
         "desktop:Text enable": { type: "switch", get: () => Config.options.background.widgets.customText.enable, set: v => { Config.options.background.widgets.customText.enable = v; } },
         "desktop:Text shadow": { type: "switch", get: () => Config.options.background.widgets.customText.shadow, set: v => { Config.options.background.widgets.customText.shadow = v; } },
@@ -192,7 +192,48 @@ QtObject {
         "hyprland:Active border": { type: "select", get: () => Config.options.hyprland.general.borderColor.activeRole, set: v => { Config.options.hyprland.general.borderColor.activeRole = v; HyprlandConfig.applyBorderColors(); }, get options() { return ["primary", "secondary", "tertiary", "primaryContainer", "secondaryContainer", "tertiaryContainer", "layer0Border"].map(name => ({ value: name, color: roleColor(name) })); } },
         "hyprland:Active border opacity": { type: "spin", get: () => Math.round(Config.options.hyprland.general.borderColor.activeOpacity * 100), set: v => { Config.options.hyprland.general.borderColor.activeOpacity = v / 100; HyprlandConfig.applyBorderColors(); }, from: 0, to: 100, stepSize: 5 },
         "hyprland:Inactive border": { type: "select", get: () => Config.options.hyprland.general.borderColor.inactiveRole, set: v => { Config.options.hyprland.general.borderColor.inactiveRole = v; HyprlandConfig.applyBorderColors(); }, get options() { return ["primary", "secondary", "tertiary", "primaryContainer", "secondaryContainer", "tertiaryContainer", "layer0Border"].map(name => ({ value: name, color: roleColor(name) })); } },
-        "hyprland:Inactive border opacity": { type: "spin", get: () => Math.round(Config.options.hyprland.general.borderColor.inactiveOpacity * 100), set: v => { Config.options.hyprland.general.borderColor.inactiveOpacity = v / 100; HyprlandConfig.applyBorderColors(); }, from: 0, to: 100, stepSize: 5 }
+        "hyprland:Inactive border opacity": { type: "spin", get: () => Math.round(Config.options.hyprland.general.borderColor.inactiveOpacity * 100), set: v => { Config.options.hyprland.general.borderColor.inactiveOpacity = v / 100; HyprlandConfig.applyBorderColors(); }, from: 0, to: 100, stepSize: 5 },
+        // Ported from default pages (missing in dashboard)
+        "desktop:Scroll to cycle shape": { type: "switch", get: () => Config.options.background.centeredWallpaperShapeCycle, set: v => { Config.options.background.centeredWallpaperShapeCycle = v; } },
+        "desktop:Visualizer performance": { type: "select", get: () => Config.options.background.widgets.visualizer.renderEveryXFrames, set: v => { Config.options.background.widgets.visualizer.renderEveryXFrames = v; }, options: [{ displayName: Translation.tr("Auto"), icon: "auto_fix_high", value: -1 }, { displayName: Translation.tr("Smooth mode"), icon: "speed", value: 1 }, { displayName: Translation.tr("Balanced mode"), icon: "balance", value: 2 }, { displayName: Translation.tr("Efficiency mode"), icon: "energy_savings_leaf", value: 4 }] },
+        "desktop:Visualizer bar width": { type: "spin", get: () => Config.options.background.widgets.visualizer.targetBarWidth, set: v => { Config.options.background.widgets.visualizer.targetBarWidth = v; }, from: 1, to: 200, stepSize: 1 },
+        "desktop:Visualizer bar gap": { type: "spin", get: () => Config.options.background.widgets.visualizer.barSpacing, set: v => { Config.options.background.widgets.visualizer.barSpacing = v; }, from: 0, to: 100, stepSize: 1 },
+        "desktop:Visualizer line thickness": { type: "spin", get: () => Config.options.background.widgets.visualizer.waveBorderWidth, set: v => { Config.options.background.widgets.visualizer.waveBorderWidth = v; }, from: 0, to: 20, stepSize: 1 },
+        "general:Suspend at": { type: "spin", get: () => Config.options.battery.suspend, set: v => { Config.options.battery.suspend = v; }, from: 0, to: 100, stepSize: 5 },
+        // Niri — bound to services/NiriConfig adapter (auto-applies to qssettings + shell.kdl)
+        "niri:Gaps": { type: "spin", get: () => NiriConfig.options.layout.gaps, set: v => { NiriConfig.options.layout.gaps = v; }, from: 0, to: 60, stepSize: 1 },
+        "niri:Center focused column": { type: "select", get: () => NiriConfig.options.layout.centerFocusedColumn, set: v => { NiriConfig.options.layout.centerFocusedColumn = v; }, options: [{ displayName: Translation.tr("Never"), icon: "close", value: "never" }, { displayName: Translation.tr("On overflow"), icon: "keyboard_double_arrow_right", value: "on-overflow" }, { displayName: Translation.tr("Always"), icon: "align_horizontal_center", value: "always" }] },
+        "niri:Default column width": { type: "select", get: () => NiriConfig.options.layout.defaultColumnWidth, set: v => { NiriConfig.options.layout.defaultColumnWidth = v; }, options: [{ displayName: "⅓", icon: "crop_portrait", value: 0.33333 }, { displayName: "½", icon: "crop_square", value: 0.5 }, { displayName: "⅔", icon: "crop_landscape", value: 0.66667 }] },
+        "niri:Keyboard layout": { type: "text", get: () => String(NiriConfig.options.input.kbLayout ?? ""), set: v => { NiriConfig.options.input.kbLayout = v; } },
+        "niri:Numlock by default": { type: "switch", get: () => NiriConfig.options.input.numlock, set: v => { NiriConfig.options.input.numlock = v; } },
+        "niri:Repeat delay (ms)": { type: "spin", get: () => NiriConfig.options.input.repeatDelay, set: v => { NiriConfig.options.input.repeatDelay = v; }, from: 100, to: 1000, stepSize: 10 },
+        "niri:Repeat rate": { type: "spin", get: () => NiriConfig.options.input.repeatRate, set: v => { NiriConfig.options.input.repeatRate = v; }, from: 10, to: 100, stepSize: 1 },
+        "niri:Focus follows mouse": { type: "switch", get: () => NiriConfig.options.input.focusFollowsMouse, set: v => { NiriConfig.options.input.focusFollowsMouse = v; } },
+        "niri:Tap to click": { type: "switch", get: () => NiriConfig.options.input.touchpad.tap, set: v => { NiriConfig.options.input.touchpad.tap = v; } },
+        "niri:Touchpad natural scroll": { type: "switch", get: () => NiriConfig.options.input.touchpad.naturalScroll, set: v => { NiriConfig.options.input.touchpad.naturalScroll = v; } },
+        "niri:Disable while typing": { type: "switch", get: () => NiriConfig.options.input.touchpad.disableWhileTyping, set: v => { NiriConfig.options.input.touchpad.disableWhileTyping = v; } },
+        "niri:Scroll factor": { type: "spin", get: () => Math.round(NiriConfig.options.input.touchpad.scrollFactor * 10), set: v => { NiriConfig.options.input.touchpad.scrollFactor = v / 10; }, from: 1, to: 30, stepSize: 1 },
+        "niri:Touchpad acceleration speed": { type: "spin", get: () => Math.round(NiriConfig.options.input.touchpad.accelSpeed * 10), set: v => { NiriConfig.options.input.touchpad.accelSpeed = v / 10; }, from: -10, to: 10, stepSize: 1 },
+        "niri:Mouse natural scroll": { type: "switch", get: () => NiriConfig.options.input.mouse.naturalScroll, set: v => { NiriConfig.options.input.mouse.naturalScroll = v; } },
+        "niri:Mouse acceleration speed": { type: "spin", get: () => Math.round(NiriConfig.options.input.mouse.accelSpeed * 10), set: v => { NiriConfig.options.input.mouse.accelSpeed = v / 10; }, from: -10, to: 10, stepSize: 1 },
+        "niri:Window Rounding": { type: "spin", get: () => NiriConfig.options.decoration.rounding, set: v => { NiriConfig.options.decoration.rounding = v; }, from: 0, to: 30, stepSize: 1 },
+        "niri:Border": { type: "switch", get: () => NiriConfig.options.decoration.border.enable, set: v => { NiriConfig.options.decoration.border.enable = v; } },
+        "niri:Border Size": { type: "spin", get: () => NiriConfig.options.decoration.border.width, set: v => { NiriConfig.options.decoration.border.width = v; }, from: 0, to: 10, stepSize: 1 },
+        "niri:Focus ring": { type: "switch", get: () => NiriConfig.options.decoration.focusRing.enable, set: v => { NiriConfig.options.decoration.focusRing.enable = v; } },
+        "niri:Focus ring width": { type: "spin", get: () => NiriConfig.options.decoration.focusRing.width, set: v => { NiriConfig.options.decoration.focusRing.width = v; }, from: 0, to: 10, stepSize: 1 },
+        "niri:Shadows": { type: "switch", get: () => NiriConfig.options.decoration.shadow.enable, set: v => { NiriConfig.options.decoration.shadow.enable = v; } },
+        "niri:Shadow softness": { type: "spin", get: () => NiriConfig.options.decoration.shadow.softness, set: v => { NiriConfig.options.decoration.shadow.softness = v; }, from: 0, to: 100, stepSize: 5 },
+        "niri:Shadow spread": { type: "spin", get: () => NiriConfig.options.decoration.shadow.spread, set: v => { NiriConfig.options.decoration.shadow.spread = v; }, from: 0, to: 50, stepSize: 1 },
+        "niri:Blur": { type: "switch", get: () => NiriConfig.options.decoration.blur.enable, set: v => { NiriConfig.options.decoration.blur.enable = v; } },
+        "niri:Blur Passes": { type: "spin", get: () => NiriConfig.options.decoration.blur.passes, set: v => { NiriConfig.options.decoration.blur.passes = v; }, from: 1, to: 6, stepSize: 1 },
+        "niri:Blur Offset": { type: "spin", get: () => Math.round(NiriConfig.options.decoration.blur.offset * 10), set: v => { NiriConfig.options.decoration.blur.offset = v / 10; }, from: 0, to: 100, stepSize: 5 },
+        "niri:Blur Noise (%)": { type: "spin", get: () => Math.round(NiriConfig.options.decoration.blur.noise * 100), set: v => { NiriConfig.options.decoration.blur.noise = v / 100; }, from: 0, to: 20, stepSize: 1 },
+        "niri:Blur Saturation (%)": { type: "spin", get: () => Math.round(NiriConfig.options.decoration.blur.saturation * 100), set: v => { NiriConfig.options.decoration.blur.saturation = v / 100; }, from: 0, to: 300, stepSize: 10 },
+        "niri:Cursor theme": { type: "select", get: () => NiriConfig.options.cursor.theme, set: v => { SystemTheming.applyCursorTheme(v, NiriConfig.options.cursor.size); }, get options() { return [{ displayName: Translation.tr("Default"), value: "" }].concat(SystemTheming.cursorThemes.map(t => ({ displayName: t, value: t }))); } },
+        "niri:Cursor size": { type: "spin", get: () => NiriConfig.options.cursor.size, set: v => { NiriConfig.options.cursor.size = v; SystemTheming.applyCursorTheme(NiriConfig.options.cursor.theme, v); }, from: 16, to: 64, stepSize: 2 },
+        "niri:Hide while typing": { type: "switch", get: () => NiriConfig.options.cursor.hideWhenTyping, set: v => { NiriConfig.options.cursor.hideWhenTyping = v; } },
+        "niri:Animations enable": { type: "switch", get: () => NiriConfig.options.animations.enable, set: v => { NiriConfig.options.animations.enable = v; } },
+        "niri:Slowdown (×10)": { type: "spin", get: () => Math.round(NiriConfig.options.animations.slowdown * 10), set: v => { NiriConfig.options.animations.slowdown = v / 10; }, from: 1, to: 50, stepSize: 1 }
     })
 
     readonly property var sections: [
@@ -400,6 +441,7 @@ QtObject {
                 { type: "toggle", key: "interface:Require password to power off/restart", title: Translation.tr("Password to power off"), icon: "password" },
                 { type: "toggle", key: "interface:Also unlock keyring", title: Translation.tr("Unlock keyring"), icon: "key" },
                 { type: "toggle", key: "interface:Center clock", title: Translation.tr("Center clock"), icon: "center_focus_strong" },
+                { type: "toggle", key: "interface:Show \"Locked\" text", title: Translation.tr("Show \"Locked\" text"), icon: "info" },
                 { type: "toggle", key: "interface:Use varying shapes for password characters", title: Translation.tr("Password shapes"), icon: "shapes" },
                 { type: "toggle", key: "interface:Enable blur", title: Translation.tr("Blur"), icon: "blur_on" },
                 { type: "spin", key: "interface:Samples", title: Translation.tr("Blur samples"), icon: "grain" },
@@ -480,6 +522,7 @@ QtObject {
             page: Translation.tr("Desktop"), title: Translation.tr("Centered wallpaper"), icon: "filter_center_focus", cards: [
                 { type: "toggle", key: "desktop:Wallpaper/Centered wallpaper/Enable", title: Translation.tr("Enable"), icon: "wallpaper" },
                 { type: "toggle", key: "desktop:Wallpaper/Centered wallpaper/Show only when locked", title: Translation.tr("Only when locked"), icon: "lock" },
+                { type: "toggle", key: "desktop:Scroll to cycle shape", title: Translation.tr("Scroll to cycle shape"), icon: "swipe_vertical" },
                 { type: "slider", key: "desktop:Wallpaper/Centered wallpaper/Size", title: Translation.tr("Size"), icon: "aspect_ratio", percent: false },
                 { type: "swatch", key: "desktop:Centered color", title: Translation.tr("Background color"), icon: "palette", w: 2 },
                 { type: "shape", key: "desktop:Centered shape", title: Translation.tr("Shape"), icon: "shapes" }
@@ -571,11 +614,15 @@ QtObject {
         {
             page: Translation.tr("Desktop"), title: Translation.tr("Visualizer"), icon: "graphic_eq", cards: [
                 { type: "toggle", key: "desktop:Visualizer enable", title: Translation.tr("Enable"), icon: "graphic_eq" },
-                { type: "select", key: "desktop:Visualizer style", title: Translation.tr("Style"), icon: "equalizer" },
+                { type: "select", key: "desktop:Visualizer style", title: Translation.tr("Style"), icon: "equalizer", splitAfter: 3 },
                 { type: "select", key: "desktop:Visualizer colors", title: Translation.tr("Colors"), icon: "palette" },
                 { type: "slider", key: "desktop:Visualizer sensitivity", title: Translation.tr("Sensitivity (%)"), icon: "speed", percent: false },
                 { type: "slider", key: "desktop:Visualizer height", title: Translation.tr("Height"), icon: "height", percent: false },
                 { type: "slider", key: "desktop:Visualizer size", title: Translation.tr("Ring size"), icon: "radio_button_unchecked", percent: false },
+                { type: "select", key: "desktop:Visualizer performance", title: Translation.tr("Performance mode"), icon: "auto_fix_high", w: 4, when: "vizcanvas" },
+                { type: "spin", key: "desktop:Visualizer bar width", title: Translation.tr("Bar / point width"), icon: "view_column", when: "vizcanvas" },
+                { type: "spin", key: "desktop:Visualizer bar gap", title: Translation.tr("Bar / point gap"), icon: "space_bar", when: "vizcanvas" },
+                { type: "spin", key: "desktop:Visualizer line thickness", title: Translation.tr("Line / border thickness"), icon: "line_weight", when: "vizcanvas" },
                 { type: "toggle", key: "desktop:Hide when fullscreen", title: Translation.tr("Hide when fullscreen/maximized"), icon: "fullscreen_exit" },
                 { type: "toggle", key: "desktop:Hide when covered", title: Translation.tr("Also hide when covered"), icon: "layers" },
                 { type: "toggle", key: "desktop:Show when locked", title: Translation.tr("Show when locked"), icon: "lock" },
@@ -642,7 +689,8 @@ QtObject {
                 { type: "spin", key: "general:Low warning", title: Translation.tr("Low warning"), icon: "warning" },
                 { type: "spin", key: "general:Critical warning", title: Translation.tr("Critical warning"), icon: "dangerous" },
                 { type: "spin", key: "general:Full warning", title: Translation.tr("Full warning"), icon: "charger" },
-                { type: "toggle", key: "general:Automatic suspend", title: Translation.tr("Automatic suspend"), icon: "pause" }
+                { type: "toggle", key: "general:Automatic suspend", title: Translation.tr("Automatic suspend"), icon: "pause" },
+                { type: "spin", key: "general:Suspend at", title: Translation.tr("Suspend at (%)"), icon: "pause" }
             ]
         },
         {
@@ -888,6 +936,67 @@ QtObject {
                 { type: "text", w: 2, key: "services:Danbooru login", title: Translation.tr("Danbooru login"), icon: "person" },
                 { type: "text", w: 2, key: "services:Danbooru API key", title: Translation.tr("Danbooru API key"), icon: "key" },
                 { type: "text", w: 2, key: "services:Zerochan username", title: Translation.tr("Zerochan username"), icon: "person" }
+            ]
+        },
+        {
+            page: Translation.tr("Niri"), title: Translation.tr("Layout"), icon: "auto_awesome_mosaic", when: "niri", cards: [
+                { type: "spin", key: "niri:Gaps", title: Translation.tr("Gaps"), icon: "margin" },
+                { type: "select", key: "niri:Center focused column", title: Translation.tr("Center focused column"), icon: "align_horizontal_center" },
+                { type: "select", key: "niri:Default column width", title: Translation.tr("Default column width"), icon: "width" }
+            ]
+        },
+        {
+            page: Translation.tr("Niri"), title: Translation.tr("Keyboard"), icon: "keyboard", when: "niri", cards: [
+                { type: "text", w: 2, key: "niri:Keyboard layout", title: Translation.tr("Keyboard layout"), icon: "keyboard", placeholder: "e.g., us, es, latam" },
+                { type: "toggle", key: "niri:Numlock by default", title: Translation.tr("Numlock by default"), icon: "numbers" },
+                { type: "spin", key: "niri:Repeat delay (ms)", title: Translation.tr("Repeat delay (ms)"), icon: "keyboard_return" },
+                { type: "spin", key: "niri:Repeat rate", title: Translation.tr("Repeat rate"), icon: "speed" },
+                { type: "toggle", key: "niri:Focus follows mouse", title: Translation.tr("Focus follows mouse"), icon: "mouse" }
+            ]
+        },
+        {
+            page: Translation.tr("Niri"), title: Translation.tr("Touchpad"), icon: "touchpad_mouse", when: "niri", cards: [
+                { type: "toggle", key: "niri:Tap to click", title: Translation.tr("Tap to click"), icon: "touch_app" },
+                { type: "toggle", key: "niri:Touchpad natural scroll", title: Translation.tr("Natural scroll"), icon: "swap_vert" },
+                { type: "toggle", key: "niri:Disable while typing", title: Translation.tr("Disable while typing"), icon: "keyboard_hide" },
+                { type: "spin", key: "niri:Scroll factor", title: Translation.tr("Scroll factor"), icon: "swipe" },
+                { type: "spin", key: "niri:Touchpad acceleration speed", title: Translation.tr("Acceleration speed"), icon: "speed" }
+            ]
+        },
+        {
+            page: Translation.tr("Niri"), title: Translation.tr("Mouse"), icon: "mouse", when: "niri", cards: [
+                { type: "toggle", key: "niri:Mouse natural scroll", title: Translation.tr("Natural scroll"), icon: "swap_vert" },
+                { type: "spin", key: "niri:Mouse acceleration speed", title: Translation.tr("Acceleration speed"), icon: "speed" }
+            ]
+        },
+        {
+            page: Translation.tr("Niri"), title: Translation.tr("Visual & Aesthetics"), icon: "deblur", when: "niri", cards: [
+                { type: "spin", key: "niri:Window Rounding", title: Translation.tr("Window Rounding"), icon: "rounded_corner" },
+                { type: "toggle", key: "niri:Border", title: Translation.tr("Border"), icon: "border_outer" },
+                { type: "spin", key: "niri:Border Size", title: Translation.tr("Border Size"), icon: "border_outer" },
+                { type: "toggle", key: "niri:Focus ring", title: Translation.tr("Focus ring"), icon: "center_focus_strong" },
+                { type: "spin", key: "niri:Focus ring width", title: Translation.tr("Focus ring width"), icon: "center_focus_weak" },
+                { type: "toggle", key: "niri:Shadows", title: Translation.tr("Shadows"), icon: "ev_shadow" },
+                { type: "spin", key: "niri:Shadow softness", title: Translation.tr("Shadow softness"), icon: "blur_linear" },
+                { type: "spin", key: "niri:Shadow spread", title: Translation.tr("Shadow spread"), icon: "expand_all" },
+                { type: "toggle", key: "niri:Blur", title: Translation.tr("Blur"), icon: "blur_on" },
+                { type: "spin", key: "niri:Blur Passes", title: Translation.tr("Blur Passes"), icon: "layers" },
+                { type: "spin", key: "niri:Blur Offset", title: Translation.tr("Blur Offset"), icon: "blur_circular" },
+                { type: "spin", key: "niri:Blur Noise (%)", title: Translation.tr("Blur Noise (%)"), icon: "grain" },
+                { type: "spin", key: "niri:Blur Saturation (%)", title: Translation.tr("Blur Saturation (%)"), icon: "palette" }
+            ]
+        },
+        {
+            page: Translation.tr("Niri"), title: Translation.tr("Cursor"), icon: "mouse", when: "niri", cards: [
+                { type: "select", key: "niri:Cursor theme", title: Translation.tr("Cursor theme"), icon: "mouse" },
+                { type: "spin", key: "niri:Cursor size", title: Translation.tr("Cursor size"), icon: "zoom_in" },
+                { type: "toggle", key: "niri:Hide while typing", title: Translation.tr("Hide while typing"), icon: "keyboard_hide" }
+            ]
+        },
+        {
+            page: Translation.tr("Niri"), title: Translation.tr("Animations"), icon: "animation", when: "niri", cards: [
+                { type: "toggle", key: "niri:Animations enable", title: Translation.tr("Enable"), icon: "check" },
+                { type: "spin", key: "niri:Slowdown (×10)", title: Translation.tr("Slowdown (×10)"), icon: "speed" }
             ]
         }
     ]

@@ -48,7 +48,8 @@ Item {
             { name: Translation.tr("Bar"), icon: "toast", rotation: 180, container: c.colSecondaryContainer, onContainer: c.colOnSecondaryContainer, accent: c.colSecondary, onAccent: c.colOnSecondary },
             { name: Translation.tr("Desktop"), icon: "texture", container: c.colTertiaryContainer, onContainer: c.colOnTertiaryContainer, accent: c.colTertiary, onAccent: c.colOnTertiary },
             { name: Translation.tr("Hyprland"), icon: "select_window_2", container: mix(c.colPrimaryContainer, c.colSecondaryContainer), onContainer: mix(c.colOnPrimaryContainer, c.colOnSecondaryContainer), accent: mix(c.colPrimary, c.colSecondary), onAccent: mix(c.colOnPrimary, c.colOnSecondary) },
-            { name: Translation.tr("Services"), icon: "settings", container: mix(c.colSecondaryContainer, c.colTertiaryContainer), onContainer: mix(c.colOnSecondaryContainer, c.colOnTertiaryContainer), accent: mix(c.colSecondary, c.colTertiary), onAccent: mix(c.colOnSecondary, c.colOnTertiary) }
+            { name: Translation.tr("Services"), icon: "settings", container: mix(c.colSecondaryContainer, c.colTertiaryContainer), onContainer: mix(c.colOnSecondaryContainer, c.colOnTertiaryContainer), accent: mix(c.colSecondary, c.colTertiary), onAccent: mix(c.colOnSecondary, c.colOnTertiary) },
+            { name: Translation.tr("Niri"), icon: "select_window_2", container: mix(c.colTertiaryContainer, c.colPrimaryContainer), onContainer: mix(c.colOnTertiaryContainer, c.colOnPrimaryContainer), accent: mix(c.colTertiary, c.colPrimary), onAccent: mix(c.colOnTertiary, c.colOnPrimary) }
         ];
     }
 
@@ -67,7 +68,7 @@ Item {
         name: Translation.tr("All"), icon: "apps",
         container: Appearance.m3colors.m3surfaceContainerHighest, onContainer: Appearance.m3colors.m3onSurface,
         accent: Appearance.m3colors.m3onSurface, onAccent: Appearance.m3colors.m3surface
-    })].concat(groupDefs.map(g => Object.assign({ id: g.name, count: allEntries.filter(e => e.kind === "card" && e.group === g.name && isVisibleEntry(e)).length }, g)))
+    })].concat(groupDefs.map(g => Object.assign({ id: g.name, count: allEntries.filter(e => e.kind === "card" && e.group === g.name && isVisibleEntry(e)).length }, g)).filter(g => g.count > 0))
 
     readonly property var railDimmed: {
         const dim = {};
@@ -151,6 +152,15 @@ Item {
         return Array.from(layouts.leftLayout).concat(Array.from(layouts.middleLayout), Array.from(layouts.rightLayout));
     }
 
+    // Mirrors BackgroundConfig's settingsClock.stylePresent(): a style is "present"
+    // if it's the desktop clock or the locked-screen clock (default mode shows its
+    // settings subsection for either).
+    function clockPresent(styleName) {
+        const clock = Config.options.background.widgets.clock;
+        if (!clock.showOnlyWhenLocked && clock.style === styleName) return true;
+        return clock.styleLocked === styleName;
+    }
+
     function isVisibleEntry(e) {
         if (e.when === "material" && ColorSchemes.current !== "") return false;
         if (e.when === "hyprland" && WM.compositor !== "hyprland") return false;
@@ -159,9 +169,11 @@ Item {
         if (e.when === "hyprbordercolor" && (WM.compositor !== "hyprland" || !Config.options.hyprland.general.borderColor.enable)) return false;
         if (e.when === "dockhug" && Config.options.dock.style !== "hug") return false;
         if (e.when === "dockfloat" && Config.options.dock.style === "hug") return false;
-        if (e.when === "clockdigital" && Config.options.background.widgets.clock.style !== "digital") return false;
-        if (e.when === "clockcookie" && Config.options.background.widgets.clock.style !== "cookie") return false;
-        if (e.when === "clockpixel" && Config.options.background.widgets.clock.style !== "pixel") return false;
+        if (e.when === "clockdigital" && !clockPresent("digital")) return false;
+        if (e.when === "clockcookie" && !clockPresent("cookie")) return false;
+        if (e.when === "clockpixel" && !clockPresent("pixel")) return false;
+        if (e.when === "niri" && WM.compositor !== "niri") return false;
+        if (e.when === "vizcanvas" && !["bars", "wave"].includes(Config.options.background.widgets.visualizer.style)) return false;
         return !e.requires || usedWidgets.includes(e.requires);
     }
 
@@ -350,15 +362,21 @@ Item {
             }
         });
 
-        // Content-driven sizing: a full-width card owns its rows exclusively,
-        // so fit those rows to its reported natural height (px).
         Object.keys(map).forEach(id => {
             const p = map[id];
-            if (p.header || p.w < 4) return;
+            if (p.header) return;
             const m = mh[id];
             if (!(m > 1)) return;
             const perRow = Math.max(0.01, (m - (p.h - 1) * gap) / p.h);
-            for (let dr = 0; dr < p.h; dr++) rowH[p.row + dr] = perRow;
+            if (p.w >= 4) {
+                // Content-driven sizing: a full-width card owns its rows exclusively,
+                // so fit those rows to its reported natural height (px).
+                for (let dr = 0; dr < p.h; dr++) rowH[p.row + dr] = perRow;
+            } else if (p.h === 1) {
+                // Shared row: grow to fit taller content (e.g. select card with split
+                // option rows), but never shrink below the default row height.
+                rowH[p.row] = Math.max(rowH[p.row], perRow);
+            }
         });
 
         const rowY = [];
@@ -1091,6 +1109,7 @@ Item {
                                 title: slot.modelData.title
                                 icon: slot.modelData.icon
                                 tileShape: slot.modelData.shape
+                                splitAfter: slot.modelData.splitAfter ?? 0
                                 pager: root.pager
                                 staggerMs: root.staggerMs
                                 animIndex: slot.index % 6

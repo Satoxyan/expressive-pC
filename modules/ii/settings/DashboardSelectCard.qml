@@ -13,12 +13,23 @@ DashboardCard {
     property var tileShape: MaterialShape.Shape.Pentagon
 
     property var override: null
+    // >0: split option chips into two rows after this index (e.g. visualizer style: 3 + rest)
+    property int splitAfter: 0
     readonly property var control: override ?? SettingsQuickControls.controls[controlKey] ?? null
     readonly property var currentValue: control ? control.get() : null
+
+    readonly property var optionRows: {
+        const opts = control?.options ?? [];
+        if (splitAfter <= 0 || opts.length <= splitAfter) return [opts];
+        return [opts.slice(0, splitAfter), opts.slice(splitAfter)];
+    }
+    // natural height for grid row fitting (e.g. split option rows exceed default row height)
+    readonly property real measuredHeight: col.implicitHeight + 28
 
     tint: Appearance.colors.colTertiaryContainer
 
     ColumnLayout {
+        id: col
         anchors.fill: parent
         anchors.margins: 14
         spacing: 10
@@ -49,52 +60,62 @@ DashboardCard {
 
         Item { Layout.fillHeight: true }
 
-        RowLayout {
+        ColumnLayout {
             Layout.fillWidth: true
             spacing: 8
 
             Repeater {
-                model: root.control?.options ?? []
+                model: root.optionRows
 
-                delegate: RippleButton {
-                    id: option
+                delegate: RowLayout {
                     required property var modelData
-
-                    readonly property bool selected: root.currentValue === modelData.value
-
                     Layout.fillWidth: true
-                    Layout.preferredWidth: implicitWidth
-                    implicitHeight: 44
-                    horizontalPadding: 20
-                    buttonRadius: 22
-                    colBackground: selected ? Appearance.colors.colTertiary : Qt.rgba(1, 1, 1, 0.12)
-                    colBackgroundHover: selected ? Appearance.colors.colTertiary : Qt.rgba(1, 1, 1, 0.22)
-                    colRipple: Qt.rgba(1, 1, 1, 0.3)
-                    downAction: () => {
-                        const value = modelData.value;
-                        Qt.callLater(() => root.control.set(value));
-                    }
+                    spacing: 8
 
-                    contentItem: Item {
-                        implicitWidth: optionRow.implicitWidth
-                        implicitHeight: optionRow.implicitHeight
+                    Repeater {
+                        model: modelData
 
-                        RowLayout {
-                            id: optionRow
-                            anchors.centerIn: parent
-                            spacing: 6
+                        delegate: RippleButton {
+                            id: option
+                            required property var modelData
 
-                            MaterialSymbol {
-                                text: option.modelData.icon ?? ""
-                                iconSize: 18
-                                fill: option.selected ? 1 : 0
-                                color: option.selected ? Appearance.colors.colOnTertiary : Appearance.colors.colOnTertiaryContainer
+                            readonly property bool selected: root.currentValue === modelData.value
+
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: implicitWidth
+                            implicitHeight: 44
+                            horizontalPadding: 20
+                            buttonRadius: 22
+                            colBackground: selected ? Appearance.colors.colTertiary : Qt.rgba(1, 1, 1, 0.12)
+                            colBackgroundHover: selected ? Appearance.colors.colTertiary : Qt.rgba(1, 1, 1, 0.22)
+                            colRipple: Qt.rgba(1, 1, 1, 0.3)
+                            downAction: () => {
+                                const value = modelData.value;
+                                Qt.callLater(() => root.control.set(value));
                             }
-                            StyledText {
-                                text: option.modelData.displayName
-                                font.pixelSize: Appearance.font.pixelSize.small
-                                font.weight: Font.Medium
-                                color: option.selected ? Appearance.colors.colOnTertiary : Appearance.colors.colOnTertiaryContainer
+
+                            contentItem: Item {
+                                implicitWidth: optionRow.implicitWidth
+                                implicitHeight: optionRow.implicitHeight
+
+                                RowLayout {
+                                    id: optionRow
+                                    anchors.centerIn: parent
+                                    spacing: 6
+
+                                    MaterialSymbol {
+                                        text: option.modelData.icon ?? ""
+                                        iconSize: 18
+                                        fill: option.selected ? 1 : 0
+                                        color: option.selected ? Appearance.colors.colOnTertiary : Appearance.colors.colOnTertiaryContainer
+                                    }
+                                    StyledText {
+                                        text: option.modelData.displayName
+                                        font.pixelSize: Appearance.font.pixelSize.small
+                                        font.weight: Font.Medium
+                                        color: option.selected ? Appearance.colors.colOnTertiary : Appearance.colors.colOnTertiaryContainer
+                                    }
+                                }
                             }
                         }
                     }
