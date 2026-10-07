@@ -25,7 +25,9 @@ Singleton {
     property string imageSearchEngineBaseUrl: Config.options.search.imageSearch.imageSearchEngineBaseUrl
     property string fileUploadApiEndpoint: "https://uguu.se/upload"
 
-    function getCommand(x, y, width, height, screenshotPath, action, saveDir = "", systemAudio = false, microphone = false) {
+    // originX/originY: monitor position in the compositor's global layout.
+    // wf-recorder's --geometry is global, while the region is screen-local.
+    function getCommand(x, y, width, height, screenshotPath, action, saveDir = "", systemAudio = false, microphone = false, originX = 0, originY = 0) {
         // Set command for action
         const rx = Math.round(x);
         const ry = Math.round(y);
@@ -36,7 +38,7 @@ Singleton {
         const cropToStdout = `${cropBase} -`
         const cropInPlace = `${cropBase} '${StringUtils.shellSingleQuoteEscape(screenshotPath)}'`
         const cleanup = `rm '${StringUtils.shellSingleQuoteEscape(screenshotPath)}'`
-        const slurpRegion = `${rx},${ry} ${rw}x${rh}`
+        const slurpRegion = `${rx + Math.round(originX)},${ry + Math.round(originY)} ${rw}x${rh}`
         const uploadAndGetUrl = (filePath) => {
             return `curl -sF files[]=@'${StringUtils.shellSingleQuoteEscape(filePath)}' ${root.fileUploadApiEndpoint} | jq -r '.files[0].url'`
         }
