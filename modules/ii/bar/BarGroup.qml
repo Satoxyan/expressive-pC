@@ -43,6 +43,9 @@ Item {
     readonly property bool rightClickFree: !["updatesCount", "weatherBar", "bluetooth", "workspaces", "sysTray", "media", "docktoPanel"].includes(root.widgetName)
 
     readonly property Item loadedWidget: gridLayout.children[0]?.item ?? null
+    // Hide the whole group (background included) when the widget hides itself,
+    // e.g. the tray indicator or the pomodoro bar chip when idle.
+    visible: root.loadedWidget ? root.loadedWidget.visible : true
     readonly property bool hasContentOverride: !root.isMaterial && root.style.color !== undefined && root.style.color !== "transparent"
     readonly property color contentColor: {
         const name = root.style.color ?? "";

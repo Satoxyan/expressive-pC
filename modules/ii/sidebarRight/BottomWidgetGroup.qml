@@ -40,6 +40,12 @@ Rectangle {
             "icon": "schedule",
             "widget": "pomodoro/PomodoroWidget.qml"
         },
+        {
+            "type": "stopwatch",
+            "name": Translation.tr("Stopwatch"),
+            "icon": "timer",
+            "widget": "pomodoro/StopwatchWidget.qml"
+        },
     ]
 
     Behavior on implicitHeight {

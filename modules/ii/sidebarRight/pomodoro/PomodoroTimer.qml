@@ -9,62 +9,130 @@ import Quickshell
 
 Item {
     id: root
+
     implicitHeight: contentColumn.implicitHeight
     implicitWidth: contentColumn.implicitWidth
+    readonly property color stateColor: TimerService.pomodoroBreak ? Appearance.colors.colTertiaryContainer : Appearance.colors.colSecondaryContainer
+    readonly property color stateTextColor: TimerService.pomodoroBreak ? Appearance.colors.colOnTertiaryContainer : Appearance.colors.colOnSecondaryContainer
+    readonly property string stateLabel: TimerService.pomodoroLongBreak ? Translation.tr("Long break") : TimerService.pomodoroBreak ? Translation.tr("Break") : Translation.tr("Focus")
+    readonly property int cyclePosition: TimerService.pomodoroCycle + 1
 
     ColumnLayout {
         id: contentColumn
-        anchors.fill: parent
-        spacing: 0
+        width: parent.width
+        height: implicitHeight
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 10
 
-        Item {
+        // The Pomodoro timer circle
+        CircularProgress {
             Layout.alignment: Qt.AlignHCenter
-            implicitWidth: 200
-            implicitHeight: 200
+            lineWidth: 10
+            value: {
+                return TimerService.pomodoroSecondsLeft / TimerService.pomodoroLapDuration;
+            }
+            implicitSize: 200
+            colPrimary: root.stateTextColor
+            colSecondary: root.stateColor
+            enableAnimation: true
 
-            ClockPicker {
-                anchors.fill: parent
-                value: Math.round(TimerService.focusTime / 60)
-                running: TimerService.pomodoroRunning
-                onDragFinished: val => {
-                    if (!TimerService.pomodoroRunning) {
-                        Config.options.time.pomodoro.focus = val * 60;
-                        TimerService.pomodoroSecondsLeft = val * 60; 
+            ColumnLayout {
+                anchors.centerIn: parent
+                spacing: 2
+
+                StyledText {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: 150
+                    horizontalAlignment: Text.AlignHCenter
+                    text: {
+                        let minutes = Math.floor(TimerService.pomodoroSecondsLeft / 60).toString().padStart(2, '0');
+                        let seconds = Math.floor(TimerService.pomodoroSecondsLeft % 60).toString().padStart(2, '0');
+                        return `${minutes}:${seconds}`;
                     }
+                    font.family: Appearance.font.family.main
+                    font.pixelSize: 40
+                    font.weight: Font.DemiBold
+                    color: Appearance.m3colors.m3onSurface
+                }
+                StyledText {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: root.stateLabel
+                    font.pixelSize: Appearance.font.pixelSize.normal
+                    color: Appearance.colors.colSubtext
                 }
             }
 
             Rectangle {
                 radius: Appearance.rounding.full
-                color: Appearance.colors.colLayer2
+                color: root.stateColor
+                
                 anchors {
                     right: parent.right
                     bottom: parent.bottom
                 }
-                implicitWidth: 36
-                implicitHeight: implicitWidth
+                implicitWidth: 58
+                implicitHeight: 36
 
-                StyledText {
+                RowLayout {
                     anchors.centerIn: parent
-                    color: Appearance.colors.colOnLayer2
-                    text: TimerService.pomodoroCycle + 1
+                    spacing: 3
+
+                    MaterialSymbol {
+                        text: "repeat"
+                        iconSize: 14
+                        color: root.stateTextColor
+                    }
+
+                    StyledText {
+                        id: cycleText
+                        font.family: Appearance.font.family.main
+                        font.weight: Font.DemiBold
+                        color: root.stateTextColor
+                        text: `${root.cyclePosition}/${TimerService.cyclesBeforeLongBreak}`
+                    }
                 }
             }
         }
 
         RowLayout {
             Layout.alignment: Qt.AlignHCenter
+            spacing: 5
+
+            Repeater {
+                model: TimerService.cyclesBeforeLongBreak
+
+                Rectangle {
+                    required property int index
+                    implicitWidth: index === TimerService.pomodoroCycle ? 18 : 8
+                    implicitHeight: 8
+                    radius: Appearance.rounding.full
+                    color: index <= TimerService.pomodoroCycle ? root.stateTextColor : Appearance.colors.colLayer2
+
+                    Behavior on implicitWidth {
+                        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                    }
+                    Behavior on color {
+                        animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+                    }
+                }
+            }
+        }
+
+        // The Start/Stop and Reset buttons
+        RowLayout {
+            Layout.alignment: Qt.AlignHCenter
             spacing: 10
 
             RippleButton {
+                buttonRadius: Appearance.rounding.full
                 contentItem: StyledText {
                     anchors.centerIn: parent
                     horizontalAlignment: Text.AlignHCenter
                     text: TimerService.pomodoroRunning ? Translation.tr("Pause") : (TimerService.pomodoroSecondsLeft === TimerService.focusTime) ? Translation.tr("Start") : Translation.tr("Resume")
                     color: TimerService.pomodoroRunning ? Appearance.colors.colOnSecondaryContainer : Appearance.colors.colOnPrimary
                 }
-                implicitHeight: 35
-                implicitWidth: 90
+                implicitHeight: 38
+                implicitWidth: 96
                 font.pixelSize: Appearance.font.pixelSize.larger
                 onClicked: TimerService.togglePomodoro()
                 colBackground: TimerService.pomodoroRunning ? Appearance.colors.colSecondaryContainer : Appearance.colors.colPrimary
@@ -72,14 +140,18 @@ Item {
             }
 
             RippleButton {
-                implicitHeight: 35
-                implicitWidth: 90
+                buttonRadius: Appearance.rounding.full
+                implicitHeight: 38
+                implicitWidth: 96
+
                 onClicked: TimerService.resetPomodoro()
                 enabled: (TimerService.pomodoroSecondsLeft < TimerService.pomodoroLapDuration) || TimerService.pomodoroCycle > 0 || TimerService.pomodoroBreak
+
                 font.pixelSize: Appearance.font.pixelSize.larger
                 colBackground: Appearance.colors.colErrorContainer
                 colBackgroundHover: Appearance.colors.colErrorContainerHover
                 colRipple: Appearance.colors.colErrorContainerActive
+
                 contentItem: StyledText {
                     anchors.centerIn: parent
                     horizontalAlignment: Text.AlignHCenter

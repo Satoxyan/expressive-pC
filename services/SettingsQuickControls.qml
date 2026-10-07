@@ -563,7 +563,7 @@ Singleton {
             { displayName: Translation.tr("Bounce"), icon: "swap_vert",   value: DockLaunchAnims.AnimType.Bounce },
             { displayName: Translation.tr("Pulse"),  icon: "open_in_new", value: DockLaunchAnims.AnimType.Pulse },
             { displayName: Translation.tr("Pop"),    icon: "album",       value: DockLaunchAnims.AnimType.Pop },
-            { displayName: Translation.tr("Wobble"), icon: "wave_sine",   value: DockLaunchAnims.AnimType.Wobble }
+            { displayName: Translation.tr("Wobble"), icon: "waves",   value: DockLaunchAnims.AnimType.Wobble }
         ]),
         // Hyprland — keyboard layout
         "hyprland:Keyboard layout": {
