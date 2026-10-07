@@ -15,6 +15,7 @@ Singleton {
     // (shared sections reused by both modes).
     readonly property var extraIndexFiles: [
         { id: "hyprland", path: "modules/ii/settings/pages/DisplaysSection.qml" },
+        { id: "hyprland", path: "modules/ii/settings/pages/HdrSection.qml", section: "Displays" },
         { id: "desktop", path: "modules/ii/settings/pages/StickersSection.qml" },
         { id: "bar", path: "modules/ii/settings/pages/BarScreensSection.qml" },
         { id: "hyprland", path: "modules/common/widgets/AutostartApps.qml" }
@@ -30,12 +31,12 @@ Singleton {
         "HyprOptionSelection", "HyprOptionText"
     ]
 
-    function parsePage(source) {
+    function parsePage(source, initialSection) {
         const typeOpen = /^\s*([A-Z][\w.]*)\s*\{/;
         const labelProp = /^\s*(title|text|placeholderText):\s*Translation\.tr\(\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')\s*\)/;
         const entries = [];
         const stack = [];
-        let section = "";
+        let section = initialSection ?? "";
         let subsection = "";
         for (const line of source.split("\n")) {
             const prop = line.match(labelProp);
@@ -61,9 +62,9 @@ Singleton {
         return entries;
     }
 
-    function indexFile(path, pageId, source) {
+    function indexFile(path, pageId, source, section) {
         const next = Object.assign({}, root.entriesByFile);
-        next[path] = { pageId: pageId, entries: root.parsePage(source) };
+        next[path] = { pageId: pageId, entries: root.parsePage(source, section) };
         root.entriesByFile = next;
     }
 
@@ -128,7 +129,7 @@ Singleton {
         delegate: FileView {
             required property var modelData
             path: FileUtils.trimFileProtocol(Quickshell.shellPath(modelData.path))
-            onLoaded: root.indexFile(modelData.path, modelData.id, text())
+            onLoaded: root.indexFile(modelData.path, modelData.id, text(), modelData.section)
         }
     }
 }

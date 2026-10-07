@@ -52,7 +52,7 @@ ContentPage {
         spacing: 20
 
         // Displays
-        DisplaysSection {}
+        DisplaysSection { hdrInDropdown: true }
 
         // Layout
         ContentSection {
