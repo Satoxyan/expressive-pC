@@ -63,7 +63,6 @@ Scope {
         return "center"
     }
     readonly property real gap: Config.options.bar.cornerStyle === 3 ? Appearance.sizes.hyprlandGapsOut : 0
-    readonly property bool cornerStyleReducesGap: Config.options.bar.cornerStyle === 1 || Config.options.bar.cornerStyle === 2
     readonly property real barThickness: barVertical ? Appearance.sizes.verticalBarWidth : Appearance.sizes.barHeight
 
     function filterDuplicatePlayers(players) {
@@ -164,6 +163,21 @@ Scope {
                 top: true
                 left: true
             }
+            readonly property real cardMargin: Appearance.sizes.elevationMargin
+            readonly property real inset: Config.options.hyprland.general.gapsOut
+            readonly property var reserved: {
+                const monitor = HyprlandData.monitors.find(m => m.name === panelWindow.screen.name)
+                if (monitor?.reserved) return monitor.reserved
+                const bar = root.barThickness
+                return [root.barEdge === "left" ? bar : 0, root.barEdge === "top" ? bar : 0, root.barEdge === "right" ? bar : 0, root.barEdge === "bottom" ? bar : 0]
+            }
+            readonly property real minX: reserved[0] + inset - cardMargin
+            readonly property real maxX: panelWindow.screen.width - reserved[2] - inset - root.widgetWidth + cardMargin
+            readonly property real minY: reserved[1] + inset - cardMargin
+            // maxY pakai tinggi window (bukan playerColumnLayout): tinggi window
+            // kita dipegang konstan N×290, margins harus menempel ke tepi window.
+            readonly property real maxY: panelWindow.screen.height - reserved[3] - inset - panelWindow.implicitHeight + cardMargin
+
             margins {
                 top: {
                     if (GlobalStates.mediaControlsAboveDock && !root.barVertical) {
@@ -171,11 +185,11 @@ Scope {
                             + Appearance.sizes.elevationMargin + Appearance.sizes.hyprlandGapsOut
                         return panelWindow.screen.height - dockHeight - panelWindow.implicitHeight
                     }
-                    if (root.barEdge === "top") return root.barThickness + (root.cornerStyleReducesGap ? -root.gap -6 : root.gap)
-                    if (root.barEdge === "bottom") return panelWindow.screen.height - root.barThickness - (root.cornerStyleReducesGap ? -root.gap : root.gap) - panelWindow.implicitHeight
-                    if (root.mediaPosition === "left") return 0
-                    if (root.mediaPosition === "right") return panelWindow.screen.height - panelWindow.implicitHeight - root.gap
-                    return (panelWindow.screen.height - panelWindow.implicitHeight) / 2
+                    if (root.barEdge === "top") return panelWindow.minY
+                    if (root.barEdge === "bottom") return panelWindow.maxY
+                    if (root.mediaPosition === "left") return panelWindow.minY
+                    if (root.mediaPosition === "right") return panelWindow.maxY
+                    return (panelWindow.minY + panelWindow.maxY) / 2
                 }
                 left: {
                     if (GlobalStates.mediaControlsAboveDock && !root.barVertical) {
@@ -183,11 +197,11 @@ Scope {
                             GlobalStates.mediaControlsAnchorX - root.widgetWidth / 2,
                             panelWindow.screen.width - root.widgetWidth - root.gap))
                     }
-                    if (root.barEdge === "left") return root.barThickness + (root.cornerStyleReducesGap ? -root.gap : root.gap)
-                    if (root.barEdge === "right") return panelWindow.screen.width - root.barThickness - (root.cornerStyleReducesGap ? -root.gap : root.gap) - root.widgetWidth
-                    if (root.mediaPosition === "left") return 0
-                    if (root.mediaPosition === "right") return panelWindow.screen.width - root.widgetWidth - root.gap
-                    return (panelWindow.screen.width - root.widgetWidth) / 2
+                    if (root.barEdge === "left") return panelWindow.minX
+                    if (root.barEdge === "right") return panelWindow.maxX
+                    if (root.mediaPosition === "left") return panelWindow.minX
+                    if (root.mediaPosition === "right") return panelWindow.maxX
+                    return (panelWindow.minX + panelWindow.maxX) / 2
                 }
             }
 
@@ -196,6 +210,7 @@ Scope {
             }
 
             Component.onCompleted: {
+                HyprlandData.updateMonitors()
                 if (!Config.options.bar.media.alwaysVisible)
                     GlobalFocusGrab.addDismissable(panelWindow);
             }

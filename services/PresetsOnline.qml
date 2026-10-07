@@ -24,13 +24,14 @@ Singleton {
     property int previewLimit: 3
     property var activeEntry: null
     property var collected: []
+    property var listed: []
     property int sourceIndex: 0
     property int failedSources: 0
 
-    readonly property int indexVersion: 2
+    readonly property int indexVersion: 3
 
     readonly property var sources: [
-        { repo: "pctrade/end4-pCpresets", branch: "main", prefix: "pctrade--", sanitize: true, rootWallpapers: false },
+        { repo: "pctrade/end4-pCpresets", branch: "main", prefix: "pctrade--", sanitize: true, rootWallpapers: false, authorsBranch: "gallery-data" },
         { repo: "Blapples/wallpapers", branch: "main", prefix: "", sanitize: false, rootWallpapers: true }
     ]
 
@@ -149,11 +150,48 @@ Singleton {
         }
         const presets = root.collected.slice();
         presets.sort((a, b) => a.title.localeCompare(b.title));
+        root.listed = presets;
+        const src = root.sources.find(item => item.authorsBranch);
+        if (!src) {
+            root.publishListing({});
+            return;
+        }
+        authorsProc.source = src;
+        authorsProc.command = ["curl", "-sSL", "-m", "15", "-w", "\nHTTP_STATUS:%{http_code}",
+            `https://raw.githubusercontent.com/${src.repo}/${src.authorsBranch}/index.json`];
+        authorsProc.running = true;
+    }
+
+    function publishListing(authors) {
+        const presets = root.listed.map(entry => {
+            const known = authors[entry.name];
+            return known ? Object.assign({}, entry, { author: known }) : entry;
+        });
         root.previewLimit = 3;
         root.entries = presets;
         root.lastFetched = Date.now();
         indexFile.setText(JSON.stringify({ version: root.indexVersion, time: root.lastFetched, entries: presets }));
         root.generateThumbs();
+    }
+
+    Process {
+        id: authorsProc
+        property var source: root.sources[0]
+        stdout: StdioCollector { id: authorsCollector }
+        onExited: code => {
+            const raw = authorsCollector.text;
+            const statusMatch = raw.match(/HTTP_STATUS:(\d+)\s*$/);
+            const body = statusMatch ? raw.slice(0, statusMatch.index) : raw;
+            const authors = {};
+            try {
+                if (statusMatch && statusMatch[1] === "200") {
+                    const data = JSON.parse(body);
+                    for (const folder in (data.presets ?? ({})))
+                        if (data.presets[folder].author) authors[authorsProc.source.prefix + folder] = data.presets[folder].author;
+                }
+            } catch (e) {}
+            root.publishListing(authors);
+        }
     }
 
     function originOf(name) {

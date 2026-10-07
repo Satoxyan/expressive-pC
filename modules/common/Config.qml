@@ -178,6 +178,7 @@ Singleton {
             }
 
             property JsonObject appearance: JsonObject {
+                property string uiBackground: "themed"
                 property bool extraBackgroundTint: true
                 property int fakeScreenRounding: 2 // 0: None | 1: Always | 2: When not fullscreen
                 property JsonObject fonts: JsonObject {
@@ -231,6 +232,7 @@ Singleton {
                 property string descriptionText: "::distro::"
                 property string displayName: ""
                 property bool onlinePresets: false
+                property bool uploadGuideSeen: false
 
             }
 
@@ -514,6 +516,16 @@ Singleton {
                         property real size: 200
                     }
 
+                    property JsonObject imageCard: JsonObject {
+                        property bool enable: false
+                        property string placementStrategy: "free"
+                        property real x: 400
+                        property real y: 100
+                        property real z: 0
+                        property string path: ""
+                        property string sizeMode: "1x2"
+                    }
+
                     property JsonObject sticker: JsonObject {
                         property bool enable: false
                         property bool blur: true
@@ -703,6 +715,7 @@ Singleton {
                 property JsonObject tooltips: JsonObject {
                     property bool enable: true
                     property bool clickToShow: false
+                    property string style: "default"
                 }
                 property JsonObject media: JsonObject {
                     property string preferredPlayer: ""

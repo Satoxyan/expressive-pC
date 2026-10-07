@@ -796,6 +796,17 @@ ContentPage {
                     onCheckedChanged: { Config.options.bar.tooltips.clickToShow = checked; }
                     enabled: Config.options.bar.tooltips.enable
                 }
+                ConfigSelectionArray {
+                    text: Translation.tr("Style")
+                    icon: "tooltip"
+                    enabled: Config.options.bar.tooltips.enable
+                    currentValue: Config.options.bar.tooltips.style
+                    onSelected: newValue => { Config.options.bar.tooltips.style = newValue }
+                    options: [
+                        { displayName: Translation.tr("Default"), icon: "tooltip", value: "default" },
+                        { displayName: Translation.tr("Morph"), icon: "join_inner", value: "morph" }
+                    ]
+                }
             }
         }
     }

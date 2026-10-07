@@ -14,6 +14,7 @@ Item {
     property int staggerMs: 45
 
     property bool confirmDelete: false
+    property bool confirmUnshare: false
     property bool overwritten: false
     property bool exported: false
     property bool installed: false
@@ -34,6 +35,7 @@ Item {
     signal overwriteRequested()
     signal exportRequested()
     signal uploadRequested()
+    signal unshareRequested()
     signal installRequested()
     signal deleteRequested()
     signal renameRequested(string newName)
@@ -92,6 +94,16 @@ Item {
         id: confirmTimer
         interval: 2500
         onTriggered: root.confirmDelete = false
+    }
+
+    Timer {
+        id: confirmUnshareTimer
+        interval: 2500
+        onTriggered: root.confirmUnshare = false
+    }
+
+    Component.onCompleted: {
+        if (preset.source === "mine" && !(info.origin ?? "")) Presets.checkOwnership(preset.name);
     }
 
     readonly property var facts: online ? [] : [
@@ -323,6 +335,14 @@ Item {
                         wrapMode: Text.WordWrap
                     }
 
+                    PresetAuthorChip {
+                        Layout.fillWidth: true
+                        visible: root.online && author !== ""
+                        author: root.preset.entry?.author ?? ""
+                        textColor: Appearance.colors.colOnSecondaryContainer
+                        avatarSize: 28
+                    }
+
                     Repeater {
                         model: root.facts
 
@@ -413,6 +433,7 @@ Item {
                     { id: "rename", icon: "edit", label: Translation.tr("Rename"), scope: ["mine"] },
                     { id: "export", icon: "ios_share", label: Translation.tr("Export ZIP"), scope: ["mine"], own: true },
                     { id: "upload", icon: "cloud_upload", label: Translation.tr("Upload"), scope: ["mine"], own: true },
+                    { id: "unshare", icon: "cloud_off", label: Translation.tr("Remove from gallery"), scope: ["mine"], published: true },
                     { id: "install", icon: "download_done", label: Translation.tr("Install"), scope: ["downloaded", "imported"] },
                     { id: "delete", icon: "delete", label: Translation.tr("Delete"), scope: ["mine", "downloaded", "imported"] }
                 ]
@@ -422,15 +443,17 @@ Item {
                     required property var modelData
 
                     readonly property bool isDelete: modelData.id === "delete"
+                    readonly property bool isUnshare: modelData.id === "unshare"
                     readonly property bool armed: isDelete && root.confirmDelete
+                    readonly property bool unshareArmed: isUnshare && root.confirmUnshare
                     readonly property bool done: (modelData.id === "overwrite" && root.overwritten) || (modelData.id === "export" && root.exported) || (modelData.id === "install" && root.installed)
 
-                    visible: !root.online && modelData.scope.includes(root.preset.source) && (!modelData.own || !(root.info.origin ?? ""))
+                    visible: !root.online && modelData.scope.includes(root.preset.source) && (!modelData.own || !(root.info.origin ?? "")) && (modelData.id === "upload" ? !Presets.isPublished(root.preset.name) : (!modelData.published || Presets.isPublished(root.preset.name)))
                     implicitHeight: 48
                     horizontalPadding: 18
                     buttonRadius: 24
-                    colBackground: armed ? Appearance.colors.colError : done ? Appearance.m3colors.m3success : Appearance.colors.colLayer1
-                    colBackgroundHover: armed ? Appearance.colors.colError : done ? Appearance.m3colors.m3success : Appearance.colors.colLayer1Hover
+                    colBackground: unshareArmed ? Appearance.colors.colPrimary : armed ? Appearance.colors.colError : done ? Appearance.m3colors.m3success : Appearance.colors.colLayer1
+                    colBackgroundHover: unshareArmed ? Appearance.colors.colPrimaryHover : armed ? Appearance.colors.colError : done ? Appearance.m3colors.m3success : Appearance.colors.colLayer1Hover
                     downAction: () => {
                         const id = modelData.id;
                         Qt.callLater(() => {
@@ -450,6 +473,15 @@ Item {
                                 renameFocusTimer.restart();
                             }
                             else if (id === "upload") root.uploadRequested();
+                            else if (id === "unshare") {
+                                if (root.confirmUnshare) {
+                                    root.confirmUnshare = false;
+                                    root.unshareRequested();
+                                } else {
+                                    root.confirmUnshare = true;
+                                    confirmUnshareTimer.restart();
+                                }
+                            }
                             else if (id === "install") {
                                 root.installRequested();
                                 root.installed = true;
@@ -468,11 +500,11 @@ Item {
                             text: secondary.done ? "check_circle" : secondary.modelData.icon
                             iconSize: 20
                             fill: secondary.done ? 1 : 0
-                            color: secondary.armed ? Appearance.colors.colOnError : secondary.done ? Appearance.m3colors.m3onSuccess : Appearance.colors.colOnLayer1
+                            color: secondary.unshareArmed ? Appearance.colors.colOnPrimary : secondary.armed ? Appearance.colors.colOnError : secondary.done ? Appearance.m3colors.m3onSuccess : Appearance.colors.colOnLayer1
                         }
                         StyledText {
-                            text: secondary.armed ? Translation.tr("Tap again to delete") : secondary.done ? (secondary.modelData.id === "export" ? Translation.tr("Exported") : secondary.modelData.id === "install" ? Translation.tr("Installed") : Translation.tr("Overwritten")) : secondary.modelData.label
-                            color: secondary.armed ? Appearance.colors.colOnError : secondary.done ? Appearance.m3colors.m3onSuccess : Appearance.colors.colOnLayer1
+                            text: secondary.unshareArmed ? Translation.tr("Tap again to remove") : secondary.armed ? Translation.tr("Tap again to delete") : secondary.done ? (secondary.modelData.id === "export" ? Translation.tr("Exported") : secondary.modelData.id === "install" ? Translation.tr("Installed") : Translation.tr("Overwritten")) : secondary.modelData.label
+                            color: secondary.unshareArmed ? Appearance.colors.colOnPrimary : secondary.armed ? Appearance.colors.colOnError : secondary.done ? Appearance.m3colors.m3onSuccess : Appearance.colors.colOnLayer1
                         }
                     }
                 }

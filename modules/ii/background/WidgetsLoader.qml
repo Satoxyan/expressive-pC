@@ -39,6 +39,7 @@ Item {
             { key: "visualizer" },
             { key: "customImages" },
             { key: "customImage" },
+            { key: "imageCard" },
             { key: "sticker" },
             { key: "calendar" },
             { key: "clock", alwaysOnLock: true },
@@ -87,6 +88,7 @@ Item {
                     case "visualizer":  return visualizerComp
                     case "customImages": return customImageComp
                     case "customImage": return customImageComp
+                    case "imageCard":   return imageCardComp
                     case "sticker":     return stickerComp
                     case "calendar":    return calendarComp
                     case "weather":     return weatherComp
@@ -132,6 +134,17 @@ Item {
             wallpaperScale: 1
             pinnedBottom: true
             isCovered: root.visualizerHidden
+        }
+    }
+    Component {
+        id: imageCardComp
+        ImageCardWidget {
+            screenWidth: root.screen.width
+            screenHeight: root.screen.height
+            scaledScreenWidth: root.screen.width
+            scaledScreenHeight: root.screen.height
+            wallpaperScale: 1
+            wallpaperItem: root.wallpaperItem
         }
     }
     Component {

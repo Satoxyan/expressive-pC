@@ -115,10 +115,12 @@ Item {
         { id: "hero:collage", type: "toggle", key: "desktop:Collage enable", title: Translation.tr("Multiple wallpapers"), icon: "grid_view", section: Translation.tr("Desktop"), kw: "multiple wallpapers collage tiles" },
         { id: "hero:centered", type: "toggle", key: "desktop:Wallpaper/Centered wallpaper/Enable", title: Translation.tr("Centered wallpaper"), icon: "filter_center_focus", section: Translation.tr("Desktop"), kw: "centered wallpaper" },
         { id: "hero:schemes", type: "schemes", title: Translation.tr("Color scheme"), section: Translation.tr("Interface"), kw: "color scheme theme palette accent catppuccin gruvbox nord dracula tokyo everforest one dark" },
+        { id: "hero:uibg", type: "select", w: 2, key: "interface:UI background", title: Translation.tr("UI background"), icon: "format_color_fill", section: Translation.tr("Interface"), kw: "ui background oled black amoled themed dark surface layer panels sidebars" },
         { id: "hero:palette", type: "palette", when: "material", key: "interface:Palette type", title: Translation.tr("Palette style"), icon: "auto_awesome", section: Translation.tr("Interface"), kw: "palette style scheme auto content expressive fidelity fruit salad monochrome neutral rainbow tonal spot material you dynamic" },
         { id: "hero:barpos", type: "barpos", title: Translation.tr("Bar position"), section: Translation.tr("Bar"), kw: "bar position top bottom left right vertical panel" },
         { id: "hero:tooltips", type: "toggle", w: 2, searchable: true, key: "bar:Tooltips/Enable", title: Translation.tr("Tooltips"), icon: "tooltip", section: Translation.tr("Bar"), kw: "bar tooltips enable hover" },
-        { id: "hero:tooltipsClick", type: "toggle", w: 2, searchable: true, key: "bar:Click to show", title: Translation.tr("Click to show"), icon: "ads_click", section: Translation.tr("Bar"), kw: "bar tooltips click to show" }
+        { id: "hero:tooltipsClick", type: "toggle", w: 2, searchable: true, key: "bar:Click to show", title: Translation.tr("Click to show"), icon: "ads_click", section: Translation.tr("Bar"), kw: "bar tooltips click to show" },
+        { id: "hero:tooltipsStyle", type: "select", w: 4, searchable: true, key: "bar:Tooltips/Style", title: Translation.tr("Tooltip style"), icon: "tooltip", section: Translation.tr("Bar"), kw: "bar tooltips style morph attached popup" }
     ]
 
     readonly property var allEntries: {

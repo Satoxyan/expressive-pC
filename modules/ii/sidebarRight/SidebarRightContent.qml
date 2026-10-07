@@ -156,7 +156,7 @@ Item {
         anchors.fill: parent
         implicitHeight: parent.height - Appearance.sizes.hyprlandGapsOut * 2
         implicitWidth: sidebarWidth - Appearance.sizes.hyprlandGapsOut * 2
-        color: Appearance.colors.colLayer0
+        color: Appearance.colors.colUiBackground
         border.width: 1
         border.color: ColorUtils.transparentize(Appearance.colors.colLayer0Border, 0.8) 
         radius: Appearance.rounding.screenRounding - Appearance.sizes.hyprlandGapsOut + 5

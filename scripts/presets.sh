@@ -28,7 +28,10 @@ BLACKLIST_FILTER='del(._presetMeta)
   | del(.ai, .networking, .musicRecognition, .search, .screenRecord, .screenSnip, .updates)
   | del(.bar.weather)
   | del(.appearance.fonts)
-  | del(.hyprland.input, .hyprland.autostartApps, .hyprland.general.layout)'
+  | del(.hyprland.input, .hyprland.autostartApps, .hyprland.general.layout)
+  | del(.dock.pinnedApps, .launcher.pinnedApps, .tray.pinnedItems)
+  | del(.sidebar.booru, .wallpaperSelector.userPath)
+  | walk(if type == "object" then with_entries(select(.key | test("^(.*api[-_]?key|secret|password|token|username|e-?mail)$"; "i") | not)) else . end)'
 
 SHARE_FILTER='with_entries(select(.key as $k | ["appearance","background","bar","calendar","crosshair","dock","interactions","launcher","light","lock","media","notifications","osd","osk","overlay","overview","panelFamily","profile","regionSelector","resources","settings","sidebar","tray","wallpaperSelector","windows","hyprland"] | index($k)))
   | if (.hyprland | type) == "object" then .hyprland |= with_entries(select(.key as $k | ["decoration","gaps","animations","general"] | index($k))) else . end'

@@ -95,6 +95,9 @@ apply_named_qt() {
 
 check_and_prompt_upscale() {
     local img="$1"
+    if [ -f "$SHELL_CONFIG_FILE" ] && [ "$(jq -r '.background.collage.enable // false' "$SHELL_CONFIG_FILE")" == "true" ]; then
+        return
+    fi
     min_width_desired="$(hyprctl monitors -j | jq '([.[].width] | max)' | xargs)"
     min_height_desired="$(hyprctl monitors -j | jq '([.[].height] | max)' | xargs)"
 
