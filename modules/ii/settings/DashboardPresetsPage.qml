@@ -53,7 +53,7 @@ Item {
     readonly property int columns: Math.max(2, Math.round(width / 340))
 
     readonly property var barPositions: [Translation.tr("Top"), Translation.tr("Bottom"), Translation.tr("Left"), Translation.tr("Right")]
-    readonly property var barStyles: ["Hug", "Float", "Islands", "M3", "M3 Hug", "Panel"]
+    readonly property var barStyles: ["Hug", "Float", "Islands", "M3", "M3 Hug", "Panel", "Split Hug"]
 
     function summaryOf(data) {
         const bar = data?.bar ?? {};
