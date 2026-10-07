@@ -135,7 +135,10 @@ Scope {
                 implicitHeight: dockHoverRegion.implicitHeight + dockRoot.shadowMargin * 2
 
                 readonly property real hiddenOffset: Config.options?.dock.hoverToReveal
-                    ? (DockStyle.thickness - Config.options.dock.hoverRegionHeight)
+                    // A hug window sits `gap` past the screen edge (negative
+                    // margin), so pull the hover strip back by that much or
+                    // it lands off-screen and hover never fires.
+                    ? (DockStyle.thickness - Config.options.dock.hoverRegionHeight - (dockRoot.hug ? dockRoot.gap : 0))
                     : (DockStyle.thickness + 1)
                 property real offset: dockRoot.reveal ? 0 : hiddenOffset
 

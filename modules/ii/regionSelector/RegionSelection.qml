@@ -315,7 +315,9 @@ PanelWindow {
             screenshotAction, //
             screenshotDir, //
             Config.options.screenRecord.systemAudio, //
-            Config.options.screenRecord.microphone
+            Config.options.screenRecord.microphone, //
+            root.monitorOffsetX, //
+            root.monitorOffsetY
         )
         Quickshell.execDetached(command);
         if (root.action == RegionSelection.SnipAction.Record || root.action == RegionSelection.SnipAction.RecordWithSound) {
