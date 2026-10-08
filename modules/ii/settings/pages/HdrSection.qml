@@ -3,20 +3,16 @@ import QtQuick.Layouts
 import qs.services
 import qs.modules.common.widgets
 
-// "HDR & Color Management" controls for one monitor. The default settings
-// page instantiates it inside each monitor's dropdown (hdrInDropdown); the
-// dashboard Displays card keeps a single copy below the rows that follows
-// the canvas selection.
+// "HDR & Color Management" controls for one monitor. Instantiated inside
+// each monitor's dropdown by the shared Displays section (default settings
+// page and dashboard Displays card alike); flat so it continues the
+// dropdown's plain rows without segment pills.
 ContentSubsection {
     id: root
 
     // The MonitorConfigOption to drive, and which monitor this copy edits.
     property var monConfig
     property int monitorIndex: 0
-    // flat: true in the default page's per-monitor dropdown so the controls
-    // sit directly next to the rows above (no segment pills). The dashboard
-    // card keeps the grouped look.
-    property bool flat: false
 
     readonly property var mon: root.monConfig?.monitors[root.monitorIndex]
     readonly property bool hdrActive: root.mon?.cm === "hdr" || root.mon?.cm === "hdredid"
@@ -36,10 +32,10 @@ ContentSubsection {
     }
 
     GroupedList {
-        flat: root.flat
-        // breathing room above the first row (Bit depth) in the dropdown;
-        // grouped mode keeps its own segment padding.
-        Layout.topMargin: root.flat ? 10 : 0
+        // flat: continues the dropdown's plain rows — no segment pills.
+        flat: true
+        // breathing room above the first row (Bit depth).
+        Layout.topMargin: 10
         ConfigSelectionArray {
             text: Translation.tr("Bit depth")
             icon: "gradient"

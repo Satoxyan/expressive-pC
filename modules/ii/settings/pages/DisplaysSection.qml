@@ -21,11 +21,6 @@ ContentSection {
     // once and a hotplug reorder doesn't shuffle them.
     property var openMonitors: ({})
 
-    // The default settings page puts the HDR controls inside each monitor's
-    // dropdown; the dashboard card keeps the single shared block below the
-    // rows (following the canvas selection).
-    property bool hdrInDropdown: false
-
     function toggleAdvanced(monName) {
         const next = Object.assign({}, root.openMonitors)
         next[monName] = !next[monName]
@@ -252,11 +247,9 @@ ContentSection {
                         }
 
                         // HDR & color management for this monitor, inside
-                        // its own dropdown (default settings page). Flat:
-                        // continues the rows above without segment pills.
+                        // its own dropdown (flat: continues the rows above
+                        // without segment pills).
                         HdrSection {
-                            visible: root.hdrInDropdown
-                            flat: true
                             monConfig: monitorConfig
                             monitorIndex: index
                         }
@@ -283,16 +276,6 @@ ContentSection {
                 horizontalAlignment: Text.AlignHCenter
                 color: Appearance.colors.colOnPrimary
             }
-        }
-
-        // Shared HDR block below the rows (dashboard card): follows the
-        // canvas selection. The default page puts it in the dropdowns and
-        // hides this copy.
-        HdrSection {
-            visible: !root.hdrInDropdown
-            Layout.topMargin: 10
-            monConfig: monitorConfig
-            monitorIndex: monitorCanvas.selectedIndex
         }
 
     }
