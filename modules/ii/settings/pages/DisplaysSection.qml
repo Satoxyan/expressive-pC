@@ -252,9 +252,11 @@ ContentSection {
                         }
 
                         // HDR & color management for this monitor, inside
-                        // its own dropdown (default settings page).
+                        // its own dropdown (default settings page). Flat:
+                        // continues the rows above without segment pills.
                         HdrSection {
                             visible: root.hdrInDropdown
+                            flat: true
                             monConfig: monitorConfig
                             monitorIndex: index
                         }

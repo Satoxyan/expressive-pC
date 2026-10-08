@@ -9,8 +9,11 @@ Item {
     property real smallRadius: Appearance.rounding.unsharpenmore
     property color bgcolor: Appearance.colors.colLayer1
     property real itemVerticalPadding: 24
+    // flat: skip the per-item segment pills — children sit directly like
+    // plain page rows (HDR dropdown so it merges with the rows above it).
+    property bool flat: false
     Layout.fillWidth: true
-    implicitHeight: col.implicitHeight
+    implicitHeight: root.flat ? plainCol.implicitHeight : col.implicitHeight
 
     ColumnLayout {
         id: col
@@ -18,7 +21,7 @@ Item {
         spacing: 2
 
         Repeater {
-            model: root.items.length
+            model: root.flat ? 0 : root.items.length
             delegate: Rectangle {
                 required property int index
                 readonly property bool isFirst: index === 0
@@ -45,6 +48,23 @@ Item {
                     spacing: 0
                 }
             }
+        }
+    }
+
+    // flat host: children are moved here once, at creation, laid out
+    // directly with no pill, margin or extra padding.
+    ColumnLayout {
+        id: plainCol
+        visible: root.flat
+        anchors.fill: parent
+        spacing: 8
+    }
+
+    Component.onCompleted: {
+        if (!root.flat) return;
+        for (const child of root.items) {
+            child.parent = plainCol;
+            child.Layout.fillWidth = true;
         }
     }
 }

@@ -13,6 +13,10 @@ ContentSubsection {
     // The MonitorConfigOption to drive, and which monitor this copy edits.
     property var monConfig
     property int monitorIndex: 0
+    // flat: true in the default page's per-monitor dropdown so the controls
+    // sit directly next to the rows above (no segment pills). The dashboard
+    // card keeps the grouped look.
+    property bool flat: false
 
     readonly property var mon: root.monConfig?.monitors[root.monitorIndex]
     readonly property bool hdrActive: root.mon?.cm === "hdr" || root.mon?.cm === "hdredid"
@@ -32,6 +36,10 @@ ContentSubsection {
     }
 
     GroupedList {
+        flat: root.flat
+        // breathing room above the first row (Bit depth) in the dropdown;
+        // grouped mode keeps its own segment padding.
+        Layout.topMargin: root.flat ? 10 : 0
         ConfigSelectionArray {
             text: Translation.tr("Bit depth")
             icon: "gradient"
