@@ -278,6 +278,7 @@ ComboBox {
 
                     TextField {
                         id: searchField
+                        ContextMenu.menu: StyledTextEditMenu { editor: searchField }
                         Layout.fillWidth: true
                         placeholderText: "Search..."
                         color: Appearance.colors.colOnLayer1
