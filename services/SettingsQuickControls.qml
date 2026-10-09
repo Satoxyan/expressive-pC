@@ -189,7 +189,6 @@ Singleton {
         "desktop:Clock/Quote/Enable": root.optionSwitch("background.widgets.clock.quote.enable"),
         "desktop:Follow Clock Font": root.optionSwitch("background.widgets.clock.quote.followClock"),
         "desktop:Custom Image/Enable": root.optionSwitch("background.widgets.customImage.enable"),
-        "desktop:Image card/Enable": root.optionSwitch("background.widgets.imageCard.enable"),
         "desktop:Show alignment grid while dragging": root.optionSwitch("background.showGrid"),
         "desktop:Show snap lines when dropping": root.optionSwitch("background.showSnapLines"),
 

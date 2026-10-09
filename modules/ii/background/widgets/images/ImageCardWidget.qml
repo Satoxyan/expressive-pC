@@ -9,10 +9,20 @@ import qs.modules.ii.background.widgets
 AbstractBackgroundWidget {
     id: root
     configEntryName: "imageCard"
+    // -1 = legacy single card from config.json; >= 0 = index into Config.imageCards
+    property int cardIndex: -1
+    configEntry: root.cardIndex >= 0
+        ? (Config.imageCards[root.cardIndex] ?? null)
+        : Config.options.background.widgets[root.configEntryName]
     hoverEnabled: true
 
-    property string imagePath: root.configEntry.path ?? ""
+    property string imagePath: root.configEntry?.path ?? ""
     property bool dropHover: false
+
+    function requestDelete() {
+        if (root.cardIndex >= 0) Config.removeImageCard(root.cardIndex);
+        else Config.options.background.widgets.imageCard.enable = false;
+    }
 
     readonly property real cardSpacing: 12
     readonly property real singleWidth: 132
@@ -26,7 +36,7 @@ AbstractBackgroundWidget {
     readonly property real rowToggleDelta: (root.doubleHeight - root.cardHeight) * 0.3
 
     property string dragMode: ""
-    readonly property string sizeMode: root.dragMode !== "" ? root.dragMode : (root.configEntry.sizeMode ?? "1x2")
+    readonly property string sizeMode: root.dragMode !== "" ? root.dragMode : (root.configEntry?.sizeMode ?? "1x2")
     readonly property bool doubleRow: root.sizeMode === "2x2" || root.sizeMode === "2x3"
 
     readonly property real modeWidth: {
@@ -62,9 +72,26 @@ AbstractBackgroundWidget {
             var cleanPath = drop.urls[0].toString().replace(/^file:\/\//, "")
             var ext = cleanPath.split(".").pop().toLowerCase()
             var accepted = ["png", "jpg", "jpeg", "webp", "avif", "bmp", "gif", "tiff", "tif"]
-            if (accepted.indexOf(ext) !== -1) root.configEntry.path = cleanPath
+            if (accepted.indexOf(ext) !== -1) {
+                if (root.cardIndex >= 0) Config.updateImageCard(root.cardIndex, { path: cleanPath });
+                else root.configEntry.path = cleanPath;
+            }
         }
         root.dropHover = false
+    }
+
+    // Base class writes configEntry.x/y in-memory; persist array entries
+    // without replacing the array (a full replace would rebuild this widget).
+    Connections {
+        target: root
+        function onReleased() {
+            if (root.cardIndex >= 0)
+                Config.saveImageCardProps(root.cardIndex, { x: root.x, y: root.y });
+        }
+        function onDragFinished() {
+            if (root.cardIndex >= 0 && root.configEntry)
+                Config.saveImageCardProps(root.cardIndex, { placementStrategy: root.configEntry.placementStrategy });
+        }
     }
 
     implicitWidth: card.implicitWidth
@@ -142,7 +169,8 @@ AbstractBackgroundWidget {
             resizeMode: "diagonal"
             onResizedXY: (dx, dy, startWidth) => { root.dragMode = root.modeForDrag(dx, dy, startWidth) }
             onResizeFinished: {
-                root.configEntry.sizeMode = root.sizeMode
+                if (root.cardIndex >= 0) Config.updateImageCard(root.cardIndex, { sizeMode: root.sizeMode });
+                else root.configEntry.sizeMode = root.sizeMode;
                 root.dragMode = ""
             }
         }

@@ -39,6 +39,7 @@ Item {
             { key: "visualizer" },
             { key: "customImages" },
             { key: "customImage" },
+            { key: "imageCards" },
             { key: "imageCard" },
             { key: "sticker" },
             { key: "calendar" },
@@ -68,6 +69,12 @@ Item {
                         && (loaderDelegate.modelData.alwaysOnLock
                             ? (GlobalStates.screenLocked || root.onThisScreen)
                             : root.onThisScreen)
+                if (loaderDelegate.modelData.key === "imageCards")
+                    return Array.isArray(Config.imageCards) && Config.imageCards.length > 0
+                        && loaderDelegate.enableLoading
+                        && (loaderDelegate.modelData.alwaysOnLock
+                            ? (GlobalStates.screenLocked || root.onThisScreen)
+                            : root.onThisScreen)
                 if (loaderDelegate.modelData.key === "sticker")
                     return Array.isArray(Config.stickers) && Config.stickers.length > 0
                         && loaderDelegate.enableLoading
@@ -88,6 +95,7 @@ Item {
                     case "visualizer":  return visualizerComp
                     case "customImages": return customImageComp
                     case "customImage": return customImageComp
+                    case "imageCards":  return imageCardsComp
                     case "imageCard":   return imageCardComp
                     case "sticker":     return stickerComp
                     case "calendar":    return calendarComp
@@ -145,6 +153,29 @@ Item {
             scaledScreenHeight: root.screen.height
             wallpaperScale: 1
             wallpaperItem: root.wallpaperItem
+        }
+    }
+    Component {
+        id: imageCardsComp
+        Item {
+            Repeater {
+                model: Config.imageCards
+                delegate: Item {
+                    required property var modelData
+                    required property int index
+                    visible: modelData.enable !== false
+                    ImageCardWidget {
+                        cardIndex: index
+                        imagePath: modelData.path ?? ""
+                        screenWidth: root.screen.width
+                        screenHeight: root.screen.height
+                        scaledScreenWidth: root.screen.width
+                        scaledScreenHeight: root.screen.height
+                        wallpaperScale: 1
+                        wallpaperItem: root.wallpaperItem
+                    }
+                }
+            }
         }
     }
     Component {

@@ -54,6 +54,41 @@ Singleton {
         _saveCustomImages();
     }
 
+    // imageCards — persisted in its own file (multi image cards, like customImages)
+    property var imageCards: []
+
+    function _imageCardsPath() {
+        return FileUtils.trimFileProtocol(Directories.config) + "/image-cards.json"
+    }
+
+    function _saveImageCards() {
+        _imageCardsFileView.setText(JSON.stringify(root.imageCards))
+    }
+
+    function updateImageCard(index, props) {
+        const current = Array.isArray(root.imageCards) ? root.imageCards : [];
+        root.imageCards = current.map((e, i) => i === index ? Object.assign({}, e, props) : e);
+        _saveImageCards();
+    }
+    function addImageCard() {
+        const current = Array.isArray(root.imageCards) ? root.imageCards : [];
+        root.imageCards = [...current, { enable: true, placementStrategy: "free", x: 400, y: 100, path: "", sizeMode: "1x2" }];
+        _saveImageCards();
+    }
+    function removeImageCard(index) {
+        const current = Array.isArray(root.imageCards) ? root.imageCards : [];
+        root.imageCards = current.filter((_, i) => i !== index);
+        _saveImageCards();
+    }
+    // Persists without replacing the array (no rebuild/blink). Use for
+    // values whose UI already reflects the change (e.g. drag position).
+    function saveImageCardProps(index, props) {
+        const arr = root.imageCards;
+        if (!Array.isArray(arr) || !arr[index]) return;
+        Object.assign(arr[index], props);
+        _saveImageCards();
+    }
+
     // --- Stickers ---
     function _stickersPath() {
         return FileUtils.trimFileProtocol(Directories.config) + "/stickers.json"
@@ -1164,6 +1199,28 @@ Singleton {
         onLoadFailed: error => {
             if (error == FileViewError.FileNotFound) {
                 _customImagesFileView.setText("[]")
+            }
+        }
+    }
+
+    FileView {
+        id: _imageCardsFileView
+        path: root._imageCardsPath()
+        watchChanges: false
+        onLoaded: {
+            const raw = _imageCardsFileView.text()
+            if (!raw) return
+            try {
+                const d = JSON.parse(raw)
+                if (Array.isArray(d))
+                    root.imageCards = d
+            } catch (e) {
+                console.warn("Config: failed to parse image-cards.json:", e)
+            }
+        }
+        onLoadFailed: error => {
+            if (error == FileViewError.FileNotFound) {
+                _imageCardsFileView.setText("[]")
             }
         }
     }

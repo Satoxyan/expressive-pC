@@ -101,7 +101,7 @@ Item {
         if (type === "barlayout") return [4, 3];
         if (type === "displays") return [4, 4];
         if (type === "stickers" || type === "autostart") return [4, 4];
-        if (type === "customimages") return [4, 1];
+        if (type === "customimages" || type === "imagecards") return [4, 1];
         if (type === "barscreens") return [4, 2];
         if (type === "palette") return [4, 1];
         if (type === "iconpicker") return [2, 2];
@@ -620,6 +620,7 @@ Item {
                             : modelData.type === "barscreens" ? barScreensComponent
                             : modelData.type === "autostart" ? autostartComponent
                             : modelData.type === "customimages" ? customImagesComponent
+                            : modelData.type === "imagecards" ? imageCardsComponent
                             : modelData.type === "palette" ? paletteComponent
                             : modelData.type === "duration" ? durationComponent
                             : modelData.type === "iconpicker" ? iconPickerComponent
@@ -1048,6 +1049,22 @@ Item {
                                         }
                                     }
                                 }
+                            }
+                        }
+
+                        Component {
+                            id: imageCardsComponent
+                            DashboardSectionCard {
+                                anchors.fill: parent
+                                title: slot.modelData.title
+                                icon: slot.modelData.icon
+                                tileShape: slot.modelData.shape
+                                pager: root.pager
+                                staggerMs: root.staggerMs
+                                animIndex: slot.index % 6
+                                travelX: slot.modelData.travelX
+                                travelY: slot.modelData.travelY
+                                content: Component { ImageCardsSection {} }
                             }
                         }
 
