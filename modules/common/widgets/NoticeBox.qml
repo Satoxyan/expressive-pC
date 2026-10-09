@@ -8,9 +8,12 @@ Rectangle {
     property alias materialIcon: icon.text
     property alias text: noticeText.text
     default property alias data: buttonRow.data
+    // Colour slots; defaults keep the old hard-coded primary values.
+    property color colBg: Appearance.colors.colPrimaryContainer
+    property color colFg: Appearance.colors.colOnPrimaryContainer
 
     radius: Appearance.rounding.normal
-    color: Appearance.colors.colPrimaryContainer
+    color: root.colBg
     implicitWidth: mainRowLayout.implicitWidth + mainRowLayout.anchors.margins * 2
     implicitHeight: mainRowLayout.implicitHeight + mainRowLayout.anchors.margins * 2
 
@@ -26,7 +29,7 @@ Rectangle {
             Layout.alignment: Qt.AlignTop
             text: "info"
             iconSize: Appearance.font.pixelSize.huge
-            color: Appearance.colors.colOnPrimaryContainer
+            color: root.colFg
         }
 
         ColumnLayout {
@@ -37,7 +40,7 @@ Rectangle {
                 id: noticeText
                 Layout.fillWidth: true
                 text: "Notice message"
-                color: Appearance.colors.colOnPrimaryContainer
+                color: root.colFg
                 wrapMode: Text.WordWrap
             }
 

@@ -13,6 +13,7 @@ Switch {
 
     property color activeColor: Appearance?.colors.colPrimaryContainer ?? "#cbc4cb"
     property color inactiveColor: Appearance?.m3colors.m3surfaceBright ?? "#3a3939"
+    property color thumbColor: Appearance?.colors.colPrimary ?? "#685496"
 
     PointingHandInteraction {}
 
@@ -46,7 +47,7 @@ Switch {
         height: thumbSize
         radius: Appearance.rounding.full
 
-        color: Appearance.colors.colPrimary
+        color: root.thumbColor
 
         layer.enabled: true
         layer.effect: MultiEffect {

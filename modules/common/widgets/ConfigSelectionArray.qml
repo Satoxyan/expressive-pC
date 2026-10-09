@@ -23,6 +23,19 @@ RowLayout {
     ]
     property var currentValue: null
     property bool textOnlyWhenActive: false
+    // Accent for the selected chip; default keeps the primary accent.
+    property color colToggled: Appearance.colors.colPrimary
+    property color colToggledHover: Appearance.colors.colPrimaryHover
+    property color colToggledActive: Appearance.colors.colPrimaryActive
+    // Label colour of the selected chip; default keeps the old value.
+    property color colToggledText: Appearance.colors.colOnPrimary
+    // Left label colour; default keeps the old hard-coded value.
+    property color colLabel: Appearance.colors.colOnSecondaryContainer
+    // Unselected chip colours; defaults keep the old hard-coded greys.
+    property color colChip: Appearance.colors.colSecondaryContainer
+    property color colChipHover: Appearance.colors.colSecondaryContainerHover
+    property color colChipActive: Appearance.colors.colSecondaryContainerActive
+    property color colChipText: Appearance.colors.colOnSecondaryContainer
 
     signal selected(var newValue)
 
@@ -35,13 +48,14 @@ RowLayout {
         visible: root.text !== ""
         OptionalMaterialSymbol {
             icon: root.icon
+            iconColor: root.colLabel
             opacity: root.enabled ? 1 : 0.4
         }
         StyledText {
             id: labelWidget
             Layout.fillWidth: true
             text: root.text
-            color: Appearance.colors.colOnSecondaryContainer
+            color: root.colLabel
             opacity: root.enabled ? 1 : 0.4
         }
     }
@@ -109,6 +123,14 @@ RowLayout {
                     : contentItem.implicitWidth + horizontalPadding * 2
                 leftmost: index === 0
                 rightmost: index === root.options.length - 1
+                colBackground: root.colChip
+                colBackgroundHover: root.colChipHover
+                colBackgroundActive: root.colChipActive
+                colTextInactive: root.colChipText
+                colTextActive: root.colToggledText
+                colBackgroundToggled: root.colToggled
+                colBackgroundToggledHover: root.colToggledHover
+                colBackgroundToggledActive: root.colToggledActive
                 buttonIcon: modelData.icon || ""
                 buttonText: (!root.textOnlyWhenActive || toggled || hovered) ? modelData.displayName : ""
                 toggled: root.currentValue == modelData.value

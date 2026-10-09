@@ -9,6 +9,9 @@ ColumnLayout {
     property string tooltip: ""
     default property alias data: sectionContent.data
 
+    // Base title colour; the flash tint stays primary.
+    property color colTitle: Appearance.colors.colSubtext
+
     property real flashScan: 0
     property real flashTint: 0
 
@@ -43,7 +46,7 @@ ColumnLayout {
         ContentSubsectionLabel {
             visible: root.title && root.title.length > 0
             text: root.title
-            color: Qt.tint(Appearance.colors.colSubtext, Qt.rgba(Appearance.colors.colPrimary.r, Appearance.colors.colPrimary.g, Appearance.colors.colPrimary.b, root.flashTint))
+            color: Qt.tint(root.colTitle, Qt.rgba(Appearance.colors.colPrimary.r, Appearance.colors.colPrimary.g, Appearance.colors.colPrimary.b, root.flashTint))
 
             TitleScanLine {
                 anchors.left: parent.left

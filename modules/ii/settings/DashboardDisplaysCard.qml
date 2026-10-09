@@ -40,6 +40,41 @@ DashboardCard {
 
             DisplaysSection {
                 Layout.fillWidth: true
+                // M3 Expressive: the whole monitor block reads tertiary
+                // (green) — solid canvas tile, green surfaces, labels and
+                // controls, inside the dropdown too.
+                accent: Appearance.colors.colTertiary
+                accentHover: Appearance.colors.colTertiaryHover
+                accentActive: Appearance.colors.colTertiaryActive
+                accentContainer: Appearance.colors.colTertiaryContainer
+                accentOn: Appearance.colors.colOnTertiary
+                panelColor: Appearance.colors.colTertiaryContainer
+                accentFill: Appearance.colors.colTertiary
+                accentOnFill: Appearance.colors.colOnTertiary
+                accentOnFillSub: Appearance.colors.colOnTertiary
+                rowBg: Appearance.colors.colTertiaryContainer
+                surfaceText: Appearance.colors.colOnTertiaryContainer
+                chevronColor: Appearance.colors.colOnTertiaryContainer
+                fieldBg: Appearance.colors.colTertiary
+                fieldBgHover: Appearance.colors.colTertiaryHover
+                fieldBgActive: Appearance.colors.colTertiaryActive
+                fieldText: Appearance.colors.colOnTertiary
+                spinBg: Appearance.colors.colTertiary
+                spinFg: Appearance.colors.colOnTertiary
+                spinBgHover: Appearance.colors.colTertiaryHover
+                spinBgActive: Appearance.colors.colTertiaryActive
+                noticeBg: Appearance.colors.colTertiary
+                noticeFg: Appearance.colors.colOnTertiary
+                titleColor: Appearance.colors.colOnTertiaryContainer
+                colChip: Appearance.colors.colTertiaryActive
+                colChipHover: Appearance.colors.colTertiaryHover
+                colChipActive: Appearance.colors.colTertiaryHover
+                colChipText: Appearance.colors.colOnTertiaryContainer
+                colToggledText: Appearance.colors.colOnTertiary
+                colPopup: Appearance.colors.colTertiaryContainer
+                colPopupText: Appearance.colors.colOnTertiaryContainer
+                colPopupHover: Appearance.colors.colTertiaryHover
+                colPopupActive: Appearance.colors.colTertiaryHover
             }
         }
     }

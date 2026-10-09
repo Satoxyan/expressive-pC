@@ -15,11 +15,54 @@ ContentSection {
     icon: "monitor"
     shape: MaterialShape.Shape.ClamShell
     title: Translation.tr("Displays")
+    // The monitor canvas is the point of this section; keep it always open.
+    collapsible: false
     visible: monitorConfig.monitors.length > 0
 
     // Dropdown menus tracked per monitor name, so several can be open at
     // once and a hotplug reorder doesn't shuffle them.
     property var openMonitors: ({})
+
+    // Accent family (primary by default). The dashboard Displays card passes
+    // the tertiary family so the canvas, rows and dropdown read M3 Expressive.
+    property color accent: Appearance.colors.colPrimary
+    property color accentHover: Appearance.colors.colPrimaryHover
+    property color accentActive: Appearance.colors.colPrimaryActive
+    property color accentContainer: Appearance.colors.colPrimaryContainer
+    property color accentOn: Appearance.colors.colOnPrimary
+    // Canvas: panel surface + selected rectangle fill + its label.
+    property color panelColor: Appearance.colors.colLayer1
+    property color accentFill: Appearance.colors.colPrimaryContainer
+    property color accentOnFill: Appearance.colors.colOnPrimaryContainer
+    property color accentOnFillSub: Appearance.colors.colSubtext
+    // Surfaces, labels and controls. Defaults are the old hard-coded
+    // colours; the dashboard passes the tertiary family so rows, the
+    // dropdown and everything inside it read M3 Expressive too.
+    property color rowBg: Appearance.colors.colLayer1
+    property color surfaceText: Appearance.colors.colOnSecondaryContainer
+    property color chevronColor: Appearance.colors.colOnLayer1
+    property color fieldBg: Appearance.colors.colSecondaryContainer
+    property color fieldBgHover: Appearance.colors.colSecondaryContainerHover
+    property color fieldBgActive: Appearance.colors.colSecondaryContainerActive
+    property color fieldText: Appearance.colors.colOnSecondaryContainer
+    property color spinBg: Appearance.colors.colLayer2
+    property color spinFg: Appearance.colors.colOnLayer2
+    property color spinBgHover: Appearance.colors.colLayer2Hover
+    property color spinBgActive: Appearance.colors.colLayer2Active
+    property color noticeBg: Appearance.colors.colPrimaryContainer
+    property color noticeFg: Appearance.colors.colOnPrimaryContainer
+    property color titleColor: Appearance.colors.colSubtext
+    // Unselected chips and combobox popups; defaults keep the old greys.
+    property color colChip: Appearance.colors.colSecondaryContainer
+    property color colChipHover: Appearance.colors.colSecondaryContainerHover
+    property color colChipActive: Appearance.colors.colSecondaryContainerActive
+    property color colChipText: Appearance.colors.colOnSecondaryContainer
+    // Selected chip label; default keeps the old value.
+    property color colToggledText: Appearance.colors.colOnPrimary
+    property color colPopup: Appearance.m3colors.m3surfaceContainerHigh
+    property color colPopupText: Appearance.colors.colOnLayer3
+    property color colPopupHover: Appearance.colors.colLayer3Hover
+    property color colPopupActive: Appearance.colors.colLayer3Active
 
     function toggleAdvanced(monName) {
         const next = Object.assign({}, root.openMonitors)
@@ -33,6 +76,11 @@ ContentSection {
             id: monitorCanvas
             Layout.fillWidth: true
             monitorConfig: monitorConfig
+            accent: root.accent
+            panelColor: root.panelColor
+            accentFill: root.accentFill
+            accentOnFill: root.accentOnFill
+            accentOnFillSub: root.accentOnFillSub
         }
 
         // One dropdown row per connected monitor. The chevron selects that
@@ -60,6 +108,7 @@ ContentSection {
                 function toggleCollapsed() { root.toggleAdvanced(monCol.monName) }
 
                 GroupedList {
+                    bgcolor: root.rowBg
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 8
@@ -81,7 +130,7 @@ ContentSection {
                                 MaterialSymbol {
                                     text: "tv_off"
                                     iconSize: Appearance.font.pixelSize.larger
-                                    color: Appearance.colors.colOnSecondaryContainer
+                                    color: root.surfaceText
                                     opacity: monCol.monOn ? 1 : 0.4
                                 }
                                 StyledText {
@@ -89,7 +138,7 @@ ContentSection {
                                     text: (monitorConfig.monitors[index]?.name ?? "")
                                         + (monitorConfig.monitors[index]?.description ? " \u00b7 " + monitorConfig.monitors[index]?.description : "")
                                     font: monRow.font
-                                    color: Appearance.colors.colOnSecondaryContainer
+                                    color: root.surfaceText
                                 }
                             }
                         }
@@ -107,12 +156,14 @@ ContentSection {
                                 iconSize: 20
                                 // Filled when pinned, outline otherwise — same colour either way.
                                 fill: monCol.monName === monitorConfig.mirrorSource ? 1 : 0
-                                color: Appearance.colors.colPrimary
+                                color: root.accent
                             }
                         }
                         StyledSwitch {
                             checked: monCol.monOn
                             enabled: !monCol.monOn || monCol.canTurnOff
+                            activeColor: root.accentContainer
+                            thumbColor: root.accent
                             onClicked: {
                                 if (!checked && !monCol.canTurnOff) return
                                 if (checked === monCol.monOn) return
@@ -132,7 +183,7 @@ ContentSection {
                                 anchors.centerIn: parent
                                 text: monCol.open ? "expand_less" : "expand_more"
                                 iconSize: 20
-                                color: Appearance.colors.colOnLayer1
+                                color: root.chevronColor
                             }
                         }
                     }
@@ -141,6 +192,7 @@ ContentSection {
                 // Advanced options for this monitor, right under its row.
                 // Scroll-down animation, no empty column when collapsed.
                 GroupedList {
+                    bgcolor: root.rowBg
                     visible: monCol.open || implicitHeight > 0
                     Layout.topMargin: 1
                     Layout.bottomMargin: monCol.open ? 24 : 0
@@ -161,6 +213,15 @@ ContentSection {
                             Layout.fillWidth: true
                             buttonIcon: "aspect_ratio"
                             text: Translation.tr("Resolution & Refresh Rate")
+                            colLabel: root.surfaceText
+                            fieldBg: root.fieldBg
+                            fieldBgHover: root.fieldBgHover
+                            fieldBgActive: root.fieldBgActive
+                            fieldText: root.fieldText
+                            colPopup: root.colPopup
+                            colPopupText: root.colPopupText
+                            colPopupHover: root.colPopupHover
+                            colPopupActive: root.colPopupActive
                             textRole: "display"
                             model: (monitorConfig.monitors[index]?.availableModes ?? [])
                                 .map(mode => ({ display: mode, value: mode }))
@@ -182,6 +243,15 @@ ContentSection {
                             visible: monitorConfig.monitors.length > 1
                             text: Translation.tr("Display mode")
                             icon: "screenshot_monitor"
+                            colLabel: root.surfaceText
+                            colChip: root.colChip
+                            colChipHover: root.colChipHover
+                            colChipActive: root.colChipActive
+                            colChipText: root.colChipText
+                            colToggled: root.accent
+                            colToggledText: root.colToggledText
+                            colToggledHover: root.accentHover
+                            colToggledActive: root.accentActive
                             currentValue: (monitorConfig.monitors[index]?.mirror ?? "") !== "" ? "mirror" : "extended"
                             onSelected: newValue => {
                                 monitorConfig.setMirroring(index, newValue === "mirror")
@@ -196,6 +266,15 @@ ContentSection {
                         ConfigSelectionArray {
                             text: Translation.tr("Orientation")
                             icon: "mobile_rotate"
+                            colLabel: root.surfaceText
+                            colChip: root.colChip
+                            colChipHover: root.colChipHover
+                            colChipActive: root.colChipActive
+                            colChipText: root.colChipText
+                            colToggled: root.accent
+                            colToggledText: root.colToggledText
+                            colToggledHover: root.accentHover
+                            colToggledActive: root.accentActive
                             currentValue: monitorConfig.monitors[index]?.transform ?? 0
                             onSelected: newValue => {
                                 monitorConfig.updateMonitor(index, { transform: newValue })
@@ -212,6 +291,11 @@ ContentSection {
                         ConfigSpinBox {
                             icon: "zoom_in"
                             text: Translation.tr("Scale")
+                            colLabel: root.surfaceText
+                            spinBg: root.spinBg
+                            spinFg: root.spinFg
+                            spinBgHover: root.spinBgHover
+                            spinBgActive: root.spinBgActive
                             value: Math.round((monitorConfig.monitors[index]?.scale ?? 1.0) * 100)
                             from: 50; to: 300; stepSize: 25
                             onValueChanged: {
@@ -225,6 +309,11 @@ ContentSection {
                         ConfigSpinBox {
                             icon: "swap_horiz"
                             text: Translation.tr("Position X")
+                            colLabel: root.surfaceText
+                            spinBg: root.spinBg
+                            spinFg: root.spinFg
+                            spinBgHover: root.spinBgHover
+                            spinBgActive: root.spinBgActive
                             value: monitorConfig.monitors[index]?.x ?? 0
                             from: 0; to: 65535; stepSize: 1
                             onValueChanged: {
@@ -237,6 +326,11 @@ ContentSection {
                         ConfigSpinBox {
                             icon: "swap_vert"
                             text: Translation.tr("Position Y")
+                            colLabel: root.surfaceText
+                            spinBg: root.spinBg
+                            spinFg: root.spinFg
+                            spinBgHover: root.spinBgHover
+                            spinBgActive: root.spinBgActive
                             value: monitorConfig.monitors[index]?.y ?? 0
                             from: 0; to: 65535; stepSize: 1
                             onValueChanged: {
@@ -252,6 +346,30 @@ ContentSection {
                         HdrSection {
                             monConfig: monitorConfig
                             monitorIndex: index
+                            colToggled: root.accent
+                            colToggledHover: root.accentHover
+                            colToggledActive: root.accentActive
+                            colTitle: root.titleColor
+                            surfaceText: root.surfaceText
+                            fieldBg: root.fieldBg
+                            fieldBgHover: root.fieldBgHover
+                            fieldBgActive: root.fieldBgActive
+                            fieldText: root.fieldText
+                            spinBg: root.spinBg
+                            spinFg: root.spinFg
+                            spinBgHover: root.spinBgHover
+                            spinBgActive: root.spinBgActive
+                            noticeBg: root.noticeBg
+                            noticeFg: root.noticeFg
+                            colChip: root.colChip
+                            colChipHover: root.colChipHover
+                            colChipActive: root.colChipActive
+                            colChipText: root.colChipText
+                            colToggledText: root.colToggledText
+                            colPopup: root.colPopup
+                            colPopupText: root.colPopupText
+                            colPopupHover: root.colPopupHover
+                            colPopupActive: root.colPopupActive
                         }
                     }
                 }
@@ -267,14 +385,14 @@ ContentSection {
             Layout.preferredHeight: monitorConfig.dirty ? 44 : 0
             buttonText: Translation.tr("Apply")
             buttonRadius: Appearance.rounding.full
-            colBackground: Appearance.colors.colPrimary
-            colBackgroundHover: Appearance.colors.colPrimaryHover
-            colRipple: Appearance.colors.colPrimaryActive
+            colBackground: root.accent
+            colBackgroundHover: root.accentHover
+            colRipple: root.accentActive
             downAction: () => monitorConfig.applyAll()
             contentItem: StyledText {
                 text: parent.buttonText
                 horizontalAlignment: Text.AlignHCenter
-                color: Appearance.colors.colOnPrimary
+                color: root.accentOn
             }
         }
 

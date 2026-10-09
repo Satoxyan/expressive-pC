@@ -16,6 +16,14 @@ Rectangle {
     property bool isSelected: false
     property var previewPositions: ({})
     property bool hasOverlap: false
+    // Accent family (primary by default); the dashboard Displays card
+    // passes tertiary so the whole monitor block reads M3 Expressive.
+    property color accent: Appearance.colors.colPrimary
+    property color accentFill: Appearance.colors.colPrimaryContainer
+    property color accentOnFill: Appearance.colors.colOnPrimaryContainer
+    // Resolution line on the selected tile; dashboard matches it to the
+    // name, the default page keeps it as subtext.
+    property color accentOnFillSub: Appearance.colors.colSubtext
 
     signal positionCommitted(int index, int x, int y)
     signal monitorClicked(int index)
@@ -57,14 +65,14 @@ Rectangle {
     color: {
         if (monitor.disabled)             return Appearance.colors.colLayer2
         if (isDragging && hasOverlap)     return Qt.alpha(Appearance.m3colors.m3error, 0.5)
-        if (isDragging)                   return Qt.alpha(Appearance.colors.colPrimaryContainer, 0.7)
-        if (isSelected)                   return Appearance.colors.colPrimaryContainer
+        if (isDragging)                   return Qt.alpha(root.accentFill, 0.7)
+        if (isSelected)                   return root.accentFill
         if (hoverArea.containsMouse)      return Appearance.colors.colSecondaryContainerHover
         return Appearance.colors.colSecondaryContainer
     }
 
     border.color: (isDragging && hasOverlap) ? Appearance.m3colors.m3error
-        : (isDragging || isSelected) ? Appearance.colors.colPrimary
+        : (isDragging || isSelected) ? root.accent
         : Appearance.colors.colLayer0Border
     border.width: (isDragging || isSelected) ? 2 : 1
 
@@ -82,7 +90,7 @@ Rectangle {
         height: root.height
         radius: root.radius
         color: "transparent"
-        border.color: Appearance.colors.colPrimary
+        border.color: root.accent
         border.width: 2
         opacity: 0.6
     }
@@ -96,8 +104,8 @@ Rectangle {
             text: monitor.disabled ? "desktop_access_disabled" : "desktop_windows"
             iconSize: Math.min(20, Math.min(root.width * 0.25, root.height * 0.25))
             color: monitor.disabled ? Appearance.colors.colSubtext
-                : isSelected ? Appearance.colors.colOnPrimaryContainer
-                : Appearance.colors.colPrimary
+                : isSelected ? root.accentOnFill
+                : root.accent
         }
 
         StyledText {
@@ -106,7 +114,7 @@ Rectangle {
             font.pixelSize: Math.max(9, Math.min(13, root.width * 0.1))
             font.weight: Font.Medium
             color: monitor.disabled ? Appearance.colors.colSubtext
-                : isSelected ? Appearance.colors.colOnPrimaryContainer
+                : isSelected ? root.accentOnFill
                 : Appearance.colors.colOnSecondaryContainer
             elide: Text.ElideMiddle
             width: Math.min(implicitWidth, root.width - 8)
@@ -117,7 +125,7 @@ Rectangle {
             anchors.horizontalCenter: parent.horizontalCenter
             text: `${root.logW}x${root.logH}`
             font.pixelSize: Math.max(8, Math.min(10, root.width * 0.08))
-            color: Appearance.colors.colSubtext
+            color: root.isSelected && !monitor.disabled ? root.accentOnFillSub : Appearance.colors.colSubtext
             horizontalAlignment: Text.AlignHCenter
         }
     }

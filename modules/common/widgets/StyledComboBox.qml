@@ -15,6 +15,13 @@ ComboBox {
     property color colBackground: Appearance.colors.colSecondaryContainer
     property color colBackgroundHover: Appearance.colors.colSecondaryContainerHover
     property color colBackgroundActive: Appearance.colors.colSecondaryContainerActive
+    // Field text/indicator colour; default keeps the old hard-coded value.
+    property color colFieldText: Appearance.colors.colOnSecondaryContainer
+    // Popup colours; defaults keep the old hard-coded values.
+    property color colPopup: Appearance.m3colors.m3surfaceContainerHigh
+    property color colPopupText: Appearance.colors.colOnLayer3
+    property color colPopupHover: Appearance.colors.colLayer3Hover
+    property color colPopupActive: Appearance.colors.colLayer3Active
 
     implicitHeight: 40
     Layout.fillWidth: true
@@ -39,7 +46,7 @@ ComboBox {
         y: root.height / 2 - height / 2
         text: "keyboard_arrow_down"
         iconSize: Appearance.font.pixelSize.larger
-        color: Appearance.colors.colOnSecondaryContainer
+        color: root.colFieldText
 
         rotation: root.popup.visible ? 180 : 0
         Behavior on rotation {
@@ -70,14 +77,14 @@ ComboBox {
                         return root.buttonIcon;
                     }
                     iconSize: Appearance.font.pixelSize.larger
-                    color: Appearance.colors.colOnSecondaryContainer
+                    color: root.colFieldText
                 }
             }
 
             StyledText {
                 Layout.fillWidth: true
                 Layout.alignment: Qt.AlignVCenter
-                color: Appearance.colors.colOnSecondaryContainer
+                color: root.colFieldText
                 text: root.displayText
                 elide: Text.ElideRight
                 verticalAlignment: Text.AlignVCenter
@@ -98,12 +105,12 @@ ComboBox {
                 if (itemDelegate.hovered) return root.colBackgroundHover;
                 return root.colBackground;
             } else {
-                if (itemDelegate.down) return Appearance.colors.colLayer3Active;
-                if (itemDelegate.hovered) return Appearance.colors.colLayer3Hover;
-                return ColorUtils.transparentize(Appearance.colors.colLayer3);
+                if (itemDelegate.down) return root.colPopupActive;
+                if (itemDelegate.hovered) return root.colPopupHover;
+                return ColorUtils.transparentize(root.colPopup);
             }
         }
-        property color colText: (root.currentIndex === itemDelegate.index) ? Appearance.colors.colOnSecondaryContainer : Appearance.colors.colOnLayer3
+        property color colText: (root.currentIndex === itemDelegate.index) ? root.colFieldText : root.colPopupText
 
         background: Rectangle {
             anchors.fill: parent
@@ -192,7 +199,7 @@ ComboBox {
                 id: popupBackground
                 anchors.fill: parent
                 radius: Appearance.rounding.normal
-                color: Appearance.m3colors.m3surfaceContainerHigh
+                color: root.colPopup
             }
         }
 

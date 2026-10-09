@@ -16,7 +16,10 @@ GroupButton {
 
     property bool isDragging: false
     readonly property bool showToggled: root.toggled && root.enabled
-    property color colText: root.showToggled ? Appearance.colors.colOnPrimary : Appearance.colors.colOnSecondaryContainer
+    // Chip label colours; defaults keep the old hard-coded values.
+    property color colTextInactive: Appearance.colors.colOnSecondaryContainer
+    property color colTextActive: Appearance.colors.colOnPrimary
+    property color colText: root.showToggled ? root.colTextActive : root.colTextInactive
 
     leftRadius: (showToggled || leftmost) ? (height / 2) : Appearance.rounding.unsharpenmore
     rightRadius: (showToggled || rightmost) ? (height / 2) : Appearance.rounding.unsharpenmore

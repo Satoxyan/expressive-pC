@@ -12,12 +12,17 @@ SpinBox {
     property real baseHeight: 35
     property real radius: Appearance.rounding.small
     property real innerButtonRadius: Appearance.rounding.unsharpen
+    // Colour slots; defaults keep the old hard-coded layer colours.
+    property color colBg: Appearance.colors.colLayer2
+    property color colFg: Appearance.colors.colOnLayer2
+    property color colBgHover: Appearance.colors.colLayer2Hover
+    property color colBgPressed: Appearance.colors.colLayer2Active
     editable: true
 
     opacity: root.enabled ? 1 : 0.4
 
     background: Rectangle {
-        color: Appearance.colors.colLayer2
+        color: root.colBg
         radius: root.radius
     }
 
@@ -29,7 +34,7 @@ SpinBox {
             id: labelText
             anchors.centerIn: parent
             text: root.value // displayText would make the numbers weird like 1,000 instead of 1000
-            color: Appearance.colors.colOnLayer2
+            color: root.colFg
             font.family: Appearance.font.family.numbers
             font.variableAxes: Appearance.font.variableAxes.numbers
             font.pixelSize: Appearance.font.pixelSize.small
@@ -52,9 +57,9 @@ SpinBox {
         topRightRadius: root.innerButtonRadius
         bottomRightRadius: root.innerButtonRadius
 
-        color: root.down.pressed ? Appearance.colors.colLayer2Active : 
-            root.down.hovered ? Appearance.colors.colLayer2Hover : 
-            ColorUtils.transparentize(Appearance.colors.colLayer2)
+        color: root.down.pressed ? root.colBgPressed :
+            root.down.hovered ? root.colBgHover :
+            ColorUtils.transparentize(root.colBg)
         Behavior on color {
             animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
         }
@@ -63,7 +68,7 @@ SpinBox {
             anchors.centerIn: parent
             text: "remove"
             iconSize: 20
-            color: Appearance.colors.colOnLayer2
+            color: root.colFg
         }
     }
 
@@ -79,9 +84,9 @@ SpinBox {
         topLeftRadius: root.innerButtonRadius
         bottomLeftRadius: root.innerButtonRadius
 
-        color: root.up.pressed ? Appearance.colors.colLayer2Active : 
-            root.up.hovered ? Appearance.colors.colLayer2Hover : 
-            ColorUtils.transparentize(Appearance.colors.colLayer2)
+        color: root.up.pressed ? root.colBgPressed :
+            root.up.hovered ? root.colBgHover :
+            ColorUtils.transparentize(root.colBg)
         Behavior on color {
             animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
         }
@@ -90,7 +95,7 @@ SpinBox {
             anchors.centerIn: parent
             text: "add"
             iconSize: 20
-            color: Appearance.colors.colOnLayer2
+            color: root.colFg
         }
     }
 }

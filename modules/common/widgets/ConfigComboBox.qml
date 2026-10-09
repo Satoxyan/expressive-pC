@@ -17,6 +17,16 @@ RowLayout {
     property real fieldWidth: 220
     property bool fixedWidth: false
     property bool searchable: false
+    // Colour slots; defaults keep the old hard-coded colours.
+    property color colLabel: Appearance.colors.colOnSecondaryContainer
+    property color fieldBg: Appearance.colors.colSecondaryContainer
+    property color fieldBgHover: Appearance.colors.colSecondaryContainerHover
+    property color fieldBgActive: Appearance.colors.colSecondaryContainerActive
+    property color fieldText: Appearance.colors.colOnSecondaryContainer
+    property color colPopup: Appearance.m3colors.m3surfaceContainerHigh
+    property color colPopupText: Appearance.colors.colOnLayer3
+    property color colPopupHover: Appearance.colors.colLayer3Hover
+    property color colPopupActive: Appearance.colors.colLayer3Active
 
     readonly property var comboBox: root.searchable ? searchComboBox : comboBox
 
@@ -29,6 +39,7 @@ RowLayout {
     OptionalMaterialSymbol {
         icon: root.buttonIcon
         iconSize: Appearance.font.pixelSize.larger
+        iconColor: root.colLabel
         opacity: root.enabled ? 1 : 0.4
     }
 
@@ -38,7 +49,7 @@ RowLayout {
         StyledText {
             Layout.fillWidth: true
             text: root.text
-            color: Appearance.colors.colOnSecondaryContainer
+            color: root.colLabel
             opacity: root.enabled ? 1 : 0.4
         }
         StyledText {
@@ -61,6 +72,14 @@ RowLayout {
         enabled: root.enabled
         textRole: root.textRole
         model: root.model
+        colBackground: root.fieldBg
+        colBackgroundHover: root.fieldBgHover
+        colBackgroundActive: root.fieldBgActive
+        colFieldText: root.fieldText
+        colPopup: root.colPopup
+        colPopupText: root.colPopupText
+        colPopupHover: root.colPopupHover
+        colPopupActive: root.colPopupActive
 
         currentIndex: {
             const index = root.model.findIndex(item => item.value === root.currentValue);
