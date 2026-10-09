@@ -100,6 +100,11 @@ DashboardCard {
 
                     readonly property bool on: DesktopWidgets.isEnabled(modelData.key)
                     readonly property bool starred: DesktopWidgets.isStarred(modelData.key)
+                    // Per-widget blur/tint config (same keys the default settings
+                    // page uses). visualizer doesn't consume them; customImage /
+                    // imageCard don't define them.
+                    readonly property var cfg: Config.options.background.widgets[modelData.key]
+                    readonly property bool hasStyleBtns: cfg.blur !== undefined && modelData.key !== "visualizer"
 
                     Layout.fillWidth: true
                     Layout.fillHeight: true
@@ -150,38 +155,91 @@ DashboardCard {
                         }
                     }
 
-                    RippleButton {
-                        id: starButton
+                    RowLayout {
                         anchors.top: parent.top
                         anchors.right: parent.right
                         anchors.margins: 6
-                        implicitWidth: 30
-                        implicitHeight: 30
-                        buttonRadius: 15
-                        colBackground: "transparent"
-                        colBackgroundHover: tile.on ? Appearance.colors.colPrimaryContainerHover : Appearance.colors.colLayer2Hover
-                        colRipple: tile.on ? Appearance.colors.colPrimaryContainerActive : Appearance.colors.colLayer2Active
-                        downAction: () => {
-                            const key = tile.modelData.key;
-                            starPop.restart();
-                            Qt.callLater(() => DesktopWidgets.toggleStar(key));
+                        spacing: 4
+
+                        // Independent blur & tint toggles, same config keys as
+                        // the default settings page; shown only while the
+                        // widget is on the desktop.
+                        RippleButton {
+                            visible: tile.hasStyleBtns && tile.on
+                            implicitWidth: 30
+                            implicitHeight: 30
+                            buttonRadius: 15
+                            colBackground: "transparent"
+                            colBackgroundHover: tile.on ? Appearance.colors.colPrimaryContainerHover : Appearance.colors.colLayer2Hover
+                            colRipple: tile.on ? Appearance.colors.colPrimaryContainerActive : Appearance.colors.colLayer2Active
+                            downAction: () => {
+                                const c = tile.cfg;
+                                c.blur = !c.blur;
+                            }
+                            contentItem: MaterialSymbol {
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                text: "blur_on"
+                                fill: tile.cfg.blur ? 1 : 0
+                                iconSize: 20
+                                color: tile.cfg.blur ? Appearance.colors.colPrimary : (tile.on ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colSubtext)
+                                opacity: tile.cfg.blur ? 1 : 0.55
+                            }
                         }
 
-                        SequentialAnimation {
-                            id: starPop
-                            NumberAnimation { target: starIcon; property: "scale"; to: 0.6; duration: 90; easing.type: Easing.InQuad }
-                            SpringAnimation { target: starIcon; property: "scale"; to: 1; spring: 4; damping: 0.22 }
+                        RippleButton {
+                            visible: tile.hasStyleBtns && tile.on
+                            implicitWidth: 30
+                            implicitHeight: 30
+                            buttonRadius: 15
+                            colBackground: "transparent"
+                            colBackgroundHover: tile.on ? Appearance.colors.colPrimaryContainerHover : Appearance.colors.colLayer2Hover
+                            colRipple: tile.on ? Appearance.colors.colPrimaryContainerActive : Appearance.colors.colLayer2Active
+                            downAction: () => {
+                                const c = tile.cfg;
+                                c.tintBlur = !c.tintBlur;
+                            }
+                            contentItem: MaterialSymbol {
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                text: "palette"
+                                fill: tile.cfg.tintBlur ? 1 : 0
+                                iconSize: 20
+                                color: tile.cfg.tintBlur ? Appearance.colors.colPrimary : (tile.on ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colSubtext)
+                                opacity: tile.cfg.tintBlur ? 1 : 0.55
+                            }
                         }
 
-                        contentItem: MaterialSymbol {
-                            id: starIcon
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            text: "star"
-                            fill: tile.starred ? 1 : 0
-                            iconSize: 20
-                            color: tile.starred ? Appearance.colors.colTertiary : (tile.on ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colSubtext)
-                            opacity: tile.starred ? 1 : 0.55
+                        RippleButton {
+                            id: starButton
+                            implicitWidth: 30
+                            implicitHeight: 30
+                            buttonRadius: 15
+                            colBackground: "transparent"
+                            colBackgroundHover: tile.on ? Appearance.colors.colPrimaryContainerHover : Appearance.colors.colLayer2Hover
+                            colRipple: tile.on ? Appearance.colors.colPrimaryContainerActive : Appearance.colors.colLayer2Active
+                            downAction: () => {
+                                const key = tile.modelData.key;
+                                starPop.restart();
+                                Qt.callLater(() => DesktopWidgets.toggleStar(key));
+                            }
+
+                            SequentialAnimation {
+                                id: starPop
+                                NumberAnimation { target: starIcon; property: "scale"; to: 0.6; duration: 90; easing.type: Easing.InQuad }
+                                SpringAnimation { target: starIcon; property: "scale"; to: 1; spring: 4; damping: 0.22 }
+                            }
+
+                            contentItem: MaterialSymbol {
+                                id: starIcon
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                text: "star"
+                                fill: tile.starred ? 1 : 0
+                                iconSize: 20
+                                color: tile.starred ? Appearance.colors.colTertiary : (tile.on ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colSubtext)
+                                opacity: tile.starred ? 1 : 0.55
+                            }
                         }
                     }
                 }
