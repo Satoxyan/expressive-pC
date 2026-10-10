@@ -45,7 +45,14 @@ Item {
     readonly property Item loadedWidget: gridLayout.children[0]?.item ?? null
     // Hide the whole group (background included) when the widget hides itself,
     // e.g. the tray indicator or the pomodoro bar chip when idle.
-    visible: root.loadedWidget ? root.loadedWidget.visible : true
+    // NB: jangan pakai `visible:` — visible QML = EFFECTIVE (mewarisi dari group
+    // ini), jadi menyembunyikan group membaca balik false-nya sendiri dan melock
+    // semua group di baris yang pernah disembunyikan (ganti bar style = bar
+    // collapse sampai restart qs). Sembunyikan via width/opacity: keduanya tidak
+    // ikut menyumbat visibilitas widget turunan, jadi tetap bisa pulih.
+    readonly property bool widgetHidden: root.loadedWidget && !root.loadedWidget.visible
+    opacity: root.widgetHidden ? 0 : 1
+    enabled: !root.widgetHidden
     readonly property bool hasContentOverride: !root.isMaterial && root.style.color !== undefined && root.style.color !== "transparent"
     readonly property color contentColor: {
         const name = root.style.color ?? "";
@@ -138,7 +145,7 @@ Item {
         return midRadius;
     }
 
-    implicitWidth: vertical && root.isMaterial ? Appearance.sizes.baseVerticalBarWidth - 6 : (gridLayout.implicitWidth + padding * 2)
+    implicitWidth: root.widgetHidden ? 0 : (vertical && root.isMaterial ? Appearance.sizes.baseVerticalBarWidth - 6 : (gridLayout.implicitWidth + padding * 2))
     implicitHeight: vertical ? (gridLayout.implicitHeight + padding * 2) : Appearance.sizes.baseBarHeight
 
     default property alias items: gridLayout.children

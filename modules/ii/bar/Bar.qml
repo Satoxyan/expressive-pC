@@ -75,6 +75,15 @@ Scope {
                 property bool monitorHasFullscreen: HyprlandData.workspaceById[thisMonitorData?.activeWorkspace?.id]?.hasfullscreen ?? false
                 property bool monitorHasSpecialOpen: (thisMonitorData?.specialWorkspace?.name ?? "") !== ""
                 exclusionMode: ExclusionMode.Ignore
+
+                // CI-DBG: dump window state setelah bar style berubah (HAPUS setelah verifikasi)
+                property int ciDbgStyle: Config.options.bar.cornerStyle
+                onCiDbgStyleChanged: ciDbgWin.restart()
+                Timer {
+                    id: ciDbgWin
+                    interval: 650
+                    onTriggered: console.log(`[CI-DBG] win style=${Config.options.bar.cornerStyle} w,h=${barRoot.width},${barRoot.height} implH=${barRoot.implicitHeight} excl=${barRoot.exclusiveZone} contentMargins(top)=${barContent?.anchors.topMargin} content(x,y,w,h,v)=${barContent?.x},${barContent?.y},${barContent?.width},${barContent?.height},${barContent?.visible} mustShow=${barRoot.mustShow} hovered=${hoverRegion?.containsMouse}`)
+                }
                 property int normalExclusiveZone: (Config?.options.bar.autoHide.enable && (!mustShow || !Config?.options.bar.autoHide.pushWindows))
                     ? 0
                     : Appearance.sizes.baseBarHeight

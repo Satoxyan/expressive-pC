@@ -40,6 +40,22 @@ Item {
     readonly property var effectiveMiddleLayout: filterLayout(Config.options.bar.layouts.middleLayout)
     readonly property var effectiveRightLayout:  filterLayout(Config.options.bar.layouts.rightLayout)
 
+    // CI-DBG: dump layout state setelah bar style berubah (HAPUS setelah verifikasi)
+    property int ciDbgStyle: Config.options.bar.cornerStyle
+    onCiDbgStyleChanged: ciDbgDump.restart()
+    function ciDbgRow(row) {
+        if (!row) return "none"
+        return Array.prototype.map.call(row.children, c => c.widgetName + ":" + c.implicitWidth + "x" + c.implicitHeight + "/w" + c.width + "/v" + c.visible + "/" + (c.loadedWidget ? "L" + c.loadedWidget.implicitWidth + "x" + c.loadedWidget.implicitHeight + "v" + c.loadedWidget.visible : "nullLoad")).join(" | ")
+    }
+    Timer {
+        id: ciDbgDump
+        interval: 600
+        onTriggered: {
+            console.log(`[CI-DBG] content style=${Config.options.bar.cornerStyle} centerOnly=${root.centerOnly} isMaterial=${root.isMaterial} tabs=${root.hasTabs} wrapper=${root.useTabWrapper} me(x,y,w,h,vis,op)=${root.x},${root.y},${root.width},${root.height},${root.visible},${root.opacity} | L=${JSON.stringify(root.effectiveLeftLayout)} leftRow(x,w,v)=${leftRow?.x},${leftRow?.width},${leftRow?.visible} leftPill(x,w,v)=${leftMaterialPill?.x},${leftMaterialPill?.width},${leftMaterialPill?.visible} | M=${JSON.stringify(root.effectiveMiddleLayout)} midRow(x,w,v)=${middleRow?.x},${middleRow?.width},${middleRow?.visible} | R=${JSON.stringify(root.effectiveRightLayout)} rightRow(x,w,v)=${rightRow?.x},${rightRow?.width},${rightRow?.visible} | pill(x,w,v)=${centerPill?.x},${centerPill?.width},${centerPill?.visible}`)
+            console.log(`[CI-DBG] groups materialRow=[${root.ciDbgRow(leftMaterialRow)}] plainRow=[${root.ciDbgRow(leftRow)}] rightMaterial=[${root.ciDbgRow(rightMaterialRow)}] rightPlain=[${root.ciDbgRow(rightRow)}]`)
+        }
+    }
+
     function getWidgetUrl(name) {
         if (!name) return "";
         let formattedName = name.charAt(0).toUpperCase() + name.slice(1);
