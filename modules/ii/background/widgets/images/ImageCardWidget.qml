@@ -168,6 +168,32 @@ AbstractBackgroundWidget {
                 onExited: root.dropHover = false
                 onDropped: (drop) => root.acceptDrop(drop)
             }
+
+            // Remove button (top-left area) — sama seperti Custom Image
+            MaterialShapeWrappedMaterialSymbol {
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    topMargin: parent.height * 0.15
+                    leftMargin: parent.width * 0.15
+                }
+                visible: root.containsMouse && !Config.options.background.widgetsLocked
+                wrappedShape: MaterialShape.Shape.Circle
+                color: Appearance.colors.colError ?? Appearance.colors.colPrimary
+                colSymbol: Appearance.colors.colOnError ?? Appearance.colors.colOnPrimary
+                text: "close"
+                iconSize: 16
+                fill: 1
+                padding: 6
+                implicitWidth: 30
+                implicitHeight: 30
+                z: 2
+
+                ButtonMouseArea {
+                    anchors.fill: parent
+                    onClicked: root.requestDelete()
+                }
+            }
         }
 
         ResizeHandler {

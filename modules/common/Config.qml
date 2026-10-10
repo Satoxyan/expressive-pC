@@ -1186,6 +1186,7 @@ Singleton {
         path: root._customImagesPath()
         watchChanges: false
         onLoaded: {
+            console.log("[CI-DBG] fileview loaded")
             const raw = _customImagesFileView.text()
             if (!raw) return
             try {

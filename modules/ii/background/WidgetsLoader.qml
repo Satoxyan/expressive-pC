@@ -60,6 +60,9 @@ Item {
             id: loaderDelegate
             required property var modelData
 
+            onShownChanged: if (modelData.key === "customImages") console.log("[CI-DBG] shown ->", shown)
+            onOpacityChanged: if (modelData.key === "customImages") console.log("[CI-DBG] opacity", opacity)
+
             property bool enableLoading: true
 
             shown: {
@@ -181,22 +184,32 @@ Item {
     Component {
         id: customImageComp
         Item {
+            // Repeater dengan model apa pun (array object / int) lakukan FULL
+            // reset semua delegate saat add/remove = semua widget blink
+            // (terbukti log: destroy-all + create-all per operasi).
+            // Slot statis: hanya slot terakhir activate/deactivate, sisanya
+            // tak tersentuh. Nilai di-bind per index (update = tanpa rebuild).
+            // ponytail: maks30 image — naikkan angka `model:` kalau butuh lebih.
             Repeater {
-                model: Config.customImages
-                delegate: CustomImage {
-                    required property var modelData
+                model: 30
+                delegate: Loader {
+                    id: slot
                     required property int index
-                    imageIndex: index
-                    imagePath: modelData.path ?? ""
-                    imageShape: modelData.shape ?? "Cookie4Sided"
-                    imageSize: modelData.size ?? 200
-                    imageRotation: modelData.rotation ?? 0
-                    screenWidth: root.screen.width
-                    screenHeight: root.screen.height
-                    scaledScreenWidth: root.screen.width
-                    scaledScreenHeight: root.screen.height
-                    wallpaperScale: 1
-                    wallpaperItem: root.wallpaperItem
+                    active: index < Config.customImages.length
+                    onActiveChanged: console.log("[CI-DBG] slot", index, active ? "on" : "off")
+                    sourceComponent: CustomImage {
+                        imageIndex: index
+                        imagePath: Config.customImages[index]?.path ?? ""
+                        imageShape: Config.customImages[index]?.shape ?? "Cookie4Sided"
+                        imageSize: Config.customImages[index]?.size ?? 200
+                        imageRotation: Config.customImages[index]?.rotation ?? 0
+                        screenWidth: root.screen.width
+                        screenHeight: root.screen.height
+                        scaledScreenWidth: root.screen.width
+                        scaledScreenHeight: root.screen.height
+                        wallpaperScale: 1
+                        wallpaperItem: root.wallpaperItem
+                    }
                 }
             }
         }

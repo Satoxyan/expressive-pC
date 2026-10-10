@@ -155,6 +155,10 @@ AbstractBackgroundWidget {
                 visible: root.imagePath === ""
                 blurSource: root.imagePath === "" ? root.wallpaperItem : null
                 cardRadius: 0
+                // mapToItem di dalam sourceRect bukan dependency binding —
+                // sourceRect hanya dihitung ulang saat trackX/trackY berubah.
+                trackX: root.x
+                trackY: root.y
             }
 
             AnimatedImage {
