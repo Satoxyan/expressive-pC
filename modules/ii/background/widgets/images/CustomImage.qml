@@ -148,6 +148,15 @@ AbstractBackgroundWidget {
                 }
             }
 
+            // Kosong: wallpaper blur + tint di dalam bentuk. Berisi gambar: tampil polos.
+            // cardRadius 0 — pemotongan bentuk sudah dilakukan OpacityMask imageShape.
+            FastBlurred {
+                anchors.fill: parent
+                visible: root.imagePath === ""
+                blurSource: root.imagePath === "" ? root.wallpaperItem : null
+                cardRadius: 0
+            }
+
             AnimatedImage {
                 anchors.fill: parent
                 source: root.imagePath !== "" ? root.imagePath : ""
