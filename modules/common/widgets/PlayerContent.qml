@@ -8,6 +8,7 @@ import qs.modules.common.functions
 import Qt5Compat.GraphicalEffects
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls
 import Quickshell.Services.Mpris
 
 Item {
@@ -220,6 +221,15 @@ Item {
         elide: Text.ElideRight
         font.features: { "tnum": 1 }
         text: `${StringUtils.friendlyTimeForSeconds(root.player?.position)} / ${StringUtils.friendlyTimeForSeconds(root.player?.length)}`
+    }
+
+    // Pemilih provider lyric — komponen bersama (pill + dropdown), hanya
+    // saat mode lyric terbuka, di kiri tombol play/pause.
+    LyricsProviderSelector {
+        blendedColors: root.blendedColors
+        x: playPauseButton.x - 8 - width
+        y: trackTime.y + (trackTime.implicitHeight - height) / 2 - 1
+        visible: root.lyricsMode && root.lyricsAllowed
     }
 
     TrackChangeButton {

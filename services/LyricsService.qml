@@ -14,6 +14,15 @@ Singleton {
     readonly property MprisPlayer activePlayer: MprisController.activePlayer
 
     property var lyricsLines: []
+    // Provider pilihan manual (dropdown di PlayerContent). Kosong = ikut
+    // rantai Config.options.lyrics.providers; terisi = provider itu dicoba
+    // dulu, baru jatuh ke rantai kalau gagal.
+    property string preferredProvider: ""
+    // Hasil probe semua provider untuk track berjalan: {ok, wordByWord}
+    // per nama provider — dipakai badge dropdown (per kata / per baris).
+    property var providerInfo: ({})
+    property string probeKey: ""
+    property real probeAt: 0
     property int activeIndex: -1
     property string status: "loading"
     property string providedBy: ""
@@ -273,6 +282,44 @@ Singleton {
         }
     }
 
+    Process {
+        id: probeProc
+        running: false
+        stdout: SplitParser {
+            onRead: data => {
+                const trimmed = data.trim()
+                let payload = null
+                try {
+                    payload = JSON.parse(trimmed)
+                } catch (e) { return }
+                if (payload?.ok === true && payload.results)
+                    root.providerInfo = payload.results
+            }
+        }
+    }
+
+    // Probe semua provider serentak (lyrics.py --probe) untuk track berjalan.
+    // Dipanggil saat ganti track dan saat dropdown provider dibuka; dibatasi
+    // sekali per 2 menit per track supaya tidak menghantam API semua provider.
+    function probeProviders() {
+        const title = root.activePlayer?.trackTitle ?? ""
+        const artist = root.activePlayer?.trackArtist ?? ""
+        if (!title || !artist) return
+        const duration = Math.floor(root.activePlayer?.length ?? 0)
+        const key = `${title}|${artist}|${duration}`
+        if (key === root.probeKey && Date.now() - root.probeAt < 120000) return
+        root.probeKey = key
+        root.probeAt = Date.now()
+        probeProc.running = false
+        probeProc.command = [
+            "python3",
+            `${Directories.scriptPath}/lyrics/lyrics.py`,
+            title, artist, String(duration),
+            "--probe"
+        ]
+        probeProc.running = true
+    }
+
     Timer {
         id: retryTimer
         interval: 200
@@ -318,11 +365,14 @@ Singleton {
         }
 
         retryTimer.running = false
+        root.probeProviders()
         lyricsProc.command = [
             "python3",
             `${Directories.scriptPath}/lyrics/lyrics.py`,
             title, artist, String(Math.floor(duration)),
-            "--providers", Config.options.lyrics.providers
+            "--providers", root.preferredProvider.length > 0
+                ? `${root.preferredProvider},${Config.options.lyrics.providers}`
+                : Config.options.lyrics.providers
         ]
         lyricsProc.running = true
     }

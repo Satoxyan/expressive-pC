@@ -298,6 +298,14 @@ Item {
                 }
             }
 
+            // ── Pemilih provider lyric (dibawah lirik, diatas play) ──
+            LyricsProviderSelector {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.topMargin: 10
+                Layout.preferredHeight: 24
+                blendedColors: root.blendedColors
+            }
+
             // ── Controls ──
             ColumnLayout {
                 Layout.fillWidth: true

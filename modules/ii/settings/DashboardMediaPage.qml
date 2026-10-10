@@ -398,4 +398,17 @@ Item {
             }
         }
     }
+
+    // Overlay pemilih provider lyric — di luar RowLayout sehingga tidak
+    // mengubah posisi lirik/kartu apa pun; menu terbuka ke atas menutupi
+    // kartu lirik (tidak masalah — konsisten dengan permukaan lain).
+    LyricsProviderSelector {
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.rightMargin: 24
+        anchors.bottomMargin: 24
+        z: 10
+        sizeScale: 1.5
+        blendedColors: root.colors
+    }
 }

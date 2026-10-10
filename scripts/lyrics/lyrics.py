@@ -14,7 +14,7 @@ import urllib.request
 import urllib.parse
 import uuid
 
-DEFAULT_PROVIDERS = "musixmatch,youlyplus,unison,paxsenix,betterlyric,simpmusic,lrclib,kugou"
+DEFAULT_PROVIDERS = "musixmatch,youlyplus,unison,netease,paxsenix,betterlyric,simpmusic,lrclib,kugou"
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
@@ -1122,6 +1122,91 @@ def fetch_kugou(title, artist, duration):
 
 
 # ---------------------------------------------------------------------------
+# Provider: netease (music.163.com)
+# Ported from m-obeid/Mixtapes src/lyrics/providers/netease.rs (GPL-3.0):
+# broadest source for Japanese/Vocaloid/K-pop/Asian tracks. Uses the
+# unencrypted cloudsearch/pc search + song/lyric endpoint, plain JSON,
+# no auth. Line-synced LRC only (no word timings).
+# ---------------------------------------------------------------------------
+
+NETEASE_HEADERS = {
+    "User-Agent": "Mozilla/5.0",
+    "Referer": "https://music.163.com/",
+}
+
+
+def _netease_strip_credits(lines):
+    """NetEase pads the start with credit lines (作词/作曲 : X) at 00:00."""
+    credit = re.compile(r"^(作词|作曲|编曲|Written by|Produced by)\s*[:：]", re.I)
+    while lines and credit.match(lines[0]["text"]):
+        lines.pop(0)
+    return lines
+
+
+def fetch_netease(title, artist, duration):
+    queries = [f"{clean_title(title)} {clean_artist(artist)}", title.strip()]
+    songs = []
+    seen = set()
+    for query in queries:
+        try:
+            data = _http_json(
+                "https://music.163.com/api/cloudsearch/pc?" + urllib.parse.urlencode(
+                    {"s": query, "type": "1", "limit": "8", "offset": "0"}),
+                headers=NETEASE_HEADERS)
+        except Exception:
+            continue
+        for s in (data.get("result") or {}).get("songs") or []:
+            sid = s.get("id")
+            if not sid or sid in seen:
+                continue
+            seen.add(sid)
+            songs.append({
+                "id": sid,
+                "name": s.get("name") or "",
+                "artists": " ".join((a.get("name") or "") for a in s.get("ar") or []),
+                # NetEase reports duration in milliseconds as "dt".
+                "duration": int((s.get("dt") or 0) / 1000),
+            })
+    if not songs:
+        return []
+
+    # Narrow to the artist when that still leaves candidates, then prefer
+    # the closest duration with a small title-match bonus.
+    qa = clean_artist(artist).lower()
+    qt = clean_title(title).lower()
+    matched = [s for s in songs if qa and qa in s["artists"].lower()]
+    if matched:
+        songs = matched
+
+    def score(s):
+        sc = 0
+        if duration and s["duration"]:
+            sc -= min(abs(int(duration) - s["duration"]), 30)
+        name = s["name"].lower()
+        if qt and (qt in name or name in qt):
+            sc += 5
+        return -sc
+
+    songs.sort(key=score)
+    for s in songs[:3]:
+        try:
+            # tv=-1 asks for the (unused here) translation track.
+            data = _http_json(
+                "https://music.163.com/api/song/lyric?" + urllib.parse.urlencode(
+                    {"id": str(s["id"]), "lv": "1", "kv": "1", "tv": "-1", "rv": "-1"}),
+                headers=NETEASE_HEADERS)
+        except Exception:
+            continue
+        lrc = ((data.get("lrc") or {}).get("lyric") or "").strip()
+        if not lrc:
+            continue
+        lines = _netease_strip_credits(_parse_lrc(lrc))
+        if lines:
+            return lines
+    return []
+
+
+# ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
 
@@ -1129,6 +1214,7 @@ PROVIDERS = {
     "musixmatch": fetch_musixmatch,
     "youlyplus": fetch_youlyplus,
     "unison": fetch_unison,
+    "netease": fetch_netease,
     "paxsenix": fetch_paxsenix,
     "betterlyric": fetch_betterlyric,
     "simpmusic": fetch_simpmusic,
@@ -1141,6 +1227,63 @@ def _provider_names(arg):
     if not arg or not arg.strip():
         return DEFAULT_PROVIDERS.split(",")
     return [p.strip() for p in arg.split(",") if p.strip()]
+
+
+def _run_timed(fn, title, artist, duration):
+    """Run a provider function on a daemon thread with a hard timeout.
+
+    SIGALRM is unreliable here because one-shot alarm fires once and gets
+    swallowed by the many `except Exception` blocks inside providers, and
+    urllib tries every resolved address (4+ IPs) at the socket timeout, so
+    a single request can block for address_count * timeout seconds.
+    A worker thread guarantees each provider gets at most PROVIDER_TIMEOUT
+    seconds regardless of what it swallows.
+    """
+    result = {}
+    def worker():
+        try:
+            result["lines"] = fn(title, artist, duration)
+        except Exception:
+            result["lines"] = []
+    t = threading.Thread(target=worker, daemon=True)
+    t.start()
+    t.join(PROVIDER_TIMEOUT)
+    if t.is_alive():
+        # None = timeout: caller must distinguish "provider has no lyrics"
+        # from "provider never answered in time".
+        return None
+    return result.get("lines") or []
+
+
+def probe_all(title, artist, duration):
+    """Query every provider concurrently; report availability + word sync.
+
+    Used by the provider dropdown to badge word-by-word vs line-by-line
+    providers for the current track. Timeout providers get "unknown": true
+    (no badge, but not dimmed — absence is not proof of no lyrics).
+    Prints one JSON line:
+    {"ok": true, "results": {"<provider>":
+        {"ok": bool, "wordByWord": bool, "unknown": bool}}}
+    """
+    results = {}
+    def probe_one(name):
+        lines = _run_timed(PROVIDERS[name], title, artist, duration)
+        if lines is None:
+            results[name] = {"ok": False, "wordByWord": False, "unknown": True}
+            return
+        wbw = any(any(l.get("words") or []) for l in lines)
+        results[name] = {"ok": bool(lines), "wordByWord": bool(lines and wbw), "unknown": False}
+    threads = []
+    for name in DEFAULT_PROVIDERS.split(","):
+        if name not in PROVIDERS:
+            continue
+        t = threading.Thread(target=probe_one, args=(name,), daemon=True)
+        t.start()
+        threads.append(t)
+    for t in threads:
+        t.join(PROVIDER_TIMEOUT + 4)
+    print(json.dumps({"ok": True, "results": results},
+                     ensure_ascii=False, separators=(",", ":")), flush=True)
 
 
 def main():
@@ -1162,34 +1305,15 @@ def main():
         print("no_info", flush=True)
         return
 
-    def run_with_timeout(fn):
-        """Run a provider function on a daemon thread with a hard timeout.
-
-        SIGALRM is unreliable here because one-shot alarm fires once and gets
-        swallowed by the many `except Exception` blocks inside providers, and
-        urllib tries every resolved address (4+ IPs) at the socket timeout, so
-        a single request can block for address_count * timeout seconds.
-        A worker thread guarantees each provider gets at most PROVIDER_TIMEOUT
-        seconds regardless of what it swallows.
-        """
-        result = {}
-        def worker():
-            try:
-                result["lines"] = fn(title, artist, duration)
-            except Exception:
-                result["lines"] = []
-        t = threading.Thread(target=worker, daemon=True)
-        t.start()
-        t.join(PROVIDER_TIMEOUT)
-        if t.is_alive():
-            return []
-        return result.get("lines") or []
+    if "--probe" in sys.argv:
+        probe_all(title, artist, duration)
+        return
 
     for name in _provider_names(providers):
         fn = PROVIDERS.get(name)
         if not fn:
             continue
-        lines = run_with_timeout(fn)
+        lines = _run_timed(fn, title, artist, duration)
         if lines:
             payload = {
                 "ok": True,
