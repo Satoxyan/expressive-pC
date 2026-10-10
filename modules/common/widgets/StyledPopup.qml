@@ -100,6 +100,12 @@ LazyLoader {
         }
         readonly property Item groupBox: root.group ? root.group.box : root.hoverTarget
         readonly property var barWin: root.hoverTarget?.QsWindow?.window ?? null
+        // hyprctl layers melaporkan koordinat GLOBAL layar; monitor bisa
+        // duduk di offset (mis. eDP-1 di 4599,3090). Tanpa normalisasi ini,
+        // cardLeft/margins dihitung terhadap ukuran layar lokal → popup
+        // terlempar ribuan px keluar layar (tooltip morph tidak terlihat
+        // sama sekali pada monitor yang tidak berada di 0,0).
+        readonly property var monitorInfo: HyprlandData.monitors.find(m => m.name === popupWindow.screen.name) ?? null
         readonly property var barLayer: {
             const levels = HyprlandData.layers[popupWindow.screen.name]?.levels
             if (!levels) return null
@@ -110,8 +116,8 @@ LazyLoader {
             }
             return null
         }
-        readonly property real originX: barLayer ? barLayer.x : (!barWin ? 0 : (barWin.anchors.left ? barWin.margins.left : popupWindow.screen.width - barWin.width - barWin.margins.right))
-        readonly property real originY: barLayer ? barLayer.y : (!barWin ? 0 : (barWin.anchors.top ? barWin.margins.top : popupWindow.screen.height - barWin.height - barWin.margins.bottom))
+        readonly property real originX: barLayer ? barLayer.x - (monitorInfo?.x ?? 0) : (!barWin ? 0 : (barWin.anchors.left ? barWin.margins.left : popupWindow.screen.width - barWin.width - barWin.margins.right))
+        readonly property real originY: barLayer ? barLayer.y - (monitorInfo?.y ?? 0) : (!barWin ? 0 : (barWin.anchors.top ? barWin.margins.top : popupWindow.screen.height - barWin.height - barWin.margins.bottom))
         readonly property point boxPos: groupBox ? groupBox.mapToItem(null, 0, 0) : Qt.point(0, 0)
         readonly property real boxX: originX + boxPos.x
         readonly property real boxY: originY + boxPos.y
