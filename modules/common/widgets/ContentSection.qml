@@ -11,6 +11,12 @@ ColumnLayout {
     property string title
     property string icon: ""
     property var bgColor: Appearance.colors.colSecondaryContainer
+    // Optional recolor hooks — defaults match the old hard-coded colors so
+    // callers can opt in (e.g. dashboard tertiary pass-through).
+    property color iconColor: Appearance.colors.colOnSecondaryContainer
+    // Dashboard cards can hide this header and show icon+title as the card
+    // chrome instead (like the other dashboard cards). Default: visible.
+    property bool showHeader: true
     property bool collapsible: true
     property string hint: ""
     property string hintIcon: "info"
@@ -86,6 +92,7 @@ ColumnLayout {
         id: header
         Layout.fillWidth: true
         implicitHeight: headerRow.implicitHeight
+        visible: root.showHeader
 
         RowLayout {
             id: headerRow
@@ -98,6 +105,7 @@ ColumnLayout {
                 iconSize: Appearance.font.pixelSize.large + 1
                 wrappedShape: root.shape
                 color: bgColor
+                colSymbol: root.iconColor
                 scale: 1 + 0.3 * root.flashPop
             }
             StyledText {

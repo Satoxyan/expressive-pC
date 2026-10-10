@@ -6,13 +6,13 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-// Image cards section: per-card enable/image/layout rows + add button.
-// Shared by the default Desktop settings page and the dashboard Image cards card.
+// Custom images section: per-image enable/image/shape rows + add button.
+// Shared by the default Desktop settings page and the dashboard Custom images card.
 ContentSection {
     id: root
-    icon: "photo_size_select_large"
-    shape: MaterialShape.Shape.ClamShell
-    title: Translation.tr("Image cards")
+    icon: "panorama"
+    shape: MaterialShape.Shape.SoftBoom
+    title: Translation.tr("Custom Images")
 
     // M3 Expressive follow-through: the dashboard passes the tertiary family
     // here; defaults equal the old hard-coded colors so default mode stays
@@ -31,13 +31,12 @@ ContentSection {
     property color colChip: Appearance.colors.colSecondaryContainer
     property color colChipHover: Appearance.colors.colSecondaryContainerHover
     property color colChipActive: Appearance.colors.colSecondaryContainerActive
-    property color colChipText: Appearance.colors.colOnSecondaryContainer
 
     Repeater {
-        model: Config.imageCards.length
+        model: Config.customImages.length
         delegate: GroupedList {
             required property int index
-            readonly property var modelData: Config.imageCards[index]
+            readonly property var modelData: Config.customImages[index]
             Layout.fillWidth: true
             bgcolor: root.rowBg
 
@@ -45,11 +44,11 @@ ContentSection {
                 Layout.fillWidth: true
                 MaterialSymbol {
                     iconSize: Appearance.font.pixelSize.large
-                    text: "photo_size_select_large"
+                    text: "image"
                     color: root.mutedText
                 }
                 StyledText {
-                    text: Translation.tr("Card %1").arg(index + 1)
+                    text: Translation.tr("Image %1").arg(index + 1)
                     font.pixelSize: Appearance.font.pixelSize.large
                     color: root.rowTitle
                     Layout.fillWidth: true
@@ -60,7 +59,7 @@ ContentSection {
                     colText: root.surfaceText
                     colIcon: root.surfaceText
                     onClicked: {
-                        Config.removeImageCard(index)
+                        Config.removeCustomImage(index)
                     }
                 }
             }
@@ -78,7 +77,7 @@ ContentSection {
                     // Skip the initial binding write — it cascades into a
                     // Repeater model binding loop that kills row rendering.
                     if (checked !== modelData.enable)
-                        Config.updateImageCard(index, { enable: checked });
+                        Config.updateCustomImage(index, { enable: checked });
                 }
             }
             RippleButtonWithIcon {
@@ -88,32 +87,29 @@ ContentSection {
                 colText: root.surfaceText
                 colIcon: root.surfaceText
                 onClicked: {
-                    FilePicker.pickImage(path => Config.updateImageCard(index, { path }))
+                    FilePicker.pickImage(path => Config.updateCustomImage(index, { path }))
                 }
             }
-            ConfigSelectionArray {
-                enabled: modelData.enable
-                text: Translation.tr("Image card layout")
-                icon: "grid_view"
-                colLabel: root.surfaceText
-                colChip: root.colChip
-                colChipHover: root.colChipHover
-                colChipActive: root.colChipActive
-                colChipText: root.colChipText
+            ConfigSelectionShapeArray {
+                currentValue: modelData.shape
+                shapeColor: root.accent
+                backgroundColor: root.accentContainer
+                colBackground: root.colChip
+                colBackgroundHover: root.colChipHover
+                colBackgroundActive: root.colChipActive
                 colToggled: root.accent
                 colToggledHover: root.accentHover
                 colToggledActive: root.accentActive
-                colToggledText: root.accentOn
-                currentValue: modelData.sizeMode ?? "1x2"
+                colToggledSymbol: root.accentOn
                 options: [
-                    { displayName: "1x1", icon: "crop_square", value: "1x1" },
-                    { displayName: "1x2", icon: "crop_landscape", value: "1x2" },
-                    { displayName: "1x3", icon: "crop_16_9", value: "1x3" },
-                    { displayName: "2x2", icon: "grid_view", value: "2x2" },
-                    { displayName: "2x3", icon: "view_module", value: "2x3" }
+                    "Circle", "Square", "Slanted", "Arch", "Arrow", "SemiCircle", "Oval", "Pill",
+                    "Triangle", "Diamond", "ClamShell", "Pentagon", "Gem", "Sunny", "VerySunny",
+                    "Cookie4Sided", "Cookie6Sided", "Cookie7Sided", "Cookie9Sided", "Cookie12Sided",
+                    "Ghostish", "Clover4Leaf", "Clover8Leaf", "Burst", "SoftBurst", "Flower",
+                    "Puffy", "PuffyDiamond", "PixelCircle", "Bun", "Heart"
                 ]
                 onSelected: newValue => {
-                    Config.updateImageCard(index, { sizeMode: newValue })
+                    Config.updateCustomImage(index, { shape: newValue })
                 }
             }
         }
@@ -123,11 +119,11 @@ ContentSection {
         RippleButtonWithIcon {
             Layout.fillWidth: true
             materialIcon: "add"
-            mainText: Translation.tr("Add Image Card")
+            mainText: Translation.tr("Add Image")
             colText: root.surfaceText
             colIcon: root.surfaceText
             onClicked: {
-                Config.addImageCard()
+                Config.addCustomImage()
             }
         }
     }

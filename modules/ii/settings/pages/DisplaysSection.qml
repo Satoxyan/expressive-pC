@@ -29,9 +29,12 @@ ContentSection {
     property color accentHover: Appearance.colors.colPrimaryHover
     property color accentActive: Appearance.colors.colPrimaryActive
     property color accentContainer: Appearance.colors.colPrimaryContainer
+    property color switchActive: Appearance.colors.colPrimaryContainer
+    property color switchThumb: Appearance.colors.colPrimary
     property color accentOn: Appearance.colors.colOnPrimary
     // Canvas: panel surface + selected rectangle fill + its label.
     property color panelColor: Appearance.colors.colLayer1
+    property color panelBorder: Appearance.colors.colLayer0Border
     property color accentFill: Appearance.colors.colPrimaryContainer
     property color accentOnFill: Appearance.colors.colOnPrimaryContainer
     property color accentOnFillSub: Appearance.colors.colSubtext
@@ -49,6 +52,7 @@ ContentSection {
     property color spinFg: Appearance.colors.colOnLayer2
     property color spinBgHover: Appearance.colors.colLayer2Hover
     property color spinBgActive: Appearance.colors.colLayer2Active
+    property bool spinFlat: false
     property color noticeBg: Appearance.colors.colPrimaryContainer
     property color noticeFg: Appearance.colors.colOnPrimaryContainer
     property color titleColor: Appearance.colors.colSubtext
@@ -78,6 +82,7 @@ ContentSection {
             monitorConfig: monitorConfig
             accent: root.accent
             panelColor: root.panelColor
+            panelBorder: root.panelBorder
             accentFill: root.accentFill
             accentOnFill: root.accentOnFill
             accentOnFillSub: root.accentOnFillSub
@@ -162,8 +167,8 @@ ContentSection {
                         StyledSwitch {
                             checked: monCol.monOn
                             enabled: !monCol.monOn || monCol.canTurnOff
-                            activeColor: root.accentContainer
-                            thumbColor: root.accent
+                            activeColor: root.switchActive
+                            thumbColor: root.switchThumb
                             onClicked: {
                                 if (!checked && !monCol.canTurnOff) return
                                 if (checked === monCol.monOn) return
@@ -296,6 +301,7 @@ ContentSection {
                             spinFg: root.spinFg
                             spinBgHover: root.spinBgHover
                             spinBgActive: root.spinBgActive
+                            flat: root.spinFlat
                             value: Math.round((monitorConfig.monitors[index]?.scale ?? 1.0) * 100)
                             from: 50; to: 300; stepSize: 25
                             onValueChanged: {
@@ -314,6 +320,7 @@ ContentSection {
                             spinFg: root.spinFg
                             spinBgHover: root.spinBgHover
                             spinBgActive: root.spinBgActive
+                            flat: root.spinFlat
                             value: monitorConfig.monitors[index]?.x ?? 0
                             from: 0; to: 65535; stepSize: 1
                             onValueChanged: {
@@ -331,6 +338,7 @@ ContentSection {
                             spinFg: root.spinFg
                             spinBgHover: root.spinBgHover
                             spinBgActive: root.spinBgActive
+                            flat: root.spinFlat
                             value: monitorConfig.monitors[index]?.y ?? 0
                             from: 0; to: 65535; stepSize: 1
                             onValueChanged: {
@@ -359,6 +367,7 @@ ContentSection {
                             spinFg: root.spinFg
                             spinBgHover: root.spinBgHover
                             spinBgActive: root.spinBgActive
+                            spinFlat: root.spinFlat
                             noticeBg: root.noticeBg
                             noticeFg: root.noticeFg
                             colChip: root.colChip

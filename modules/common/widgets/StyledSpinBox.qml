@@ -17,12 +17,15 @@ SpinBox {
     property color colFg: Appearance.colors.colOnLayer2
     property color colBgHover: Appearance.colors.colLayer2Hover
     property color colBgPressed: Appearance.colors.colLayer2Active
+    // Flat "Sides" style: value sits on the parent background, minus/plus
+    // become translucent circles at both ends.
+    property bool flat: false
     editable: true
 
     opacity: root.enabled ? 1 : 0.4
 
     background: Rectangle {
-        color: root.colBg
+        color: root.flat ? "transparent" : root.colBg
         radius: root.radius
     }
 
@@ -52,12 +55,14 @@ SpinBox {
         }
         implicitHeight: root.baseHeight
         implicitWidth: root.baseHeight
-        topLeftRadius: root.radius
-        bottomLeftRadius: root.radius
-        topRightRadius: root.innerButtonRadius
-        bottomRightRadius: root.innerButtonRadius
+        topLeftRadius: root.flat ? height / 2 : root.radius
+        bottomLeftRadius: root.flat ? height / 2 : root.radius
+        topRightRadius: root.flat ? height / 2 : root.innerButtonRadius
+        bottomRightRadius: root.flat ? height / 2 : root.innerButtonRadius
 
-        color: root.down.pressed ? root.colBgPressed :
+        color: root.flat ? (root.down.pressed ? Qt.rgba(1, 1, 1, 0.35) :
+            root.down.hovered ? Qt.rgba(1, 1, 1, 0.26) : Qt.rgba(1, 1, 1, 0.14)) :
+            root.down.pressed ? root.colBgPressed :
             root.down.hovered ? root.colBgHover :
             ColorUtils.transparentize(root.colBg)
         Behavior on color {
@@ -79,12 +84,14 @@ SpinBox {
         }
         implicitHeight: root.baseHeight
         implicitWidth: root.baseHeight
-        topRightRadius: root.radius
-        bottomRightRadius: root.radius
-        topLeftRadius: root.innerButtonRadius
-        bottomLeftRadius: root.innerButtonRadius
+        topRightRadius: root.flat ? height / 2 : root.radius
+        bottomRightRadius: root.flat ? height / 2 : root.radius
+        topLeftRadius: root.flat ? height / 2 : root.innerButtonRadius
+        bottomLeftRadius: root.flat ? height / 2 : root.innerButtonRadius
 
-        color: root.up.pressed ? root.colBgPressed :
+        color: root.flat ? (root.up.pressed ? Qt.rgba(1, 1, 1, 0.35) :
+            root.up.hovered ? Qt.rgba(1, 1, 1, 0.26) : Qt.rgba(1, 1, 1, 0.14)) :
+            root.up.pressed ? root.colBgPressed :
             root.up.hovered ? root.colBgHover :
             ColorUtils.transparentize(root.colBg)
         Behavior on color {

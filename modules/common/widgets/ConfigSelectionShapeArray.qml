@@ -14,6 +14,15 @@ Flow {
     property var currentValue: null
     property color shapeColor: Appearance.colors.colPrimaryContainer
     property color backgroundColor: Appearance.colors.colLayer1
+    // Optional recolor hooks — defaults match the old hard-coded colors so
+    // callers can opt in (e.g. dashboard tertiary pass-through).
+    property color colBackground: Appearance.colors.colSecondaryContainer
+    property color colBackgroundHover: Appearance.colors.colSecondaryContainerHover
+    property color colBackgroundActive: Appearance.colors.colSecondaryContainerActive
+    property color colToggled: Appearance.colors.colPrimary
+    property color colToggledHover: Appearance.colors.colPrimaryHover
+    property color colToggledActive: Appearance.colors.colPrimaryActive
+    property color colToggledSymbol: Appearance.colors.colOnPrimary
 
     signal selected(var newValue)
 
@@ -33,9 +42,12 @@ Flow {
             rightRadius: (toggled || rightmost) ? (height / 2) : Appearance.rounding.unsharpenmore
             horizontalPadding: 12
             verticalPadding: 8
-            colBackground: Appearance.colors.colSecondaryContainer
-            colBackgroundHover: Appearance.colors.colSecondaryContainerHover
-            colBackgroundActive: Appearance.colors.colSecondaryContainerActive
+            colBackground: root.colBackground
+            colBackgroundHover: root.colBackgroundHover
+            colBackgroundActive: root.colBackgroundActive
+            colBackgroundToggled: root.colToggled
+            colBackgroundToggledHover: root.colToggledHover
+            colBackgroundToggledActive: root.colToggledActive
 
             onYChanged: {
                 if (index === 0) {
@@ -52,7 +64,7 @@ Flow {
                 implicitSize: Appearance.font.pixelSize.larger
                 shape: ShapeUtils.getShape(shapeButton.modelData)
                 color: shapeButton.toggled
-                    ? Appearance.colors.colOnPrimary
+                    ? root.colToggledSymbol
                     : root.shapeColor
                 Behavior on color {
                     ColorAnimation { duration: 180 }

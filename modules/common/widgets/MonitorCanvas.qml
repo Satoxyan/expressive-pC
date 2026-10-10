@@ -19,6 +19,7 @@ Item {
     property color accentOnFill: Appearance.colors.colOnPrimaryContainer
     property color accentOnFillSub: Appearance.colors.colSubtext
     property color panelColor: Appearance.colors.colLayer1
+    property color panelBorder: Appearance.colors.colLayer0Border
 
     implicitHeight: 220
 
@@ -137,7 +138,7 @@ Item {
         radius: Appearance.rounding.normal
         color: root.panelColor
         border.width: 1
-        border.color: Appearance.colors.colLayer0Border
+        border.color: root.panelBorder
 
         Item {
             id: canvas

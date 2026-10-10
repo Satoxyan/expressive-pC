@@ -28,6 +28,7 @@ ContentSubsection {
     property color spinFg: Appearance.colors.colOnLayer2
     property color spinBgHover: Appearance.colors.colLayer2Hover
     property color spinBgActive: Appearance.colors.colLayer2Active
+    property bool spinFlat: false
     property color noticeBg: Appearance.colors.colPrimaryContainer
     property color noticeFg: Appearance.colors.colOnPrimaryContainer
     // Unselected chips and combobox popup; defaults keep the old greys.
@@ -131,6 +132,7 @@ ContentSubsection {
                 Layout.fillWidth: true
                 enabled: root.hdrActive
                 icon: "brightness_6"
+                flat: root.spinFlat
                 text: Translation.tr("SDR brightness")
                 colLabel: root.surfaceText
                 spinBg: root.spinBg
@@ -151,6 +153,7 @@ ContentSubsection {
                 Layout.fillWidth: true
                 enabled: root.hdrActive
                 icon: "contrast"
+                flat: root.spinFlat
                 text: Translation.tr("SDR saturation")
                 colLabel: root.surfaceText
                 spinBg: root.spinBg
@@ -176,6 +179,7 @@ ContentSubsection {
                 Layout.fillWidth: true
                 enabled: root.hdrActive
                 icon: "wb_twilight"
+                flat: root.spinFlat
                 text: Translation.tr("SDR min (nits)")
                 colLabel: root.surfaceText
                 spinBg: root.spinBg
@@ -195,6 +199,7 @@ ContentSubsection {
                 Layout.fillWidth: true
                 enabled: root.hdrActive
                 icon: "wb_sunny"
+                flat: root.spinFlat
                 text: Translation.tr("SDR max (nits)")
                 colLabel: root.surfaceText
                 spinBg: root.spinBg
@@ -219,6 +224,7 @@ ContentSubsection {
                 Layout.fillWidth: true
                 enabled: root.hdrActive
                 icon: "nightlight"
+                flat: root.spinFlat
                 text: Translation.tr("HDR min (nits)")
                 colLabel: root.surfaceText
                 spinBg: root.spinBg
@@ -238,6 +244,7 @@ ContentSubsection {
                 Layout.fillWidth: true
                 enabled: root.hdrActive
                 icon: "hdr_strong"
+                flat: root.spinFlat
                 text: Translation.tr("HDR peak (nits)")
                 colLabel: root.surfaceText
                 spinBg: root.spinBg
@@ -257,6 +264,7 @@ ContentSubsection {
         ConfigSpinBox {
             enabled: root.hdrActive
             icon: "hdr_weak"
+            flat: root.spinFlat
             text: Translation.tr("HDR max average luminance (nits)")
             colLabel: root.surfaceText
             spinBg: root.spinBg

@@ -941,6 +941,8 @@ Item {
                             id: stickersComponent
                             DashboardSectionCard {
                                 anchors.fill: parent
+                                showHeader: true
+                                tint: Appearance.colors.colTertiaryContainer
                                 title: slot.modelData.title
                                 icon: slot.modelData.icon
                                 tileShape: slot.modelData.shape
@@ -949,7 +951,23 @@ Item {
                                 animIndex: slot.index % 6
                                 travelX: slot.modelData.travelX
                                 travelY: slot.modelData.travelY
-                                content: Component { StickersSection {} }
+                                content: Component {
+                                    StickersSection {
+                                        showHeader: false
+                                        switchActive: Appearance.colors.colTertiary
+                                        switchThumb: Appearance.colors.colOnTertiary
+                                        bgColor: Appearance.colors.colTertiaryContainer
+                                        iconColor: Appearance.colors.colOnTertiaryContainer
+                                        accent: Appearance.colors.colTertiary
+                                        accentContainer: Appearance.colors.colTertiaryContainer
+                                        accentOn: Appearance.colors.colOnTertiary
+                                        surfaceBg: Appearance.colors.colLayer1
+                                        rowBg: Appearance.colors.colLayer1
+                                        rowTitle: Appearance.colors.colOnTertiaryContainer
+                                        mutedText: Appearance.colors.colOnTertiaryContainer
+                                        surfaceText: Appearance.colors.colOnTertiaryContainer
+                                    }
+                                }
                             }
                         }
 
@@ -989,6 +1007,8 @@ Item {
                             id: customImagesComponent
                             DashboardSectionCard {
                                 anchors.fill: parent
+                                showHeader: true
+                                tint: Appearance.colors.colTertiaryContainer
                                 title: slot.modelData.title
                                 icon: slot.modelData.icon
                                 tileShape: slot.modelData.shape
@@ -998,55 +1018,24 @@ Item {
                                 travelX: slot.modelData.travelX
                                 travelY: slot.modelData.travelY
                                 content: Component {
-                                    ColumnLayout {
-                                        Layout.fillWidth: true
-                                        spacing: 8
-
-                                        Repeater {
-                                            model: Config.customImages
-
-                                            delegate: GroupedList {
-                                                required property int index
-                                                Layout.fillWidth: true
-
-                                                RowLayout {
-                                                    Layout.fillWidth: true
-                                                    spacing: 8
-
-                                                    MaterialSymbol {
-                                                        text: "image"
-                                                        iconSize: Appearance.font.pixelSize.large
-                                                        color: Appearance.colors.colOnSurfaceVariant
-                                                    }
-                                                    StyledText {
-                                                        Layout.fillWidth: true
-                                                        text: Translation.tr("Image %1").arg(index + 1)
-                                                        font.pixelSize: Appearance.font.pixelSize.normal
-                                                        elide: Text.ElideRight
-                                                    }
-                                                    RippleButtonWithIcon {
-                                                        materialIcon: "image"
-                                                        mainText: Translation.tr("Choose")
-                                                        onClicked: FilePicker.pickImage(path => Config.updateCustomImage(index, { path }))
-                                                    }
-                                                    RippleButtonWithIcon {
-                                                        materialIcon: "delete"
-                                                        mainText: Translation.tr("Remove")
-                                                        onClicked: Config.removeCustomImage(index)
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        GroupedList {
-                                            Layout.fillWidth: true
-                                            RippleButtonWithIcon {
-                                                Layout.fillWidth: true
-                                                materialIcon: "add"
-                                                mainText: Translation.tr("Add Image")
-                                                onClicked: Config.addCustomImage()
-                                            }
-                                        }
+                                    CustomImagesSection {
+                                        showHeader: false
+                                        switchActive: Appearance.colors.colTertiary
+                                        switchThumb: Appearance.colors.colOnTertiary
+                                        bgColor: Appearance.colors.colTertiaryContainer
+                                        iconColor: Appearance.colors.colOnTertiaryContainer
+                                        accent: Appearance.colors.colTertiary
+                                        accentHover: Appearance.colors.colTertiaryHover
+                                        accentActive: Appearance.colors.colTertiaryActive
+                                        accentContainer: Appearance.colors.colTertiaryContainer
+                                        accentOn: Appearance.colors.colOnTertiary
+                                        rowBg: Appearance.colors.colLayer1
+                                        rowTitle: Appearance.colors.colOnTertiaryContainer
+                                        mutedText: Appearance.colors.colOnTertiaryContainer
+                                        surfaceText: Appearance.colors.colOnTertiaryContainer
+                                        colChip: Appearance.colors.colTertiaryActive
+                                        colChipHover: Appearance.colors.colTertiaryHover
+                                        colChipActive: Appearance.colors.colTertiaryHover
                                     }
                                 }
                             }
@@ -1056,6 +1045,8 @@ Item {
                             id: imageCardsComponent
                             DashboardSectionCard {
                                 anchors.fill: parent
+                                showHeader: true
+                                tint: Appearance.colors.colTertiaryContainer
                                 title: slot.modelData.title
                                 icon: slot.modelData.icon
                                 tileShape: slot.modelData.shape
@@ -1064,7 +1055,28 @@ Item {
                                 animIndex: slot.index % 6
                                 travelX: slot.modelData.travelX
                                 travelY: slot.modelData.travelY
-                                content: Component { ImageCardsSection {} }
+                                content: Component {
+                                    ImageCardsSection {
+                                        showHeader: false
+                                        switchActive: Appearance.colors.colTertiary
+                                        switchThumb: Appearance.colors.colOnTertiary
+                                        bgColor: Appearance.colors.colTertiaryContainer
+                                        iconColor: Appearance.colors.colOnTertiaryContainer
+                                        accent: Appearance.colors.colTertiary
+                                        accentHover: Appearance.colors.colTertiaryHover
+                                        accentActive: Appearance.colors.colTertiaryActive
+                                        accentContainer: Appearance.colors.colTertiaryContainer
+                                        accentOn: Appearance.colors.colOnTertiary
+                                        rowBg: Appearance.colors.colLayer1
+                                        rowTitle: Appearance.colors.colOnTertiaryContainer
+                                        mutedText: Appearance.colors.colOnTertiaryContainer
+                                        surfaceText: Appearance.colors.colOnTertiaryContainer
+                                        colChip: Appearance.colors.colTertiaryActive
+                                        colChipHover: Appearance.colors.colTertiaryHover
+                                        colChipActive: Appearance.colors.colTertiaryHover
+                                        colChipText: Appearance.colors.colOnTertiaryContainer
+                                    }
+                                }
                             }
                         }
 

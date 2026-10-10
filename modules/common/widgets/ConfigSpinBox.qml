@@ -11,6 +11,7 @@ RowLayout {
     property alias stepSize: spinBoxWidget.stepSize
     property alias from: spinBoxWidget.from
     property alias to: spinBoxWidget.to
+    property alias flat: spinBoxWidget.flat
     signal valueModified()
     // Colour slots; defaults keep the old hard-coded colours.
     property color colLabel: Appearance.colors.colOnSecondaryContainer
