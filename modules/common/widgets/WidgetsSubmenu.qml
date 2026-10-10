@@ -93,7 +93,13 @@ Item {
                 required property var modelData
                 Layout.fillWidth: true
                 Layout.bottomMargin: 6 // ConfigSwitch normally carries this; it's lost inside a Loader
-                sourceComponent: (entry.modelData.key === "customImage" || entry.modelData.key === "sticker") ? addRow : toggleSwitch
+                sourceComponent: ["customImage", "sticker", "imageCard"].includes(entry.modelData.key) ? addRow : toggleSwitch
+
+                function add() {
+                    if (entry.modelData.key === "sticker") Config.addSticker();
+                    else if (entry.modelData.key === "imageCard") Config.addImageCard();
+                    else Config.addCustomImage();
+                }
 
                 Component {
                     id: toggleSwitch
@@ -105,7 +111,7 @@ Item {
                     }
                 }
 
-                // Custom Image / Sticker: mirrors ConfigSwitch structure exactly, "+" instead of the switch
+                // Custom Image / Sticker / Image Card: mirrors ConfigSwitch structure exactly, "+" instead of the switch
                 Component {
                     id: addRow
                     RippleButton {
@@ -114,7 +120,7 @@ Item {
                         colBackgroundHover: "transparent"
                         implicitHeight: contentItem.implicitHeight + 8
                         font.pixelSize: Appearance.font.pixelSize.small
-                        onClicked: entry.modelData.key === "sticker" ? Config.addSticker() : Config.addCustomImage()
+                        onClicked: entry.add()
 
                         contentItem: RowLayout {
                             spacing: 10
@@ -139,7 +145,7 @@ Item {
 
                                 ButtonMouseArea {
                                     anchors.fill: parent
-                                    onClicked: entry.modelData.key === "sticker" ? Config.addSticker() : Config.addCustomImage()
+                                    onClicked: entry.add()
                                 }
                             }
                         }

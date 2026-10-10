@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell.Widgets
 import qs
+import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.widgets.widgetCanvas
@@ -91,6 +92,14 @@ AbstractBackgroundWidget {
         function onDragFinished() {
             if (root.cardIndex >= 0 && root.configEntry)
                 Config.saveImageCardProps(root.cardIndex, { placementStrategy: root.configEntry.placementStrategy });
+        }
+        // Klik kiri saat tidak terkunci: buka image picker — sama seperti Custom Image/Sticker.
+        function onClicked(mouse) {
+            if (mouse.button !== Qt.LeftButton || Config.options.background.widgetsLocked) return;
+            FilePicker.pickImage(path => {
+                if (root.cardIndex >= 0) Config.updateImageCard(root.cardIndex, { path: path });
+                else root.configEntry.path = path;
+            });
         }
     }
 
