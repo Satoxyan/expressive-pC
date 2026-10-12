@@ -377,12 +377,18 @@ Singleton {
         lyricsProc.running = true
     }
 
-    onActivePlayerChanged: root.restartLyrics()
+    Timer {
+        id: restartDebounce
+        interval: 150
+        onTriggered: root.restartLyrics()
+    }
+
+    onActivePlayerChanged: restartDebounce.restart()
 
     Connections {
         target: root.activePlayer
         function onTrackTitleChanged() { root.restartLyrics() }
-        function onTrackArtistChanged() { root.restartLyrics() }
+        function onTrackArtistChanged() { restartDebounce.restart() }
         function onPlaybackStateChanged() { root.resync() }
     }
 

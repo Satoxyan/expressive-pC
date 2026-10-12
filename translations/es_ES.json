@@ -1185,5 +1185,12 @@
   "Live Wallpaper Folder": "Carpeta de fondos en vivo",
   "Right / bottom": "Derecha / abajo",
   "Custom icons folder": "Carpeta de iconos personalizados",
-  "Allow workspace cycles": "Permitir ciclos de espacios de trabajo"
+  "Allow workspace cycles": "Permitir ciclos de espacios de trabajo",
+  "Webapps": "Aplicaciones web",
+  "Website URL": "URL del sitio",
+  "example.com (one per line)": "ejemplo.com (una por línea)",
+  "Could not create: %1": "No se pudo crear: %1",
+  "Your webapps": "Tus aplicaciones web",
+  "Create webapp": "Crear aplicación web",
+  "No webapps yet": "Aún no hay aplicaciones web"
 }

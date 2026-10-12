@@ -909,6 +909,11 @@ QtObject {
             ]
         },
         {
+            page: Translation.tr("Services"), title: Translation.tr("Webapps"), icon: "web_asset", cards: [
+                { type: "webapps", key: "services:Webapps", title: Translation.tr("Webapps"), icon: "web_asset", kw: "webapp web app chromium chrome url site pwa" }
+            ]
+        },
+        {
             page: Translation.tr("Services"), title: Translation.tr("System updates (Arch)"), icon: "deployed_code_update", cards: [
                 { type: "toggle", key: "services:Enable update checks", title: Translation.tr("Update checks"), icon: "update" },
                 { type: "spin", key: "services:Check interval (mins)", title: Translation.tr("Check interval (min)"), icon: "av_timer" }

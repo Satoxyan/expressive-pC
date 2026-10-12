@@ -31,7 +31,8 @@ Singleton {
 		return null;
 	}
 
-	property MprisPlayer activePlayer: preferredPlayer ?? trackedPlayer ?? Mpris.players.values[0] ?? null;
+	property MprisPlayer manualPlayer: null;
+	property MprisPlayer activePlayer: manualPlayer ?? preferredPlayer ?? trackedPlayer ?? Mpris.players.values[0] ?? null;
 	signal trackChanged(reverse: bool);
 
 	property bool __reverse: false;

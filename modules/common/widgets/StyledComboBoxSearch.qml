@@ -15,6 +15,21 @@ ComboBox {
     property color colBackground: Appearance.colors.colSecondaryContainer
     property color colBackgroundHover: Appearance.colors.colSecondaryContainerHover
     property color colBackgroundActive: Appearance.colors.colSecondaryContainerActive
+    property color colText: Appearance.colors.colOnSecondaryContainer
+    property color colAccent: Appearance.colors.colPrimary
+    property color colOnAccent: Appearance.colors.colOnPrimary
+    property color colPopup: Appearance.m3colors.m3surfaceContainerHigh
+    property color colSelected: Appearance.colors.colSecondaryContainer
+    property color colSelectedHover: Appearance.colors.colSecondaryContainerHover
+    property color colSelectedActive: Appearance.colors.colSecondaryContainerActive
+    property color colOnSelected: Appearance.colors.colOnSecondaryContainer
+    property color colItemHover: Appearance.colors.colLayer3Hover
+    property color colItemActive: Appearance.colors.colLayer3Active
+    property color colOnItem: Appearance.colors.colOnLayer3
+    property color colSearch: Appearance.colors.colLayer2
+    property color colOnSearch: Appearance.colors.colOnLayer1
+    property color colSearchHint: Appearance.colors.colSubtext
+    property bool popupAbove: false
     property string searchText: ""
     property bool splitIndicator: false
 
@@ -73,6 +88,9 @@ ComboBox {
             height: parent.height
             open: root.popup.visible
             colClosed: (root.down && !root.popup.visible) ? root.colBackgroundActive : root.hovered ? root.colBackgroundHover : root.colBackground
+            colOpen: root.colAccent
+            colIconClosed: root.colText
+            colIconOpen: root.colOnAccent
         }
 
         MaterialSymbol {
@@ -82,7 +100,7 @@ ComboBox {
             y: parent.height / 2 - height / 2
             text: "keyboard_arrow_down"
             iconSize: Appearance.font.pixelSize.larger
-            color: Appearance.colors.colOnSecondaryContainer
+            color: root.colText
 
             rotation: root.popup.visible ? 180 : 0
             Behavior on rotation {
@@ -114,14 +132,14 @@ ComboBox {
                         return root.buttonIcon;
                     }
                     iconSize: Appearance.font.pixelSize.larger
-                    color: Appearance.colors.colOnSecondaryContainer
+                    color: root.colText
                 }
             }
 
             StyledText {
                 Layout.fillWidth: true
                 Layout.alignment: Qt.AlignVCenter
-                color: Appearance.colors.colOnSecondaryContainer
+                color: root.colText
                 text: root.displayText
                 elide: Text.ElideRight
                 verticalAlignment: Text.AlignVCenter
@@ -144,16 +162,16 @@ ComboBox {
 
             property color color: {
                 if (itemDelegate.selected) {
-                    if (itemDelegate.down) return Appearance.colors.colSecondaryContainerActive;
-                    if (itemDelegate.hovered) return Appearance.colors.colSecondaryContainerHover;
-                    return Appearance.colors.colSecondaryContainer;
+                    if (itemDelegate.down) return root.colSelectedActive;
+                    if (itemDelegate.hovered) return root.colSelectedHover;
+                    return root.colSelected;
                 } else {
-                    if (itemDelegate.down) return Appearance.colors.colLayer3Active;
-                    if (itemDelegate.hovered) return Appearance.colors.colLayer3Hover;
+                    if (itemDelegate.down) return root.colItemActive;
+                    if (itemDelegate.hovered) return root.colItemHover;
                     return ColorUtils.transparentize(Appearance.colors.colLayer3);
                 }
             }
-            property color colText: itemDelegate.selected ? Appearance.colors.colOnSecondaryContainer : Appearance.colors.colOnLayer3
+            property color colText: itemDelegate.selected ? root.colOnSelected : root.colOnItem
 
             background: Rectangle {
                 anchors.fill: parent
@@ -206,7 +224,7 @@ ComboBox {
     }
 
     popup: Popup {
-        y: root.height + 4
+        y: root.popupAbove ? -height - 4 : root.height + 4
         width: root.width
         clip: true
         height: Math.min(
@@ -251,7 +269,7 @@ ComboBox {
                 id: popupBackground
                 anchors.fill: parent
                 radius: Appearance.rounding.normal
-                color: Appearance.m3colors.m3surfaceContainerHigh
+                color: root.colPopup
             }
         }
 
@@ -262,7 +280,7 @@ ComboBox {
                 Layout.fillWidth: true
                 implicitHeight: searchField.implicitHeight + 8
                 radius: Appearance.rounding.small
-                color: Appearance.colors.colLayer2
+                color: root.colSearch
 
                 RowLayout {
                     anchors.fill: parent
@@ -273,7 +291,7 @@ ComboBox {
                         Layout.leftMargin: 6
                         text: "search"
                         iconSize: Appearance.font.pixelSize.larger
-                        color: Appearance.colors.colSubtext
+                        color: root.colSearchHint
                     }
 
                     TextField {
@@ -281,7 +299,8 @@ ComboBox {
                         ContextMenu.menu: StyledTextEditMenu { editor: searchField }
                         Layout.fillWidth: true
                         placeholderText: "Search..."
-                        color: Appearance.colors.colOnLayer1
+                        placeholderTextColor: root.colSearchHint
+                        color: root.colOnSearch
                         background: null
                         font.family: Appearance.font.family.main
                         font.pixelSize: Appearance.font.pixelSize.normal
@@ -298,7 +317,7 @@ ComboBox {
                         visible: searchField.text.length > 0
                         text: "close"
                         iconSize: Appearance.font.pixelSize.normal
-                        color: Appearance.colors.colSubtext
+                        color: root.colSearchHint
                         Layout.rightMargin: 6
                         MouseArea {
                             anchors.fill: parent

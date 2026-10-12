@@ -221,6 +221,11 @@ Scope {
                                 : RoundCorner.CornerEnum.BottomLeft
                         }
 
+                        DockContextMenu {
+                            id: dockContextMenu
+                            screen: dockRoot.screen
+                        }
+
                         GridLayout {
                             id: dockRow
                             anchors.top: dockRoot.vertical ? undefined : parent.top
@@ -250,6 +255,7 @@ Scope {
                                 visible: dockRow.hasPinnedApps
                                 Layout.topMargin: DockStyle.mTop(DockStyle.pinnedInnerMargin, 0)
                                 Layout.leftMargin: DockStyle.mLeft(DockStyle.pinnedInnerMargin, 0)
+                                contextMenu: dockContextMenu
                                 pinnedApps: Config.options?.dock.pinnedApps ?? []
                             }
 
@@ -261,6 +267,7 @@ Scope {
 
                             DockActiveApps {
                                 id: activeApps
+                                contextMenu: dockContextMenu
                             }
 
                             DockSeparator {

@@ -8,6 +8,7 @@ Item {
     id: root
 
     property bool requestDockShow: false
+    property var contextMenu: null
     property alias media: dockMedia
     readonly property var activeUnpinned: TaskbarApps.apps.filter(
         a => !a.pinned && a.appId !== "SEPARATOR" && a.toplevels.length > 0
@@ -56,6 +57,7 @@ Item {
                 Layout.leftMargin: DockStyle.mLeft(DockStyle.pinnedInnerMargin, 0)
                 Layout.rightMargin: DockStyle.mRight(DockStyle.pinnedInnerMargin, 0)
                 appListRoot: appListBridge
+                contextMenu: root.contextMenu
                 innerInset: DockStyle.iconInset
                 outerInset: DockStyle.iconInset
             }

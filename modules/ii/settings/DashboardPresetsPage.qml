@@ -363,6 +363,7 @@ Item {
                         try {
                             cell.summary = root.summaryOf(JSON.parse(text()));
                             cell.loaded = true;
+                            PresetThumbs.request(cell.summary.wallpaper);
                         } catch (e) {
                             cell.summary = {};
                         }
@@ -387,7 +388,7 @@ Item {
 
                         Image {
                             anchors.fill: parent
-                            source: cell.summary.wallpaper ?? ""
+                            source: PresetThumbs.thumbFor(cell.summary.wallpaper) || (cell.summary.wallpaper ?? "")
                             fillMode: Image.PreserveAspectCrop
                             asynchronous: true
                             cache: true

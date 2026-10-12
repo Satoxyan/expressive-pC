@@ -17,6 +17,48 @@ Menu {
     topPadding: 6
     bottomPadding: 6
 
+    transformOrigin: Item.TopLeft
+
+    enter: Transition {
+        ParallelAnimation {
+            NumberAnimation {
+                property: "scale"
+                from: 0.6
+                to: 1
+                duration: 500
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Appearance.animationCurves.expressiveFastSpatial
+            }
+            NumberAnimation {
+                property: "opacity"
+                from: 0
+                to: 1
+                duration: Appearance.animationCurves.expressiveEffectsDuration
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Appearance.animationCurves.expressiveEffects
+            }
+        }
+    }
+
+    exit: Transition {
+        ParallelAnimation {
+            NumberAnimation {
+                property: "scale"
+                to: 0.85
+                duration: 160
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Appearance.animationCurves.emphasizedAccel
+            }
+            NumberAnimation {
+                property: "opacity"
+                to: 0
+                duration: 140
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Appearance.animationCurves.emphasizedAccel
+            }
+        }
+    }
+
     background: Rectangle {
         implicitWidth: 190
         radius: Appearance.rounding.small + 4

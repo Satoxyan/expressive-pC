@@ -26,6 +26,7 @@ Item {
     property Item lastHoveredButton: null
     property bool buttonHovered: false
     property bool requestDockShow: previewPopup.show
+    property var contextMenu: null
     signal orderChanged(var newOrder)
     property var  _workOrder: pinnedApps.slice()
     property int  activeDragVisualIndex: -1
@@ -261,6 +262,7 @@ Item {
         property bool shouldShow: WM.compositor === "hyprland"
                                   && (popupMouseArea.containsMouse || root.buttonHovered)
                                   && !root._dragging
+                                  && !(root.contextMenu?.isOpen ?? false)
                                   && Config.options.dock.showPreviews
                                   && appTopLevel
                                   && appTopLevel.toplevels

@@ -1194,5 +1194,12 @@
   "Live Wallpaper Folder": "Live Wallpaper Folder",
   "Right / bottom": "Right / bottom",
   "Custom icons folder": "Custom icons folder",
-  "Allow workspace cycles": "Allow workspace cycles"
+  "Allow workspace cycles": "Allow workspace cycles",
+  "Webapps": "Webapps",
+  "Website URL": "Website URL",
+  "example.com (one per line)": "example.com (one per line)",
+  "Could not create: %1": "Could not create: %1",
+  "Your webapps": "Your webapps",
+  "Create webapp": "Create webapp",
+  "No webapps yet": "No webapps yet"
 }

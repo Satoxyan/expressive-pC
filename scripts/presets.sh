@@ -28,6 +28,7 @@ BLACKLIST_FILTER='del(._presetMeta)
   | del(.ai, .networking, .musicRecognition, .search, .screenRecord, .screenSnip, .updates)
   | del(.bar.weather)
   | del(.appearance.fonts)
+  | del(.profile.onlinePresets, .profile.uploadGuideSeen)
   | del(.hyprland.input, .hyprland.autostartApps, .hyprland.general.layout)
   | del(.dock.pinnedApps, .launcher.pinnedApps, .tray.pinnedItems)
   | del(.sidebar.booru, .wallpaperSelector.userPath)
@@ -258,6 +259,33 @@ case "$action" in
             | walk(if type == "string" and test("^[A-Za-z][A-Za-z0-9+.-]*://") then "" else . end)
             | if (.background.collage.tree? // null) != null then .background.collage.tree |= (try (fromjson | scrub | tojson) catch .) else . end' \
             "$filtered" > "$scrubbed" && mv "$scrubbed" "$filtered"
+        fix_extension() {
+            local img="$1" want base new current
+            case "$(file -b --mime-type "$img" 2>/dev/null)" in
+                image/png) want=png ;;
+                image/jpeg) want=jpg ;;
+                image/webp) want=webp ;;
+                *) return 0 ;;
+            esac
+            base="${img##*/}"
+            current="${base##*.}"
+            [ "$current" = jpeg ] && current=jpg
+            [ "${current,,}" = "$want" ] && return 0
+            new="${base%.*}.$want"
+            [ -e "$tmpdir/$new" ] && new="${base%.*}-fixed.$want"
+            mv "$img" "$tmpdir/$new"
+            for target in "$filtered" "$tmpdir/meta.json"; do
+                jq --arg old "$base" --arg new "$new" \
+                    'def swap: walk(if type == "string" and . == $old then $new else . end);
+                     swap | if (.background.collage.tree? // null) != null then .background.collage.tree |= (try (fromjson | swap | tojson) catch .) else . end' \
+                    "$target" > "$target.tmp" && mv "$target.tmp" "$target"
+            done
+        }
+        if command -v file >/dev/null 2>&1; then
+            for img in "$tmpdir"/*.png "$tmpdir"/*.jpg "$tmpdir"/*.jpeg "$tmpdir"/*.webp; do
+                [ -f "$img" ] && fix_extension "$img"
+            done
+        fi
         # preview: try to generate or copy existing preview if exists in assets
         # Just include filtered json + meta + wallpaper basename
         size_limit=$((9 * 1024 * 1024 + 512 * 1024))

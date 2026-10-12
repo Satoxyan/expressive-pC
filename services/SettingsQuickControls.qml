@@ -336,12 +336,15 @@ Singleton {
         "bar:Workspaces shown": root.optionSpin("bar.workspaces.shown", 1, 30, 1),
         "bar:Polling interval (ms)": root.optionSpin("resources.updateInterval", 100, 10000, 100),
         "bar:Max media width": root.optionSpin("bar.media.maxWidth", 100, 500, 10),
-        "bar:Group style": root.optionSelect("bar.borderless", [
+        "bar:Group style": Object.assign(root.optionSelect("bar.borderless", [
             { displayName: Translation.tr(""), icon: "block", value: "transparent" },
             { displayName: Translation.tr("Pills"), icon: "pill", value: "pills" },
             { displayName: Translation.tr("Separated"), icon: "view_column_2", value: "separated" },
             { displayName: Translation.tr("Segmented"), icon: "tablet", value: "segmented" }
-        ]),
+        ]), {
+            canReset: () => (Config.options.bar.widgetStyles ?? []).length > 0,
+            reset: () => { Config.options.bar.widgetStyles = []; }
+        }),
         "bar:Autohide": root.optionSelect("bar.autoHide.enable", [
             { displayName: Translation.tr("No"), icon: "close", value: false },
             { displayName: Translation.tr("Yes"), icon: "check", value: true }
