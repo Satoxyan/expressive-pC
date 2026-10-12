@@ -88,10 +88,10 @@ DashboardCard {
                 rowBg: Appearance.colors.colLayer1
                 surfaceText: Appearance.colors.colOnTertiaryContainer
                 chevronColor: Appearance.colors.colOnTertiaryContainer
-                fieldBg: Appearance.colors.colTertiary
-                fieldBgHover: Appearance.colors.colTertiaryHover
+                fieldBg: Appearance.colors.colTertiaryActive
+                fieldBgHover: Qt.rgba(1, 1, 1, 0.26)
                 fieldBgActive: Appearance.colors.colTertiaryActive
-                fieldText: Appearance.colors.colOnTertiary
+                fieldText: Appearance.colors.colOnTertiaryContainer
                 spinBg: Appearance.colors.colTertiary
                 spinFg: Appearance.colors.colOnTertiaryContainer
                 spinFlat: true
@@ -107,10 +107,6 @@ DashboardCard {
                 colChipActive: Appearance.colors.colTertiaryHover
                 colChipText: Appearance.colors.colOnTertiaryContainer
                 colToggledText: Appearance.colors.colOnTertiary
-                colPopup: Appearance.colors.colLayer1
-                colPopupText: Appearance.colors.colOnTertiaryContainer
-                colPopupHover: Appearance.colors.colTertiaryHover
-                colPopupActive: Appearance.colors.colTertiaryHover
             }
         }
     }

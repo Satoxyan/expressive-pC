@@ -17,6 +17,11 @@ RowLayout {
     property real fieldWidth: 220
     property bool fixedWidth: false
     property bool searchable: false
+    // Search-mode only: flat right edge + badge indicator (dashboard combo-card look).
+    property bool splitIndicator: false
+    // Badge colours while the popup is open (closed badge derives from the field).
+    property color colAccent: Appearance.colors.colPrimary
+    property color colOnAccent: Appearance.colors.colOnPrimary
     // Colour slots; defaults keep the old hard-coded colours.
     property color colLabel: Appearance.colors.colOnSecondaryContainer
     property color fieldBg: Appearance.colors.colSecondaryContainer
@@ -100,6 +105,23 @@ RowLayout {
         enabled: root.enabled
         textRole: root.textRole
         model: root.model
+        splitIndicator: root.splitIndicator
+        colBackground: root.fieldBg
+        colBackgroundHover: root.fieldBgHover
+        colBackgroundActive: root.fieldBgActive
+        colText: root.fieldText
+        colPopup: root.colPopup
+        colOnItem: root.colPopupText
+        colItemHover: root.colPopupHover
+        colItemActive: root.colPopupActive
+        // Selected row and open badge reuse the field colours so the whole
+        // control reads as one accent family (tertiary in the dashboard card).
+        colSelected: root.fieldBg
+        colSelectedHover: root.fieldBgHover
+        colSelectedActive: root.fieldBgActive
+        colOnSelected: root.fieldText
+        colAccent: root.colAccent
+        colOnAccent: root.colOnAccent
 
         currentIndex: {
             const index = root.model.findIndex(item => item.value === root.currentValue);

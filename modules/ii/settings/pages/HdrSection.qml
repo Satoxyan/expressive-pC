@@ -100,6 +100,10 @@ ContentSubsection {
             Layout.fillWidth: true
             buttonIcon: "palette"
             text: Translation.tr("Color management")
+            searchable: true
+            splitIndicator: true
+            colAccent: root.colToggled
+            colOnAccent: root.colToggledText
             colLabel: root.surfaceText
             fieldBg: root.fieldBg
             fieldBgHover: root.fieldBgHover

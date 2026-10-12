@@ -218,6 +218,10 @@ ContentSection {
                             Layout.fillWidth: true
                             buttonIcon: "aspect_ratio"
                             text: Translation.tr("Resolution & Refresh Rate")
+                            searchable: true
+                            splitIndicator: true
+                            colAccent: root.accent
+                            colOnAccent: root.colToggledText
                             colLabel: root.surfaceText
                             fieldBg: root.fieldBg
                             fieldBgHover: root.fieldBgHover
