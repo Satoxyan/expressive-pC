@@ -275,6 +275,7 @@ ContentSection {
                         ConfigSelectionArray {
                             text: Translation.tr("Orientation")
                             icon: "mobile_rotate"
+                            pill: true
                             colLabel: root.surfaceText
                             colChip: root.colChip
                             colChipHover: root.colChipHover

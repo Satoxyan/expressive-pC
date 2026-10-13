@@ -23,6 +23,8 @@ RowLayout {
     ]
     property var currentValue: null
     property bool textOnlyWhenActive: false
+    // pill: every chip a full pill (active or not) instead of the segmented look.
+    property bool pill: false
     // Accent for the selected chip; default keeps the primary accent.
     property color colToggled: Appearance.colors.colPrimary
     property color colToggledHover: Appearance.colors.colPrimaryHover
@@ -64,7 +66,7 @@ RowLayout {
         id: buttonsFlow
         Layout.fillWidth: !root.text
         Layout.alignment: Qt.AlignRight
-        spacing: 2
+        spacing: root.pill ? 8 : 2
         Layout.preferredWidth: root.textOnlyWhenActive ? singleRowWidth() : implicitWidth
         Layout.minimumWidth: root.textOnlyWhenActive ? Layout.preferredWidth : 0
         Layout.preferredHeight: root.textOnlyWhenActive ? singleRowHeight() : implicitHeight
@@ -123,6 +125,7 @@ RowLayout {
                     : contentItem.implicitWidth + horizontalPadding * 2
                 leftmost: index === 0
                 rightmost: index === root.options.length - 1
+                alwaysPill: root.pill
                 colBackground: root.colChip
                 colBackgroundHover: root.colChipHover
                 colBackgroundActive: root.colChipActive

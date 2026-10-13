@@ -72,6 +72,7 @@ ContentSubsection {
         ConfigSelectionArray {
             text: Translation.tr("Bit depth")
             icon: "gradient"
+            pill: true
             colLabel: root.surfaceText
             colChip: root.colChip
             colChipHover: root.colChipHover

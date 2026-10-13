@@ -13,6 +13,8 @@ GroupButton {
     property string buttonIcon
     property bool leftmost: false
     property bool rightmost: false
+    // every chip a full pill, selected or not (segmented look is dropped).
+    property bool alwaysPill: false
 
     property bool isDragging: false
     readonly property bool showToggled: root.toggled && root.enabled
@@ -21,8 +23,8 @@ GroupButton {
     property color colTextActive: Appearance.colors.colOnPrimary
     property color colText: root.showToggled ? root.colTextActive : root.colTextInactive
 
-    leftRadius: (showToggled || leftmost) ? (height / 2) : Appearance.rounding.unsharpenmore
-    rightRadius: (showToggled || rightmost) ? (height / 2) : Appearance.rounding.unsharpenmore
+    leftRadius: (alwaysPill || showToggled || leftmost) ? (height / 2) : Appearance.rounding.unsharpenmore
+    rightRadius: (alwaysPill || showToggled || rightmost) ? (height / 2) : Appearance.rounding.unsharpenmore
 
     horizontalPadding: 12
     verticalPadding: 8 
