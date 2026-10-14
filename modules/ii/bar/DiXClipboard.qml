@@ -29,7 +29,6 @@ ColumnLayout {
         ? xclip.decodedText.trim() : xclip.listText
     readonly property bool isUrl: /^https?:\/\/\S+$/.test(xclip.text)
     readonly property bool isPlainText: !xclip.isImage && !xclip.hasFiles && xclip.text !== ""
-    readonly property bool isYoutube: xclip.isUrl && /^https?:\/\/(www\.|m\.|music\.)?(youtube\.com\/(watch|shorts|live)|youtu\.be\/)/.test(xclip.text)
     readonly property bool isPdfUrl: xclip.isUrl && /\.pdf([?#]|$)/i.test(xclip.text)
     readonly property bool isAddress: xclip.isPlainText && !xclip.isUrl && IslandEvents.looksLikeAddress(xclip.text)
     readonly property bool isForeign: xclip.isPlainText && !xclip.isUrl && IslandEvents.looksForeign(xclip.text)
@@ -53,12 +52,9 @@ ColumnLayout {
     readonly property bool isEmail: xclip.isPlainText && /^\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*$/.test(xclip.text)
     readonly property bool isPython: xclip.kind.kind === "code" && xclip.kind.label === "Python"
     readonly property bool isShellCommand: xclip.kind.kind === "code" && xclip.kind.label === "Shell" && xclip.text.length < 4000
-    readonly property bool isMediaLink: xclip.isYoutube || (xclip.isUrl && (
-        /^https?:\/\/(www\.|m\.|vm\.|vt\.)?(instagram\.com\/(p|reel|reels|tv)\/|tiktok\.com\/|soundcloud\.com\/[^\/]+\/|vimeo\.com\/\d|dailymotion\.com\/video|fb\.watch\/|facebook\.com\/(watch|reel|[^\/]+\/videos)|clips\.twitch\.tv\/|twitch\.tv\/[^\/]+\/clip\/|(twitter|x)\.com\/[^\/]+\/status\/)/i.test(xclip.text)
-        || /^https?:\/\/[^\/]*whatsapp\.net\//i.test(xclip.text)
-        || /\.(mp3|m4a|ogg|opus|wav|flac|aac|mp4|webm|mkv|mov)([?#]|$)/i.test(xclip.text)))
-    readonly property bool isAudioOnlyLink: xclip.isUrl && (/^https?:\/\/(www\.)?soundcloud\.com\//i.test(xclip.text) || /\.(mp3|m4a|ogg|opus|wav|flac|aac)([?#]|$)/i.test(xclip.text)
-        || /^https?:\/\/[^\/]*whatsapp\.net\/\S*\.(ogg|opus)/i.test(xclip.text))
+    readonly property string downloadKind: xclip.isUrl ? IslandEvents.linkDownloadKind(xclip.text) : ""
+    readonly property bool isMediaLink: ["video", "post", "audio"].includes(xclip.downloadKind)
+    readonly property bool isAudioOnlyLink: xclip.downloadKind === "audio"
     readonly property bool isFilePath: xclip.isPlainText && xclip.text.length < 300 && /^\s*(~|\/[^\/\s][^\/\n]*)\/[^\n]+\s*$/.test(xclip.text) && !/^\s*\/\//.test(xclip.text)
     readonly property string titleGuess: {
         const t = xclip.text.trim()
@@ -131,6 +127,11 @@ ColumnLayout {
         const name = `clip-${xclip.stamp()}.py`
         Quickshell.execDetached(["bash", "-c", `d="$HOME/Documentos/snippets"; mkdir -p "$d" && printf '%s\\n' "$1" > "$d/$2" && exec code "$d" "$d/$2"`, "_", xclip.text, name])
         xclip.status = Translation.tr("Opening in VS Code…")
+    }
+
+    function downloadLink(mode) {
+        IslandEvents.downloadMedia(xclip.text, mode)
+        xclip.status = Translation.tr("Downloading to %1…").arg(IslandEvents.linkDownloadLabel)
     }
 
     function openPathFolder() {
@@ -567,36 +568,33 @@ ColumnLayout {
                 }
                 ActionChip {
                     visible: xclip.isMediaLink && !xclip.isAudioOnlyLink
-                    icon: "movie"
-                    label: Translation.tr("Download video")
-                    onTap: () => {
-                        IslandEvents.downloadMedia(xclip.text, false)
-                        xclip.status = Translation.tr("Downloading to the drawer…")
-                    }
+                    icon: xclip.downloadKind === "post" ? "perm_media" : "movie"
+                    label: xclip.downloadKind === "post" ? Translation.tr("Download media") : Translation.tr("Download video")
+                    onTap: () => xclip.downloadLink("video")
                 }
                 ActionChip {
                     visible: xclip.isMediaLink
                     icon: "music_note"
                     label: Translation.tr("Download audio")
-                    onTap: () => {
-                        IslandEvents.downloadMedia(xclip.text, true)
-                        xclip.status = Translation.tr("Downloading to the drawer…")
-                    }
+                    onTap: () => xclip.downloadLink("audio")
+                }
+                ActionChip {
+                    visible: xclip.downloadKind === "file"
+                    icon: "download"
+                    label: Translation.tr("Download file")
+                    onTap: () => xclip.downloadLink("file")
+                }
+                ActionChip {
+                    visible: xclip.downloadKind === "try"
+                    icon: "download"
+                    label: Translation.tr("Try to download media")
+                    onTap: () => xclip.downloadLink("video")
                 }
                 ActionChip {
                     visible: xclip.isPdfUrl
                     icon: "picture_as_pdf"
                     label: Translation.tr("Open PDF")
                     onTap: () => Qt.openUrlExternally(xclip.text)
-                }
-                ActionChip {
-                    visible: xclip.isPdfUrl
-                    icon: "download"
-                    label: Translation.tr("Save to drawer")
-                    onTap: () => {
-                        DropShelf.addItems([xclip.text])
-                        xclip.status = Translation.tr("Saving to the drawer…")
-                    }
                 }
                 ActionChip {
                     visible: xclip.isAddress

@@ -900,6 +900,7 @@ Singleton {
                     property string downloadDetection: "files"
                     property int shelfExpireHours: 2 // unpinned files leave the drawer this long after last being touched; 0 keeps them
                     property bool shelfClearOnBoot: true // unpinned files do not survive a reboot
+                    property string linkDownloadDir: "" // where downloads from a copied link are kept; empty = an "Island" folder inside Downloads
                     property list<string> mutedConversations: []
                     property list<string> mutedConversationsUntil: [] // "<epoch ms>|App|Title": muted for a while (1 h, until tomorrow)
                     property list<string> priorityNotificationApps: ["whatsapp"]

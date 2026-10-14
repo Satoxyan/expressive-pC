@@ -772,39 +772,98 @@ Singleton {
 
     readonly property bool mediaDownloadBusy: mediaDownloadProc.running
 
-    function downloadMedia(url, audioOnly) {
-        if (mediaDownloadProc.running) return
-        mediaDownloadProc.activityId = `ytdlp-${Date.now()}`
-        mediaDownloadProc.file = ""
-        root.upsertActivity(mediaDownloadProc.activityId, audioOnly ? Translation.tr("Downloading audio") : Translation.tr("Downloading video"),
-            url.replace(/^https?:\/\/(www\.|m\.)?/, ""), audioOnly ? "music_note" : "movie", -1, "running")
-        mediaDownloadProc.command = ["yt-dlp", "--newline", "--no-playlist", "--progress", "-P", DropShelf.storeDir,
-            "-o", "%(title).80B.%(ext)s", "--progress-template", "download:ISLAND %(progress._percent_str)s",
-            "--print", "after_move:FILE %(filepath)s",
-            ...(audioOnly ? ["-x", "--audio-format", "mp3"] : ["-f", "bv*[height<=1080]+ba/b[height<=1080]/b", "--merge-output-format", "mp4"]),
-            url]
+    // "video" | "post" | "audio" | "file" for links known to download, "try" for the rest of the web, "" for pages with nothing to fetch
+    function linkDownloadKind(text) {
+        const m = /^https?:\/\/(?:www\.|m\.|mobile\.)?([^\/?#:]+)(?::\d+)?([^?#]*)(.*)$/i.exec((text ?? "").trim())
+        if (!m) return ""
+        const host = m[1].toLowerCase()
+        const target = host + m[2] + m[3]
+        const site = root.linkDownloadSites.find(s => s.re.test(target))
+        if (site) return site.kind
+        if (/\.whatsapp\.net$/.test(host)) return /\.(ogg|opus)/i.test(m[2]) ? "audio" : "video"
+        if (/\.(mp3|m4a|ogg|opus|wav|flac|aac)$/i.test(m[2])) return "audio"
+        if (/\.(mp4|webm|mkv|mov|m4v)$/i.test(m[2])) return "video"
+        if (/\.(pdf|zip|7z|rar|tar|gz|tgz|xz|zst|png|jpe?g|webp|gif|avif|svg|bmp|docx?|xlsx?|pptx?|od[tsp]|csv|txt|md|json|epub|apk|deb|rpm|appimage|iso|exe|msi|ttf|otf|woff2?)$/i.test(m[2])) return "file"
+        if (m[2].length <= 1 || root.linkBrands.some(b => b.re.test(host) && (!b.path || b.path.test(m[2])))) return ""
+        return "try"
+    }
+
+    // mode: "video" (a post with only pictures gives the pictures), "audio" or "file"
+    function downloadMedia(url, mode) {
+        const job = { id: `linkdl-${Date.now()}`, url: url, mode: mode }
+        root.upsertActivity(job.id,
+            mode === "audio" ? Translation.tr("Downloading audio") : mode === "file" ? Translation.tr("Downloading file") : Translation.tr("Downloading video"),
+            url.replace(/^https?:\/\/(www\.|m\.)?/, ""), mode === "audio" ? "music_note" : mode === "file" ? "download" : "movie", -1, "running")
+        if (mediaDownloadProc.running) root.mediaDownloadQueue = [...root.mediaDownloadQueue, job]
+        else root.startMediaDownload(job)
+    }
+
+    function startMediaDownload(job) {
+        mediaDownloadProc.activityId = job.id
+        mediaDownloadProc.saved = []
+        mediaDownloadProc.failure = ""
+        mediaDownloadProc.command = ["python3", Quickshell.shellPath("scripts/island/link_download.py"),
+            "--mode", job.mode, "--dest", root.linkDownloadDir, job.url]
         mediaDownloadProc.running = true
     }
 
     Process {
         id: mediaDownloadProc
+    // Link downloads land in a folder the user can find again; the drawer only points at the file
+    readonly property string linkDownloadDir: {
+        const custom = (root.cfg.linkDownloadDir ?? "").trim().replace(/\/+$/, "")
+        if (custom === "") return `${FileUtils.trimFileProtocol(Directories.downloads)}/${Translation.tr("Island")}`
+        return custom.replace(/^~(?=\/|$)/, FileUtils.trimFileProtocol(Directories.home))
+    }
+    readonly property string linkDownloadLabel: root.linkDownloadDir.replace(`${FileUtils.trimFileProtocol(Directories.home)}/`, "")
+    readonly property var linkDownloadErrors: ({
+        "login": Translation.tr("This link needs a login"),
+        "unsupported": Translation.tr("Nothing to download at this link"),
+        "notfound": Translation.tr("Link not found or removed"),
+        "network": Translation.tr("No connection")
+    })
+    property var mediaDownloadQueue: []
+
+    // Sites yt-dlp fetches without a login, matched against host + path. "post" may hold only pictures
+    readonly property var linkDownloadSites: [
+        { kind: "video", re: /^((music\.)?youtube\.com\/(watch|shorts\/|live\/|clip\/|embed\/|playlist\?)|youtu\.be\/)/ },
+        { kind: "video", re: /^([a-z]+\.)?tiktok\.com\/./ },
+        { kind: "video", re: /^(vimeo\.com\/(\d|channels\/|groups\/)|player\.vimeo\.com\/video\/|dailymotion\.com\/video|dai\.ly\/)/ },
+        { kind: "video", re: /^(clips\.twitch\.tv\/|twitch\.tv\/([^\/]+\/clip\/|videos\/)|kick\.com\/[^\/]+\/(clips|videos)\/)/ },
+        { kind: "video", re: /^(fb\.watch\/|facebook\.com\/(watch|reel|share\/[vr]\/|[^\/]+\/videos))/ },
+        { kind: "video", re: /^(streamable\.com\/\w|rumble\.com\/v|odysee\.com\/@|bilibili\.com\/video\/|b23\.tv\/|nicovideo\.jp\/watch|vk\.com\/(video|clip)|ok\.ru\/video)/ },
+        { kind: "video", re: /^(ted\.com\/talks\/|loom\.com\/share\/|archive\.org\/details\/|coub\.com\/view\/|newgrounds\.com\/portal\/view|9gag\.com\/gag\/)/ },
+        { kind: "video", re: /^(snapchat\.com\/(spotlight|t)\/|linkedin\.com\/(posts|feed\/update)\/|t\.me\/[^\/]+\/\d|giphy\.com\/(gifs|clips)\/|tenor\.com\/([a-zA-Z-]+\/)?view\/)/ },
+        { kind: "video", re: /^(drive\.google\.com\/file\/d\/|dropbox\.com\/(s|scl)\/)/ },
+        { kind: "post", re: /^(twitter|x|fxtwitter|vxtwitter|fixupx|fixvx)\.com\/[^\/]+\/status\/\d/ },
+        { kind: "post", re: /^instagram\.com\/([^\/]+\/)?(p|reel|reels|tv|share)\/./ },
+        { kind: "post", re: /^((old\.|new\.)?reddit\.com\/r\/[^\/]+\/(comments|s)\/|redd\.it\/|v\.redd\.it\/)/ },
+        { kind: "post", re: /^(bsky\.app\/profile\/[^\/]+\/post\/|([a-z]{2}\.)?pinterest\.[a-z.]+\/pin\/|pin\.it\/|imgur\.com\/(a\/|gallery\/|\w{5,}))/ },
+        { kind: "post", re: /^([^\/]+\.tumblr\.com\/(post\/|\d)|tumblr\.com\/[^\/]+\/\d)/ },
+        { kind: "audio", re: /^((on\.)?soundcloud\.com\/[^\/?#]+|open\.spotify\.com\/(intl-[a-z-]+\/)?(track|album|playlist)\/|deezer\.com\/([a-z]{2}\/)?track\/\d)/ },
+        { kind: "audio", re: /^([^\/]+\.bandcamp\.com\/(track|album)\/|mixcloud\.com\/[^\/]+\/[^\/]|audiomack\.com\/[^\/]+\/(song|album)\/|newgrounds\.com\/audio\/listen)/ }
+    ]
         property string activityId: ""
-        property string file: ""
+        property var saved: []
+        property string failure: ""
         stdout: SplitParser {
             onRead: line => {
-                const trimmed = line.trim()
-                const progress = /^ISLAND\s+([\d.]+)%/.exec(trimmed)
-                if (progress) root.upsertActivity(mediaDownloadProc.activityId, "", undefined, "", Math.min(1, Number(progress[1]) / 100), "running")
-                const file = /^FILE (.+)$/.exec(trimmed)
-                if (file) mediaDownloadProc.file = file[1]
+                const m = /^(ISLAND|TITLE|FILE|ERROR) (.+)$/.exec(line.trim())
+                if (!m) return
+                if (m[1] === "ISLAND") root.upsertActivity(mediaDownloadProc.activityId, "", undefined, "", Math.min(1, Number(m[2]) / 100), "running")
+                else if (m[1] === "TITLE") root.upsertActivity(mediaDownloadProc.activityId, "", m[2], "", -1, "running")
+                else if (m[1] === "FILE") mediaDownloadProc.saved = [...mediaDownloadProc.saved, m[2]]
+                else mediaDownloadProc.failure = m[2]
             }
         }
         onExited: (exitCode, exitStatus) => {
-            if (exitCode === 0 && mediaDownloadProc.file !== "") {
-                DropShelf.addItems([`file://${mediaDownloadProc.file}`])
-                root.upsertActivity(mediaDownloadProc.activityId, Translation.tr("Saved to the drawer"), DropShelf.fileName(mediaDownloadProc.file), "", 1, "done")
+            const saved = mediaDownloadProc.saved
+            if (exitCode === 0 && saved.length > 0) {
+                DropShelf.addItems(saved.map(path => `file://${path.split("/").map(encodeURIComponent).join("/")}`))
+                root.upsertActivity(mediaDownloadProc.activityId, Translation.tr("Saved to %1").arg(root.linkDownloadLabel),
+                    saved.length === 1 ? DropShelf.fileName(saved[0]) : Translation.tr("%1 files").arg(saved.length), "", 1, "done")
             } else {
-                root.upsertActivity(mediaDownloadProc.activityId, "", Translation.tr("Download failed"), "", -1, "error")
+                root.upsertActivity(mediaDownloadProc.activityId, "", root.linkDownloadErrors[mediaDownloadProc.failure] ?? Translation.tr("Download failed"), "", -1, "error")
             }
         }
     }
@@ -823,6 +882,10 @@ Singleton {
         return foreignCount >= 2 && foreignCount > portugueseCount
     }
 
+            if (root.mediaDownloadQueue.length === 0) return
+            const next = root.mediaDownloadQueue[0]
+            root.mediaDownloadQueue = root.mediaDownloadQueue.slice(1)
+            root.startMediaDownload(next)
     function translateText(text) {
         root.translation = { source: text, result: "", busy: true }
         translateProc.command = ["trans", "-b", "-no-autocorrect", ":pt-BR", text]
@@ -1982,6 +2045,10 @@ Singleton {
         }
         function remove(id: string): void {
             root.removeActivity(id)
+        // mode: video | audio | file
+        function download(url: string, mode: string): void {
+            root.downloadMedia(url, ["audio", "file"].includes(mode) ? mode : "video")
+        }
         }
         function dev(id: string, title: string, subtitle: string, state: string, url: string): void {
             if (state === "error") { root.upsertActivity(id, title, subtitle, "web", -1, "error", { url: url, kind: "dev" }); return }
