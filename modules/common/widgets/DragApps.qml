@@ -155,6 +155,7 @@ Item {
                 anchors.fill: parent
 
                 property var appToplevel: slotItem.appEntry
+                magnifiable: true
 
                 innerInset: DockStyle.iconInset
                 outerInset: DockStyle.iconInset
@@ -447,7 +448,7 @@ Item {
                     id: popupBackground
                     property real padding: 5
                     clip: true
-                    color: Appearance.m3colors.m3surfaceContainer
+                    color: Config.options.appearance.uiBackground === "oled" ? "#000000" : Appearance.m3colors.m3surfaceContainer
                     radius: Appearance.rounding.normal
                     anchors.bottom: DockStyle.vertical ? undefined : parent.bottom
                     anchors.bottomMargin: Appearance.sizes.elevationMargin

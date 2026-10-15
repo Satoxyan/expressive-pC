@@ -32,7 +32,7 @@ AbstractBackgroundWidget {
     readonly property bool effectiveVertical: GlobalStates.screenLocked ? Config.options.background.widgets.clock.digital.verticalLocked : Config.options.background.widgets.clock.digital.vertical
     readonly property string effectiveColorMode: GlobalStates.screenLocked ? Config.options.background.widgets.clock.digital.colorModeLocked : Config.options.background.widgets.clock.digital.colorMode
     property bool wallpaperSafetyTriggered: false
-    needsColText: clockStyle === "digital"
+    needsColText: clockStyle === "digital" || clockStyle === "daily"
 
     property real refWidth: 0
     property real refHeight: 0
@@ -102,6 +102,16 @@ AbstractBackgroundWidget {
                 blurSource: root.wallpaperItem
                 originX: root.x
                 originY: root.y
+            }
+        }
+
+        FadeLoader {
+            id: dailyClockLoader
+            anchors.horizontalCenter: parent.horizontalCenter
+            shown: root.clockStyle === "daily" && (root.shouldShow)
+            fade: false
+            sourceComponent: DailyClock {
+                colText: root.resolvedClockColor
             }
         }
 

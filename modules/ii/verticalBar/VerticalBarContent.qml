@@ -25,7 +25,7 @@ Item {
     readonly property real splitGroupSpacing: Config.options.bar.borderless === "transparent" ? -4 : Config.options.bar.borderless === "segmented" ? -2 : 2
     readonly property color materialPillBgColor: (Config.options.bar.followFrameColor && Config.options.bar.frameColor)
         ? Appearance.getColorFromName(Config.options.bar.frameColor)
-        : Appearance.colors.colLayer0
+        : Appearance.colors.colUiBackground
     readonly property bool trayHasItems: SystemTray.items.values.length > 0
     readonly property bool isPanel: Config.options.bar.cornerStyle === 5
 
@@ -90,7 +90,7 @@ Item {
         color: (!centerOnly && Config.options.bar.showBackground && Config.options.bar.cornerStyle !== 2 && !root.useTabWrapper)
             ? (Config.options.bar.followFrameColor
                 ? Appearance.getColorFromName(Config.options.bar.frameColor)
-                : Appearance.colors.colLayer0)
+                : Appearance.colors.colUiBackground)
             : "transparent"
         radius: Config.options.bar.cornerStyle === 1 ? Appearance.rounding.windowRounding + 6 : 0
         border.width: (!root.centerOnly && Config.options.bar.cornerStyle === 1) ? 1 : 0
@@ -107,7 +107,7 @@ Item {
         width: parent.width - (Config.options.bar.cornerStyle === 1 ? Appearance.sizes.hyprlandGapsOut * 2 : 0)
         color: Config.options.bar.followFrameColor
             ? Appearance.getColorFromName(Config.options.bar.frameColor)
-            : Appearance.colors.colLayer0
+            : Appearance.colors.colUiBackground
         radius: Config.options.bar.cornerStyle === 1 ? Appearance.rounding.windowRounding : 0
         border.width: Config.options.bar.cornerStyle === 1 ? 1 : 0
         border.color: Appearance.colors.colLayer0Border

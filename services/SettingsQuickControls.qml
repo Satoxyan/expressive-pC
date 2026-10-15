@@ -129,11 +129,13 @@ Singleton {
         "desktop:Clock style": root.optionSelect("background.widgets.clock.style", [
             { displayName: Translation.tr("Digital"), icon: "timer_10", value: "digital" },
             { displayName: Translation.tr("Cookie"), icon: "cookie", value: "cookie" },
+            { displayName: Translation.tr("Daily"), icon: "today", value: "daily" },
             { displayName: Translation.tr("Pixel"), icon: "grid_view", value: "pixel" }
         ]),
         "desktop:Clock style (locked)": root.optionSelect("background.widgets.clock.styleLocked", [
             { displayName: Translation.tr("Digital"), icon: "timer_10", value: "digital" },
             { displayName: Translation.tr("Cookie"), icon: "cookie", value: "cookie" },
+            { displayName: Translation.tr("Daily"), icon: "today", value: "daily" },
             { displayName: Translation.tr("Pixel"), icon: "grid_view", value: "pixel" }
         ]),
         "desktop:Vertical": root.optionSwitch("background.widgets.clock.digital.vertical"),
@@ -204,6 +206,16 @@ Singleton {
         "interface:Left Sidebar/Enable": root.optionSwitch("sidebar.media.enable"),
         "interface:Follow Album Colors": root.optionSwitch("sidebar.media.artColors"),
         "interface:Enable Translator": root.optionSwitch("sidebar.translator.enable"),
+        "interface:Enable Football": root.optionSwitch("sidebar.football.enable"),
+        "interface:Football/Alerts": root.optionSwitch("sidebar.football.alerts"),
+        "interface:Football/Scope": root.optionSelect("sidebar.football.alertsScope", [
+            { displayName: Translation.tr("My parlay"), icon: "layers", value: "parlay" },
+            { displayName: Translation.tr("All matches"), icon: "public", value: "all" }
+        ]),
+        "interface:Football/Goal sound": root.optionSwitch("sidebar.football.goalSound"),
+        "interface:Football/Corner sound": root.optionSwitch("sidebar.football.cornerSound"),
+        "interface:Football/Notify": root.optionSwitch("sidebar.football.notify"),
+        "interface:Football/Volume": root.optionSpin("sidebar.football.soundVolume", 0, 100, 5),
         "interface:Banner": root.optionSwitch("sidebar.banner"),
         "interface:Bottom Group": root.optionSwitch("sidebar.bottomGroup"),
         "interface:Right Sidebar/Media Player": root.optionSwitch("sidebar.mediaPlayer"),
@@ -375,6 +387,19 @@ Singleton {
             { displayName: Translation.tr("Dots"), icon: "radio_button_checked", value: "dot" },
             { displayName: Translation.tr("Icons"), icon: "interests", value: "icon" }
         ]),
+        "bar:Battery/Style": root.optionSelect("bar.battery.style", [
+            { displayName: "Android", icon: "battery_android_full", value: "bar" },
+            { displayName: Translation.tr("Ring"), icon: "donut_large", value: "ring" },
+            { displayName: Translation.tr("Icon"), icon: "battery_android_6", value: "icon" },
+            { displayName: Translation.tr("Number"), icon: "pin", value: "number" },
+            { displayName: "iOS", icon: "tablet_mac", value: "ios" },
+            { displayName: "macOS", icon: "laptop_mac", value: "macos" },
+            { displayName: "Windows", icon: "desktop_windows", value: "windows" }
+        ]),
+        "bar:Battery/Show percentage": root.optionSwitch("bar.battery.showPercentage"),
+        "bar:Battery/Show charging": root.optionSwitch("bar.battery.showCharging"),
+        "interface:Dock/Magnify": root.optionSwitch("dock.magnify"),
+        "interface:Dock/Magnification": root.optionScaledSpin("dock.magnification", 110, 220, 10, 100),
         "bar:Resources/Style": root.optionSelect("bar.resources.style", [
             { displayName: Translation.tr("Filled"), icon: "incomplete_circle", value: "filled" },
             { displayName: Translation.tr("Outline"), icon: "circles", value: "outline" },

@@ -237,7 +237,7 @@ Scope {
                             readonly property color decoratorColor: (Config.options.bar.cornerStyle === 4 || Config.options.bar.cornerStyle === 6 || showBarBackground)
                                 ? (Config.options.bar.followFrameColor && Config.options.bar.frameColor
                                     ? Appearance.getColorFromName(Config.options.bar.frameColor)
-                                    : Appearance.colors.colLayer0)
+                                    : Appearance.colors.colUiBackground)
                                 : "transparent"
 
                             RoundCorner {

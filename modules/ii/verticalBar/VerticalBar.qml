@@ -96,7 +96,7 @@ Scope {
                         implicitSize: Appearance.rounding.screenRounding
                         color: Config.options.bar.followFrameColor
                             ? Appearance.getColorFromName(Config.options.bar.frameColor)
-                            : Appearance.colors.colLayer0
+                            : Appearance.colors.colUiBackground
                         corner: RoundCorner.CornerEnum.BottomLeft
 
                         states: State {
@@ -126,7 +126,7 @@ Scope {
                         implicitSize: Appearance.rounding.screenRounding
                         color: Config.options.bar.followFrameColor
                             ? Appearance.getColorFromName(Config.options.bar.frameColor)
-                            : Appearance.colors.colLayer0
+                            : Appearance.colors.colUiBackground
                         corner: RoundCorner.CornerEnum.TopLeft
 
                         states: State {
@@ -224,7 +224,7 @@ Scope {
                             readonly property color decoratorColor: (Config.options.bar.cornerStyle === 4 || Config.options.bar.cornerStyle === 6 || showBarBackground)
                                 ? (Config.options.bar.followFrameColor && Config.options.bar.frameColor
                                     ? Appearance.getColorFromName(Config.options.bar.frameColor)
-                                    : Appearance.colors.colLayer0)
+                                    : Appearance.colors.colUiBackground)
                                 : "transparent"
 
                             RoundCorner {

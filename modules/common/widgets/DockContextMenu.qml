@@ -124,7 +124,7 @@ Item {
                 property real padding: 4
 
                 anchors.centerIn: parent
-                color: Appearance.m3colors.m3surfaceContainer
+                color: Config.options.appearance.uiBackground === "oled" ? "#000000" : Appearance.m3colors.m3surfaceContainer
                 radius: Appearance.rounding.normal
                 implicitWidth: menuColumn.implicitWidth + padding * 2
                 implicitHeight: menuColumn.implicitHeight + padding * 2

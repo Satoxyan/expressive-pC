@@ -40,6 +40,38 @@ Item {
         return scored.map(e => e.item);
     }
 
+    function rankOnline(items) {
+        if (tokens.length === 0) return items;
+        const forceAuthor = tokens.some(t => t.startsWith("@"));
+        const plain = tokens.map(t => t.replace(/^@+/, "")).filter(t => t.length > 0);
+        if (plain.length === 0) return items;
+        const scored = [];
+        items.forEach(entry => {
+            const nameKey = Wallpapers.normalizeText(entry.title + " " + entry.name.replace(/^[^\s]+?--/, "")).replace(/[_\-.]+/g, " ");
+            const authorKey = Wallpapers.normalizeText(entry.author ?? "").replace(/[_\-.]+/g, " ");
+            if (!forceAuthor) {
+                const nameScore = Wallpapers.scoreItem(nameKey, plain);
+                if (nameScore >= 0) {
+                    scored.push({ item: entry, score: 2000 + nameScore });
+                    return;
+                }
+            }
+            if (authorKey !== "") {
+                const authorScore = Wallpapers.scoreItem(authorKey, plain);
+                if (authorScore >= 0) {
+                    scored.push({ item: entry, score: authorScore });
+                    return;
+                }
+                if (!forceAuthor) {
+                    const mixedScore = Wallpapers.scoreItem(nameKey + " " + authorKey, plain);
+                    if (mixedScore >= 0) scored.push({ item: entry, score: 1000 + mixedScore });
+                }
+            }
+        });
+        scored.sort((a, b) => b.score - a.score);
+        return scored.map(e => e.item);
+    }
+
     readonly property var localEntries: {
         const model = currentModel;
         if (!model) return [];
@@ -49,7 +81,7 @@ Item {
         return rankBy(items, item => item.fileName.replace(".json", ""));
     }
 
-    readonly property var onlineEntries: rankBy(PresetsOnline.pending, entry => entry.title + " " + entry.name)
+    readonly property var onlineEntries: rankOnline(PresetsOnline.pending)
     readonly property int columns: Math.max(2, Math.round(width / 340))
 
     readonly property var barPositions: [Translation.tr("Top"), Translation.tr("Bottom"), Translation.tr("Left"), Translation.tr("Right")]

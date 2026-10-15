@@ -170,6 +170,12 @@ build_video_opts() {
     if [ -n "$fps" ]; then echo "[switchwall] video fps: $fps (native max)" >&2; fi
     echo "$opts"
 }
+MPVPAPER_FLAGS="-p -a max"
+VIDEO_OPTS="no-audio loop hwdec=auto scale=bilinear interpolation=no video-sync=display-resample panscan=1.0 video-scale-x=1.0 video-scale-y=1.0 video-align-x=0.5 video-align-y=0.5 load-scripts=no"
+# One control socket per output, so the shell can pause and resume the live
+# wallpaper instead of only being able to kill it.
+MPV_SOCKET_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+MPV_SOCKET_PREFIX="$MPV_SOCKET_DIR/mpvpaper-"
 
 is_video() {
     local extension="${1##*.}"
@@ -191,9 +197,10 @@ create_restore_script() {
 # GPU prefix: $prefix | opts: $opts | fps native max
 
 pkill -f -9 mpvpaper
+rm -f "$MPV_SOCKET_PREFIX"*.sock
 
 for monitor in \$(hyprctl monitors -j | jq -r '.[] | .name'); do
-    $prefix mpvpaper -o "$opts" "\$monitor" "$video_path" &
+    $prefix mpvpaper $MPVPAPER_FLAGS -o "$opts input-ipc-server=$MPV_SOCKET_PREFIX\$monitor.sock" "\$monitor" "$video_path" &
     sleep 0.1
 done
 EOF
@@ -301,13 +308,14 @@ switch() {
                 local opts=$(build_video_opts "$video_path")
                 local prefix=$(get_gpu_prefix)
                 monitors=$(hyprctl monitors -j | jq -r '.[] | .name')
+                rm -f "$MPV_SOCKET_PREFIX"*.sock
                 for monitor in $monitors; do
                     # ponytail: dedicated GPU first via prefix, fps native max via opts
                     if [ -n "$prefix" ]; then
                         # shellcheck disable=SC2086
-                        eval "$prefix mpvpaper -o \"$opts\" \"\$monitor\" \"$video_path\" &"
+                        eval "$prefix mpvpaper $MPVPAPER_FLAGS -o \"$opts input-ipc-server=$MPV_SOCKET_PREFIX$monitor.sock\" \"\$monitor\" \"$video_path\" &"
                     else
-                        mpvpaper -o "$opts" "$monitor" "$video_path" &
+                        mpvpaper $MPVPAPER_FLAGS -o "$opts input-ipc-server=$MPV_SOCKET_PREFIX$monitor.sock" "$monitor" "$video_path" &
                     fi
                     sleep 0.1
                 done

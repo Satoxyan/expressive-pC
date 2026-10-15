@@ -59,6 +59,7 @@ Scope {
             screen: modelData.screen
             visible: !GlobalStates.screenLocked
 
+            readonly property bool macos: DockStyle.magnifying
             readonly property bool hug: Config.options.dock.style === "hug"
             readonly property string position: modelData.position
             readonly property bool vertical: position !== "bottom"
@@ -120,17 +121,53 @@ Scope {
                 right: dockRoot.hug && dockRoot.position === "right" ? -dockRoot.gap : 0
             }
             implicitWidth: dockRoot.vertical ? DockStyle.thickness : dockBackground.implicitWidth
-            implicitHeight: dockRoot.vertical ? dockBackground.implicitHeight : DockStyle.thickness
+            implicitHeight: dockRoot.vertical ? dockBackground.implicitHeight : DockStyle.thickness + DockStyle.headroom
             WlrLayershell.namespace: "quickshell:dock"
             color: "transparent"
 
-            mask: Region { item: dockMouseArea }
+            mask: Region {
+                item: dockMouseArea
+                Region { item: riseArea }
+            }
+
+            readonly property bool magnifyHover: DockStyle.magnifying && (dockMouseArea.containsMouse || riseArea.containsMouse)
+            property real magnifyAmp: dockRoot.magnifyHover ? 1 : 0
+
+            Behavior on magnifyAmp {
+                NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
+            }
+
+            onMagnifyAmpChanged: {
+                if (DockMagnify.window === dockRoot) DockMagnify.amplitude = dockRoot.magnifyAmp;
+            }
+
+            function updatePointer(item, mouseX) {
+                if (!DockStyle.magnifying) return;
+                DockMagnify.window = dockRoot;
+                DockMagnify.amplitude = dockRoot.magnifyAmp;
+                DockMagnify.pointer = item.mapToItem(null, mouseX, 0).x;
+            }
+
+            MouseArea {
+                id: riseArea
+                enabled: DockStyle.magnifying
+                hoverEnabled: true
+                acceptedButtons: Qt.NoButton
+                x: dockMouseArea.x
+                width: dockMouseArea.width
+                height: DockStyle.headroom * dockRoot.magnifyAmp
+                anchors.bottom: dockMouseArea.top
+                onPositionChanged: mouse => dockRoot.updatePointer(riseArea, mouse.x)
+                onEntered: dockRoot.updatePointer(riseArea, mouseX)
+            }
 
             MouseArea {
                 id: dockMouseArea
                 hoverEnabled: true
+                onPositionChanged: mouse => dockRoot.updatePointer(dockMouseArea, mouse.x)
+                onEntered: dockRoot.updatePointer(dockMouseArea, mouseX)
                 width: dockRoot.vertical ? parent.width : implicitWidth
-                height: dockRoot.vertical ? implicitHeight : parent.height
+                height: dockRoot.vertical ? implicitHeight : (dockRoot.macos ? DockStyle.thickness : parent.height)
                 implicitWidth: dockHoverRegion.implicitWidth + dockRoot.shadowMargin * 2
                 implicitHeight: dockHoverRegion.implicitHeight + dockRoot.shadowMargin * 2
 
@@ -147,8 +184,10 @@ Scope {
                 }
 
                 anchors {
-                    top: dockRoot.vertical ? undefined : parent.top
+                    top: dockRoot.vertical || dockRoot.macos ? undefined : parent.top
                     topMargin: dockMouseArea.offset
+                    bottom: dockRoot.macos ? parent.bottom : undefined
+                    bottomMargin: dockRoot.macos ? -dockMouseArea.offset : 0
                     horizontalCenter: dockRoot.vertical ? undefined : parent.horizontalCenter
                     verticalCenter: dockRoot.vertical ? parent.verticalCenter : undefined
                     left: dockRoot.position === "left" ? parent.left : undefined
@@ -186,8 +225,8 @@ Scope {
                             anchors.fill: parent
                             anchors.topMargin: dockRoot.position === "bottom" ? dockRoot.shadowMargin : 0
                             anchors.bottomMargin: dockRoot.position === "bottom" ? dockRoot.gap : 0
-                            anchors.leftMargin: dockRoot.position === "left" ? dockRoot.gap : dockRoot.position === "right" ? dockRoot.shadowMargin : 0
-                            anchors.rightMargin: dockRoot.position === "right" ? dockRoot.gap : dockRoot.position === "left" ? dockRoot.shadowMargin : 0
+                            anchors.leftMargin: dockRoot.macos ? -DockMagnify.totalExtra / 2 : (dockRoot.position === "left" ? dockRoot.gap : dockRoot.position === "right" ? dockRoot.shadowMargin : 0)
+                            anchors.rightMargin: dockRoot.macos ? -DockMagnify.totalExtra / 2 : (dockRoot.position === "right" ? dockRoot.gap : dockRoot.position === "left" ? dockRoot.shadowMargin : 0)
                             color: Config.options.dock.showBackground ? dockRoot.backgroundColor : "transparent"
                             border.width: dockRoot.borderWidth
                             border.color: Appearance.getColorFromName(Config.options.dock.borderColor)

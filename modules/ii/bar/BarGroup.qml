@@ -172,7 +172,7 @@ Item {
                     : (Config.options?.bar.borderless === "transparent"
                         ? "transparent"
                         : Config.options.bar.cornerStyle === 2 || (Config.options?.bar.borderless === "segmented" && !Config.options.bar.showBackground)
-                            ? Appearance.colors.colLayer0
+                            ? Appearance.colors.colUiBackground
                             : root.resolvedGroupColor)
 
         border.width: root.morphEdge !== "" ? 0 : root.style.borderWidth ?? (root.paintBackground && root.isSegmented && !root.isMaterial ? 1 : 0)
