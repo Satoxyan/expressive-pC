@@ -72,7 +72,7 @@ StyledOverlayWidget {
                 colRipple: Appearance.colors.colLayer3Active
                 onClicked: {
                     GlobalStates.overlayOpen = false;
-                    Qt.openUrlExternally(`file://${Config.options.screenRecord.savePath}`);
+                    Quickshell.execDetached(["xdg-open", `file://${Config.options.screenRecord.savePath}`]);
                 }
                 contentItem: Row {
                     anchors.centerIn: parent

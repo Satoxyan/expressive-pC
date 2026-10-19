@@ -179,7 +179,7 @@ Item {
                         buttonText: justCopied ? Translation.tr("Path copied") : Translation.tr("Config file")
                         expanded: navRail.expanded
                         downAction: () => {
-                            Qt.openUrlExternally(`${Directories.config}/illogical-impulse/config.json`);
+                            Quickshell.execDetached(["xdg-open", `${Directories.config}/illogical-impulse/config.json`]);
                         }
                         altAction: () => {
                             Quickshell.clipboardText = CF.FileUtils.trimFileProtocol(`${Directories.config}/illogical-impulse/config.json`);

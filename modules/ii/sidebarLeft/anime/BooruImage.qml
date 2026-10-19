@@ -55,7 +55,7 @@ Button {
             if (src.startsWith("/"))
                 src = "file://" + src
             if (src.length > 0)
-                Qt.openUrlExternally(src)
+                Quickshell.execDetached(["xdg-open", src])
         }
     }
 
@@ -176,7 +176,7 @@ Button {
                 if (trimmed === "CACHED") {
                     if (root.checkingForPlay) {
                         root.checkingForPlay = false
-                        Qt.openUrlExternally("file://" + root.filePath)
+                        Quickshell.execDetached(["xdg-open", "file://" + root.filePath])
                     } else {
                         root.sampleDownloaded = true
                         root.playOverlayVisible = true
