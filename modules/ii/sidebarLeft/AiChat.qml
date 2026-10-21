@@ -373,7 +373,6 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                 topMargin: statusBg.implicitHeight + statusBg.anchors.topMargin * 2
 
                 touchpadScrollFactor: Config.options.interactions.scrolling.touchpadScrollFactor * 1.4
-                mouseScrollFactor: Config.options.interactions.scrolling.mouseScrollFactor * 1.4
 
                 property int lastResponseLength: 0
                 onContentHeightChanged: {
@@ -518,6 +517,7 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
 
                 ScrollView {
                     id: inputScrollView
+                    property TouchpadScrollArea _touchpadScroll: TouchpadScrollArea { flickable: inputScrollView.contentItem }
                     Layout.fillWidth: true
                     Layout.preferredHeight: Math.min(root.height * 3/5, messageInputField.height)
                     clip: true

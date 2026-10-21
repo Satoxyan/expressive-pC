@@ -12,6 +12,7 @@ Item {
     // flat: skip the per-item segment pills — children sit directly like
     // plain page rows (HDR dropdown so it merges with the rows above it).
     property bool flat: false
+    property bool glass: false
     Layout.fillWidth: true
     implicitHeight: root.flat ? plainCol.implicitHeight : col.implicitHeight
 
@@ -29,6 +30,16 @@ Item {
                 Layout.fillWidth: true
                 implicitHeight: (root.items[index]?.implicitHeight ?? 0) + root.itemVerticalPadding
                 color: root.bgcolor
+
+                WindowGlass {
+                    anchors.fill: parent
+                    glassEnabled: root?.glass ?? false
+                    topLeftRadius: parent.topLeftRadius
+                    topRightRadius: parent.topRightRadius
+                    bottomLeftRadius: parent.bottomLeftRadius
+                    bottomRightRadius: parent.bottomRightRadius
+                    tint: root?.bgcolor ?? "transparent"
+                }
                 topLeftRadius:     isFirst ? root.bigRadius : root.smallRadius
                 topRightRadius:    isFirst ? root.bigRadius : root.smallRadius
                 bottomLeftRadius:  isLast  ? root.bigRadius : root.smallRadius

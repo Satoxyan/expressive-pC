@@ -26,7 +26,9 @@ Button {
     property bool altLongPressed: false
     property bool border: false
     property real borderWidth: 1
-    property color colBorder: Appearance?.colors.colOutlineVariant ?? "#79747E"
+    property color colBorder: Config.options.background.widgets.glass.enable
+        ? ColorUtils.transparentize(Appearance?.colors.colOutlineVariant ?? "#79747E", 0.55)
+        : (Appearance?.colors.colOutlineVariant ?? "#79747E")
 
     property color colBackground: ColorUtils.transparentize(Appearance?.colors.colLayer1Hover, 1) || "transparent"
     property color colBackgroundHover: Appearance?.colors.colLayer1Hover ?? "#E5DFED"

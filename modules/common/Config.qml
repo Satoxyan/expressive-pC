@@ -375,6 +375,9 @@ Singleton {
                     property bool blurWidgets: false
                     property bool tintBlur: true
                     property real blurRadius: 32
+                    property JsonObject glass: JsonObject {
+                        property bool enable: true
+                    }
                     property bool shadow: true
                     property list<string> menuHidden: []
                     property JsonObject clock: JsonObject {
@@ -831,27 +834,27 @@ Singleton {
 
             property JsonObject interactions: JsonObject {
                 property JsonObject scrolling: JsonObject {
-                    property bool fasterTouchpadScroll: true // Master switch for inertial scroll engine
+                    property bool fasterTouchpadScroll: true // Apply shared touchpad sensitivity to scrollable views
 
-                    // === Touchpad physics ===
+                    // Both values multiply direct pixel movement and the angle fallback.
+                    property real touchpadSensitivity: 3.5
+                    property real touchpadScrollFactor: 1.0
+                    // Legacy factors > 10 are divided by 450 to preserve relative
+                    // preferences and per-list ratios, not the old absolute speed.
+
+                    // Legacy fling/bounce options retained for config compatibility;
+                    // direct touchpad tracking no longer adds inertia after release.
                     property real flingFriction: 0.002
                     property real flingStopThreshold: 0.01
-                    // Sensitivity: pixels per angleDelta unit during finger-follow phase
-                    property real touchpadSensitivity: 3.5
-                    // Velocity reflection coefficient at bounds (0 = hard stop, 1 = perfect bounce)
                     property real bounceDamping: 0.3
 
-                    // === Mouse wheel ===
+                    // Legacy mouse options retained for config compatibility only.
+                    // Native Qt scrolling does not use these or per-list boosts.
                     property int wheelScrollAmount: 100
                     property int wheelDurationMin: 200
                     property int wheelDurationMax: 400
-
-                    // === Detection ===
-                    property int mouseScrollDeltaThreshold: 120 // angleDelta >= this = mouse wheel
-
-                    // === Relative Multipliers ===
-                    property real touchpadScrollFactor: 1.0 // scales touchpadSensitivity per-instance
-                    property real mouseScrollFactor: 1.0    // scales wheelScrollAmount per-instance
+                    property int mouseScrollDeltaThreshold: 120
+                    property real mouseScrollFactor: 1.0
                 }
                 property JsonObject deadPixelWorkaround: JsonObject { // Hyprland leaves out 1 pixel on the right for interactions
                     property bool enable: false

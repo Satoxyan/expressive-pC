@@ -152,6 +152,12 @@ Item {
     }
     Rectangle {
         id: sidebarRightBackground
+        WindowGlass {
+            anchors.fill: parent
+            glassEnabled: (parent?.color.a ?? 0) > 0
+            cardRadius: parent?.radius ?? 0
+            tint: parent?.color ?? 'transparent'
+        }
 
         anchors.fill: parent
         implicitHeight: parent.height - Appearance.sizes.hyprlandGapsOut * 2
@@ -227,6 +233,12 @@ Item {
 
                 Rectangle {
                     id: sysRect
+                    WindowGlass {
+                        anchors.fill: parent
+                        glassEnabled: (parent?.color.a ?? 0) > 0
+                        cardRadius: parent?.radius ?? 0
+                        tint: parent?.color ?? 'transparent'
+                    }
                     readonly property real inset: 5
                     anchors.fill: parent
                     radius: Appearance.rounding.normal
@@ -485,6 +497,19 @@ Item {
         id: quickTogglesSection
         Item {
             implicitHeight: (classicLoader.item?.implicitHeight ?? 0) + (androidLoader.item?.implicitHeight ?? 0)
+
+            Rectangle {
+                anchors.fill: parent
+                radius: Appearance.rounding.normal
+                color: Config.options.background.widgets.glass.enable ? Appearance.colors.colLayer1 : "transparent"
+
+                WindowGlass {
+                    anchors.fill: parent
+                    glassEnabled: parent.color.a > 0
+                    cardRadius: parent.radius
+                    tint: parent.color
+                }
+            }
 
             Loader {
                 id: classicLoader

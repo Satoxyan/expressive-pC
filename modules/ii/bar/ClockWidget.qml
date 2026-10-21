@@ -145,7 +145,7 @@ BarWidgetSwitcher {
             StyledText {
                 visible: root.showDate
                 font.pixelSize: Appearance.font.pixelSize.small
-                color: Appearance.colors.colOnPrimaryContainer
+                color: Appearance.colors.colOnLayer0
                 text: DateTime.longDate
                 Layout.alignment: Qt.AlignVCenter
                 leftPadding: 5

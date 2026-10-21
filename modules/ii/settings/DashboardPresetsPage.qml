@@ -363,7 +363,7 @@ Item {
             }
         }
 
-        GridView {
+        StyledGridView {
             id: grid
             visible: root.source !== "online"
             Layout.fillWidth: true
@@ -529,7 +529,7 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
 
-            GridView {
+            StyledGridView {
                 id: onlineGrid
                 anchors.fill: parent
                 visible: root.onlineEnabled

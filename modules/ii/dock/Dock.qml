@@ -123,6 +123,19 @@ Scope {
             implicitWidth: dockRoot.vertical ? DockStyle.thickness : dockBackground.implicitWidth
             implicitHeight: dockRoot.vertical ? dockBackground.implicitHeight : DockStyle.thickness + DockStyle.headroom
             WlrLayershell.namespace: "quickshell:dock"
+
+            Binding {
+                target: GlassLayers
+                property: "dockZone"
+                value: Math.max(0, dockRoot.exclusiveZone)
+                restoreMode: Binding.RestoreBinding
+            }
+            Binding {
+                target: GlassLayers
+                property: "dockEdge"
+                value: dockRoot.position
+                restoreMode: Binding.RestoreBinding
+            }
             color: "transparent"
 
             mask: Region {
@@ -222,6 +235,12 @@ Scope {
 
                         Rectangle {
                             id: dockVisualBackground
+                            WindowGlass {
+                                anchors.fill: parent
+                                glassEnabled: (parent?.color.a ?? 0) > 0
+                                cardRadius: parent?.radius ?? 0
+                                tint: parent?.color ?? 'transparent'
+                            }
                             anchors.fill: parent
                             anchors.topMargin: dockRoot.position === "bottom" ? dockRoot.shadowMargin : 0
                             anchors.bottomMargin: dockRoot.position === "bottom" ? dockRoot.gap : 0
@@ -238,6 +257,7 @@ Scope {
                         }
 
                         RoundCorner {
+                            glass: true
                             visible: dockRoot.hug && Config.options.dock.showBackground
                             anchors.right: dockRoot.vertical ? (dockRoot.position === "right" ? dockVisualBackground.right : undefined) : dockVisualBackground.left
                             anchors.bottom: dockRoot.vertical ? dockVisualBackground.top : dockVisualBackground.bottom
@@ -248,6 +268,7 @@ Scope {
                         }
 
                         RoundCorner {
+                            glass: true
                             visible: dockRoot.hug && Config.options.dock.showBackground
                             anchors.left: dockRoot.vertical ? (dockRoot.position === "left" ? dockVisualBackground.left : undefined) : dockVisualBackground.right
                             anchors.bottom: dockRoot.vertical ? undefined : dockVisualBackground.bottom

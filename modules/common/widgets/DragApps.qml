@@ -446,6 +446,12 @@ Item {
 
                 Rectangle {
                     id: popupBackground
+                    WindowGlass {
+                        anchors.fill: parent
+                        glassEnabled: (parent?.color.a ?? 0) > 0
+                        cardRadius: parent?.radius ?? 0
+                        tint: parent?.color ?? 'transparent'
+                    }
                     property real padding: 5
                     clip: true
                     color: Config.options.appearance.uiBackground === "oled" ? "#000000" : Appearance.m3colors.m3surfaceContainer
