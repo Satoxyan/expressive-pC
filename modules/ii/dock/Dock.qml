@@ -96,6 +96,10 @@ Scope {
                 // are showing, even over a fullscreen window
                 if (mediaHoldActive)
                     return true
+                // Keep the dock up while its context menu is open, otherwise it
+                // slides away from the menu it just spawned.
+                if (dockContextMenu.isOpen)
+                    return true
                 if (fullscreenOnThisMonitor)
                     return Config.options?.dock.hoverToReveal && dockMouseArea.containsMouse
                 return root.pinned

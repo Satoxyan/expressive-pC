@@ -185,7 +185,7 @@ Item {
                 }
 
                 middleClickAction: () => { if (slotItem.deskEntry) Quickshell.execDetached(["gtk-launch", slotItem.deskEntry.id]) }
-                altAction:         () => { TaskbarApps.togglePin(slotItem.appId) }
+                altAction:         () => { root.contextMenu?.open(dockBtn, slotItem.appId) }
 
                 contentItem: DockAppIcon {
                     anchors.centerIn: parent
