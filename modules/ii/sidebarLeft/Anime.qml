@@ -171,14 +171,15 @@ Item {
         spacing: root.padding
 
         Item {
+            id: imagesArea
             Layout.fillWidth: true
             Layout.fillHeight: true
 
             layer.enabled: true
             layer.effect: OpacityMask {
                 maskSource: Rectangle {
-                    width: swipeView.width
-                    height: swipeView.height
+                    width: imagesArea.width
+                    height: imagesArea.height
                     radius: Appearance.rounding.small
                 }
             }

@@ -294,14 +294,15 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
         spacing: root.padding
 
         Item {
+            id: messagesArea
             // Messages
             Layout.fillWidth: true
             Layout.fillHeight: true
             layer.enabled: true
             layer.effect: OpacityMask {
                 maskSource: Rectangle {
-                    width: swipeView.width
-                    height: swipeView.height
+                    width: messagesArea.width
+                    height: messagesArea.height
                     radius: Appearance.rounding.small
                 }
             }

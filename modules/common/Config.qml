@@ -376,7 +376,7 @@ Singleton {
                     property bool tintBlur: true
                     property real blurRadius: 32
                     property JsonObject glass: JsonObject {
-                        property bool enable: true
+                        property bool enable: false
                     }
                     property bool shadow: true
                     property list<string> menuHidden: []
@@ -1033,6 +1033,8 @@ Singleton {
                 property real bannerFocusY: 0.5
                 property bool keepRightSidebarLoaded: true
                 property list<string> panelOrder: ["quickToggles", "sliders", "media"]
+                property string leftLastPage: "home"
+                property bool leftRememberPage: true
                 property JsonObject translator: JsonObject {
                     property bool enable: false
                     property int delay: 300 // Delay before sending request. Reduces (potential) rate limits and lag.
