@@ -273,6 +273,16 @@ Singleton {
 
                 if (lines.length === 0) { root.status = "not_found"; return }
 
+                // Badge for the provider we just used comes for free from the
+                // payload; no probe request needed.
+                const info = Object.assign({}, root.providerInfo)
+                info[payload.provider] = {
+                    ok: true,
+                    wordByWord: lines.some(l => l.words.length > 0),
+                    unknown: false
+                }
+                root.providerInfo = info
+
                 root.lyricsLines = lines
                 root.activeIndex = -1
                 root.slots = root.buildSlots(-1)
@@ -298,9 +308,9 @@ Singleton {
         }
     }
 
-    // Probe semua provider serentak (lyrics.py --probe) untuk track berjalan.
-    // Dipanggil saat ganti track dan saat dropdown provider dibuka; dibatasi
-    // sekali per 2 menit per track supaya tidak menghantam API semua provider.
+    // Probe provider sesuai rantai aktif (lyrics.py --probe) untuk track
+    // berjalan. Hanya dipanggil saat dropdown provider dibuka; hasilnya
+    // di-cache 12 jam di disk oleh lyrics.py.
     function probeProviders() {
         const title = root.activePlayer?.trackTitle ?? ""
         const artist = root.activePlayer?.trackArtist ?? ""
@@ -310,11 +320,15 @@ Singleton {
         if (key === root.probeKey && Date.now() - root.probeAt < 120000) return
         root.probeKey = key
         root.probeAt = Date.now()
+        const chain = root.preferredProvider.length > 0
+            ? `${root.preferredProvider},${Config.options.lyrics.providers}`
+            : Config.options.lyrics.providers
         probeProc.running = false
         probeProc.command = [
             "python3",
             `${Directories.scriptPath}/lyrics/lyrics.py`,
             title, artist, String(duration),
+            "--providers", chain,
             "--probe"
         ]
         probeProc.running = true
@@ -365,7 +379,7 @@ Singleton {
         }
 
         retryTimer.running = false
-        root.probeProviders()
+        root.providerInfo = ({})
         lyricsProc.command = [
             "python3",
             `${Directories.scriptPath}/lyrics/lyrics.py`,

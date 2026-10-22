@@ -293,7 +293,9 @@ _MS_HEADERS = {
     "Accept-Language": "en-US,en;q=0.9",
 }
 
-_MS_SECRET_FALLBACK = "b3dc8788299f5806a70a6a20a0cb0ffc"
+# Android app id: the old "mobile-app-v1.0" id now gets 403 from apic.
+_MS_APP_ID = "android-player-v1.0"
+_MS_SECRET_FALLBACK = "e9966b7e2aff48cb090d7c1bebd9d7a2"
 _ms_secret_cache = [None]
 _ms_token_cache = [None]
 # token.get is the call Musixmatch challenges (401 hint=captcha) whenever it
@@ -375,7 +377,7 @@ def _ms_get_token(secret, force=False):
             _ms_token_cache[0] = cached["token"]
             return _ms_token_cache[0]
     url = ("https://apic.musixmatch.com/ws/1.1/token.get"
-           f"?app_id=mobile-app-v1.0&guid={_ms_guid}&format=json")
+           f"?app_id={_MS_APP_ID}&guid={_ms_guid}&format=json")
     data = _http_json(_ms_sign(url, secret), headers=_MS_HEADERS)
     body = data.get("message", {}).get("body")
     if isinstance(body, dict):
@@ -389,7 +391,7 @@ def _ms_get_token(secret, force=False):
 
 def _ms_fetch_lyric(track_id, token, secret, kind):
     ep = {"richsync": "track.richsync.get", "subtitle": "track.subtitle.get"}[kind]
-    url = (f"https://apic.musixmatch.com/ws/1.1/{ep}?app_id=mobile-app-v1.0&format=json"
+    url = (f"https://apic.musixmatch.com/ws/1.1/{ep}?app_id={_MS_APP_ID}&format=json"
            f"&track_id={track_id}&usertoken={token}")
     data = _http_json(_ms_sign(url, secret), headers=_MS_HEADERS)
     if data.get("message", {}).get("header", {}).get("status_code") in (401, 402):
@@ -470,7 +472,7 @@ def fetch_musixmatch(title, artist, duration):
             secret = _ms_get_secret()
             token = _ms_get_token(secret, force=(attempt > 0))
             search_url = ("https://apic.musixmatch.com/ws/1.1/track.search?"
-                          "app_id=mobile-app-v1.0&format=json"
+                          f"app_id={_MS_APP_ID}&format=json"
                           f"&q_track={_q(title)}&q_artist={_q(artist)}"
                           "&f_has_lyrics=true&page_size=10"
                           f"&usertoken={token}")
@@ -509,7 +511,12 @@ def fetch_musixmatch(title, artist, duration):
             tracks.sort(key=keyfn)
             best = tracks[0]
             track_id = best.get("track_id")
-            for kind in ("richsync", "subtitle"):
+            kinds = []
+            if best.get("has_richsync") != 0:
+                kinds.append("richsync")   # word-by-word
+            if best.get("has_subtitles") != 0:
+                kinds.append("subtitle")   # line-by-line
+            for kind in kinds:
                 body = _ms_fetch_lyric(track_id, token, secret, kind)
                 if not body:
                     continue
@@ -1255,8 +1262,38 @@ def _run_timed(fn, title, artist, duration):
     return result.get("lines") or []
 
 
-def probe_all(title, artist, duration):
-    """Query every provider concurrently; report availability + word sync.
+# Capability probes fetch full lyrics from every provider just to learn whether
+# they have word timings, so they are the easiest way to get rate limited. Keep
+# the answers for a while and only probe providers the user actually enabled.
+_PROBE_CACHE_FILE = os.path.join(os.path.expanduser("~/.cache"),
+                                 "expressive-pC-lyrics-capabilities.json")
+_PROBE_TTL = 12 * 3600
+
+
+def _probe_cache_load():
+    try:
+        with open(_PROBE_CACHE_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _probe_cache_save(cache):
+    try:
+        now = time.time()
+        cache = {k: v for k, v in cache.items()
+                 if now - (v.get("ts") or 0) < _PROBE_TTL}
+        os.makedirs(os.path.dirname(_PROBE_CACHE_FILE), exist_ok=True)
+        tmp = _PROBE_CACHE_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(cache, f)
+        os.replace(tmp, _PROBE_CACHE_FILE)
+    except Exception:
+        pass
+
+
+def probe_all(title, artist, duration, providers=None):
+    """Query the enabled providers; report availability + word sync.
 
     Used by the provider dropdown to badge word-by-word vs line-by-line
     providers for the current track. Timeout providers get "unknown": true
@@ -1265,24 +1302,36 @@ def probe_all(title, artist, duration):
     {"ok": true, "results": {"<provider>":
         {"ok": bool, "wordByWord": bool, "unknown": bool}}}
     """
-    results = {}
+    key = f"{clean_text(title)}|{clean_text(artist)}|{int(duration)}"
+    names = [n for n in (providers or DEFAULT_PROVIDERS).replace(" ", "").split(",")
+             if n in PROVIDERS]
+    cache = _probe_cache_load()
+    entry = cache.get(key) or {}
+    results = dict(entry.get("results") or {})
+    missing = [n for n in names if n not in results]
+
     def probe_one(name):
         lines = _run_timed(PROVIDERS[name], title, artist, duration)
         if lines is None:
-            results[name] = {"ok": False, "wordByWord": False, "unknown": True}
-            return
+            return  # unknown: leave it out so the next open retries
         wbw = any(any(l.get("words") or []) for l in lines)
         results[name] = {"ok": bool(lines), "wordByWord": bool(lines and wbw), "unknown": False}
-    threads = []
-    for name in DEFAULT_PROVIDERS.split(","):
-        if name not in PROVIDERS:
-            continue
-        t = threading.Thread(target=probe_one, args=(name,), daemon=True)
-        t.start()
-        threads.append(t)
-    for t in threads:
-        t.join(PROVIDER_TIMEOUT + 4)
-    print(json.dumps({"ok": True, "results": results},
+
+    if missing:
+        threads = []
+        for name in missing:
+            t = threading.Thread(target=probe_one, args=(name,), daemon=True)
+            t.start()
+            threads.append(t)
+        for t in threads:
+            t.join(PROVIDER_TIMEOUT + 4)
+        cache[key] = {"ts": time.time(),
+                      "results": {n: results[n] for n in names if n in results}}
+        _probe_cache_save(cache)
+
+    out = {n: results.get(n, {"ok": False, "wordByWord": False, "unknown": True})
+           for n in names}
+    print(json.dumps({"ok": True, "results": out},
                      ensure_ascii=False, separators=(",", ":")), flush=True)
 
 
@@ -1306,7 +1355,7 @@ def main():
         return
 
     if "--probe" in sys.argv:
-        probe_all(title, artist, duration)
+        probe_all(title, artist, duration, providers)
         return
 
     for name in _provider_names(providers):
