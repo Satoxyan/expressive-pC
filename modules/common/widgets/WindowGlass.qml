@@ -17,10 +17,14 @@ Item {
     property bool glassEnabled: true
     property bool fullscreenSurface: false
     property real tintStrength: 0.3
+    // Flat mode draws the tinted wallpaper directly instead of the frosted
+    // shader. Needed where the glass sits inside a layer with OpacityMask:
+    // the shader's texture capture does not render inside a layer.
+    property bool flat: false
     readonly property bool live: glassEnabled && (Config.options?.background?.widgets?.glass?.enable ?? false)
     readonly property bool tracking: live && (win?.visible ?? true)
 
-    readonly property var win: QsWindow.window
+    readonly property var win: root.QsWindow ? root.QsWindow.window : null
     readonly property var surfaceScreen: ({
         name: "",
         width: root.Window.width,
@@ -50,20 +54,23 @@ Item {
     function layerOffset(w, s, guess) {
         const mon = GlassLayers.layers[s.name]
         if (!mon) return guess
+        // hyprctl reports layer positions in global layout coordinates; glass uses screen-local
+        const ox = s.x ?? 0
+        const oy = s.y ?? 0
         let best = null
         let bestDist = Infinity
         for (const level of Object.values(mon.levels ?? {})) {
             for (const layer of level) {
                 if (!layer.namespace.startsWith("quickshell:")) continue
                 if (layer.w !== Math.round(w.width) || layer.h !== Math.round(w.height)) continue
-                const dist = Math.abs(layer.x - guess.x) + Math.abs(layer.y - guess.y)
+                const dist = Math.abs(layer.x - ox - guess.x) + Math.abs(layer.y - oy - guess.y)
                 if (dist < bestDist) {
                     bestDist = dist
                     best = layer
                 }
             }
         }
-        return best ? Qt.point(best.x, best.y) : guess
+        return best ? Qt.point(best.x - ox, best.y - oy) : guess
     }
 
     function popupOffset(w, s) {
@@ -177,9 +184,11 @@ Item {
         active: root.live && !!root.scr && root.wallpaper !== ""
 
         sourceComponent: Item {
+            clip: root.flat
+
             Image {
                 id: wallpaperImage
-                visible: false
+                visible: root.flat
                 width: root.scr.width
                 height: root.scr.height
                 x: -(root.winX + root.origin.x)
@@ -191,7 +200,14 @@ Item {
                 cache: true
             }
 
+            Rectangle {
+                anchors.fill: parent
+                visible: root.flat
+                color: Qt.rgba(root.tint.r, root.tint.g, root.tint.b, root.tintStrength)
+            }
+
             FrostedGlass {
+                visible: !root.flat
                 anchors.fill: parent
                 blurSource: wallpaperImage
                 cardRadius: root.cardRadius

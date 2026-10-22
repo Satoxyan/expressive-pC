@@ -239,6 +239,13 @@ Scope {
                                 anchors.fill: parent
                                 glassEnabled: (parent?.color.a ?? 0) > 0
                                 cardRadius: parent?.radius ?? 0
+                                // Hug docks are square at the bottom; match the
+                                // body's per-corner radii or the glass rounds
+                                // them and leaves a dark notch.
+                                topLeftRadius: parent?.topLeftRadius ?? cardRadius
+                                topRightRadius: parent?.topRightRadius ?? cardRadius
+                                bottomLeftRadius: parent?.bottomLeftRadius ?? cardRadius
+                                bottomRightRadius: parent?.bottomRightRadius ?? cardRadius
                                 tint: parent?.color ?? 'transparent'
                             }
                             anchors.fill: parent

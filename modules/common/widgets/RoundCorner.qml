@@ -46,6 +46,7 @@ Item {
             anchors.fill: parent
             glassEnabled: root.glassOn
             tint: root.color
+            flat: true
         }
     }
 
