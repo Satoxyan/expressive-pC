@@ -137,6 +137,9 @@ Item {
     readonly property real rowHeight:
         rowMeter.implicitHeight > 0 ? rowMeter.implicitHeight : activeRowMetrics.height
     readonly property real rowSpacing: 4
+    readonly property real slotGap: root.lineSpacing + (root.compactNeighbors ? 6 : 0)
+    readonly property real uniformSlotHeight:
+        Math.max(0, (root.height - (root.slotCount - 1) * root.slotGap) / root.slotCount)
 
     function comfortableHeightFor(dist) {
         if (dist === 1) return Math.max(8, nearLineMetrics.height - root.lineSlack)
@@ -159,7 +162,7 @@ Item {
     // the widget height minus the layout gaps and the others' reserves.
     readonly property real activeRoom:
         Math.max(root.rowHeight, root.height
-            - (root.slotCount - 1) * root.lineSpacing - root.comfortableReserve)
+            - (root.slotCount - 1) * root.slotGap - root.comfortableReserve)
 
     // Largest whole number of active rows that fit in that room; the cap is
     // that many rows (not the room itself), so the active slot never ends on
@@ -274,7 +277,7 @@ Item {
         anchors.fill: parent
         // Compact mode keeps lines clustered, but with a bit more air
         // between slots so it doesn't look cramped.
-        spacing: root.lineSpacing + (root.compactNeighbors ? 6 : 0)
+        spacing: root.slotGap
 
         // Compact mode: symmetric padding so the line cluster hugs the
         // active line in the middle instead of stretching edge to edge.
@@ -302,11 +305,15 @@ Item {
                 Layout.minimumHeight: slotItem.isActiveSlot
                     ? 0
                     : Math.ceil(slotItem.comfortableHeight)
+                readonly property real contentHeight: slotItem.useKaraoke
+                    ? slotItem.karaokeContentHeight
+                    : slotItem.fallbackContentHeight
+                // Active keeps its wrapped height only when it needs more than
+                // a normal slot; a one-row line takes the same height as the
+                // others so the gaps above and below stay equal.
                 Layout.preferredHeight: slotItem.isActiveSlot
-                    ? slotItem.useKaraoke
-                        ? Math.min(slotItem.karaokeContentHeight, root.activeCap)
-                        : Math.min(slotItem.fallbackContentHeight, root.activeCap)
-                    : 0
+                    ? Math.min(Math.max(slotItem.contentHeight, root.uniformSlotHeight), root.activeCap)
+                    : (root.compactNeighbors ? 0 : root.uniformSlotHeight)
 
                 readonly property int dist: Math.abs(index - root.activeSlot)
                 readonly property bool isActiveSlot: index === root.activeSlot
@@ -454,7 +461,12 @@ Item {
 
                 Column {
                     id: karaokeColumn
-                    anchors.fill: parent
+                    // The slot is usually taller than a one-row line, so the
+                    // rows are centered in it instead of hugging its top.
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    height: implicitHeight
                     spacing: root.rowSpacing
                     visible: slotItem.useKaraoke
                     // Anything that overflows the slot is clipped so it never

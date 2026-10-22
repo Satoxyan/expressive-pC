@@ -451,8 +451,8 @@ Item {
     LyricsProviderSelector {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.rightMargin: 24
-        anchors.bottomMargin: 24
+        anchors.rightMargin: 8
+        anchors.bottomMargin: 4
         z: 10
         sizeScale: 1.5
         blendedColors: root.colors

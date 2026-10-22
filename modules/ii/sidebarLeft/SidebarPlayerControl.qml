@@ -321,14 +321,6 @@ Item {
                 }
             }
 
-            // ── Pemilih provider lyric (dibawah lirik, diatas play) ──
-            LyricsProviderSelector {
-                Layout.alignment: Qt.AlignHCenter
-                Layout.topMargin: 10
-                Layout.preferredHeight: 24
-                blendedColors: root.blendedColors
-            }
-
             // ── Controls ──
             ColumnLayout {
                 Layout.fillWidth: true
@@ -483,6 +475,7 @@ Item {
                 spacing: 8
 
                 RippleButton {
+                    id: lyricsToggle
                     property real baseSize: Math.max(36, parent.parent.height * 0.05)
                     implicitWidth: baseSize
                     implicitHeight: baseSize
@@ -493,6 +486,8 @@ Item {
                     downAction: () => {
                         Config.options.sidebar.media.showLyrics = !Config.options.sidebar.media.showLyrics
                     }
+                    // Klik kanan: pilih provider lirik (dulu pill di atas play).
+                    altAction: () => providerMenu.show(lyricsToggle)
                     contentItem: MaterialSymbol {
                         iconSize: 18
                         fill: Config.options.sidebar.media.showLyrics ? 1 : 0
@@ -691,5 +686,11 @@ Item {
                 currentIndex: 0
             }
         }
+    }
+
+    LyricsProviderMenu {
+        id: providerMenu
+        blendedColors: root.blendedColors
+        alignLeft: true
     }
 }
