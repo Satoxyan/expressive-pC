@@ -60,6 +60,12 @@ Item {
             if (root.liveMatches.length > 0) return Translation.tr("%1 live now").arg(root.liveMatches.length);
             if (root.nextMatch) return `${root.nextMatch.home.name} – ${root.nextMatch.away.name} · ${Qt.formatDateTime(new Date(root.nextMatch.date), "ddd HH:mm")}`;
             return Translation.tr("No matches");
+        case "phone": {
+            const device = PhoneConnect.activeDevice;
+            if (!device) return Translation.tr("No device connected");
+            const name = device.name || device.id;
+            return device.batteryAvailable ? `${name} · ${device.batteryCharge}%` : name;
+        }
         case "anime":
             return Translation.tr("Browse images");
         default:

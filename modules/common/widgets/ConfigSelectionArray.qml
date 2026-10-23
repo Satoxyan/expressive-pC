@@ -9,6 +9,7 @@ RowLayout {
     id: root
     property string text: ""
     property string icon: ""
+    property string infoText: ""
     property list<var> options: [
         {
             "displayName": "Option 1",
@@ -59,6 +60,10 @@ RowLayout {
             text: root.text
             color: root.colLabel
             opacity: root.enabled ? 1 : 0.4
+        }
+        InfoTooltipIcon {
+            visible: root.infoText !== ""
+            tooltipText: root.infoText
         }
     }
 

@@ -7,6 +7,10 @@ import QtQuick.Controls
 RippleButton {
     id: root
     property string buttonIcon
+    property string infoText: ""
+    // false: the service owns the state; the switch only asks.
+    property bool selfToggle: true
+    signal toggleRequested()
     property alias iconSize: iconWidget.iconSize
     // Optional recolor hooks — defaults match the old hard-coded colors,
     // so callers opt in (e.g. dashboard tertiary pass-through).
@@ -21,7 +25,10 @@ RippleButton {
     implicitHeight: contentItem.implicitHeight + 8 
     font.pixelSize: Appearance.font.pixelSize.small
     
-    onClicked: checked = !checked
+    onClicked: {
+        if (root.selfToggle) checked = !checked;
+        else root.toggleRequested();
+    }
 
     contentItem: RowLayout {
         spacing: 10
@@ -39,6 +46,11 @@ RippleButton {
             font: root.font
             color: root.colText
             opacity: root.enabled ? 1 : 0.4
+            wrapMode: Text.Wrap
+        }
+        InfoTooltipIcon {
+            visible: root.infoText !== ""
+            tooltipText: root.infoText
         }
         StyledSwitch {
             id: switchWidget

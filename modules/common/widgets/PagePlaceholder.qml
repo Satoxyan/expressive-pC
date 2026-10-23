@@ -13,6 +13,8 @@ Item {
     property alias description: widgetDescriptionText.text
     property alias shape: shapeWidget.shape
     property alias descriptionHorizontalAlignment: widgetDescriptionText.horizontalAlignment
+    property real descriptionMaximumWidth: -1
+    property bool dropIconWhenCramped: false // no-op; kept for upstream call sites
 
     opacity: shown ? 1 : 0
     visible: opacity > 0
@@ -54,6 +56,7 @@ Item {
             id: widgetDescriptionText
             visible: description !== ""
             Layout.fillWidth: true
+            Layout.maximumWidth: root.descriptionMaximumWidth > 0 ? root.descriptionMaximumWidth : Infinity
             font.pixelSize: Appearance.font.pixelSize.small
             color: Appearance.m3colors.m3outline
             horizontalAlignment: Text.AlignLeft

@@ -14,6 +14,7 @@ RowLayout {
     property alias value: textArea.text
     property alias textArea: textArea
     property bool filled: true
+    property bool floatingLabel: false // label stays in the row in this fork
     property bool showBorder: !filled
     property bool rounded: false
     property bool multiline: false
@@ -50,9 +51,11 @@ RowLayout {
         spacing: 0
         StyledText {
             Layout.fillWidth: true
+            Layout.maximumWidth: root.floatingLabel ? root.width * 0.45 : Number.POSITIVE_INFINITY
             text: root.text
             color: root.colLabel
             opacity: root.enabled ? 1 : 0.4
+            wrapMode: Text.Wrap
         }
         StyledText {
             Layout.fillWidth: true

@@ -212,6 +212,60 @@ Singleton {
                 ]
             }
 
+            // Phone tab (port dari immaterial-impulse).
+            property JsonObject phone: JsonObject {
+                property bool showPeripheralCards: true
+                property JsonObject contacts: JsonObject {
+                    property bool enabled: true
+                    property list<string> favoriteIds: []
+                    property string sortBy: "first" // first | last
+                    property bool hideUnnamed: true
+                }
+                property JsonObject scrcpy: JsonObject {
+                    property bool stayAwake: false
+                    property bool turnScreenOff: false
+                    property bool noPowerOn: false
+                    property bool noAudio: false
+                    property bool showTouches: false
+                    property bool fullscreen: false
+                    property bool alwaysOnTop: false
+                    property int maxFps: 0
+                    property string bitRate: "8M"
+                    property int maxSize: 0
+                    property int videoBuffer: 0
+                    property bool useWireless: false
+                    property bool autoWirelessIp: true
+                    property string wirelessIp: ""
+                    property string wirelessPort: "5555"
+                    property JsonObject appMode: JsonObject {
+                        property bool enabled: true
+                        property bool flexDisplay: true
+                        property int displayWidth: 1280
+                        property int displayHeight: 960
+                        property int density: 160
+                        property bool keepActive: true
+                        property bool systemDecorations: true
+                        property list<string> favoritePackages: []
+                    }
+                }
+                property JsonObject webcam: JsonObject {
+                    property string cameraFacing: "front"
+                    property string resolution: "1280x720"
+                    property bool mirrorHorizontally: false
+                    property int rotateDegrees: 0
+                    property string connection: "wifi"
+                    property string wifiIp: ""
+                    property int port: 4747
+                }
+                property JsonObject microphone: JsonObject {
+                    property string connection: "wifi"
+                    property string wifiIp: ""
+                    property int port: 4748
+                    property int micGain: 100
+                    property bool setAsDefault: false
+                }
+            }
+
             property JsonObject appearance: JsonObject {
                 property string uiBackground: "themed"
                 property bool extraBackgroundTint: true
@@ -920,6 +974,12 @@ Singleton {
             }
 
             property JsonObject networking: JsonObject {
+                property JsonObject phoneConnect: JsonObject {
+                    property bool enable: true
+                    // Battery/reachability drift slowly; each sweep is a chain
+                    // of busctl processes, so poll gentler than the rest.
+                    property int pollInterval: 10000
+                }
                 property string userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
             }
 
@@ -1035,6 +1095,9 @@ Singleton {
                 property list<string> panelOrder: ["quickToggles", "sliders", "media"]
                 property string leftLastPage: "home"
                 property bool leftRememberPage: true
+                property JsonObject phone: JsonObject {
+                    property bool enable: true
+                }
                 property JsonObject translator: JsonObject {
                     property bool enable: false
                     property int delay: 300 // Delay before sending request. Reduces (potential) rate limits and lag.

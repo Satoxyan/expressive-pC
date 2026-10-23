@@ -1,6 +1,7 @@
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
+import qs.modules.ii.sidebarLeft.phone
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -17,12 +18,14 @@ Item {
     property bool animeCloset: Config.options.policies.weeb === 2
     property bool mediaEnabled: Config.options.sidebar.media.enable
     property bool footballEnabled: Config.options.sidebar.football.enable
+    property bool phoneEnabled: Config.options.sidebar.phone.enable
 
     readonly property var featurePages: [
         ...(root.aiChatEnabled ? [{"key": "ai", "icon": "neurology", "name": Translation.tr("Intelligence")}] : []),
         ...(root.translatorEnabled ? [{"key": "translator", "icon": "translate", "name": Translation.tr("Translator")}] : []),
         ...(root.mediaEnabled ? [{"key": "media", "icon": "music_note", "name": Translation.tr("Media")}] : []),
         ...(root.footballEnabled ? [{"key": "sports", "icon": "sports", "name": Translation.tr("Sports")}] : []),
+        ...(root.phoneEnabled ? [{"key": "phone", "icon": "smartphone", "name": Translation.tr("Phone")}] : []),
         ...((root.animeEnabled && !root.animeCloset) ? [{"key": "anime", "icon": "bookmark_heart", "name": Translation.tr("Anime")}] : [])
     ]
     readonly property var pageKeys: ["home", ...root.featurePages.map(page => page.key)]
@@ -266,6 +269,7 @@ Item {
                 PageSlot { pageKey: "translator"; enabledPage: root.translatorEnabled; page: translator }
                 PageSlot { pageKey: "media"; enabledPage: root.mediaEnabled; page: media }
                 PageSlot { pageKey: "sports"; enabledPage: root.footballEnabled; page: football }
+                PageSlot { pageKey: "phone"; enabledPage: root.phoneEnabled; page: phone }
                 PageSlot { pageKey: "anime"; enabledPage: root.animeEnabled && !root.animeCloset; page: anime }
             }
         }
@@ -292,6 +296,10 @@ Item {
         Component {
             id: football
             FootballPage {}
+        }
+        Component {
+            id: phone
+            Phone {}
         }
         Component {
             id: anime

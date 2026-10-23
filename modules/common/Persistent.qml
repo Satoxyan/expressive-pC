@@ -79,6 +79,27 @@ Singleton {
                 property string provider: "yandere"
             }
 
+            property JsonObject phone: JsonObject {
+                property string activeDeviceId: ""
+                property list<string> recentDeviceIds: []
+                property string cachedNotificationsJson: ""
+                property JsonObject scrcpy: JsonObject {
+                    property list<string> recentPackages: []
+                }
+                property JsonObject camera: JsonObject {
+                    property string lastMode: "wifi"
+                    property string lastIp: ""
+                    property int lastPort: 4747
+                }
+                property JsonObject mic: JsonObject {
+                    property string originalDefaultSink: ""
+                    property string lastBackend: ""
+                    property string lastMode: "wifi"
+                    property string lastIp: ""
+                    property int lastPort: 4748
+                }
+            }
+
             property JsonObject idle: JsonObject {
                 property bool inhibit: false
             }

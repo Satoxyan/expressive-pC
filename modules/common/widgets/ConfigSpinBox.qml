@@ -7,6 +7,7 @@ RowLayout {
     id: root
     property string text: ""
     property string icon
+    property string infoText: ""
     property alias value: spinBoxWidget.value
     property alias stepSize: spinBoxWidget.stepSize
     property alias from: spinBoxWidget.from
@@ -36,6 +37,10 @@ RowLayout {
             text: root.text
             color: root.colLabel
             opacity: root.enabled ? 1 : 0.4
+        }
+        InfoTooltipIcon {
+            visible: root.infoText !== ""
+            tooltipText: root.infoText
         }
     }
 

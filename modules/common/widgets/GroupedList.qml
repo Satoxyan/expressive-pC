@@ -13,6 +13,10 @@ Item {
     // plain page rows (HDR dropdown so it merges with the rows above it).
     property bool flat: false
     property bool glass: false
+    // Model-driven spelling: a group whose rows are only known at runtime.
+    property var model: null
+    property Component rowDelegate: null
+    readonly property bool modelDriven: root.rowDelegate !== null
     Layout.fillWidth: true
     implicitHeight: root.flat ? plainCol.implicitHeight : col.implicitHeight
 
@@ -22,13 +26,17 @@ Item {
         spacing: 2
 
         Repeater {
-            model: root.flat ? 0 : root.items.length
+            model: root.flat ? 0 : (root.modelDriven ? root.model : root.items.length)
             delegate: Rectangle {
+                id: plate
                 required property int index
+                required property var modelData
                 readonly property bool isFirst: index === 0
-                readonly property bool isLast: index === root.items.length - 1
+                readonly property bool isLast: index === (root.modelDriven ? (root.model?.length ?? 0) : root.items.length) - 1
                 Layout.fillWidth: true
-                implicitHeight: (root.items[index]?.implicitHeight ?? 0) + root.itemVerticalPadding
+                implicitHeight: (root.modelDriven
+                    ? (rowLoader.item?.implicitHeight ?? 0)
+                    : (root.items[index]?.implicitHeight ?? 0)) + root.itemVerticalPadding
                 color: root.bgcolor
 
                 WindowGlass {
@@ -46,6 +54,7 @@ Item {
                 bottomRightRadius: isLast  ? root.bigRadius : root.smallRadius
 
                 Component.onCompleted: {
+                    if (root.modelDriven) return;
                     const child = root.items[index]
                     if (child) {
                         child.parent = contentArea
@@ -57,6 +66,44 @@ Item {
                     id: contentArea
                     anchors { fill: parent; margins: 8 }
                     spacing: 0
+
+                    Loader {
+                        id: rowLoader
+                        active: root.modelDriven
+                        Layout.fillWidth: true
+                        sourceComponent: root.rowDelegate
+                    }
+                }
+
+                Binding {
+                    target: rowLoader.item
+                    property: "modelData"
+                    value: plate.modelData
+                    when: rowLoader.item !== null
+                }
+                Binding {
+                    target: rowLoader.item
+                    property: "cornerTopLeft"
+                    value: plate.topLeftRadius
+                    when: rowLoader.item?.cornerTopLeft !== undefined
+                }
+                Binding {
+                    target: rowLoader.item
+                    property: "cornerTopRight"
+                    value: plate.topRightRadius
+                    when: rowLoader.item?.cornerTopRight !== undefined
+                }
+                Binding {
+                    target: rowLoader.item
+                    property: "cornerBottomLeft"
+                    value: plate.bottomLeftRadius
+                    when: rowLoader.item?.cornerBottomLeft !== undefined
+                }
+                Binding {
+                    target: rowLoader.item
+                    property: "cornerBottomRight"
+                    value: plate.bottomRightRadius
+                    when: rowLoader.item?.cornerBottomRight !== undefined
                 }
             }
         }

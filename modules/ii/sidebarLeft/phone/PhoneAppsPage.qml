@@ -1,0 +1,485 @@
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import QtQuick.Layouts
+import qs.services
+import qs.modules.common
+import qs.modules.common.widgets
+import "phone_cards.js" as PhoneCards
+
+/**
+ * The Phone tab's Android Apps sub-page: scrcpy's App Mode.
+ *
+ * Rooted on `PhoneSubPage` (W5a's; the interface is pinned by the stub at
+ * tests/imports/qs/modules/imi/sidebarLeft/phone/PhoneSubPage.qml).
+ *
+ * Every app draws the generic `android` glyph. Pulling launcher icons off the
+ * phone is explicitly out of scope this round (spec, "Non-goals"), and the
+ * glyph is what the fork falls back to anyway whenever its extractor cannot
+ * resolve one.
+ *
+ * The page has three states and draws exactly one message in each: App Mode
+ * with no transport (`PhoneAdbPairPanel`, which owns the diagnosis and the
+ * pairing job, and no placeholder under it), a phone that answered with
+ * nothing (the placeholder), and a phone with apps (the list). What
+ * separates the first from the second is the probe - `PhoneDeps.adbDevice`
+ * and the two states around it - never `PhoneScrcpy.appsError`, which is the
+ * supervisor's sentence about the same fact and would be a second answer to
+ * it.
+ *
+ * The search query lives HERE rather than on PhoneScrcpy: a text field on one
+ * page writing a property on a singleton makes the query global state, and the
+ * filter itself is phone_cards.js's `filterApps` (tests/tst_phone_cards.qml).
+ */
+PhoneSubPage {
+    id: root
+
+    title: Translation.tr("Android Apps")
+
+    property string query: ""
+
+    readonly property var filteredApps: PhoneCards.filterApps(PhoneScrcpy.apps, root.query)
+
+    // Whether adb can see a phone. That is a different link from the one the
+    // device chip reports: a phone paired to KDE Connect over the LAN is
+    // reachable there and lists nothing under `adb devices`, and App Mode runs
+    // on the second one. Deliberately TRI-STATE, the way PhoneFeatureCards
+    // derives it - every PhoneDeps flag starts `false`, so a plain falsy test
+    // would draw the panel below for the first frames of every session.
+    readonly property var adbDevice: PhoneDeps.ready ? PhoneDeps.adbDevice : undefined
+    // App Mode is installed and has no transport: nothing on this page can
+    // start, and the reason is the whole content of the page. WHICH reason is
+    // the panel's own question now - adb absent, adb unable to start, or adb
+    // working with nothing on it - because the old wording assumed the first
+    // two away and told everybody to go and look at their phone.
+    readonly property bool adbOffline: PhoneScrcpy.appModeSupported && adbPanel.shown
+
+    // The live sessions, as a plain list. PhoneScrcpy.sessions is a ListModel,
+    // which is not a binding source - `sessionCount` is read so this
+    // re-evaluates when a window opens or closes.
+    readonly property var appSessions: {
+        const rows = [];
+        const count = PhoneScrcpy.sessionCount;
+        for (let index = 0; index < count; index++) {
+            const row = PhoneScrcpy.sessions.get(index);
+            if (row.type === "app")
+                rows.push({ id: row.id, package: row.package, title: row.title });
+        }
+        return rows;
+    }
+
+    // The list is asked for once, when the page opens with nothing in it.
+    // Never on a timer and never from a binding: `--list-apps` starts a scrcpy
+    // against the phone.
+    function askForApps(): void {
+        if (PhoneScrcpy.appModeSupported && PhoneScrcpy.apps.length === 0 && !PhoneScrcpy.appsLoading)
+            PhoneScrcpy.refreshApps();
+    }
+
+    Component.onCompleted: root.askForApps()
+
+    // ...and once more when a phone appears on ADB while the page is open,
+    // which is the one event that turns an unanswerable request into an
+    // answerable one. That is an observation of a state change rather than a
+    // second trigger borrowed from something else, so it fires once per plug-in
+    // and the panel below can honestly say the list arrives on its own.
+    Connections {
+        target: PhoneDeps
+        function onAdbDeviceChanged() {
+            if (PhoneDeps.adbDevice)
+                root.askForApps();
+        }
+    }
+
+    ColumnLayout {
+        Layout.fillWidth: true
+        Layout.fillHeight: true
+        spacing: Appearance.spacing.space100
+
+        // The search row is content-height, stated rather than left to the
+        // default: `ToolbarTextField` declares `Layout.fillHeight: true` of
+        // its own, which makes this row's maximum height unbounded, and a
+        // nested layout defaults to filling - so the row would take the
+        // column's whole leftover and leave the list eight pixels.
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: false
+            spacing: Appearance.spacing.space100
+
+            MaterialSymbol {
+                Layout.alignment: Qt.AlignVCenter
+                text: "search"
+                iconSize: Appearance.font.pixelSize.large
+                color: Appearance.colors.colSubtext
+            }
+
+            ToolbarTextField {
+                id: searchField
+                Layout.fillWidth: true
+                enabled: PhoneScrcpy.appModeSupported
+                placeholderText: Translation.tr("Search apps…")
+                onTextChanged: root.query = searchField.text
+            }
+
+            IconButton {
+                enabled: PhoneScrcpy.appModeSupported && !PhoneScrcpy.appsLoading
+                buttonIcon: "refresh"
+                buttonSize: 40
+                colBackground: Appearance.colors.colLayer3
+                colBackgroundHover: Appearance.colors.colLayer3Hover
+                colRipple: Appearance.colors.colLayer3Active
+                colText: Appearance.colors.colOnLayer3
+                tooltip: Translation.tr("Ask the phone for its app list")
+                onClicked: PhoneScrcpy.refreshApps()
+            }
+        }
+
+        // The count, or whatever there is to say instead of one. It stands
+        // down while the panel below is up: with no device on ADB the list
+        // request fails with "Phone not reachable over ADB", and a red line
+        // saying that over a panel saying it at length is the same sentence
+        // twice.
+        StyledText {
+            Layout.fillWidth: true
+            Layout.leftMargin: Appearance.spacing.space50
+            visible: !root.adbOffline
+            text: {
+                if (!PhoneScrcpy.appModeSupported)
+                    return Translation.tr("App Mode needs scrcpy 4.0 or newer");
+                if (PhoneScrcpy.appsLoading)
+                    return Translation.tr("Reading the phone's app list…");
+                if (PhoneScrcpy.appsError.length > 0)
+                    return PhoneScrcpy.appsError;
+                return Translation.tr("%1 of %2 apps").arg(root.filteredApps.length).arg(PhoneScrcpy.apps.length);
+            }
+            font.pixelSize: Appearance.font.pixelSize.smaller
+            color: PhoneScrcpy.appsError.length > 0 ? Appearance.colors.colError : Appearance.colors.colSubtext
+            wrapMode: Text.WordWrap
+        }
+
+        // ---- no transport, and what to do about it ----
+        //
+        // A page with nothing in it because a link is missing owes the reader
+        // the link. It used to owe them a recipe - open a terminal and type
+        // `adb pair host:port code` - and the shell can run that instead, so
+        // the panel is a job now rather than a paragraph. It answers three
+        // states rather than one, because "no phone on ADB" was hiding "adb
+        // is not installed" and "adb cannot start" inside it.
+        PhoneAdbPairPanel {
+            id: adbPanel
+            Layout.fillWidth: true
+            visible: PhoneScrcpy.appModeSupported && adbPanel.shown
+        }
+
+        // ---- what is running right now ----
+        ColumnLayout {
+            Layout.fillWidth: true
+            visible: root.appSessions.length > 0
+            spacing: Appearance.spacing.space50
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Appearance.spacing.space100
+
+                StyledText {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: Appearance.spacing.space50
+                    text: Translation.tr("Active sessions (%1)").arg(root.appSessions.length)
+                    font.pixelSize: Appearance.font.pixelSize.smallest
+                    font.weight: Font.DemiBold
+                    color: Appearance.colors.colSubtext
+                }
+
+                RippleButton {
+                    Layout.preferredHeight: Appearance.font.pixelSize.huge + Appearance.spacing.space50
+                    buttonRadius: Appearance.rounding.small
+                    colBackground: "transparent"
+                    colBackgroundHover: Appearance.colors.colErrorContainerHover
+                    colRipple: Appearance.colors.colErrorContainerActive
+                    onClicked: PhoneScrcpy.stopAllApps()
+
+                    contentItem: StyledText {
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        text: Translation.tr("Stop all")
+                        font.pixelSize: Appearance.font.pixelSize.smallest
+                        font.weight: Font.DemiBold
+                        color: Appearance.colors.colError
+                    }
+                }
+            }
+
+            Repeater {
+                model: root.appSessions
+
+                delegate: Rectangle {
+                    id: sessionRow
+                    required property var modelData
+
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: sessionLayout.implicitHeight + Appearance.spacing.space100
+                    radius: Appearance.rounding.normal
+                    color: Appearance.colors.colPrimaryContainer
+
+                    RowLayout {
+                        id: sessionLayout
+                        anchors {
+                            left: parent.left
+                            right: parent.right
+                            verticalCenter: parent.verticalCenter
+                            leftMargin: Appearance.spacing.space125
+                            rightMargin: Appearance.spacing.space75
+                        }
+                        spacing: Appearance.spacing.space100
+
+                        MaterialSymbol {
+                            Layout.alignment: Qt.AlignVCenter
+                            text: "play_circle"
+                            fill: 1
+                            iconSize: Appearance.font.pixelSize.large
+                            color: Appearance.colors.colOnPrimaryContainer
+                        }
+
+                        StyledText {
+                            Layout.fillWidth: true
+                            // A package name is the phone's own; never markup.
+                            textFormat: Text.PlainText
+                            text: PhoneCards.appLabel({ package: sessionRow.modelData.package })
+                            font.pixelSize: Appearance.font.pixelSize.small
+                            font.weight: Font.DemiBold
+                            color: Appearance.colors.colOnPrimaryContainer
+                            elide: Text.ElideRight
+                        }
+
+                        DialogButton {
+                            buttonText: Translation.tr("Focus")
+                            colBackground: Appearance.colors.colPrimary
+                                        colBackgroundHover: Appearance.colors.colPrimaryHover
+                            colRipple: Appearance.colors.colPrimaryActive
+                            colText: Appearance.colors.colOnPrimary
+                            onClicked: PhoneScrcpy.focusApp(sessionRow.modelData.package)
+                        }
+
+                        IconButton {
+                            buttonIcon: "close"
+                            buttonSize: 32
+                            colBackground: Appearance.colors.colErrorContainer
+                            colBackgroundHover: Appearance.colors.colErrorContainerHover
+                            colRipple: Appearance.colors.colErrorContainerActive
+                            colText: Appearance.colors.colOnErrorContainer
+                            tooltip: Translation.tr("Close this session")
+                            onClicked: PhoneScrcpy.stopApp(sessionRow.modelData.package)
+                        }
+                    }
+                }
+            }
+        }
+
+        // ---- the starred apps, as a strip ----
+        ColumnLayout {
+            Layout.fillWidth: true
+            visible: favouriteRepeater.count > 0
+            spacing: Appearance.spacing.space50
+
+            StyledText {
+                Layout.leftMargin: Appearance.spacing.space50
+                text: Translation.tr("Favourites")
+                font.pixelSize: Appearance.font.pixelSize.smallest
+                font.weight: Font.DemiBold
+                color: Appearance.colors.colSubtext
+            }
+
+            Flow {
+                Layout.fillWidth: true
+                spacing: Appearance.spacing.space50
+
+                Repeater {
+                    id: favouriteRepeater
+                    model: PhoneCards.filterApps(PhoneScrcpy.apps, "")
+                        .filter(app => PhoneScrcpy.isFavorite(app.package))
+
+                    delegate: RippleButton {
+                        id: favouriteChip
+                        required property var modelData
+
+                        readonly property bool running: PhoneScrcpy.isAppRunning(favouriteChip.modelData.package)
+                        implicitHeight: Appearance.font.pixelSize.huge + Appearance.spacing.space150
+                        buttonRadius: Appearance.rounding.full
+                        colBackground: favouriteChip.running ? Appearance.colors.colPrimaryContainer : Appearance.colors.colLayer3
+                        colBackgroundHover: favouriteChip.running ? Appearance.colors.colPrimaryContainerHover : Appearance.colors.colLayer3Hover
+                        colRipple: favouriteChip.running ? Appearance.colors.colPrimaryContainerActive : Appearance.colors.colLayer3Active
+                        onClicked: PhoneScrcpy.launchApp(favouriteChip.modelData.package)
+
+                        contentItem: RowLayout {
+                            spacing: Appearance.spacing.space50
+
+                            MaterialSymbol {
+                                Layout.alignment: Qt.AlignVCenter
+                                text: "android"
+                                iconSize: Appearance.font.pixelSize.small
+                                color: favouriteChip.running
+                                    ? Appearance.colors.colOnPrimaryContainer
+                                    : Appearance.colors.colOnLayer3
+                            }
+                            StyledText {
+                                Layout.alignment: Qt.AlignVCenter
+                                textFormat: Text.PlainText
+                                text: PhoneCards.appLabel(favouriteChip.modelData)
+                                font.pixelSize: Appearance.font.pixelSize.smaller
+                                color: favouriteChip.running
+                                    ? Appearance.colors.colOnPrimaryContainer
+                                    : Appearance.colors.colOnLayer3
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ---- every app on the phone ----
+        Item {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+
+            StyledListView {
+                id: appList
+                anchors.fill: parent
+                clip: true
+                spacing: Appearance.spacing.space50
+                model: root.filteredApps
+                animateAppearance: false
+                visible: root.filteredApps.length > 0
+
+                delegate: Rectangle {
+                    id: appRow
+                    required property var modelData
+
+                    readonly property bool running: PhoneScrcpy.isAppRunning(appRow.modelData.package)
+
+                    width: appList.width
+                    // A constant off the token scale rather than the content's
+                    // own height: the row's content is the fill-anchored
+                    // button's contentItem, so deriving the row from it is a
+                    // cycle QtQuick never converges on.
+                    height: Appearance.font.pixelSize.huge * 2 + Appearance.spacing.space100
+                    radius: Appearance.rounding.normal
+                    color: appRow.running ? Appearance.colors.colPrimaryContainer : Appearance.colors.colLayer2
+
+                    Behavior on color {
+                        animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+                    }
+
+                    RippleButton {
+                        anchors.fill: parent
+                        buttonRadius: Appearance.rounding.normal
+                        colBackground: "transparent"
+                        colBackgroundHover: Appearance.colors.colLayer3Hover
+                        colRipple: Appearance.colors.colLayer3Active
+                        // launchApp() focuses an app that is already up, so
+                        // there is no second copy of that decision here.
+                        onClicked: PhoneScrcpy.launchApp(appRow.modelData.package)
+
+                        // The shell's catalogue row shape. The leading visual
+                        // is a shaped glyph rather than a bare symbol, so it
+                        // goes through `iconComponent`; the ink is stated
+                        // because the row's plate changes tone while the app
+                        // is running.
+                        contentItem: CatalogueRow {
+                            rowSpacing: Appearance.spacing.space125
+
+                            iconComponent: Component {
+                                MaterialShapeWrappedMaterialSymbol {
+                                    // The generic glyph, deliberately: pulling
+                                    // launcher icons off the phone is a follow-up
+                                    // (spec, "Non-goals").
+                                    text: "android"
+                                    wrappedShape: MaterialShape.Shape.Cookie9Sided
+                                    iconSize: Appearance.font.pixelSize.small
+                                    padding: Appearance.spacing.space75
+                                    color: appRow.running
+                                        ? Appearance.colors.colPrimary
+                                        : Appearance.colors.colSecondaryContainer
+                                    colSymbol: appRow.running
+                                        ? Appearance.colors.colOnPrimary
+                                        : Appearance.colors.colOnSecondaryContainer
+                                }
+                            }
+
+                            title: PhoneCards.appLabel(appRow.modelData)
+                            titleFont.pixelSize: Appearance.font.pixelSize.small
+                            titleFont.weight: Font.DemiBold
+                            titleColor: appRow.running
+                                ? Appearance.colors.colOnPrimaryContainer
+                                : Appearance.colors.colOnLayer2
+                            titleFillsWidth: true
+                            titleElides: true
+                            description: appRow.modelData.package
+                            descriptionWraps: false
+
+                            trailingContent: [
+                                IconButton {
+                                    id: starButton
+                                    readonly property bool favourite: PhoneScrcpy.isFavorite(appRow.modelData.package)
+
+                                    buttonIcon: starButton.favourite ? "star" : "star_outline"
+                                    buttonSize: 32
+                                    iconFill: starButton.favourite ? 1 : 0
+                                    colText: starButton.favourite ? Appearance.colors.colPrimary : Appearance.colors.colSubtext
+                                    tooltip: starButton.favourite
+                                        ? Translation.tr("Remove from favourites")
+                                        : Translation.tr("Add to favourites")
+                                    onClicked: PhoneScrcpy.toggleFavorite(appRow.modelData.package)
+                                }
+                            ]
+
+                            affordance: [
+                                MaterialSymbol {
+                                    text: appRow.running ? "open_in_new" : "play_arrow"
+                                    iconSize: Appearance.font.pixelSize.larger
+                                    color: appRow.running ? Appearance.colors.colPrimary : Appearance.colors.colSubtext
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+
+            PagePlaceholder {
+                anchors.fill: parent
+                // Not while the panel above is up. "No apps yet" and "no phone
+                // on ADB" are the same fact told twice, and the placeholder is
+                // the half that cannot say what to do about it. What it is
+                // for is the state it is actually about: a phone the shell can
+                // reach that came back with nothing.
+                shown: root.filteredApps.length === 0 && !root.adbOffline
+                // A sentence, held to a measure and centred, rather than one
+                // line of text across the whole panel.
+                descriptionMaximumWidth: Appearance.font.pixelSize.small * 21
+                descriptionHorizontalAlignment: Text.AlignHCenter
+                icon: PhoneScrcpy.appModeSupported ? "apps" : "warning"
+                shape: MaterialShape.Shape.Ghostish
+                title: {
+                    if (!PhoneScrcpy.appModeSupported)
+                        return Translation.tr("App Mode is not available");
+                    if (PhoneScrcpy.appsLoading)
+                        return Translation.tr("Reading the app list…");
+                    if (root.query.length > 0)
+                        return Translation.tr("No app matches");
+                    return Translation.tr("No apps yet");
+                }
+                description: {
+                    if (!PhoneScrcpy.appModeSupported)
+                        return Translation.tr("scrcpy 4.0 or newer is needed to start one app on a display of its own.");
+                    if (PhoneScrcpy.appsLoading)
+                        return Translation.tr("scrcpy is asking the phone what it has installed.");
+                    if (root.query.length > 0)
+                        return Translation.tr("Try part of a name or a package.");
+                    // The panel above owns the case where there is no phone on
+                    // ADB, so this one is about a phone that answered and had
+                    // nothing to say.
+                    return Translation.tr("The phone answered with no apps. Unlock its screen and refresh to ask again.");
+                }
+            }
+        }
+    }
+}

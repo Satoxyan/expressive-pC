@@ -11,6 +11,8 @@ Singleton {
     property QtObject animationCurves
     property QtObject colors
     property QtObject rounding
+    property QtObject spacing
+    property QtObject borderWidth
     property QtObject font
     property QtObject sizes
     property string syntaxHighlightingTheme
@@ -292,7 +294,40 @@ Singleton {
         readonly property real expressiveEffectsDuration: 200
     }
 
+    spacing: QtObject {
+        // Material 3 spacing tokens (space100 = 8dp).
+        property int space0: 0
+        property int space25: 2
+        property int space50: 4
+        property int space75: 6
+        property int space100: 8
+        property int space125: 10
+        property int space150: 12
+        property int space175: 14
+        property int space200: 16
+        property int space250: 20
+        property int space300: 24
+        property int space400: 32
+        property int space450: 36
+        property int space500: 40
+        property int space600: 48
+        property int space700: 56
+        property int space800: 64
+        property int space900: 72
+    }
+
+    borderWidth: QtObject {
+        property int standard: 1
+        property int emphasis: 2
+        property int heavy: 4
+    }
+
     animation: QtObject {
+        // Skala awal masuk untuk panel selebar `reference` (dipakai Phone tab).
+        function entranceScaleFrom(reference: real): real {
+            return Math.max(0.85, Math.min(1, 1 - 20 / Math.max(1, reference)));
+        }
+
         property QtObject elementMove: QtObject {
             property int duration: animationCurves.expressiveDefaultSpatialDuration
             property int type: Easing.BezierSpline
