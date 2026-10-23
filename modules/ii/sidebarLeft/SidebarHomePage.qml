@@ -25,6 +25,16 @@ Item {
     }
     readonly property var player: MprisController.activePlayer
 
+    // Kartu terakhir (animIndex 4 + index, lihat Repeater di bawah) baru selesai
+    // bounce-out setelah jeda stagger + durasi 280 ms. SidebarLeftContent
+    // memakai ini untuk menahan halaman berikutnya sampai kartu benar-benar
+    // selesai keluar. Jeda stagger tidak ikut dibagi animationSpeed.
+    readonly property int contentExitMs: {
+        const lastIndex = 4 + Math.max(0, root.pages.length - 1);
+        const speed = Math.max(0.5, Config.options.settings.animationSpeed ?? 1);
+        return Math.round(lastIndex * 41 + 280 / speed);
+    }
+
     function styleFor(key) {
         switch (key) {
         case "ai": return { shape: MaterialShape.Shape.Cookie9Sided, container: Appearance.colors.colTertiaryContainer, onContainer: Appearance.colors.colOnTertiaryContainer, accent: Appearance.colors.colTertiary, onAccent: Appearance.colors.colOnTertiary };

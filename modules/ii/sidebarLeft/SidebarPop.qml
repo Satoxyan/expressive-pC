@@ -26,15 +26,55 @@ Item {
         y: root.offsetY
     }
 
+    // Jeda sebelum bounce-in, dan penanda "masih menunggu" supaya halaman
+    // yang belum mulai beranimasi tetap tidak dirender (tidak menimpa
+    // halaman lama yang sedang bounce-out).
+    property int enterDelay: 0
+    property bool waiting: false
+    // Lama bounce-out; dipakai PageSlot untuk menyelaraskan jeda.
+    readonly property int exitMs: Math.round(300 / root.speed)
+
+    // animScale/offset punya binding ke `active`, jadi nilainya snap ke posisi
+    // akhir begitu active berubah. Set balik ke state awal dulu, kalau tidak
+    // spring berjalan dari 1 ke 1 dan halaman langsung tampil penuh.
+    function resetEnterState() {
+        root.animScale = root.minScale
+        root.animOpacity = root.fade ? 0 : 1
+        root.offsetX = root.travelX
+        root.offsetY = root.travelY
+    }
+
+    function startEnter() {
+        root.waiting = false
+        if (!root.active) return
+        root.resetEnterState()
+        enterAnim.restart()
+    }
+
     onActiveChanged: {
         if (!root.initialized) return
         if (root.active) {
             exitAnim.stop()
-            enterAnim.restart()
+            enterDelayTimer.stop()
+            root.resetEnterState()
+            if (root.enterDelay > 0) {
+                root.waiting = true
+                enterDelayTimer.restart()
+            } else {
+                enterAnim.restart()
+            }
         } else {
             enterAnim.stop()
+            enterDelayTimer.stop()
+            root.waiting = false
             exitAnim.restart()
         }
+    }
+
+    Timer {
+        id: enterDelayTimer
+        interval: root.enterDelay
+        onTriggered: root.startEnter()
     }
 
     property bool initialized: false

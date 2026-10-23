@@ -27,12 +27,34 @@ Item {
     ]
     readonly property var pageKeys: ["home", ...root.featurePages.map(page => page.key)]
     property string currentKey: "home"
+    // Jeda sebelum halaman tujuan bounce-in, dihitung saat pindah halaman.
+    property int nextDelay: 0
     readonly property int currentIndex: Math.max(0, root.pageKeys.indexOf(root.currentKey))
     readonly property var currentPage: root.featurePages.find(page => page.key === root.currentKey) ?? null
     property bool restored: false
 
+    // Header "kertas dari printer": isinya memakai headerKey yang tertinggal
+    // sebentar dari currentKey, supaya header lama sempat slide keluar dulu
+    // sebelum diganti header baru yang slide masuk.
+    property string headerKey: "home"
+    property real headerOffset: 0
+    property real headerOpacity: 1
+    readonly property var headerPage: root.featurePages.find(page => page.key === root.headerKey) ?? null
+    readonly property real animSpeed: Math.max(0.5, Config.options.settings.animationSpeed ?? 1)
+
+    // Lama animasi keluar sebuah halaman, untuk menyelaraskan jeda masuk.
+    function pageOutMs(key) {
+        const slot = pageStack.children.find(child => child.pageKey === key)
+        return slot ? slot.outMs : 0
+    }
+
     function goTo(key) {
         if (root.pageKeys.indexOf(key) < 0) key = "home"
+        if (key !== root.currentKey) {
+            // Dihitung sekarang, saat nilainya masih segar (contentExitMs home
+            // bergantung pada jumlah kartu yang bisa berubah).
+            root.nextDelay = root.pageOutMs(root.currentKey) + 30
+        }
         root.currentKey = key
         if (Config.options.sidebar.leftRememberPage) Config.options.sidebar.leftLastPage = key
     }
@@ -57,6 +79,27 @@ Item {
         if (root.restored && root.pageKeys.indexOf(root.currentKey) < 0) root.currentKey = "home"
     }
 
+    onCurrentKeyChanged: headerAnim.restart()
+
+    SequentialAnimation {
+        id: headerAnim
+        // Keluar: lembaran lama naik masuk ke celah.
+        NumberAnimation {
+            target: root; property: "headerOffset"
+            to: -40; duration: 120 / root.animSpeed; easing.type: Easing.InCubic
+        }
+        NumberAnimation { target: root; property: "headerOpacity"; to: 0; duration: 60 / root.animSpeed }
+        // Ganti isi saat tak terlihat, lalu lembaran baru turun keluar celah.
+        ScriptAction { script: root.headerKey = root.currentKey }
+        ParallelAnimation {
+            NumberAnimation {
+                target: root; property: "headerOffset"
+                to: 0; duration: 300 / root.animSpeed; easing.type: Easing.OutCubic
+            }
+            NumberAnimation { target: root; property: "headerOpacity"; to: 1; duration: 200 / root.animSpeed }
+        }
+    }
+
     Keys.onPressed: (event) => {
         if (event.modifiers === Qt.ControlModifier) {
             if (event.key === Qt.Key_PageDown) {
@@ -77,61 +120,70 @@ Item {
         }
         spacing: 6
 
-        RowLayout {
+        // Slot header: clip supaya judul/tombol seolah keluar dari celah.
+        Item {
             Layout.fillWidth: true
             Layout.preferredHeight: 40
-            visible: root.currentKey !== "home"
-            spacing: 8
+            clip: true
+            visible: root.headerKey !== "home"
 
-            RippleButton {
-                implicitWidth: 40
-                implicitHeight: 40
-                buttonRadius: Appearance.rounding.full
-                colBackground: Appearance.colors.colSecondaryContainer
-                colBackgroundHover: Appearance.colors.colSecondaryContainerHover
-                colRipple: Appearance.colors.colSecondaryContainerActive
-                onClicked: root.goTo("home")
-                contentItem: MaterialSymbol {
-                    anchors.centerIn: parent
-                    horizontalAlignment: Text.AlignHCenter
-                    text: "arrow_back"
-                    iconSize: Appearance.font.pixelSize.larger
-                    color: Appearance.colors.colOnSecondaryContainer
-                }
-            }
+            RowLayout {
+                width: parent.width
+                height: parent.height
+                y: root.headerOffset
+                opacity: root.headerOpacity
+                spacing: 8
 
-            MaterialSymbol {
-                text: root.currentPage?.icon ?? ""
-                fill: 1
-                iconSize: Appearance.font.pixelSize.huge
-                color: Appearance.colors.colPrimary
-            }
-
-            StyledText {
-                Layout.fillWidth: true
-                text: root.currentPage?.name ?? ""
-                font.pixelSize: Appearance.font.pixelSize.larger
-                font.weight: Font.DemiBold
-                color: Appearance.colors.colOnLayer0
-                elide: Text.ElideRight
-            }
-
-            Repeater {
-                model: root.featurePages.filter(page => page.key !== root.currentKey)
-                delegate: RippleButton {
-                    required property var modelData
-                    implicitWidth: 36
-                    implicitHeight: 36
+                RippleButton {
+                    implicitWidth: 40
+                    implicitHeight: 40
                     buttonRadius: Appearance.rounding.full
-                    onClicked: root.goTo(modelData.key)
+                    colBackground: Appearance.colors.colSecondaryContainer
+                    colBackgroundHover: Appearance.colors.colSecondaryContainerHover
+                    colRipple: Appearance.colors.colSecondaryContainerActive
+                    onClicked: root.goTo("home")
                     contentItem: MaterialSymbol {
                         anchors.centerIn: parent
                         horizontalAlignment: Text.AlignHCenter
-                        text: modelData.icon
+                        text: "arrow_back"
                         iconSize: Appearance.font.pixelSize.larger
-                        color: Appearance.colors.colSubtext
+                        color: Appearance.colors.colOnSecondaryContainer
                     }
-                    StyledToolTip { text: modelData.name }
+                }
+
+                MaterialSymbol {
+                    text: root.headerPage?.icon ?? ""
+                    fill: 1
+                    iconSize: Appearance.font.pixelSize.huge
+                    color: Appearance.colors.colPrimary
+                }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    text: root.headerPage?.name ?? ""
+                    font.pixelSize: Appearance.font.pixelSize.larger
+                    font.weight: Font.DemiBold
+                    color: Appearance.colors.colOnLayer0
+                    elide: Text.ElideRight
+                }
+
+                Repeater {
+                    model: root.featurePages.filter(page => page.key !== root.headerKey)
+                    delegate: RippleButton {
+                        required property var modelData
+                        implicitWidth: 36
+                        implicitHeight: 36
+                        buttonRadius: Appearance.rounding.full
+                        onClicked: root.goTo(modelData.key)
+                        contentItem: MaterialSymbol {
+                            anchors.centerIn: parent
+                            horizontalAlignment: Text.AlignHCenter
+                            text: modelData.icon
+                            iconSize: Appearance.font.pixelSize.larger
+                            color: Appearance.colors.colSubtext
+                        }
+                        StyledToolTip { text: modelData.name }
+                    }
                 }
             }
         }
@@ -164,15 +216,26 @@ Item {
                     readonly property bool current: root.currentKey === pageKey
                     readonly property bool isHome: pageKey === "home"
                     readonly property alias item: loader.item
+                    // Lama bounce-out halaman ini, dipakai halaman berikutnya
+                    // untuk menunda bounce-in. Home keluar lewat kartu-kartunya.
+                    readonly property int outMs: isHome
+                        ? (slot.item?.contentExitMs ?? 600)
+                        : slot.exitMs
 
                     anchors.fill: parent
                     active: current
-                    visible: current || lingering
+                    // Halaman lama tetap tampil selama bounce-out-nya; halaman
+                    // baru disembunyikan (waiting) sampai animasi itu selesai,
+                    // jadi keduanya tidak pernah tampil bersamaan.
+                    visible: (current && !waiting) || lingering
+                    enterDelay: root.nextDelay
                     minScale: isHome ? 1 : 0.9
                     travelX: 0
                     travelY: isHome ? 0 : 36
                     fade: !isHome
-                    animIndex: isHome ? 0 : 5
+                    // Tanpa stagger: keluarnya halaman lama dan masuknya yang
+                    // baru sudah diurutkan lewat enterDelay.
+                    animIndex: 0
 
                     onCurrentChanged: {
                         if (!current) {
@@ -183,7 +246,7 @@ Item {
 
                     Timer {
                         id: lingerTimer
-                        interval: 760
+                        interval: slot.outMs + 30
                         onTriggered: slot.lingering = false
                     }
 
@@ -192,7 +255,9 @@ Item {
                         anchors.fill: parent
                         active: slot.enabledPage
                         sourceComponent: slot.page
-                        onLoaded: if (slot.isHome) item.active = Qt.binding(() => slot.current)
+                        // Kartu home menunggu halaman benar-benar tampil, jadi
+                        // animasinya tidak habis di balik `waiting`.
+                        onLoaded: if (slot.isHome) item.active = Qt.binding(() => slot.current && !slot.waiting)
                     }
                 }
 
