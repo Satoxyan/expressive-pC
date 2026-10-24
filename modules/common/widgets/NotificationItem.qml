@@ -1,4 +1,3 @@
-import qs
 import qs.modules.common
 import qs.services
 import qs.modules.common.functions
@@ -11,10 +10,36 @@ import Quickshell.Services.Notifications
 Item { // Notification item area
     id: root
     property var notificationObject
+    // See NotificationGroup: the operations this card is allowed to perform,
+    // defaulting to the shell's own service.
+    property NotificationController controller: NotificationController {}
+    // Inline reply, which only some backends have: the freedesktop server has
+    // no reply channel at all, and a phone notification has one only when the
+    // posting app attached a `replyId`. Both questions are the controller's.
+    readonly property bool canReply: root.controller.supportsReply
+        && root.controller.canReply(root.notificationObject)
+    property bool replying: false
+    // The reply row's reveal, the way the card's own expansion moves: the
+    // HEIGHT on the spatial curve (elementMove, the one the card's height
+    // takes when it expands) and the contents fading on the faster effects
+    // curve (elementMoveFast, the one the expanded body fades with). One
+    // scalar for the height keeps the card's content height continuous both
+    // ways - flipping `visible` removed the row in one frame while the card
+    // was still shrinking, and the column spread the body text into the
+    // slack.
+    property real replyReveal: root.canReply && root.replying ? 1 : 0
+    Behavior on replyReveal {
+        NumberAnimation {
+            id: replyRevealAnimation
+            duration: Appearance.animation.elementMove.duration
+            easing.type: Appearance.animation.elementMove.type
+            easing.bezierCurve: Appearance.animation.elementMove.bezierCurve
+        }
+    }
     property bool expanded: false
     property bool onlyNotification: false
     property real fontSize: Appearance.font.pixelSize.small
-    property real padding: onlyNotification ? 0 : 8
+    property real padding: onlyNotification ? 0 : Appearance.spacing.space100
     property real summaryElideRatio: 0.85
 
     property real dragConfirmThreshold: 70 // Drag further to discard notification
@@ -57,7 +82,7 @@ Item { // Notification item area
             easing.bezierCurve: Appearance.animation.elementMove.bezierCurve
         }
         onFinished: () => {
-            Notifications.discardNotification(notificationObject.notificationId);
+            root.controller.discard(root.notificationObject);
         }
     }
 
@@ -105,7 +130,7 @@ Item { // Notification item area
         image: notificationObject.image
         anchors.right: background.left
         anchors.top: background.top
-        anchors.rightMargin: 10
+        anchors.rightMargin: Appearance.spacing.space150
     }
 
     Rectangle { // Background of notification item
@@ -131,7 +156,12 @@ Item { // Notification item area
             ColorUtils.transparentize(Appearance.colors.colLayer3)
 
         implicitHeight: expanded ? (contentColumn.implicitHeight + padding * 2) : summaryRow.implicitHeight
+        // Stands down while the reply row is revealing: that reveal is
+        // already continuous, and a second easing chasing it left the card
+        // taller than its content for a beat - slack the column spread the
+        // body text into.
         Behavior on implicitHeight {
+            enabled: !replyRevealAnimation.running
             animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
         }
 
@@ -139,7 +169,7 @@ Item { // Notification item area
             id: contentColumn
             anchors.fill: parent
             anchors.margins: expanded ? root.padding : 0
-            spacing: 3
+            spacing: Appearance.spacing.space50
 
             Behavior on anchors.margins {
                 animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
@@ -200,10 +230,10 @@ Item { // Notification item area
                             `${NotificationUtils.processNotificationBody(notificationObject.body, notificationObject.appName || notificationObject.summary).replace(/\n/g, "<br/>")}`
                     }
 
-                    onLinkActivated: (link) => {
-                        Qt.openUrlExternally(link)
-                        GlobalStates.sidebarRightOpen = false
-                    }
+                    // Which sidebar (if any) closes behind a followed link
+                    // is the backend's to say: the shell's cards sit in the
+                    // right sidebar, the phone's in the left.
+                    onLinkActivated: link => root.controller.openLink(link)
                     
                     PointingHandLinkHover {}
                 }
@@ -246,19 +276,25 @@ Item { // Notification item area
                         RowLayout {
                             id: actionRowLayout
                             Layout.alignment: Qt.AlignBottom
+                            // As wide as the card when the chips fit, their
+                            // own width when they do not (then the flickable
+                            // scrolls). The chips share the room through
+                            // fillWidth; the old arithmetic split the width
+                            // in two by hand and put a third chip - Reply -
+                            // off the edge.
+                            width: Math.max(implicitWidth, actionsFlickable.width)
 
                             NotificationActionButton {
                                 Layout.fillWidth: true
                                 buttonText: Translation.tr("Close")
                                 urgency: notificationObject.urgency
-                                implicitWidth: (notificationObject.actions.length == 0) ? ((actionsFlickable.width - actionRowLayout.spacing) / 2) : 
-                                    (contentItem.implicitWidth + leftPadding + rightPadding)
 
                                 onClicked: {
                                     root.destroyWithAnimation()
                                 }
 
                                 contentItem: MaterialSymbol {
+                                    verticalAlignment: Text.AlignVCenter
                                     iconSize: Appearance.font.pixelSize.larger
                                     horizontalAlignment: Text.AlignHCenter
                                     color: (notificationObject.urgency == NotificationUrgency.Critical) ? 
@@ -269,7 +305,7 @@ Item { // Notification item area
 
                             Repeater {
                                 id: actionRepeater
-                                model: notificationObject.actions
+                                model: root.controller.actionsOf(root.notificationObject)
                                 NotificationActionButton {
                                     id: notifAction
                                     required property var modelData
@@ -277,16 +313,36 @@ Item { // Notification item area
                                     buttonText: modelData.text
                                     urgency: notificationObject.urgency
                                     onClicked: {
-                                        Notifications.attemptInvokeAction(notificationObject.notificationId, modelData.identifier);
+                                        root.controller.invokeAction(root.notificationObject, modelData);
                                     }
+                                }
+                            }
+
+                            NotificationActionButton {
+                                id: replyToggle
+                                visible: root.canReply
+                                Layout.fillWidth: true
+                                urgency: notificationObject.urgency
+                                toggled: root.replying
+                                onClicked: root.replying = !root.replying
+
+                                contentItem: MaterialSymbol {
+                                    anchors.centerIn: parent
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: "reply"
+                                    iconSize: Appearance.font.pixelSize.larger
+                                    color: replyToggle.colText
+                                }
+
+                                StyledToolTip {
+                                    text: Translation.tr("Reply")
                                 }
                             }
 
                             NotificationActionButton {
                                 Layout.fillWidth: true
                                 urgency: notificationObject.urgency
-                                implicitWidth: (notificationObject.actions.length == 0) ? ((actionsFlickable.width - actionRowLayout.spacing) / 2) : 
-                                    (contentItem.implicitWidth + leftPadding + rightPadding)
 
                                 onClicked: {
                                     Quickshell.clipboardText = notificationObject.body
@@ -304,6 +360,7 @@ Item { // Notification item area
                                 }
 
                                 contentItem: MaterialSymbol {
+                                    verticalAlignment: Text.AlignVCenter
                                     id: copyIcon
                                     iconSize: Appearance.font.pixelSize.larger
                                     horizontalAlignment: Text.AlignHCenter
@@ -314,6 +371,70 @@ Item { // Notification item area
                             }
                             
                         }
+                    }
+                }
+
+                // The reply field, under the actions rather than among them:
+                // it is a text entry and they are chips, and it is present
+                // only while the user is actually replying.
+                Item {
+                    Layout.fillWidth: true
+                    // Always laid out, never toggled: flipping `visible` made
+                    // the column add or drop its spacing in one frame, a 6px
+                    // snap at each end of an otherwise eased reveal. The
+                    // spacing rides the reveal instead, as a margin that
+                    // cancels it while the row is away.
+                    visible: root.canReply
+                    Layout.topMargin: -(parent?.spacing ?? 0) * (1 - root.replyReveal)
+                    opacity: root.replying ? 1 : 0
+                    Behavior on opacity {
+                        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                    }
+                    clip: true
+                    implicitHeight: replyRow.implicitHeight * root.replyReveal
+                    RowLayout {
+                    id: replyRow
+                    anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+                    spacing: Appearance.spacing.space50
+
+                    ToolbarTextField {
+                        id: replyField
+                        Layout.fillWidth: true
+                        // The chip height, with padding that fits it: the
+                        // field's default 12px padding around a 14px font
+                        // wants 38, and squeezed to 34 it drew its text past
+                        // the top edge.
+                        implicitHeight: 34
+                        padding: Appearance.spacing.space100
+                        colBackground: Appearance.colors.colLayer3
+                        placeholderText: Translation.tr("Reply…")
+                        onAccepted: replySendButton.send()
+                    }
+
+                    NotificationActionButton {
+                        id: replySendButton
+                        urgency: notificationObject.urgency
+                        enabled: replyField.text.length > 0
+
+                        function send(): void {
+                            if (replyField.text.length === 0)
+                                return;
+                            root.controller.reply(root.notificationObject, replyField.text);
+                            replyField.text = "";
+                            root.replying = false;
+                        }
+
+                        onClicked: replySendButton.send()
+
+                        contentItem: MaterialSymbol {
+                            anchors.centerIn: parent
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            text: "send"
+                            iconSize: Appearance.font.pixelSize.larger
+                            color: Appearance.colors.colOnLayer2
+                        }
+                    }
                     }
                 }
             }

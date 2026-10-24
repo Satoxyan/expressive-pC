@@ -1,15 +1,29 @@
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
+import qs.modules.ii.phone
 import QtQuick
-import QtQuick.Layouts
 
 /**
  * The phone's mirrored notifications, grouped by the app that posted them.
  *
- * This is a first-pass list: the shared NotificationListView in this fork
- * predates the controller seam the upstream Phone tab uses, so the cards are
- * drawn here from PhoneNotifications' card fields. Polish later.
+ * This is the shell's own notification list (modules/common/widgets/
+ * NotificationListView.qml) pointed at a different backend, and nothing
+ * else. It used to be 429 lines that re-spelled the shared card from the
+ * inside: the same 70px drag threshold, the same 0.3/0.1 neighbour lean, the
+ * same dismiss animation - and then drifted from it, so a group of one drew
+ * an expand chevron that expanded nothing while the original knew to hide it.
+ *
+ * What differs between the two backends is not a card. A phone notification
+ * is a public id on a KDE Connect leaf, dismissed there, its actions are bare
+ * Android keys, and it can be replied to inline when the posting app attached
+ * a `replyId`. All of that lives in PhoneNotificationController; the service
+ * carries each notification in the card's own vocabulary as well as the
+ * daemon's.
+ *
+ * The empty state says WHY there is nothing, down to the missing busctl,
+ * because "No notifications" over a dead daemon is a lie the user cannot
+ * see through.
  */
 Item {
     id: root
@@ -35,6 +49,7 @@ Item {
 
     PagePlaceholder {
         shown: root.count === 0
+        dropIconWhenCramped: true
         icon: PhoneConnect.devices.length === 0 ? "mobile_off" : "notifications_off"
         shape: MaterialShape.Shape.Ghostish
         title: root.emptyTitle
@@ -42,69 +57,11 @@ Item {
         descriptionHorizontalAlignment: Text.AlignHCenter
     }
 
-    ListView {
+    NotificationListView {
+        id: listView
         anchors.fill: parent
         visible: root.count > 0
         clip: true
-        spacing: Appearance.spacing.space75
-        model: PhoneNotifications.notifications
-
-        delegate: Rectangle {
-            id: card
-            required property var modelData
-            required property int index
-
-            width: ListView.view.width
-            implicitHeight: cardColumn.implicitHeight + Appearance.spacing.space200
-            radius: Appearance.rounding.normal
-            color: Appearance.colors.colLayer2
-
-            ColumnLayout {
-                id: cardColumn
-                anchors {
-                    left: parent.left
-                    right: parent.right
-                    top: parent.top
-                    margins: Appearance.spacing.space100
-                }
-                spacing: Appearance.spacing.space25
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: Appearance.spacing.space50
-
-                    StyledText {
-                        Layout.fillWidth: true
-                        text: card.modelData.appName ?? ""
-                        font.pixelSize: Appearance.font.pixelSize.smaller
-                        color: Appearance.colors.colSubtext
-                        elide: Text.ElideRight
-                    }
-
-                    IconButton {
-                        buttonSize: 26
-                        buttonIcon: "close"
-                        tooltip: Translation.tr("Dismiss")
-                        onClicked: PhoneNotifications.dismiss(card.modelData.publicId)
-                    }
-                }
-
-                StyledText {
-                    Layout.fillWidth: true
-                    visible: text.length > 0
-                    text: card.modelData.title ?? ""
-                    font.weight: Font.DemiBold
-                    elide: Text.ElideRight
-                }
-
-                StyledText {
-                    Layout.fillWidth: true
-                    visible: text.length > 0
-                    text: card.modelData.text ?? ""
-                    color: Appearance.colors.colSubtext
-                    wrapMode: Text.Wrap
-                }
-            }
-        }
+        controller: PhoneNotificationController {}
     }
 }

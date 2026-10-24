@@ -13,12 +13,23 @@ import Quickshell.Services.Notifications
 MouseArea { // Notification group area
     id: root
     property var notificationGroup
-    property var notifications: notificationGroup?.notifications ?? []
+    // Which backend this card is drawn for. The default is the shell's own
+    // freedesktop service, so a call site that says nothing is unchanged.
+    property NotificationController controller: NotificationController {}
+    // The group as last SEEN: on the way out the lookup behind
+    // `notificationGroup` goes empty while the delegate is still sliding
+    // (the list keeps it for the remove transition), and a card that read
+    // the live lookup collapsed to a 24 px stub with no text and changed
+    // its frame key mid-slide - the sink into the band became a jump.
+    property var shownGroup: notificationGroup
+    onNotificationGroupChanged: if (root.notificationGroup) root.shownGroup = root.notificationGroup
+    property var notifications: shownGroup?.notifications ?? []
     property int notificationCount: notifications.length
     property bool multipleNotifications: notificationCount > 1
     property bool expanded: false
     property bool popup: false
-    property real padding: 10
+
+    property real padding: Appearance.spacing.space150
     implicitHeight: background.implicitHeight
 
     property real dragConfirmThreshold: 70 // Drag further to discard notification
@@ -33,26 +44,58 @@ MouseArea { // Notification group area
         dragIndexDiff == 2 ? (parentDragDistance * 0.1) : 0
 
     function destroyWithAnimation(left = false) {
+        root.leaveWithAnimation(left, null);
+    }
+    // Slides the card out - toward the left, or the right - and then runs
+    // `then`, or discards without one. A fused card leaves INTO its band
+    // (frame-pin-grammar.md): the same slide, aimed at the band's side.
+    function leaveWithAnimation(left, then): void {
         root.qmlParent.resetDrag()
         background.anchors.leftMargin = background.anchors.leftMargin; // Break binding
         destroyAnimation.left = left;
+        destroyAnimation.then = then ?? null;
         destroyAnimation.running = true;
+    }
+    readonly property bool leavesLeft: false
+    // This fork has no frame band to land on, so dismissal is immediate.
+    function dismissWithAnimation(then): void {
+        if (then) then();
+    }
+    function timeOutWithAnimation(): void {
+        root.dismissWithAnimation(() => root.notifications.forEach(notif => root.controller.timeout(notif)));
     }
 
     hoverEnabled: true
+
+    // Grace period before a popup starts hiding after the mouse leaves, so a
+    // brief unfocus (e.g. moving the cursor onto the notification, or a 50ms
+    // flicker) doesn't instantly dismiss it. Re-entering cancels the pending
+    // hide. See issue #28.
+    Timer {
+        id: leaveHideTimer
+        interval: Config.options?.notifications?.hideDelayOnLeave ?? 200
+        onTriggered: {
+            if (root.containsMouse) return;
+            root.timeOutWithAnimation();
+        }
+    }
+
     onContainsMouseChanged: {
         if (!root.popup) return;
-        if (root.containsMouse) root.notifications.forEach(notif => {
-            Notifications.cancelTimeout(notif.notificationId);
-        });
-        else root.notifications.forEach(notif => {
-            Notifications.timeoutNotification(notif.notificationId);
-        });
+        if (root.containsMouse) {
+            leaveHideTimer.stop();
+            root.notifications.forEach(notif => {
+                root.controller.cancelTimeout(notif);
+            });
+        } else {
+            leaveHideTimer.restart();
+        }
     }
 
     SequentialAnimation { // Drag finish animation
         id: destroyAnimation
         property bool left: true
+        property var then: null
         running: false
 
         NumberAnimation {
@@ -64,10 +107,17 @@ MouseArea { // Notification group area
             easing.bezierCurve: Appearance.animation.elementMove.bezierCurve
         }
         onFinished: () => {
-            // One call for the whole group, so the list is rewritten and the file
-            // saved once instead of once per notification.
-            const ids = root.notifications.map((notif) => notif.notificationId);
-            Qt.callLater(() => Notifications.discardNotifications(ids));
+            if (destroyAnimation.then) {
+                const then = destroyAnimation.then;
+                destroyAnimation.then = null;
+                Qt.callLater(then);
+                return;
+            }
+            root.notifications.forEach((notif) => {
+                Qt.callLater(() => {
+                    root.controller.discard(notif);
+                });
+            });
         }
     }
 
@@ -84,8 +134,8 @@ MouseArea { // Notification group area
         automaticallyReset: false
         acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
 
-        onPressed: {
-            if (mouse.button === Qt.RightButton) 
+        onPressed: mouse => {
+            if (mouse.button === Qt.RightButton)
                 root.toggleExpanded();
         }
 
@@ -112,26 +162,28 @@ MouseArea { // Notification group area
         }
     }
 
+    // The painted card, published so the popup window can scope the
+    // compositor's blur to the cards and leave the gaps - and the shadow
+    // below - alone. See WindowBlurRegion in NotificationPopup.qml.
+    readonly property Item blurItem: background
+
     StyledRectangularShadow {
         target: background
         visible: popup
     }
     Rectangle { // Background of the notification
         id: background
-
-        WindowGlass {
-            anchors.fill: parent
-            glassEnabled: root.popup && (parent?.color.a ?? 0) > 0
-            cardRadius: parent?.radius ?? 0
-            tint: parent?.color ?? 'transparent'
-        }
         anchors.left: parent.left
         width: parent.width
+        // Stood down while the frame paints the plate: the same silhouette
+        // in the same colour, and a translucent fill drawn twice is darker.
         color: popup ? Appearance.colors.colBackgroundSurfaceContainer : Appearance.colors.colLayer2
         radius: Appearance.rounding.normal
         anchors.leftMargin: root.xOffset
 
         Behavior on anchors.leftMargin {
+            // Off while the join moves the card: a Behavior whose target
+            // moves every frame restarts every frame and never ticks.
             enabled: !dragManager.dragging
             NumberAnimation {
                 duration: Appearance.animation.elementMove.duration
@@ -156,14 +208,14 @@ MouseArea { // Notification group area
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.margins: root.padding
-            spacing: 10
+            spacing: Appearance.spacing.space150
 
             NotificationAppIcon { // Icons
                 Layout.alignment: Qt.AlignTop
                 Layout.fillWidth: false
-                image: root?.multipleNotifications ? "" : notificationGroup?.notifications[0]?.image ?? ""
-                appIcon: root.notificationGroup?.appIcon
-                summary: root.notificationGroup?.notifications[root.notificationCount - 1]?.summary
+                image: root?.multipleNotifications ? "" : shownGroup?.notifications[0]?.image ?? ""
+                appIcon: root.shownGroup?.appIcon
+                summary: root.shownGroup?.notifications[root.notificationCount - 1]?.summary
                 urgency: root.notifications.some(n => n.urgency === NotificationUrgency.Critical.toString()) ? 
                     NotificationUrgency.Critical : NotificationUrgency.Normal
             }
@@ -171,7 +223,7 @@ MouseArea { // Notification group area
             ColumnLayout { // Content
                 Layout.fillWidth: true
                 spacing: expanded ? (root.multipleNotifications ? 
-                    (notificationGroup?.notifications[root.notificationCount - 1].image != "") ? 35 : 
+                    (shownGroup?.notifications[root.notificationCount - 1].image != "") ? 35 : 
                     5 : 0) : 0
                 // spacing: 00
                 Behavior on spacing {
@@ -191,14 +243,14 @@ MouseArea { // Notification group area
                         anchors.left: parent.left
                         anchors.right: expandButton.left
                         anchors.verticalCenter: parent.verticalCenter
-                        spacing: 5
+                        spacing: Appearance.spacing.space100
                         StyledText {
                             id: appName
                             elide: Text.ElideRight
                             Layout.fillWidth: true
                             text: (topRow.showAppName ?
-                                notificationGroup?.appName :
-                                notificationGroup?.notifications[0]?.summary) || ""
+                                shownGroup?.appName :
+                                shownGroup?.notifications[0]?.summary) || ""
                             font.pixelSize: topRow.showAppName ?
                                 topRow.fontSize :
                                 Appearance.font.pixelSize.small
@@ -209,9 +261,9 @@ MouseArea { // Notification group area
                         StyledText {
                             id: timeText
                             // Layout.fillWidth: true
-                            Layout.rightMargin: 10
+                            Layout.rightMargin: Appearance.spacing.space150
                             horizontalAlignment: Text.AlignLeft
-                            text: NotificationUtils.getFriendlyNotifTimeString(notificationGroup?.time)
+                            text: NotificationUtils.getFriendlyNotifTimeString(shownGroup?.time)
                             font.pixelSize: topRow.fontSize
                             color: Appearance.colors.colSubtext
                         }
@@ -236,7 +288,7 @@ MouseArea { // Notification group area
                     id: notificationsColumn
                     implicitHeight: contentHeight
                     Layout.fillWidth: true
-                    spacing: expanded ? 5 : 3
+                    spacing: expanded ? Appearance.spacing.space50 : Appearance.spacing.space50
                     // clip: true
                     interactive: false
                     Behavior on spacing {
@@ -250,6 +302,7 @@ MouseArea { // Notification group area
                         required property int index
                         required property var modelData
                         notificationObject: modelData
+                        controller: root.controller
                         expanded: root.expanded
                         onlyNotification: (root.notificationCount === 1)
                         opacity: (!root.expanded && index == 1 && root.notificationCount > 2) ? 0.5 : 1

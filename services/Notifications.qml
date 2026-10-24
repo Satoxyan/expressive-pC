@@ -79,6 +79,22 @@ Singleton {
     property list<Notif> list: []
     property var popupList: list.filter((notif) => notif.popup);
     property bool popupInhibited: (GlobalStates?.sidebarRightOpen ?? false) || silent
+    // KDE Connect's desktop notifications are the daemon's copy of what the
+    // Phone tab shows. They belong to that tab: keep them out of this list
+    // (and so out of the popup and the right sidebar).
+    readonly property bool phoneNotificationsOwnedByTab: Config.options.sidebar?.phone?.enable ?? true
+    function isPhoneOwnedNotification(notif) {
+        return root.phoneNotificationsOwnedByTab
+            && PhoneNotifications.mirrorsAppName(notif?.appName, PhoneConnect.devices.filter(d => d.paired).map(d => d.name));
+    }
+    function prunePhoneOwnedNotifications() {
+        if (!root.phoneNotificationsOwnedByTab) return;
+        const remaining = root.list.filter((notif) => !root.isPhoneOwnedNotification(notif));
+        if (remaining.length === root.list.length) return;
+        root.list = remaining;
+        notifFileView.setText(stringifyList(root.list));
+    }
+    onPhoneNotificationsOwnedByTabChanged: root.prunePhoneOwnedNotifications()
     property var latestTimeForApp: ({})
     Component {
         id: notifComponent
@@ -160,6 +176,9 @@ Singleton {
         persistenceSupported: true
 
         onNotification: (notification) => {
+            // Ignored, not dismissed: dismissing would close it on the phone
+            // too. It expires on its own; the Phone tab reads it from the daemon.
+            if (root.isPhoneOwnedNotification(notification)) return;
             notification.tracked = true
             const newNotifObject = notifComponent.createObject(root, {
                 "notificationId": notification.id + root.idOffset,
@@ -280,7 +299,9 @@ Singleton {
         onLoaded: {
             try {
                 const fileContents = notifFileView.text()
-                root.list = JSON.parse(fileContents).map((notif) => {
+                const stored = JSON.parse(fileContents)
+                const kept = stored.filter((notif) => !root.isPhoneOwnedNotification(notif))
+                root.list = kept.map((notif) => {
                     return notifComponent.createObject(root, {
                         "notificationId": notif.notificationId,
                         "actions": [], // Notification actions are meaningless if they're not tracked by the server or the sender is dead
@@ -293,6 +314,8 @@ Singleton {
                         "urgency": notif.urgency,
                     });
                 });
+                if (kept.length !== stored.length)
+                    notifFileView.setText(stringifyList(root.list));
                 // Find largest notificationId
                 let maxId = 0
                 root.list.forEach((notif) => {

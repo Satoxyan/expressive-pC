@@ -174,7 +174,7 @@ Singleton {
     function mirrorsAppName(appName: var, deviceNames: var): bool {
         const lower = String(appName ?? "").toLowerCase();
         if (lower === "") return false;
-        if (["kdeconnect", "kde connect", "org.kde.kdeconnect"].includes(lower)) return true;
+        if (["kdeconnect", "kde connect", "org.kde.kdeconnect", "valent"].includes(lower)) return true;
         return (deviceNames ?? []).some(name => String(name ?? "").toLowerCase() === lower);
     }
 

@@ -41,6 +41,7 @@ Item {
         case "translator": return { shape: MaterialShape.Shape.Clover4Leaf, container: Appearance.colors.colSecondaryContainer, onContainer: Appearance.colors.colOnSecondaryContainer, accent: Appearance.colors.colSecondary, onAccent: Appearance.colors.colOnSecondary };
         case "media": return { shape: MaterialShape.Shape.Sunny, container: Appearance.colors.colPrimaryContainer, onContainer: Appearance.colors.colOnPrimaryContainer, accent: Appearance.colors.colPrimary, onAccent: Appearance.colors.colOnPrimary };
         case "sports": return { shape: MaterialShape.Shape.Flower, container: Appearance.colors.colTertiaryContainer, onContainer: Appearance.colors.colOnTertiaryContainer, accent: Appearance.colors.colTertiary, onAccent: Appearance.colors.colOnTertiary };
+        case "phone": return { shape: MaterialShape.Shape.Cookie6Sided, container: Appearance.colors.colPrimaryContainer, onContainer: Appearance.colors.colOnPrimaryContainer, accent: Appearance.colors.colPrimary, onAccent: Appearance.colors.colOnPrimary };
         default: return { shape: MaterialShape.Shape.Cookie6Sided, container: Appearance.colors.colSecondaryContainer, onContainer: Appearance.colors.colOnSecondaryContainer, accent: Appearance.colors.colSecondary, onAccent: Appearance.colors.colOnSecondary };
         }
     }

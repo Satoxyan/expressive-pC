@@ -26,9 +26,9 @@ RippleButton { // Expand button
         RowLayout {
             id: contentRow
             anchors.centerIn: parent
-            spacing: 3
+            spacing: Appearance.spacing.space50
             StyledText {
-                Layout.leftMargin: 4
+                Layout.leftMargin: Appearance.spacing.space50
                 visible: root.count > 1
                 text: root.count
                 font.pixelSize: root.fontSize

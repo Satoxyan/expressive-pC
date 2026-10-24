@@ -12,6 +12,7 @@ ListView {
     property real removeOvershoot: 20 // Account for gaps and bouncy animations
     property int dragIndex: -1
     property real dragDistance: 0
+    property bool removeToLeft: false
     property bool popin: true
     property bool animateAppearance: true
     property bool animateMovement: false
@@ -95,7 +96,7 @@ ListView {
         animations: animateAppearance ? [
             Appearance?.animation.elementMove.numberAnimation.createObject(this, {
                 property: "x",
-                to: root.width + root.removeOvershoot,
+                to: root.removeToLeft ? -(root.width + root.removeOvershoot) : root.width + root.removeOvershoot,
             }),
             Appearance?.animation.elementMove.numberAnimation.createObject(this, {
                 property: "opacity",
