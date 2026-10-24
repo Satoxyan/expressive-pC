@@ -21,11 +21,30 @@ Item {
     // =========================================================
     // Inner Flickable
     // =========================================================
-    StyledFlickable {
+    Flickable {
         id: flickable
         anchors.fill: parent
         contentHeight: contentColumn.implicitHeight + root.bottomContentPadding
-        onTouchpadScrollingChanged: if (touchpadScrolling) _scrollAnim.stop()
+        maximumFlickVelocity: 3500
+        boundsBehavior: Flickable.StopAtBounds
+
+        ScrollBar.vertical: StyledScrollBar {}
+
+        InertialScrollEngine {
+            id: scrollEngine
+            flickable: flickable
+        }
+
+        // Runs before the Flickable's C++ wheel handling, so wheel notches and
+        // touchpad gestures share the dashboard's inertial feel.
+        WheelHandler {
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            onWheel: event => {
+                event.accepted = false;
+                _scrollAnim.stop();
+                scrollEngine.handleWheel(event);
+            }
+        }
 
         ColumnLayout {
             id: contentColumn
