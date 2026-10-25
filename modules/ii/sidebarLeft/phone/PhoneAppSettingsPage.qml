@@ -42,6 +42,8 @@ PhoneScrcpySettings {
     // mirrored off the phone's own screen.
     followOrientationAvailable: root.appDisplaySize.length > 0
         && (root.appConfig?.videoEnabled ?? true)
+    // Auto gets its own toggle above the fixed rotation row on this page.
+    separateAutoRotationToggle: true
 
     introText: Translation.tr("These are scrcpy launch flags for App Mode. A change applies to the next app you start; an app that is already open keeps the flags it started with.")
     noAdbText: Translation.tr("No phone over ADB. App Mode cannot start an app until the link is up; the resolution default and the encoder list also need it.")

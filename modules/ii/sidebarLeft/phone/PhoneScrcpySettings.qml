@@ -48,6 +48,14 @@ PhoneSubPage {
     // Whose turn the hint describes: the mirror follows the phone's screen,
     // App Mode follows its app's virtual display.
     property bool followPhoneOrientation: false
+    // App Mode puts Auto in a toggle of its own above the fixed Rotation row;
+    // the mirror keeps it inside the selection array.
+    property bool separateAutoRotationToggle: false
+    readonly property bool autoRotation: Number(root.scrcpyConfig?.captureOrientation ?? 0) === -1
+    // Auto owns the picture while it is on: the fixed Rotation row stays in
+    // place but fades out and stops taking input until the toggle goes off.
+    readonly property bool rotationLocked: root.separateAutoRotationToggle
+        && root.followOrientationAvailable && root.autoRotation
 
     // The service owns the write and whatever follows from it, so the page
     // never touches the config itself.
@@ -349,15 +357,35 @@ PhoneSubPage {
             shape: MaterialShape.Shape.Pill
             title: Translation.tr("Orientation")
 
+            // A box of its own above Rotation when the page separates Auto
+            // from the fixed choices.
+            GroupedList {
+                visible: root.separateAutoRotationToggle && root.followOrientationAvailable
+
+                ConfigSwitch {
+                    text: Translation.tr("Auto rotation")
+                    buttonIcon: "autorenew"
+                    infoText: Translation.tr("On: the virtual display keeps the Resolution size and the window turns with the app.\nOff: the picture uses the fixed Rotation below.\nThe virtual display follows the window size instead, so resizing re-lays out the app.")
+                    checked: root.autoRotation
+                    selfToggle: false
+                    onToggleRequested: root.settingChanged("captureOrientation", root.autoRotation ? 0 : -1)
+                }
+            }
+
             GroupedList {
                 PhoneConfigSelectionArray {
                     text: Translation.tr("Rotation")
                     icon: "screen_rotation"
-                    infoText: root.followOrientationAvailable
-                        ? (root.followPhoneOrientation
-                            ? Translation.tr("Auto turns the scrcpy window between portrait and landscape to match the phone's screen. A fixed value rotates the picture and holds the window still.")
-                            : Translation.tr("Auto turns the scrcpy window between portrait and landscape to match the app; Resolution sets its starting shape. A fixed value rotates the picture and holds the window still."))
-                        : Translation.tr("Clockwise rotation scrcpy applies to the picture. 0° mirrors the phone as it stands.")
+                    infoText: root.separateAutoRotationToggle && root.followOrientationAvailable
+                        ? (root.rotationLocked
+                            ? Translation.tr("Auto rotation is on, so the picture is not rotated.\nTurn the toggle above off to pick a fixed rotation.")
+                            : Translation.tr("Clockwise rotation applied to the picture."))
+                        : root.followOrientationAvailable
+                            ? (root.followPhoneOrientation
+                                ? Translation.tr("Auto turns the scrcpy window between portrait and landscape to match the phone's screen.\nA fixed value rotates the picture and holds the window still.")
+                                : Translation.tr("Auto turns the scrcpy window between portrait and landscape to match the app; Resolution sets its starting shape.\nA fixed value rotates the picture and holds the window still."))
+                            : Translation.tr("Clockwise rotation scrcpy applies to the picture. 0° mirrors the phone as it stands.")
+                    dimmed: root.rotationLocked
                     currentValue: root.orientationValue
                     onSelected: value => root.settingChanged("captureOrientation", Number(value))
                     options: {
@@ -367,6 +395,8 @@ PhoneSubPage {
                             { displayName: "180°", value: 180, icon: "screen_rotation" },
                             { displayName: "270°", value: 270, icon: "screen_rotation" }
                         ];
+                        if (root.separateAutoRotationToggle)
+                            return fixed;
                         return root.followOrientationAvailable
                             ? [{ displayName: Translation.tr("Auto"), value: -1, icon: "autorenew" }].concat(fixed)
                             : fixed;

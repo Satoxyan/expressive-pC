@@ -18,6 +18,9 @@ ColumnLayout {
     property string infoText: ""
     property var options: []
     property var currentValue: null
+    // The page fades this row out and stops the chips from taking input while
+    // another control (Auto rotation) owns the value; the hint stays readable.
+    property bool dimmed: false
 
     signal selected(var newValue)
 
@@ -34,18 +37,19 @@ ColumnLayout {
         OptionalMaterialSymbol {
             icon: root.icon
             iconColor: Appearance.colors.colOnSecondaryContainer
-            opacity: root.enabled ? 1 : 0.4
+            opacity: (root.enabled && !root.dimmed) ? 1 : 0.4
         }
 
         StyledText {
             text: root.text
             color: Appearance.colors.colOnSecondaryContainer
-            opacity: root.enabled ? 1 : 0.4
+            opacity: (root.enabled && !root.dimmed) ? 1 : 0.4
         }
 
         InfoTooltipIcon {
             visible: root.infoText !== ""
             tooltipText: root.infoText
+            opacity: root.dimmed ? 0.4 : 1
         }
 
         // Keeps the hint right beside the title instead of at the far edge.
@@ -60,6 +64,7 @@ ColumnLayout {
         id: chipsHost
         Layout.fillWidth: true
         implicitHeight: totalHeight
+        opacity: root.dimmed ? 0.4 : 1
 
         property real totalHeight: 0
         property real chipSpacing: 2
@@ -122,6 +127,7 @@ ColumnLayout {
                 buttonIcon: modelData.icon || ""
                 buttonText: modelData.displayName ?? ""
                 toggled: root.currentValue == modelData.value
+                enabled: !root.dimmed
                 leftmost: false
                 rightmost: false
                 baseWidth: contentItem.implicitWidth + horizontalPadding * 2
