@@ -238,7 +238,9 @@ Singleton {
                     property string videoCodec: "h264"
                     // "" lets scrcpy pick; the names come from the phone.
                     property string videoEncoder: ""
-                    // Clockwise capture rotation: 0 | 90 | 180 | 270.
+                    // Clockwise capture rotation: 0 | 90 | 180 | 270. -1
+                    // follows the phone: the supervisor resizes the window
+                    // when the screen turns.
                     property int captureOrientation: 0
                     property bool useWireless: false
                     property bool autoWirelessIp: true

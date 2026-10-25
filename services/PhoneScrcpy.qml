@@ -157,8 +157,8 @@ Singleton {
         if (codec.length > 0) args.push("--video-codec=" + codec);
         const encoder = String(o.videoEncoder ?? "").trim();
         if (encoder.length > 0) args.push("--video-encoder=" + encoder);
-        // No flag at all is Auto (-1): scrcpy leaves the picture upright and
-        // a followed virtual display forwards its own turn unrotated.
+        // No flag at all is Auto (-1): scrcpy applies no static rotation, and
+        // a followed session forwards the display's own turn.
         const orientation = Number(o.captureOrientation);
         if (orientation === 0 || orientation === 90 || orientation === 180 || orientation === 270)
             args.push("--capture-orientation=" + orientation);
@@ -176,6 +176,9 @@ Singleton {
         if (o.showTouches) args.push("--show-touches");
         if (o.fullscreen) args.push("--fullscreen");
         if (o.alwaysOnTop) args.push("--always-on-top");
+        // A followed window is resized by the compositor, which the aspect
+        // lock would fight; same trade as App Mode's Auto.
+        if (root.mirrorFollowsOrientation(o)) args.push("--no-window-aspect-ratio-lock");
         return args.concat(root.videoArgs(o));
     }
 
@@ -202,14 +205,24 @@ Singleton {
         };
     }
 
-    // Auto rotation only exists for a virtual display: the app can ask THAT
-    // display to turn. Without one it runs on the phone's own screen, which
-    // turns on its own, and the supervisor has no display of its own to
-    // watch.
+    // App Mode's Auto rotation only exists with a virtual display: the
+    // supervisor watches THAT display and applies the orientation policy.
+    // Without one the app runs on the phone's own screen and the page does
+    // not offer Auto. The mirror has its own follow path below, on display 0.
     function appFollowsOrientation(appOpts: var): bool {
         const o = appOpts ?? {};
         return Number(o.captureOrientation) === -1
             && o.flexDisplay === true && o.videoEnabled !== false;
+    }
+
+    // The mirror can follow the phone's own screen (display 0), whose logical
+    // size swaps when the phone turns. Auto drops the fixed picture flag and
+    // asks the supervisor to resize the window; a fullscreen window already
+    // fills the screen, so there is nothing to follow.
+    function mirrorFollowsOrientation(opts: var): bool {
+        const o = opts ?? {};
+        return Number(o.captureOrientation) === -1
+            && o.videoEnabled !== false && o.fullscreen !== true;
     }
 
     // App mode: one app on a virtual display of its own when flexDisplay is
@@ -474,10 +487,12 @@ Singleton {
         root.mirrorLaunching = true;
         root.lastError = "";
         root.mirrorError = "";
+        const opts = Config.options.phone.scrcpy;
         root.send({
             cmd: "launch", id: "mirror", type: "mirror",
             target_args: root.scrcpyTarget(),
-            extra_args: root.mirrorArgs(Config.options.phone.scrcpy)
+            extra_args: root.mirrorArgs(opts),
+            follow_orientation: root.mirrorFollowsOrientation(opts)
         });
     }
 

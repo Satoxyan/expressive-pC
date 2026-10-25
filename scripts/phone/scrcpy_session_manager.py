@@ -42,12 +42,14 @@ virtual display is created with `--new-display`; scrcpy logs its id on
 stdout as "New display: WxH/DPI (id=N)". For a followed session this
 supervisor tells the phone to honour orientation requests on THAT display
 (`wm set-ignore-orientation-request -d N 0`), then watches the display's
-logical size and resizes the scrcpy window to the new shape. Hyprland
-ignores SDL's own resize, so the window is resized through the compositor,
-preserving the window's current scale and fitting within the usable screen
-minus scrcpy's own 96 px margins. A fixed rotation instead pins the display
-(`... 1`) so the picture flag is the only rotation applied. Nothing is
-polled or changed for a session without a virtual display.
+logical size and resizes the scrcpy window to the new shape. The mirror can
+follow too: it has no virtual display, so the display watched is the phone's
+own (id 0) and no `wm` policy is applied - the phone's rotation stands and
+only the window follows it. Hyprland ignores SDL's own resize, so the window
+is resized through the compositor, preserving the window's current scale and
+fitting within the usable screen minus scrcpy's own 96 px margins. A fixed
+rotation instead pins the virtual display (`... 1`) so the picture flag is
+the only rotation applied.
 
 stdin closing means the shell went away; every session is stopped then, so a
 shell restart never leaves headless scrcpy windows behind.
@@ -255,9 +257,10 @@ class ScrcpySessionManager:
         self.emit_lock = threading.Lock()
         self.processes = {}     # session_id -> subprocess.Popen
         self.session_info = {}  # session_id -> {id, type, title, pid, startedAt, ...}
-        # Sessions whose virtual display follows the app: session_id ->
-        # {display_id, title, args, size}. `size` is the last logical size
-        # the window was fitted to (None until the first reading).
+        # Sessions whose window follows a display: App Mode's virtual display
+        # (id learned from scrcpy's output), or the phone's own display 0 for
+        # a mirror. `size` is the last logical size the window was fitted to
+        # (None until the first reading).
         self.follow_displays = {}
         self.follow_wake = threading.Event()
         self.follow_thread = None
@@ -531,7 +534,7 @@ class ScrcpySessionManager:
 
         with self.lock:
             self.processes[session_id] = proc
-            self.session_info[session_id] = {
+            info = {
                 "id": session_id, "type": type_str, "title": title,
                 "pid": proc.pid, "startedAt": int(time.time()),
                 # The display id is learned from scrcpy's output. The
@@ -541,6 +544,24 @@ class ScrcpySessionManager:
                 "adbArgs": adb_args,
                 "displayId": None,
                 "displaySize": parse_new_display_size(extra_args)}
+            self.session_info[session_id] = info
+            # A followed session without a virtual display is the mirror. Its
+            # display is the phone's own (id 0), which swaps its logical size
+            # when the phone turns; no wm policy applies - the phone's own
+            # rotation stands - but the window still has to follow. The first
+            # poll records the baseline, so the shape the phone starts in is
+            # never treated as a turn.
+            mirror_follow = (bool(follow_orientation)
+                             and info["displaySize"] is None)
+            if mirror_follow:
+                self.follow_displays[session_id] = {
+                    "display_id": 0,
+                    "title": title,
+                    "args": adb_args,
+                    "size": None,
+                }
+        if mirror_follow:
+            self._ensure_follow_thread()
         self.emit({"event": "started", "id": session_id, "pid": proc.pid, "title": title})
         threading.Thread(target=self._wait_process, args=(session_id, proc),
                          daemon=True).start()

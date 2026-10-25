@@ -41,10 +41,13 @@ PhoneSubPage {
     property string dependencyFeature: "mirror"
     property string installGuideTitle: Translation.tr("scrcpy — missing dependencies")
 
-    // App Mode can hand the shape of its virtual display to the app; the
-    // mirror cannot, because its display is the phone's own. Only the App
-    // Mode page offers Auto (-1) then.
-    property bool followAppOrientationAvailable: false
+    // Auto needs a display whose turn the supervisor can watch: App Mode's
+    // virtual display, or the phone's own screen for the mirror. Only App
+    // Mode without a virtual display lacks one.
+    property bool followOrientationAvailable: false
+    // Whose turn the hint describes: the mirror follows the phone's screen,
+    // App Mode follows its app's virtual display.
+    property bool followPhoneOrientation: false
 
     // The service owns the write and whatever follows from it, so the page
     // never touches the config itself.
@@ -55,11 +58,11 @@ PhoneSubPage {
 
     readonly property string codec: String(root.scrcpyConfig?.videoCodec ?? "h264")
 
-    // A stored -1 is Auto only where Auto exists; a mirror page never offers
-    // it, so a value carried over from App Mode reads as 0° there.
+    // A stored -1 is Auto only where Auto exists; a page that does not offer
+    // it reads a carried-over value as 0°.
     readonly property int orientationValue: {
         const value = Number(root.scrcpyConfig?.captureOrientation ?? 0);
-        return (!root.followAppOrientationAvailable && value < 0) ? 0 : value;
+        return (!root.followOrientationAvailable && value < 0) ? 0 : value;
     }
 
     readonly property string missingDependencies: PhoneDeps.missingFor(root.dependencyFeature)
@@ -350,8 +353,10 @@ PhoneSubPage {
                 PhoneConfigSelectionArray {
                     text: Translation.tr("Rotation")
                     icon: "screen_rotation"
-                    infoText: root.followAppOrientationAvailable
-                        ? Translation.tr("Auto turns the scrcpy window between portrait and landscape to match the app; Resolution sets its starting shape. A fixed value rotates the picture and holds the window still.")
+                    infoText: root.followOrientationAvailable
+                        ? (root.followPhoneOrientation
+                            ? Translation.tr("Auto turns the scrcpy window between portrait and landscape to match the phone's screen. A fixed value rotates the picture and holds the window still.")
+                            : Translation.tr("Auto turns the scrcpy window between portrait and landscape to match the app; Resolution sets its starting shape. A fixed value rotates the picture and holds the window still."))
                         : Translation.tr("Clockwise rotation scrcpy applies to the picture. 0° mirrors the phone as it stands.")
                     currentValue: root.orientationValue
                     onSelected: value => root.settingChanged("captureOrientation", Number(value))
@@ -362,7 +367,7 @@ PhoneSubPage {
                             { displayName: "180°", value: 180, icon: "screen_rotation" },
                             { displayName: "270°", value: 270, icon: "screen_rotation" }
                         ];
-                        return root.followAppOrientationAvailable
+                        return root.followOrientationAvailable
                             ? [{ displayName: Translation.tr("Auto"), value: -1, icon: "autorenew" }].concat(fixed)
                             : fixed;
                     }

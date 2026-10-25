@@ -40,7 +40,7 @@ PhoneScrcpySettings {
     nativeResolution: root.appDisplaySize.length > 0 ? root.appDisplaySize : PhoneScrcpy.deviceScreenSize
     // Only a virtual display can turn with the app; without one the app is
     // mirrored off the phone's own screen.
-    followAppOrientationAvailable: root.appDisplaySize.length > 0
+    followOrientationAvailable: root.appDisplaySize.length > 0
         && (root.appConfig?.videoEnabled ?? true)
 
     introText: Translation.tr("These are scrcpy launch flags for App Mode. A change applies to the next app you start; an app that is already open keeps the flags it started with.")
