@@ -231,7 +231,7 @@ PhoneSubPage {
             title: Translation.tr("Connection")
 
             GroupedList {
-                ConfigSelectionArray {
+                PhoneConfigSelectionArray {
                     text: Translation.tr("Connect over")
                     icon: "settings_ethernet"
                     infoText: Translation.tr("Only the DroidCam backend uses this. The scrcpy backend reaches the phone through adb, which prefers USB on its own.")

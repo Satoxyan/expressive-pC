@@ -347,7 +347,7 @@ PhoneSubPage {
             title: Translation.tr("Orientation")
 
             GroupedList {
-                ConfigSelectionArray {
+                PhoneConfigSelectionArray {
                     text: Translation.tr("Rotation")
                     icon: "screen_rotation"
                     infoText: root.followAppOrientationAvailable

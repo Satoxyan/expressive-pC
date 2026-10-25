@@ -276,7 +276,7 @@ PhoneSubPage {
             title: Translation.tr("Camera settings")
 
             GroupedList {
-                ConfigSelectionArray {
+                PhoneConfigSelectionArray {
                     text: Translation.tr("Camera")
                     icon: "photo_camera"
                     infoText: Translation.tr("Which lens scrcpy asks the phone for. A running stream is restarted to apply it - the choice is made when the stream starts and cannot be changed mid-flight.")
@@ -288,7 +288,7 @@ PhoneSubPage {
                     ]
                 }
 
-                ConfigSelectionArray {
+                PhoneConfigSelectionArray {
                     text: Translation.tr("Resolution")
                     icon: "aspect_ratio"
                     // The node's grip on the old size is what used to make this
@@ -306,7 +306,7 @@ PhoneSubPage {
                     ]
                 }
 
-                ConfigSelectionArray {
+                PhoneConfigSelectionArray {
                     text: Translation.tr("Aspect ratio")
                     icon: "crop_free"
                     // The three numbers are the shape of the PICTURE, so they
@@ -324,7 +324,7 @@ PhoneSubPage {
                     ]
                 }
 
-                ConfigSelectionArray {
+                PhoneConfigSelectionArray {
                     text: Translation.tr("Orientation")
                     icon: "screen_rotation"
                     infoText: Translation.tr("Portrait turns the picture a quarter turn, and the turn that reads upright is different for the two lenses, so the lens in use picks it. The crop is computed before the turn, so a 4:3 capture in Portrait is a 3:4 webcam. The node ends up tall rather than wide: 1280x720 in Portrait is a 720x1280 webcam.")
