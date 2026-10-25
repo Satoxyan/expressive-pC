@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
-# install_droidcam.sh — Detects distro and installs DroidCam + deps.
+# install_droidcam.sh — Detects distro and installs the Phone tab's streaming
+# stack + deps.
 #
 # Supports:
-#   • Arch Linux (AUR: droidcam package includes everything)
+#   • Arch Linux (scrcpy and v4l2loopback-dkms from [extra], droidcam from the AUR)
 #   • Fedora (RPMFusion for v4l2loopback + official DroidCam client installer)
 #   • Debian/Ubuntu (official DroidCam installer zip)
 #
-# Installs: droidcam-cli, v4l2loopback (kernel module), pactl (audio routing),
-#           libappindicator-gtk3, adb (android-tools), ffmpeg, alsa-lib.
+# Installs: scrcpy (the webcam's engine and the preferred microphone backend),
+#           adb (android-tools), v4l2loopback (kernel module, and loads it),
+#           v4l-utils, mpv, droidcam-cli (the microphone's fallback),
+#           pactl (audio routing), ffmpeg, alsa-lib.
+#
+# The name predates the webcam moving to scrcpy; DroidCam CLI is what is left
+# of it, and the mic still uses it as a fallback.
 
 set -u
 IFS=$'\n\t'
@@ -33,6 +39,29 @@ press_enter_to_close() {
     # path, so without the guard a completed install exits non-zero whenever
     # stdin is not a terminal.
     read -r || true
+}
+
+# The device DroidCam writes to, and what an install used to get wrong: a
+# module that is INSTALLED is not a module that is LOADED. It takes a
+# modprobe before any /dev/videoN exists and a modules-load.d line before it
+# survives the next boot, and only the Fedora branch did either — so an Arch
+# or Debian run could print "✓ installed" and leave the webcam with nowhere
+# to stream, a session that never starts and a preview that then complains
+# about mpv.
+load_v4l2loopback() {
+    echo "▸ Loading v4l2loopback kernel module..."
+    if ! sudo modprobe v4l2loopback; then
+        echo "  ! modprobe failed. After a kernel update the dkms module is"
+        echo "    rebuilt for the new kernel; reboot and run this again."
+        return 1
+    fi
+    echo "  ✓ Loaded."
+    if [ ! -f /etc/modules-load.d/v4l2loopback.conf ]; then
+        echo "▸ Loading it on every boot..."
+        echo "v4l2loopback" | sudo tee /etc/modules-load.d/v4l2loopback.conf >/dev/null \
+            || echo "  ! Could not write /etc/modules-load.d/v4l2loopback.conf."
+    fi
+    return 0
 }
 
 # URL of the official DroidCam Linux client zip.
@@ -138,7 +167,7 @@ main() {
     local DISTRO="${1:-$(detect_distro)}"
 
     echo "╔═══════════════════════════════════════════════╗"
-    echo "║     DroidCam Installer for the ImI Phone tab     ║"
+    echo "║    Phone camera & microphone installer for ImI   ║"
     echo "╚═══════════════════════════════════════════════╝"
     echo ""
 
@@ -147,50 +176,17 @@ case "$DISTRO" in
         echo "▸ Detected: Arch Linux"
         echo ""
 
-        # Find AUR helper
-        AUR_HELPER=""
-        for helper in yay paru; do
-            if command -v "$helper" >/dev/null 2>&1; then
-                AUR_HELPER="$helper"
-                break
-            fi
-        done
-
-        if [ -z "$AUR_HELPER" ]; then
-            echo "✗ No AUR helper (yay/paru) found."
-            echo "  Install one first:"
-            echo "    sudo pacman -S --needed base-devel git"
-            echo "    git clone https://aur.archlinux.org/yay.git /tmp/yay"
-            echo "    cd /tmp/yay && makepkg -si"
-            press_enter_to_close
-            return 1
-        fi
-
-        echo "▸ Using AUR helper: $AUR_HELPER"
-        echo ""
-        # The 'droidcam' AUR package bundles the client AND the v4l2loopback-dc
-        # kernel module, so this single command covers the client itself.
-        # It was UNCHECKED, and the "✓ DroidCam installed" below printed
-        # regardless — after which the footer told the user the Phone tab's
-        # cards should now read "Ready".
-        if ! "$AUR_HELPER" -S --needed droidcam; then
+        # The webcam's whole stack is in [extra] and [community] now that
+        # scrcpy writes /dev/videoN itself, so this first command is the one
+        # that decides whether the cards can work. `droidcam` is AUR-only and
+        # is NOT in it: it is the microphone's fallback backend, so it is
+        # attempted afterwards and a missing AUR helper is a warning rather
+        # than a refusal — it used to abort the install before a single
+        # package was fetched, on the branch where none of it was needed.
+        echo "▸ Installing scrcpy, mpv, v4l-utils, android-tools and v4l2loopback-dkms..."
+        if ! sudo pacman -S --needed --noconfirm scrcpy mpv v4l-utils android-tools v4l2loopback-dkms; then
             echo ""
-            echo "✗ $AUR_HELPER could not install droidcam."
-            press_enter_to_close
-            return 1
-        fi
-
-        # v4l-utils and android-tools are what the OTHER branches install and
-        # what PhoneDeps treats as dependencies: droidcam_status.sh reports
-        # the webcam device through `v4l2-ctl --list-devices` and cannot find
-        # it at all without them, and adb is the mirror's whole transport. The
-        # Arch branch installed neither, so it could complete successfully and
-        # leave the webcam unfindable.
-        echo ""
-        echo "▸ Installing v4l-utils and android-tools..."
-        if ! sudo pacman -S --needed --noconfirm v4l-utils android-tools; then
-            echo ""
-            echo "✗ Could not install v4l-utils / android-tools."
+            echo "✗ Could not install the camera stack."
             press_enter_to_close
             return 1
         fi
@@ -208,8 +204,31 @@ case "$DISTRO" in
             fi
         fi
 
+        # Installed is not loaded: until this runs there is no /dev/videoN for
+        # scrcpy to write to, and the webcam's own start refuses.
         echo ""
-        echo "✓ DroidCam installed (Arch/AUR)."
+        load_v4l2loopback || echo "  (continuing; load it by hand before using the webcam)"
+
+        AUR_HELPER=""
+        for helper in yay paru; do
+            if command -v "$helper" >/dev/null 2>&1; then
+                AUR_HELPER="$helper"
+                break
+            fi
+        done
+
+        echo ""
+        if [ -z "$AUR_HELPER" ]; then
+            echo "▸ Skipping the DroidCam CLI: no AUR helper (yay/paru) found."
+            echo "  The webcam does not need it. Only the microphone's fallback backend does,"
+            echo "  and scrcpy is that backend's preferred half and is installed."
+        elif ! "$AUR_HELPER" -S --needed droidcam; then
+            echo ""
+            echo "  ! $AUR_HELPER could not install droidcam — continuing without the"
+            echo "    microphone's fallback backend."
+        else
+            echo "✓ DroidCam CLI installed (Arch/AUR), for the microphone's fallback."
+        fi
         ;;
 
     fedora)
@@ -233,12 +252,16 @@ case "$DISTRO" in
         echo ""
 
         # Install build/runtime deps.
+        #   • scrcpy is the webcam's engine (and the preferred mic backend);
+        #     mpv is the preview player.
         #   • v4l2loopback-dkms does NOT exist on Fedora — use akmod-v4l2loopback
         #     from RPM Fusion (auto-builds for any kernel).
         #   • android-tools = adb
         #   • libappindicator-gtk3 = systray icon (Ubuntu 21+/Fedora 33+ removed it pre-installed)
         echo "▸ Installing runtime dependencies..."
         sudo dnf install -y --skip-broken \
+            scrcpy \
+            mpv \
             akmod-v4l2loopback \
             v4l-utils \
             pulseaudio-utils \
@@ -257,18 +280,19 @@ case "$DISTRO" in
 
         # Load the v4l2loopback kernel module now (akmod should have built it
         # against the running kernel during the dnf install above).
-        echo "▸ Loading v4l2loopback kernel module..."
-        sudo modprobe v4l2loopback || echo "  ! modprobe v4l2loopback failed — you may need to reboot."
-        echo "v4l2loopback" | sudo tee /etc/modules-load.d/v4l2loopback.conf >/dev/null 2>&1 || true
+        echo ""
+        load_v4l2loopback || echo "  (continuing; load it by hand before using the webcam)"
         echo ""
 
-        # Install the DroidCam client binary from official zip
-        # (it's not packaged in Fedora's repositories; only the kernel module is).
+        # Install the DroidCam client binary from official zip.
+        # Optional now: the webcam is scrcpy, and droidcam-cli is only the
+        # microphone's fallback backend, so a failed download is reported and
+        # the run still ends successfully on the packages that matter.
         install_from_official_zip || {
             echo ""
-            echo "✗ Installation failed."
-            press_enter_to_close
-            return 1
+            echo "  ! The DroidCam CLI could not be installed. The microphone will"
+            echo "    use scrcpy, which needs nothing on this machine beyond what is"
+            echo "    already installed; nothing else is affected."
         }
         ;;
 
@@ -276,9 +300,21 @@ case "$DISTRO" in
         echo "▸ Detected: Debian/Ubuntu"
         echo ""
 
-        echo "▸ Installing build deps and pactl..."
+        # `apt install` refuses the ENTIRE transaction when one name is
+        # unknown, and `scrcpy` is unknown to Ubuntu before 23.04 — so it gets
+        # its own command, where failing costs only scrcpy.
+        echo "▸ Installing scrcpy (the webcam's engine)..."
+        sudo apt install -y scrcpy 2>&1 || {
+            echo "  ! scrcpy is not in this release's repositories."
+            echo "    The Phone tab's webcam needs it: install it from"
+            echo "    https://github.com/genymobile/scrcpy or a newer release."
+        }
+        echo ""
+
+        echo "▸ Installing build deps, mpv and pactl..."
         sudo apt update
         sudo apt install -y \
+            mpv \
             v4l2loopback-dkms \
             v4l-utils \
             pulseaudio-utils \
@@ -293,15 +329,14 @@ case "$DISTRO" in
             2>&1 || echo "  ! Some deps failed to install (continuing)."
         echo ""
 
-        echo "▸ Loading v4l2loopback kernel module..."
-        sudo modprobe v4l2loopback || echo "  ! modprobe failed — you may need to reboot."
+        load_v4l2loopback || echo "  (continuing; load it by hand before using the webcam)"
         echo ""
 
         install_from_official_zip || {
             echo ""
-            echo "✗ Installation failed."
-            press_enter_to_close
-            return 1
+            echo "  ! The DroidCam CLI could not be installed. The microphone will"
+            echo "    use scrcpy, which needs nothing on this machine beyond what is"
+            echo "    already installed; nothing else is affected."
         }
         ;;
 
@@ -309,12 +344,13 @@ case "$DISTRO" in
         echo "✗ Unsupported distribution."
         echo ""
         echo "Install manually following the docs below:"
-        echo "  Arch:    yay -S droidcam v4l2loopback-dkms pulseaudio-utils"
-        echo "  Fedora:  sudo dnf install akmod-v4l2loopback v4l-utils pulseaudio-utils"
-        echo "           Enable RPM Fusion free, then:"
-        echo "           Download from https://www.dev47apps.com/droidcam/linux/"
-        echo "  Debian:  sudo apt install v4l2loopback-dkms v4l-utils pulseaudio-utils"
-        echo "           Download from https://www.dev47apps.com/droidcam/linux/"
+        echo "  Arch:    sudo pacman -S scrcpy mpv v4l2loopback-dkms v4l-utils android-tools pulseaudio-utils"
+        echo "           sudo modprobe v4l2loopback"
+        echo "           (optional, mic fallback) yay -S droidcam"
+        echo "  Fedora:  sudo dnf install scrcpy mpv akmod-v4l2loopback v4l-utils pulseaudio-utils android-tools"
+        echo "           Enable RPM Fusion free first, for akmod-v4l2loopback."
+        echo "  Debian:  sudo apt install scrcpy mpv v4l2loopback-dkms v4l-utils pulseaudio-utils adb"
+        echo "           (optional, mic fallback) download from https://www.dev47apps.com/droidcam/linux/"
         press_enter_to_close
         return 1
         ;;
@@ -323,10 +359,13 @@ esac
 echo ""
 echo "═══════════════════════════════════════════════"
 echo " Next steps:"
-echo "   1. Install DroidCam app on your Android phone"
-echo "   2. Open DroidCam on phone, enter IP, connect"
-echo "   3. Re-open the Phone tab in ImI — cards should"
-echo "      now show 'Ready' instead of 'Install'"
+echo "   1. Enable USB debugging on the phone (or wireless"
+echo "      debugging) so adb can see it — the webcam is"
+echo "      scrcpy over adb and needs no app on the phone."
+echo "   2. Re-open the Phone tab in ImI — cards should"
+echo "      now show 'Ready' instead of 'Install'."
+echo "   3. Only for the microphone's DroidCam fallback:"
+echo "      install the DroidCam app on the phone."
 echo "═══════════════════════════════════════════════"
     press_enter_to_close
 }

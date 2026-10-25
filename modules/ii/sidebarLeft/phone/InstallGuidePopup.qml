@@ -35,6 +35,11 @@ Item {
 
     signal closeRequested
     signal recheckRequested
+    // Launching anything is the host's decision: it is the host that knows
+    // which feature asked for the guide, and therefore which script covers
+    // these packages. This component stays a list of what is missing.
+    signal installRequested
+    property bool installerAvailable: false
 
     property string selectedDistro: PhoneCards.initialDistro(root.detectedDistro)
 
@@ -119,6 +124,18 @@ Item {
                 }
             }
 
+            StyledText {
+                Layout.fillWidth: true
+                // What the list is for, spelled out: the rows below are the
+                // packages this machine is missing, and the feature stays off
+                // until they are in. Without this line the guide reads as a
+                // bare distro picker.
+                text: Translation.tr("These packages are missing, so this feature cannot run yet. Pick your distribution, run the commands, then re-check.")
+                font.pixelSize: Appearance.font.pixelSize.smallest
+                color: Appearance.colors.colSubtext
+                wrapMode: Text.WordWrap
+            }
+
             RowLayout {
                 Layout.fillWidth: true
                 spacing: Appearance.spacing.space50
@@ -156,6 +173,14 @@ Item {
                 id: dependencyScroll
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                // The card sizes itself off this column's implicit height, and
+                // a Flickable reports 0 for its own: without a preferred height
+                // here the fill wins against nothing, the list is laid out at
+                // 0px and the guide shows only its header, the distro pills and
+                // the Re-check button - every command and every description
+                // present and invisible. This is the row list's real height, and
+                // fillHeight still lets it shrink when the card hits the panel.
+                Layout.preferredHeight: dependencyColumn.implicitHeight
                 contentHeight: dependencyColumn.implicitHeight
                 clip: true
 
@@ -163,6 +188,19 @@ Item {
                     id: dependencyColumn
                     width: dependencyScroll.width
                     spacing: Appearance.spacing.space100
+
+                    // Nothing to show is a state the guide can be in: opened
+                    // before the probes have answered, or re-checked into
+                    // cleanliness. Saying so keeps the card from reading as an
+                    // unlabelled distro picker.
+                    StyledText {
+                        Layout.fillWidth: true
+                        visible: root.dependencies.length === 0
+                        text: Translation.tr("Nothing is missing right now. The checks may still be running - re-check to see.")
+                        font.pixelSize: Appearance.font.pixelSize.smallest
+                        color: Appearance.colors.colSubtext
+                        wrapMode: Text.WordWrap
+                    }
 
                     Repeater {
                         model: root.dependencies
@@ -292,10 +330,45 @@ Item {
 
                 StyledText {
                     Layout.fillWidth: true
-                    text: Translation.tr("After installing, re-check to verify.")
+                    text: root.installerAvailable
+                        ? Translation.tr("Run the installer and answer the prompts in its terminal, then re-check.")
+                        : Translation.tr("After installing, re-check to verify.")
                     font.pixelSize: Appearance.font.pixelSize.smallest
                     color: Appearance.colors.colSubtext
                     wrapMode: Text.WordWrap
+                }
+
+                RippleButton {
+                    Layout.preferredHeight: Appearance.font.pixelSize.huge + Appearance.spacing.space100
+                    visible: root.installerAvailable
+                    buttonRadius: Appearance.rounding.full
+                    colBackground: Appearance.colors.colPrimary
+                    colBackgroundHover: Appearance.colors.colPrimaryHover
+                    colRipple: Appearance.colors.colPrimaryActive
+                    // The host runs it; this only asks. The terminal is not a
+                    // formality: the script needs a password and prints a
+                    // per-distro build's progress, so it has to be somewhere a
+                    // person can read and answer.
+                    onClicked: root.installRequested()
+
+                    contentItem: RowLayout {
+                        spacing: Appearance.spacing.space50
+
+                        MaterialSymbol {
+                            Layout.alignment: Qt.AlignVCenter
+                            text: "terminal"
+                            fill: 1
+                            iconSize: Appearance.font.pixelSize.small
+                            color: Appearance.colors.colOnPrimary
+                        }
+                        StyledText {
+                            Layout.alignment: Qt.AlignVCenter
+                            text: Translation.tr("Run installer")
+                            font.pixelSize: Appearance.font.pixelSize.smallest
+                            font.weight: Font.DemiBold
+                            color: Appearance.colors.colOnPrimary
+                        }
+                    }
                 }
 
                 RippleButton {

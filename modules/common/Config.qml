@@ -252,10 +252,7 @@ Singleton {
                     property string cameraFacing: "front"
                     property string resolution: "1280x720"
                     property bool mirrorHorizontally: false
-                    property int rotateDegrees: 0
-                    property string connection: "wifi"
-                    property string wifiIp: ""
-                    property int port: 4747
+                    property string orientation: "landscape"
                 }
                 property JsonObject microphone: JsonObject {
                     property string connection: "wifi"

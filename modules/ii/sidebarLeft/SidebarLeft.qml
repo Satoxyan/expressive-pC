@@ -84,10 +84,17 @@ Scope { // Scope
     function unload() {
         root.loaded = false;
         if (sidebarLoader.item) GlobalFocusGrab.removeDismissable(sidebarLoader.item);
+        // Orphan the content rather than destroying it. Building it is what
+        // the open was waiting on: the Phone tab's roster and notification
+        // cards, one enter animation per card, a scroll position and pages
+        // that had already been fetched, all thrown away three seconds after
+        // a close and rebuilt behind the next slide-in. An item survives its
+        // parent's death, so unparenting it before the window goes leaves a
+        // finished tree for load() to reattach.
         if (root.sidebarContent) {
+            if (!Config.options.sidebar.leftRememberPage)
+                root.sidebarContent.currentKey = "home";
             root.sidebarContent.parent = null;
-            root.sidebarContent.destroy();
-            root.sidebarContent = null;
         }
         sidebarLoader.active = false;
         detachedSidebarLoader.active = false;

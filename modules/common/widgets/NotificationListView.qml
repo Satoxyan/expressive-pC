@@ -4,6 +4,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.services
 import QtQuick
+import QtQuick.Window
 import Quickshell
 
 StyledListView { // Scrollable window
@@ -33,6 +34,15 @@ StyledListView { // Scrollable window
 
     spacing: Appearance.spacing.space50
 
+    // A ListView keeps only what is on screen and rebuilds the rest as it
+    // scrolls by, and a group is no cheap item to rebuild: a nested list, a
+    // drag handler, an icon, a shadow. Flicking a long list then spends every
+    // frame of the flick constructing cards, and each one arrives through
+    // this view's add transition, so the list fades in card by card while you
+    // scroll instead of sitting still. Keep a few viewports' worth alive
+    // off-screen; the list still culls them, it just stops discarding them.
+    cacheBuffer: 3000
+
     // Entrance transitions only while the view is on screen. A delegate built
     // while the sidebar's content was hidden (a notification arriving with
     // the panel closed, the list restored from file at startup) started its
@@ -44,9 +54,14 @@ StyledListView { // Scrollable window
     // under a footer counting sixteen. So a view that is not visible adds
     // its cards at rest, and coming on screen settles anything a transition
     // left half way.
-    animateAppearance: root.visible
-    onVisibleChanged: {
-        if (root.visible)
+    //
+    // "On screen" counts the window, not just the view: the sidebar keeps its
+    // content built while it is closed, so a card can now also arrive with the
+    // view visible and nothing anywhere near a window to draw it.
+    readonly property bool onScreen: root.visible && Window.window?.visible === true
+    animateAppearance: root.onScreen
+    onOnScreenChanged: {
+        if (root.onScreen)
             Qt.callLater(root.settleDelegates);
     }
     function settleDelegates(): void {

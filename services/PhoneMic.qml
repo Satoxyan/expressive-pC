@@ -106,8 +106,30 @@ Singleton {
         return args;
     }
 
+    // The transport question, answered off `adb devices` rather than off
+    // `adb get-state`. get-state cannot answer it: it says `device` for a
+    // phone reached through wireless debugging exactly as for one on a cable,
+    // and taking that for a cable plans a USB session for a tunnel that does
+    // not exist - which is a session that connects to nothing and, because
+    // droidcam-cli keeps the loopback node open, still looks alive. `adb
+    // devices` prints the serial next to the state and the serial names its
+    // own transport: `192.168.1.12:37269`, `adb-<host>-<port>` and anything
+    // else with a colon is a network route, not a cable. `offline` and
+    // `unauthorized` are not a connection either.
+    function usbAdbState(text: string): string {
+        const lines = String(text ?? "").split("\n");
+        for (let i = 0; i < lines.length; i++) {
+            const parts = String(lines[i]).trim().split(/\s+/);
+            if (parts.length < 2 || parts[1] !== "device") continue;
+            const serial = parts[0];
+            if (/:/.test(serial) || /^\d+(\.\d+){3}/.test(serial) || /^adb-/.test(serial)) continue;
+            return "device";
+        }
+        return "";
+    }
+
     // Same rule as the webcam's: usb when asked, a configured address when
-    // given, else adb's answer, else KDE Connect's address.
+    // given, else adb ON A CABLE, else KDE Connect's address.
     function connectionPlan(conf: var, adbState: string, addresses: var): var {
         const c = conf ?? {};
         const port = Number(c.port) > 0 ? Number(c.port) : 4748;
@@ -255,9 +277,9 @@ Singleton {
             root.launchDroidcam(direct);
             return;
         }
-        root.run(["adb", "get-state"], (text, code) => {
+        root.run(["adb", "devices"], (text, code) => {
             if (!root.connecting) return;
-            const plan = root.connectionPlan(conf, code === 0 ? text : "",
+            const plan = root.connectionPlan(conf, code === 0 ? root.usbAdbState(text) : "",
                 PhoneConnect.activeDevice?.reachableAddresses ?? []);
             if (plan.error) {
                 root.fail(plan.error);

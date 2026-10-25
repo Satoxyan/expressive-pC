@@ -8,8 +8,8 @@ import qs.modules.common.widgets
 import "phone_cards.js" as PhoneCards
 
 /**
- * The Phone tab's Phone Webcam sub-page: the DroidCam stream's toggle and its
- * settings.
+ * The Phone tab's Phone Webcam sub-page: the scrcpy camera stream's toggle and
+ * its settings.
  *
  * Rooted on `PhoneSubPage` (W5a's; the interface is pinned by the stub at
  * tests/imports/qs/modules/imi/sidebarLeft/phone/PhoneSubPage.qml), with a
@@ -17,11 +17,14 @@ import "phone_cards.js" as PhoneCards
  * shell's settings do.
  *
  * Every row here writes a key `Config.qml` already declares under
- * `phone.webcam`, read with optional chaining. The sibling fork's page also
- * offers a frame rate and a bitrate; neither key exists in this schema and
- * `droidcam-cli` takes no flag for either, so neither row is here - a control
- * bound to an undeclared key reads `undefined`, takes its fallback for ever
- * and is destroyed by the JsonAdapter's first write.
+ * `phone.webcam`, read with optional chaining. The connection rows the
+ * DroidCam engine needed - over which transport, which address, which port -
+ * are gone: scrcpy writes the phone's camera through adb, so there is no
+ * address or port to choose and the transport is whatever adb already has.
+ * What a row here sets is a scrcpy flag, so nothing writes the config
+ * directly: every row calls `PhoneCamera.applySetting`, which restarts the
+ * stream for a value that changed and does nothing for the one already
+ * active.
  */
 PhoneSubPage {
     id: root
@@ -51,16 +54,15 @@ PhoneSubPage {
 
         // A NoticeBox reports its string's UNWRAPPED width as its implicit
         // width, so one long service error asks the column for more room than
-        // the panel has - 495px for PhoneCamera's own "DroidCam did not start
-        // - is the DroidCam app open on the phone?" in a 440px page, which is
-        // what `Math.max(baseWidth, implicitWidth)` above was widening on.
-        // Capped, the banner wraps inside itself instead of moving the page.
+        // the panel has, which is what `Math.max(baseWidth, implicitWidth)`
+        // above was widening on. Capped, the banner wraps inside itself
+        // instead of moving the page.
         NoticeBox {
             Layout.fillWidth: true
             Layout.maximumWidth: page.baseWidth
             visible: !PhoneCamera.available
             materialIcon: "download"
-            text: Translation.tr("DroidCam is not set up on this machine. %1 is missing.")
+            text: Translation.tr("The camera stream is not set up on this machine. %1 is missing.")
                 .arg(PhoneDeps.missingFor("webcam").map(dependency => dependency.name).join(", "))
 
             DialogButton {
@@ -70,7 +72,8 @@ PhoneSubPage {
                 colBackgroundHover: Appearance.colors.colPrimaryHover
                 colRipple: Appearance.colors.colPrimaryActive
                 colText: Appearance.colors.colOnPrimary
-                onClicked: installGuide.shown = true
+                onClicked: root.openInstallGuideRequested("webcam",
+                    Translation.tr("Phone Webcam — missing dependencies"))
             }
         }
 
@@ -79,7 +82,7 @@ PhoneSubPage {
             Layout.maximumWidth: page.baseWidth
             visible: PhoneCamera.available && !root.deviceReachable
             materialIcon: "phonelink_off"
-            text: Translation.tr("No phone is reachable. Pair one in KDE Connect and bring it onto the network.")
+            text: Translation.tr("No phone is reachable. Connect one over USB or with adb over the network.")
         }
 
         NoticeBox {
@@ -88,6 +91,23 @@ PhoneSubPage {
             visible: PhoneCamera.lastError.length > 0
             materialIcon: "error"
             text: PhoneCamera.lastError
+
+            // The webcam's only backend is scrcpy and scrcpy drives the phone
+            // over adb, so a good share of what can land in `lastError` is a
+            // link that is down rather than a camera that is broken - and the
+            // string that says so comes out of the process, which cannot also
+            // say where the fix is. Offered whenever adb has answered and
+            // listed nothing, which is the same tri-state the cards read.
+            DialogButton {
+                Layout.alignment: Qt.AlignRight
+                visible: PhoneDeps.ready && !PhoneDeps.adbDevice
+                buttonText: Translation.tr("Fix the phone link (ADB)")
+                colBackground: Appearance.colors.colPrimary
+                colBackgroundHover: Appearance.colors.colPrimaryHover
+                colRipple: Appearance.colors.colPrimaryActive
+                colText: Appearance.colors.colOnPrimary
+                onClicked: root.openAdbPageRequested()
+            }
         }
 
         ContentSection {
@@ -139,10 +159,14 @@ PhoneSubPage {
                 Layout.fillWidth: true
                 Layout.leftMargin: Appearance.spacing.space100
                 visible: PhoneCamera.active
-                text: Translation.tr("Running for %1 · %2:%3")
+                // There is no address and no port to show any more: the stream
+                // is scrcpy over whatever transport adb already settled on,
+                // and the node the button already names is the other fact.
+                text: Translation.tr("Running for %1 · %2 %3 · %4 lens")
                     .arg(PhoneCards.formatElapsed(PhoneCards.elapsedMs(PhoneCamera.startedAt, clock.nowMs)))
-                    .arg(PhoneCamera.activeIp || Translation.tr("usb"))
-                    .arg(PhoneCamera.activePort)
+                    .arg(root.webcamConfig?.resolution ?? "1280x720")
+                    .arg(root.webcamConfig?.orientation ?? "landscape")
+                    .arg(root.webcamConfig?.cameraFacing ?? "front")
                 font.pixelSize: Appearance.font.pixelSize.smaller
                 color: Appearance.colors.colSubtext
             }
@@ -158,9 +182,10 @@ PhoneSubPage {
                     colBackground: Appearance.colors.colLayer2
                     colBackgroundHover: Appearance.colors.colLayer2Hover
                     colRipple: Appearance.colors.colLayer2Active
-                    // DroidCam has no flag for which camera it opens - the app
-                    // on the phone decides - so this records the preference
-                    // the next fresh start uses.
+                    // scrcpy picks the lens with --camera-facing, and the
+                    // stream is one process that reads it at startup, so the
+                    // service restarts it rather than trying to re-open a
+                    // camera mid-stream.
                     onClicked: PhoneCamera.flip()
 
                     contentItem: RowLayout {
@@ -235,9 +260,9 @@ PhoneSubPage {
                 ConfigSelectionArray {
                     text: Translation.tr("Camera")
                     icon: "photo_camera"
-                    infoText: Translation.tr("DroidCam has no flag for this - the app on the phone picks the lens. The choice is recorded and applies from the next start.")
+                    infoText: Translation.tr("Which lens scrcpy asks the phone for. A running stream is restarted to apply it - the choice is made when the stream starts and cannot be changed mid-flight.")
                     currentValue: root.webcamConfig?.cameraFacing ?? "front"
-                    onSelected: value => Config.options.phone.webcam.cameraFacing = value
+                    onSelected: value => PhoneCamera.applySetting("cameraFacing", value)
                     options: [
                         { displayName: Translation.tr("Front"), value: "front", icon: "camera_front" },
                         { displayName: Translation.tr("Back"), value: "back", icon: "camera_rear" }
@@ -247,8 +272,14 @@ PhoneSubPage {
                 ConfigSelectionArray {
                     text: Translation.tr("Resolution")
                     icon: "aspect_ratio"
+                    // The node's grip on the old size is what used to make this
+                    // row a lie: a 1080p stream on a node left at 720p started,
+                    // stayed alive and wrote nothing. `PhoneCamera.prepareNode`
+                    // clears `keep_format` before every launch, so the row can
+                    // promise the change lands instead of only asking for it.
+                    infoText: Translation.tr("The size scrcpy asks the camera for, landscape as the phone reports it: Portrait below turns this picture rather than asking for a taller one. The loopback node holds the size its last writer negotiated, so the stream's launch resets it first - without that a new size attaches and produces no frames.")
                     currentValue: root.webcamConfig?.resolution ?? "1280x720"
-                    onSelected: value => Config.options.phone.webcam.resolution = value
+                    onSelected: value => PhoneCamera.applySetting("resolution", value)
                     options: [
                         { displayName: Translation.tr("480p"), value: "640x480", icon: "sd" },
                         { displayName: Translation.tr("720p"), value: "1280x720", icon: "hd" },
@@ -257,78 +288,27 @@ PhoneSubPage {
                 }
 
                 ConfigSelectionArray {
-                    text: Translation.tr("Rotation")
+                    text: Translation.tr("Orientation")
                     icon: "screen_rotation"
-                    infoText: Translation.tr("180° is the only turn droidcam-cli can make - it is both flips at once. 90° and 270° would need a filter this stream does not run through.")
-                    currentValue: root.webcamConfig?.rotateDegrees ?? 0
-                    onSelected: value => Config.options.phone.webcam.rotateDegrees = value
+                    infoText: Translation.tr("Portrait turns the picture a quarter turn, and the turn that reads upright is different for the two lenses, so the lens in use picks it. A mirrored stream turns from the mirrored picture. The node ends up tall rather than wide: 1280x720 in Portrait is a 720x1280 webcam.")
+                    currentValue: root.webcamConfig?.orientation ?? "landscape"
+                    onSelected: value => PhoneCamera.applySetting("orientation", value)
                     options: [
-                        { displayName: Translation.tr("None"), value: 0, icon: "crop_din" },
-                        { displayName: Translation.tr("180°"), value: 180, icon: "flip" }
+                        { displayName: Translation.tr("Landscape"), value: "landscape", icon: "mobile_landscape" },
+                        { displayName: Translation.tr("Portrait"), value: "portrait", icon: "mobile" }
                     ]
                 }
 
                 ConfigSwitch {
                     buttonIcon: "flip"
                     text: Translation.tr("Mirror horizontally")
-                    // Through the service, not straight into the config: a
-                    // running stream is re-flipped live with v4l2-ctl, and the
-                    // service is the only thing that knows the device node.
+                    // Through the service, not straight into the config: the
+                    // mirror is a scrcpy flag rather than a control on the
+                    // node, so applying it means restarting the stream, and
+                    // only the service knows when one is running.
                     checked: root.webcamConfig?.mirrorHorizontally ?? false
                     selfToggle: false
                     onToggleRequested: PhoneCamera.mirror(!(root.webcamConfig?.mirrorHorizontally ?? false))
-                }
-            }
-        }
-
-        ContentSection {
-            icon: "cable"
-            shape: MaterialShape.Shape.Slanted
-            title: Translation.tr("Connection")
-
-            GroupedList {
-                ConfigSelectionArray {
-                    text: Translation.tr("Connect over")
-                    icon: "settings_ethernet"
-                    infoText: Translation.tr("Automatic prefers USB whenever adb can reach the phone, then the address KDE Connect reports for it.")
-                    currentValue: root.webcamConfig?.connection ?? "wifi"
-                    onSelected: value => Config.options.phone.webcam.connection = value
-                    options: [
-                        { displayName: Translation.tr("Automatic"), value: "wifi", icon: "auto_mode" },
-                        { displayName: Translation.tr("USB"), value: "usb", icon: "usb" }
-                    ]
-                }
-
-                ConfigTextArea {
-                    id: webcamIpField
-                    // `rowVisible`, never `visible`: a GroupedList row hidden
-                    // with `visible` keeps a full-height empty plate.
-                    property bool rowVisible: (root.webcamConfig?.connection ?? "wifi") !== "usb"
-                    Layout.fillWidth: true
-                    floatingLabel: true
-                    buttonIcon: "lan"
-                    text: Translation.tr("Phone address (empty = ask KDE Connect)")
-                    value: root.webcamConfig?.wifiIp ?? ""
-                    // Debounced: every keystroke otherwise re-evaluates the
-                    // connection plan the camera service builds from it.
-                    onValueChanged: webcamIpDebounce.restart()
-
-                    Timer {
-                        id: webcamIpDebounce
-                        interval: 600
-                        onTriggered: Config.options.phone.webcam.wifiIp = webcamIpField.value
-                    }
-                }
-
-                ConfigSpinBox {
-                    icon: "tag"
-                    text: Translation.tr("DroidCam port")
-                    infoText: Translation.tr("The port the DroidCam app shows on the phone. 4747 is its default.")
-                    value: root.webcamConfig?.port ?? 4747
-                    from: 1024
-                    to: 65535
-                    stepSize: 1
-                    onValueModified: Config.options.phone.webcam.port = value
                 }
             }
         }
@@ -345,24 +325,5 @@ PhoneSubPage {
         repeat: true
         running: PhoneCamera.active && root.visible
         onTriggered: clock.nowMs = Date.now()
-    }
-
-    // The same guide the feature card opens, filled to the panel rather than
-    // to this page: the per-distro command blocks do not fit in a column. It
-    // is reparented onto the window's own content item, which is the only
-    // thing spanning the panel that this page may reach.
-    InstallGuidePopup {
-        id: installGuide
-        property bool shown: false
-
-        parent: root.Window.contentItem ?? root
-        anchors.fill: parent
-        visible: installGuide.shown
-        z: 9999
-        dependencies: PhoneDeps.missingFor("webcam")
-        detectedDistro: PhoneDeps.distro
-        headerTitle: Translation.tr("Phone Webcam — missing dependencies")
-        onCloseRequested: installGuide.shown = false
-        onRecheckRequested: PhoneDeps.recheck()
     }
 }

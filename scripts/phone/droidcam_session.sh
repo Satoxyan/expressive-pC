@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
-# droidcam_session.sh — Persistent lifecycle manager for DroidCam sessions.
+# droidcam_session.sh — Persistent lifecycle manager for phone media sessions.
 #
-# The droidcam-cli / scrcpy process is launched DETACHED (setsid + nohup) so it
-# keeps running when the Quickshell process dies, reloads, or restarts. A small
-# JSON state file records the PID + connection info so the shell can re-adopt
-# the existing process on boot instead of spawning a duplicate.
+# The streaming process is launched DETACHED (setsid + nohup) so it
+# keeps running when the Quickshell process dies, reloads, or restarts. A
+# small JSON state file records the PID + connection info so the shell can
+# re-adopt the existing process on boot instead of spawning a duplicate.
 #
 # Sessions:
-#   video      — droidcam-cli -nocontrols [ip|adb] <port>           (webcam)
+#   video      — scrcpy --video-source=camera --v4l2-sink=/dev/videoN  (webcam)
 #   audio      — env PULSE_SINK=DroidCam-Mic droidcam-cli -a ...    (mic via droidcam)
 #   scrcpy-mic — scrcpy --no-video --no-window --audio-source=mic   (preferred mic)
+#
+# `video` and `scrcpy-mic` are both scrcpy, so what separates them is the
+# argument each one exists for: the sink, or the mic.
 #
 # Usage:
 #   droidcam_session.sh launch <session> <bin> <args...>   Start detached + save state, print PID
@@ -52,24 +55,28 @@ read_json_field() {
 # session_binary <session> → the binary `pgrep -x` must match
 session_binary() {
     case "$1" in
-        scrcpy-mic) echo "scrcpy" ;;
-        video|audio) echo "droidcam-cli" ;;
-        *)          echo "" ;;
+        scrcpy-mic|video) echo "scrcpy" ;;
+        audio)            echo "droidcam-cli" ;;
+        *)                echo "" ;;
     esac
 }
 
 # session_matches <session> <cmdline> → 0 when the cmdline belongs to that
 # session kind.
 #
-# This was a plain substring per session, and a substring cannot express what
-# separates the webcam from the microphone: the audio process IS
-# `droidcam-cli -a ...`, so its cmdline contains the video signature
-# `droidcam-cli` and matched it. With `video.json` absent - a shell restart
-# with only the mic up - `status video` therefore answered with the MIC's
-# pid, the tab drew a webcam stream that did not exist, and the user turning
-# it off ran `stop video`, which sent SIGTERM to the microphone. The port
-# could not break the tie either: `find_running` is called with an empty port
-# whenever there is no state file.
+# Two of the three sessions are the same binary now, so the signature is an
+# argument, not a name: the webcam exists to fill a `--v4l2-sink=` node and
+# the scrcpy microphone exists to publish `--audio-source=mic`, and neither
+# carries the other's flag.
+#
+# Before the webcam moved to scrcpy this had to break a tie inside one binary
+# rather than between two: the audio process IS `droidcam-cli -a ...`, so its
+# cmdline contains the video signature `droidcam-cli` and matched it. With
+# `video.json` absent - a shell restart with only the mic up - `status video`
+# therefore answered with the MIC's pid, the tab drew a webcam stream that did
+# not exist, and the user turning it off ran `stop video`, which sent SIGTERM
+# to the microphone. The port could not break the tie either: `find_running`
+# is called with an empty port whenever there is no state file.
 #
 # The `-a` test is on a whole token (the cmdline is padded, and cmdline_of
 # has already turned its NULs into spaces), so `-nocontrols` and a `-size=`
@@ -78,9 +85,7 @@ session_matches() {
     local session="$1" cl=" $2 "
     case "$session" in
         video)
-            case "$cl" in
-                *droidcam-cli*) case "$cl" in *" -a "*) return 1 ;; esac; return 0 ;;
-            esac
+            case "$cl" in *"--v4l2-sink="*) return 0 ;; esac
             return 1 ;;
         audio)
             case "$cl" in
@@ -161,6 +166,23 @@ extract_ip() {
     printf ''
 }
 
+# extract_sink <args...> → the node a `--v4l2-sink=` argument names.
+#
+# The webcam's /dev/videoN used to be read out of the session's own log
+# (`Video: /dev/videoN`, which is a line droidcam-cli prints). scrcpy prints
+# no such line because it is TOLD the node, so the argv is where the answer
+# lives - and that survives a shell restart, when the log has been truncated
+# and the process rediscovered from the process table.
+extract_sink() {
+    local a
+    for a in "$@"; do
+        case "$a" in
+            --v4l2-sink=*) printf '%s' "${a#--v4l2-sink=}"; return 0 ;;
+        esac
+    done
+    printf ''
+}
+
 # ─── Commands ────────────────────────────────────────────────────────────
 
 # cmd_launch <session> <bin> <args...>
@@ -172,9 +194,11 @@ cmd_launch() {
     statefile="$(statefile_for "$session")"
     logfile="$(logfile_for "$session")"
 
-    local port mode ip
+    local port mode ip sink
     port="$(extract_port "$@")"
+    sink="$(extract_sink "$@")"
     mode="wifi"
+    [ -n "$sink" ] && mode="scrcpy"
     for a in "$@"; do
         [ "$a" = "adb" ] && mode="usb" && break
     done
@@ -188,7 +212,7 @@ cmd_launch() {
         local cl
         cl="$(cmdline_of "$existing")"
         atomically_write "$statefile" \
-            "{\"pid\":\"$existing\",\"started\":$(date +%s),\"port\":\"$port\",\"mode\":\"$mode\",\"ip\":\"$ip\",\"cmdline\":\"$cl\"}"
+            "{\"pid\":\"$existing\",\"started\":$(date +%s),\"port\":\"$port\",\"mode\":\"$mode\",\"ip\":\"$ip\",\"device\":\"$sink\",\"cmdline\":\"$cl\"}"
         echo "$existing"
         return 0
     fi
@@ -199,7 +223,7 @@ cmd_launch() {
     # later. Waking the transport first noticeably improves launch odds.
     # Bounded, because an unreachable phone must not hang the launch.
     case "$session" in
-        scrcpy-mic)
+        scrcpy-mic|video)
             timeout 3 adb devices  > /dev/null 2>&1 || true
             timeout 3 adb shell true > /dev/null 2>&1 || true
             ;;
@@ -233,7 +257,7 @@ cmd_launch() {
     local cl
     cl="$(cmdline_of "$pid")"
     atomically_write "$statefile" \
-        "{\"pid\":\"$pid\",\"started\":$(date +%s),\"port\":\"$port\",\"mode\":\"$mode\",\"ip\":\"$ip\",\"cmdline\":\"$cl\"}"
+        "{\"pid\":\"$pid\",\"started\":$(date +%s),\"port\":\"$port\",\"mode\":\"$mode\",\"ip\":\"$ip\",\"device\":\"$sink\",\"cmdline\":\"$cl\"}"
     echo "$pid"
 }
 
@@ -241,17 +265,17 @@ cmd_launch() {
 #   {session,pid,alive,started,port,mode,ip,device,video_running,audio_running}
 cmd_status() {
     local session="$1"
-    local statefile logfile
+    local statefile
     statefile="$(statefile_for "$session")"
-    logfile="$(logfile_for "$session")"
 
-    local pid="" alive="false" port="" mode="unknown" ip="" started=""
+    local pid="" alive="false" port="" mode="unknown" ip="" started="" device=""
     if [ -f "$statefile" ]; then
         pid="$(read_json_field "$statefile" pid)"
         port="$(read_json_field "$statefile" port)"
         mode="$(read_json_field "$statefile" mode)"
         ip="$(read_json_field "$statefile" ip)"
         started="$(read_json_field "$statefile" started)"
+        device="$(read_json_field "$statefile" device)"
         [ -z "$mode" ] && mode="unknown"
         if is_alive "$pid"; then
             alive="true"
@@ -272,11 +296,15 @@ cmd_status() {
                 port="$(extract_port "${CMDLINE_WORDS[@]}")"
             fi
             case " $cl " in
+                *" --v4l2-sink="*) mode="scrcpy" ;;
                 *" adb "*) mode="usb" ;;
                 *) mode="wifi" ;;
             esac
             if [ "$mode" = "wifi" ] && [ -z "$ip" ]; then
                 ip="$(extract_ip "$mode" "${CMDLINE_WORDS[@]}")"
+            fi
+            if [ -z "$device" ]; then
+                device="$(extract_sink "${CMDLINE_WORDS[@]}")"
             fi
             [ -z "$started" ] && started="$(stat -c %Y "/proc/$pid" 2>/dev/null || echo 0)"
         fi
@@ -287,12 +315,6 @@ cmd_status() {
         video)      [ "$alive" = "true" ] && video_running="true" ;;
         audio|scrcpy-mic) [ "$alive" = "true" ] && audio_running="true" ;;
     esac
-
-    # Device: droidcam sessions print "Video: /dev/videoN" on stdout (logged).
-    local device=""
-    if [ -f "$logfile" ]; then
-        device="$(grep -oE 'Video: /dev/video[0-9]+' "$logfile" | head -n1 | awk '{print $2}' || true)"
-    fi
 
     printf '{"session":"%s","pid":"%s","alive":%s,"started":"%s","port":"%s","mode":"%s","ip":"%s","device":"%s","video_running":%s,"audio_running":%s}\n' \
         "$session" "$pid" "$alive" "$started" "$port" "$mode" "$ip" "$device" "$video_running" "$audio_running"

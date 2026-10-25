@@ -86,17 +86,21 @@ Singleton {
                 property JsonObject scrcpy: JsonObject {
                     property list<string> recentPackages: []
                 }
-                property JsonObject camera: JsonObject {
-                    property string lastMode: "wifi"
-                    property string lastIp: ""
-                    property int lastPort: 4747
-                }
                 property JsonObject mic: JsonObject {
                     property string originalDefaultSink: ""
                     property string lastBackend: ""
                     property string lastMode: "wifi"
                     property string lastIp: ""
                     property int lastPort: 4748
+                }
+                // The address that last ANSWERED `adb connect`, which is a
+                // different question from the one `Config.options.phone.scrcpy`
+                // answers ("what should scrcpy dial") and is not a setting:
+                // Android re-rolls both adb ports every time Wireless
+                // debugging is turned off and on, so this is a hint the pair
+                // panel offers, never something a feature refuses over.
+                property JsonObject adb: JsonObject {
+                    property string lastWirelessAddress: ""
                 }
             }
 

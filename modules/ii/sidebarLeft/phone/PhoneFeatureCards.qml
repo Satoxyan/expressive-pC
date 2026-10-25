@@ -22,7 +22,9 @@ import "phone_cards.js" as PhoneCards
  *
  * The stack is one Item the tab places last in its column. It reads nothing
  * from the tab and announces what it cannot do itself: `openPage(id)` with
- * "webcam" or "mic".
+ * "webcam", "mic" or "adb" - the last of the three because a card that knows
+ * before the click that its service has no transport should hand over the
+ * route rather than wait to be refused.
  *
  * `showPeripheralCards` hides the three FEATURE cards only. A pairing request
  * is a question a peer asked, not a peripheral, and dropping it because the
@@ -32,6 +34,8 @@ Item {
     id: root
 
     signal openPage(string id)
+    // The guide belongs to the tab, not to this stack: see Phone.qml.
+    signal openInstallGuideRequested(string feature, string title)
 
     implicitHeight: stack.implicitHeight
 
@@ -87,12 +91,6 @@ Item {
         return index >= 0 ? Number(PhoneScrcpy.sessions.get(index).startedAt) : 0;
     }
 
-    function openInstallGuide(feature: string, title: string): void {
-        installGuide.feature = feature;
-        installGuide.headerTitle = title;
-        installGuide.shown = true;
-    }
-
     ColumnLayout {
         id: stack
         anchors {
@@ -143,7 +141,7 @@ Item {
                 case "offline":
                     return Translation.tr("Pair a reachable device to mirror its screen");
                 case "noDevice":
-                    return Translation.tr("No device over ADB · turn on USB or wireless debugging");
+                    return Translation.tr("No device over ADB · open Phone link to pair or reconnect");
                 case "error":
                     return PhoneCards.errorHeadline(PhoneScrcpy.mirrorError);
                 case "running":
@@ -176,11 +174,23 @@ Item {
 
             onClicked: {
                 if (!PhoneScrcpy.available) {
-                    root.openInstallGuide("mirror", Translation.tr("scrcpy Mirror — missing dependencies"));
+                    root.openInstallGuideRequested("mirror", Translation.tr("scrcpy Mirror — missing dependencies"));
                     return;
                 }
                 if (PhoneScrcpy.mirrorLaunching)
                     return;
+                // scrcpy with nothing on adb is a LINK question, and asking
+                // scrcpy turns it into a stack trace: the click flashed the
+                // card and left it saying exactly what it said before, which
+                // is the whole reason this branch exists. The tri-state flag
+                // and not `cardState` - the state folds an adb gap into
+                // "offline", and `undefined` (probes still running) must not
+                // send a click off to another page. A running mirror is asked
+                // first, because its click is a focus, not a launch.
+                if (!PhoneScrcpy.mirrorRunning && root.adbDevice === false) {
+                    root.openPage("adb");
+                    return;
+                }
                 // launchMirror() focuses an already-running mirror itself, so
                 // there is one call here rather than a second copy of that
                 // decision.
@@ -201,6 +211,10 @@ Item {
                 connecting: PhoneCamera.connecting,
                 active: PhoneCamera.active,
                 device: PhoneCamera.device,
+                // The webcam is scrcpy now, and scrcpy has nothing to attach
+                // to when `adb devices` is empty — unlike the DroidCam engine
+                // it replaced, which reached the phone over Wi-Fi.
+                adbDevice: root.adbDevice,
                 error: PhoneCamera.lastError
             })
 
@@ -209,7 +223,7 @@ Item {
             hasSettings: true
             cardState: PhoneCamera.state
             title: PhoneCards.webcamTitleKey(PhoneCamera.available) === "install"
-                ? Translation.tr("Install DroidCam")
+                ? Translation.tr("Install scrcpy")
                 : Translation.tr("Phone Webcam")
             subtitle: {
                 switch (PhoneCards.webcamSubtitleKey(webcamCard.flags)) {
@@ -223,6 +237,8 @@ Item {
                     return PhoneCamera.device;
                 case "running":
                     return Translation.tr("Streaming from the phone's camera");
+                case "noDevice":
+                    return Translation.tr("No device over ADB · open Phone link to pair or reconnect");
                 case "error":
                     return PhoneCards.errorHeadline(PhoneCamera.lastError);
                 default:
@@ -233,17 +249,26 @@ Item {
                 if (!PhoneCamera.active)
                     return "";
                 const elapsed = PhoneCards.formatElapsed(PhoneCards.elapsedMs(PhoneCamera.startedAt, root.nowMs));
-                const target = (PhoneCamera.activeIp || Translation.tr("usb")) + ":" + PhoneCamera.activePort;
-                return Translation.tr("Active for %1 · %2 · %3")
-                    .arg(elapsed).arg(target).arg(PhoneCamera.device || "—");
+                return Translation.tr("Active for %1 · %2")
+                    .arg(elapsed).arg(PhoneCamera.device || "—");
             }
             lastError: PhoneCamera.lastError
             inlineActions: [
-                {
-                    icon: "preview",
-                    label: Translation.tr("Open a preview window"),
-                    action: () => PhoneCamera.openPreview()
-                },
+                // Only while there is something to preview. The webcam page
+                // gates its button the same way; a chip that is drawn on an
+                // idle card can only ever fail, and used to fail with a
+                // complaint about mpv.
+                ...((PhoneCamera.previewRunning
+                        || (PhoneCamera.active && PhoneCamera.device.length > 0))
+                    ? [{
+                        icon: PhoneCamera.previewRunning ? "visibility_off" : "preview",
+                        label: PhoneCamera.previewRunning
+                            ? Translation.tr("Close the preview window")
+                            : Translation.tr("Open a preview window"),
+                        action: () => PhoneCamera.previewRunning
+                            ? PhoneCamera.closePreview()
+                            : PhoneCamera.openPreview()
+                    }] : []),
                 {
                     icon: "cameraswitch",
                     label: Translation.tr("Switch the camera the app uses"),
@@ -253,7 +278,15 @@ Item {
 
             onClicked: {
                 if (!PhoneCamera.available) {
-                    root.openInstallGuide("webcam", Translation.tr("Phone Webcam — missing dependencies"));
+                    root.openInstallGuideRequested("webcam", Translation.tr("Phone Webcam — missing dependencies"));
+                    return;
+                }
+                // scrcpy is the only thing that writes this card's video node,
+                // so with nothing on adb there is no stream to start and the
+                // link page is the answer. Stopping a running stream is still
+                // what the click does.
+                if (!PhoneCamera.active && root.adbDevice === false) {
+                    root.openPage("adb");
                     return;
                 }
                 PhoneCamera.toggle();
@@ -302,7 +335,7 @@ Item {
                 case "active":
                     return Translation.tr("Active · click to mute");
                 case "noDevice":
-                    return Translation.tr("No device over ADB · turn on USB or wireless debugging");
+                    return Translation.tr("No device over ADB · open Phone link to pair or reconnect");
                 case "error":
                     return PhoneCards.errorHeadline(PhoneMic.lastError);
                 default:
@@ -351,7 +384,7 @@ Item {
 
             onClicked: {
                 if (!PhoneMic.available) {
-                    root.openInstallGuide("microphone", Translation.tr("Phone Microphone — missing dependencies"));
+                    root.openInstallGuideRequested("microphone", Translation.tr("Phone Microphone — missing dependencies"));
                     return;
                 }
                 // A running microphone's primary click mutes rather than
@@ -359,6 +392,15 @@ Item {
                 // button is right there for the other one.
                 if (PhoneMic.active) {
                     PhoneMic.toggleMute();
+                    return;
+                }
+                // Only the scrcpy backend drives the phone over adb. The
+                // DroidCam CLI reaches it over Wi-Fi and needs nothing from
+                // this page, so the refusal is asked for rather than assumed
+                // - which is the same distinction phone_cards.js's `micState`
+                // draws, and the reason the check is not on `cardState`.
+                if (PhoneMic.preferredBackend === "scrcpy" && root.adbDevice === false) {
+                    root.openPage("adb");
                     return;
                 }
                 PhoneMic.toggle();
@@ -373,36 +415,5 @@ Item {
         // URL - a stack that failed to load would take pairing with it. The
         // type also moved to qs.modules.imi.phone as PhonePairingCard; the
         // name that used to be here was the dialog's.
-    }
-
-    // The guide covers the phone panel rather than the three cards it was
-    // opened from: a per-distro command block does not fit in 200px. It is
-    // reparented onto the window's own content item, which is the only thing
-    // reachable from here that spans the panel - this component may not read
-    // anything off the tab that hosts it.
-    InstallGuidePopup {
-        id: installGuide
-        property bool shown: false
-        // Which feature the guide was opened for, so a re-check that resolves
-        // it can close it. Declared here rather than on the component: the
-        // popup itself is handed a dependency list and knows nothing about
-        // scrcpy, DroidCam or the microphone.
-        property string feature: ""
-
-        parent: root.Window.contentItem ?? root
-        anchors.fill: parent
-        visible: installGuide.shown
-        z: 9999
-        // A binding, not an assignment: missingFor() reads every one of
-        // PhoneDeps' presence flags, so a Re-check that installs something
-        // empties this list on its own - and the popup dismisses itself when
-        // it does. Assigning the list once instead left the guide showing
-        // dependencies the probes had just stopped reporting.
-        dependencies: installGuide.feature.length > 0
-            ? PhoneDeps.missingFor(installGuide.feature)
-            : []
-        detectedDistro: PhoneDeps.distro
-        onCloseRequested: installGuide.shown = false
-        onRecheckRequested: PhoneDeps.recheck()
     }
 }

@@ -75,7 +75,8 @@ PhoneSubPage {
                 colBackgroundHover: Appearance.colors.colPrimaryHover
                 colRipple: Appearance.colors.colPrimaryActive
                 colText: Appearance.colors.colOnPrimary
-                onClicked: installGuide.shown = true
+                onClicked: root.openInstallGuideRequested("microphone",
+                    Translation.tr("Phone Microphone — missing dependencies"))
             }
         }
 
@@ -286,23 +287,5 @@ PhoneSubPage {
         repeat: true
         running: PhoneMic.active && root.visible
         onTriggered: clock.nowMs = Date.now()
-    }
-
-    // The same guide the feature card opens, filled to the panel rather than
-    // to this page. Reparented onto the window's own content item, the only
-    // thing spanning the panel that this page may reach.
-    InstallGuidePopup {
-        id: installGuide
-        property bool shown: false
-
-        parent: root.Window.contentItem ?? root
-        anchors.fill: parent
-        visible: installGuide.shown
-        z: 9999
-        dependencies: PhoneDeps.missingFor("microphone")
-        detectedDistro: PhoneDeps.distro
-        headerTitle: Translation.tr("Phone Microphone — missing dependencies")
-        onCloseRequested: installGuide.shown = false
-        onRecheckRequested: PhoneDeps.recheck()
     }
 }

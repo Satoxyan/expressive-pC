@@ -30,6 +30,14 @@ Item {
 
     ColumnLayout {
         anchors.centerIn: parent
+        // The column has to be given a width for the description's
+        // Layout.fillWidth to mean anything: sized only by its contents it
+        // measured itself to the sentence's UNWRAPPED length, so a description
+        // longer than the widget ran off both sides of it and the clipping cut
+        // the words in half at the edges.
+        width: root.descriptionMaximumWidth > 0
+            ? Math.min(root.width, root.descriptionMaximumWidth)
+            : root.width
         spacing: 5
 
         MaterialShapeWrappedMaterialSymbol {

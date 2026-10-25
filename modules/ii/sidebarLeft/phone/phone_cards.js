@@ -68,8 +68,7 @@ function mirrorState(flags) {
 // see it, and its scrcpy backend - the preferred one wherever scrcpy is
 // installed - drives the phone over ADB. The droidcam backend does not, so
 // the refusal is asked for rather than assumed (`needsAdbDevice`); the webcam
-// is the case that never asks, since droidcam-cli reaches the phone over
-// Wi-Fi when adb has nothing.
+// asks unconditionally, since scrcpy is the only thing that writes its node.
 function micState(flags) {
     const f = flags || {};
     const linked = f.reachable && !(f.needsAdbDevice && f.adbDevice === false);
@@ -134,6 +133,10 @@ function webcamSubtitleKey(flags) {
     // gone back to saying "Tap to start", which is what "clicking it does
     // nothing" looked like.
     if (errorHeadline(f.error).length > 0) return "error";
+    // Same ordering as the mirror's: the failure from the click the user just
+    // made outranks the standing ADB precondition, which was already on the
+    // card before it.
+    if (f.adbDevice === false) return "noDevice";
     return "ready";
 }
 
@@ -180,6 +183,33 @@ function formatElapsed(ms) {
     const hours = Math.floor(minutes / 60);
     const restMinutes = minutes % 60;
     return hours + "h " + (restMinutes < 10 ? "0" : "") + restMinutes + "m";
+}
+
+// ---------------------------------------------------------------------------
+// The wireless adb link
+// ---------------------------------------------------------------------------
+
+// The address to offer for `adb connect`, out of the two halves the shell can
+// each know one of. `knownHost` is where KDE Connect reaches the phone NOW -
+// which says nothing about the port, because Android re-rolls it every time
+// Wireless debugging is turned off and on, and nothing about the future,
+// because DHCP moves the host. `lastAddress` is the whole address that last
+// ANSWERED, and it is the only record of a port this shell keeps.
+//
+// So the current host and the remembered port, which is neither of the two
+// inputs, is the answer whenever both are there; a whole remembered address
+// beats a bare host when the shell has no idea where the phone is; and a bare
+// host is still the fallback, which is what the field used to start with and
+// what the Connect button refuses - a host with no port is not an address.
+function reconnectAddress(knownHost, lastAddress) {
+    const host = String(knownHost || "").trim();
+    const last = String(lastAddress || "").trim();
+    if (host.length === 0)
+        return last;
+    const colon = last.lastIndexOf(":");
+    if (colon < 0)
+        return host;
+    return host + last.substring(colon);
 }
 
 // ---------------------------------------------------------------------------

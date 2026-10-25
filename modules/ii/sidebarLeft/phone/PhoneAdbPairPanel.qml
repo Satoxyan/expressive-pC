@@ -8,8 +8,9 @@ import qs.modules.common.widgets
 import "phone_cards.js" as PhoneCards
 
 /**
- * What the Android Apps page draws when App Mode has no transport, which
- * on Android 11+ is a job rather than a paragraph.
+ * What the Phone link page draws for its whole subject, and what the Android
+ * Apps page draws when App Mode has no transport - which on Android 11+ is a
+ * job rather than a paragraph.
  *
  * The page used to print a recipe - open a terminal, type `adb pair
  * host:port code`, then `adb connect host:port` - and the maintainer's
@@ -30,15 +31,20 @@ import "phone_cards.js" as PhoneCards
  *               used to get (see PhoneDeps.parseLoaderFailure).
  *   noDevice  - adb works and lists nothing, which is the state the
  *               pairing form is for.
+ *   ""        - nothing to complain about. `formAlwaysShown` is what makes
+ *               that a state with a UI: the link page is about this job, not
+ *               about being a consequence, and the second phone and the
+ *               re-rolled port are both walked in here.
  *
  * What it still asks the user to read off the phone: the six-digit
  * pairing code, always - it is generated per pairing and advertised
  * nowhere - and both ports whenever avahi cannot see them. The host is
- * prefilled from the address KDE Connect already reaches the phone on;
- * the ports are prefilled from `_adb-tls-pairing._tcp` /
- * `_adb-tls-connect._tcp` when the phone is advertising them and avahi is
- * installed. Nothing here promises more than that: with no avahi the
- * discovery row is simply not drawn.
+ * prefilled from the address KDE Connect already reaches the phone on, and
+ * the connect port from the last address that answered, which is the only
+ * port record there is between one re-roll and the next; the ports are
+ * prefilled from `_adb-tls-pairing._tcp` / `_adb-tls-connect._tcp` when the
+ * phone is advertising them and avahi is installed. Nothing here promises
+ * more than that: with no avahi the discovery row is simply not drawn.
  */
 ColumnLayout {
     id: root
@@ -59,7 +65,14 @@ ColumnLayout {
         return "";
     }
 
-    readonly property bool shown: root.mode.length > 0
+    // The link page hosts this form on purpose, and a device already answering
+    // is no reason to take the pair and connect fields away from it: that is
+    // the state a second phone, or a phone whose port just re-rolled, is
+    // walked into. The Apps page shows the panel as a REFUSAL and leaves this
+    // at its default, where every binding below is what it always was.
+    property bool formAlwaysShown: false
+
+    readonly property bool shown: root.formAlwaysShown || root.mode.length > 0
 
     // The install command for this machine, so the absent state carries the
     // one thing that fixes it. `PhoneDeps.dependency` is the same table the
@@ -77,6 +90,13 @@ ColumnLayout {
     // rather than as an address, and the Pair button stays refused until the
     // port is there.
     readonly property string knownHost: PhoneDeps.preferredWirelessHost()
+
+    // The other half of an address, from the last time this phone answered.
+    // The host above is current and the port here is not, and neither alone
+    // is an address the Connect button accepts, which is what
+    // `reconnectAddress` is for.
+    readonly property string lastWirelessAddress:
+        Persistent.states.phone.adb.lastWirelessAddress
 
     // What was last put into each field on the shell's behalf. A suggestion
     // is an ASSIGNMENT and never a binding on `text`: a binding would be
@@ -105,19 +125,30 @@ ColumnLayout {
     }
 
     function offerEverythingKnown(): void {
+        // The PAIRING address is not offered the remembered one: pairing
+        // listens on its own port, advertised only while the phone's pairing
+        // screen is open, and it is never the port `connect` answered on last
+        // time. The connect field is the one with a history worth reusing.
         root.offerPairAddress(PhoneDeps.mdnsPairingAddress.length > 0
                               ? PhoneDeps.mdnsPairingAddress : root.knownHost);
         root.offerConnectAddress(PhoneDeps.mdnsConnectAddress.length > 0
-                                 ? PhoneDeps.mdnsConnectAddress : root.knownHost);
+                                 ? PhoneDeps.mdnsConnectAddress
+                                 : PhoneCards.reconnectAddress(root.knownHost,
+                                                               root.lastWirelessAddress));
     }
 
     Component.onCompleted: root.offerEverythingKnown()
     onKnownHostChanged: root.offerEverythingKnown()
+    // A connect that lands while this panel is open has taught the shell a
+    // port it did not have at construction, and the same rule as the
+    // discovery's answer applies: reach the field, unless the field is
+    // carrying something the user typed.
+    onLastWirelessAddressChanged: root.offerEverythingKnown()
 
-    // An observation of the two results, rather than a poll or a binding on
-    // `text`: a discovery that answers while the panel is open has to reach
-    // the fields, and a discovery that answers with nothing must leave them
-    // exactly as they were.
+    // An observation of the discovery results and of a connect landing, rather
+    // than a poll or a binding on `text`: an answer that arrives while the
+    // panel is open has to reach the fields, and one that arrives with nothing
+    // must leave them exactly as they were.
     Connections {
         target: PhoneDeps
 
@@ -127,6 +158,15 @@ ColumnLayout {
 
         function onMdnsConnectAddressChanged(): void {
             root.offerConnectAddress(PhoneDeps.mdnsConnectAddress);
+        }
+
+        // The one thing worth remembering from a connect is the address that
+        // ANSWERED, and only that: a failure is evidence about a port Android
+        // has already thrown away. `wirelessAttemptAddress` rather than the
+        // field, because the field is editable while adb is running.
+        function onConnectStateChanged(): void {
+            if (PhoneDeps.connectState === "ok")
+                Persistent.states.phone.adb.lastWirelessAddress = PhoneDeps.wirelessAttemptAddress;
         }
     }
 
@@ -140,6 +180,11 @@ ColumnLayout {
     NoticeBox {
         id: diagnosis
 
+        // Nothing to complain about is nothing to show. The Apps page never
+        // let this box answer for a healthy link because it set `visible` on
+        // the PANEL, and a panel that is asked to stay open has to decide that
+        // for each of its own parts.
+        visible: root.mode.length > 0
         Layout.fillWidth: true
         colBg: Appearance.colors.colErrorContainer
         colFg: Appearance.colors.colOnErrorContainer
@@ -199,7 +244,14 @@ ColumnLayout {
     ContentSubsection {
         id: wirelessSection
 
-        visible: root.mode === "noDevice"
+        // The form is a job the shell can do, so adb has to be installed AND
+        // startable for it to be worth drawing, which is what `noDevice` and
+        // the healthy `""` both mean. `formAlwaysShown` widens the refusal to
+        // the healthy link - a second phone, or a port that just re-rolled -
+        // and deliberately not to `absent` or `broken`: offering to pair from a
+        // machine whose adb cannot start is the thing this panel exists to stop
+        // doing.
+        visible: root.mode === "noDevice" || (root.formAlwaysShown && root.mode === "")
         title: Translation.tr("Pair over Wi-Fi")
 
         StyledText {
@@ -388,6 +440,11 @@ ColumnLayout {
                 StyledText {
                     id: closingNote
                     Layout.fillWidth: true
+                    // A promise about this block going away, which is what the
+                    // Apps page does with it and is not what the link page
+                    // does: there the form is the point and it stays whether or
+                    // not a device answers.
+                    visible: !root.formAlwaysShown
                     text: Translation.tr("The tab keeps asking while it is open. As soon as a device answers, this goes and the app list is fetched on its own.")
                     font.pixelSize: Appearance.font.pixelSize.smallest
                     color: Appearance.colors.colSubtext

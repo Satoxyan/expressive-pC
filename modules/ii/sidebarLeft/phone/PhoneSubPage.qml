@@ -23,6 +23,14 @@ Item {
     // the host's, not the page's - a page that handled it would have to be
     // focused, and the pages are not all focusable.
     signal back()
+    // Raised by a page whose feature has unmet dependencies. Phone.qml owns
+    // the guide and fills the tab with it; a page that drew its own would
+    // have to reach outside its own column to be readable.
+    signal openInstallGuideRequested(string feature, string title)
+    // Raised by a page whose feature is missing the adb half of the link -
+    // which is a different page from the one asking, and the asking page has
+    // no business knowing what the tab does with it.
+    signal openAdbPageRequested()
 
     default property alias content: contentHolder.data
 

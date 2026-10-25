@@ -3,6 +3,10 @@ import "shapes/material-shapes.js" as MaterialShapes
 
 ShapeCanvas {
     id: root
+    // A Canvas paints into a texture with antialiasing off, which a square or
+    // a pill hides but the curvier shapes do not: drawn at placeholder size
+    // their edges came out as stair steps.
+    antialiasing: true
     enum Shape {
         Circle,
         Square,

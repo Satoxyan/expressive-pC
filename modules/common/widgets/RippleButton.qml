@@ -16,6 +16,13 @@ Button {
     property real buttonRadius: Appearance?.rounding?.small ?? 4
     property real buttonRadiusPressed: buttonRadius
     property real buttonEffectiveRadius: root.down ? root.buttonRadiusPressed : root.buttonRadius
+    // Per-corner overrides, defaulting to the uniform radius. A button used as
+    // a row of a GroupedList needs the group's outer corners and square inner
+    // ones; GroupedList pushes them through these four.
+    property real cornerTopLeft: root.buttonEffectiveRadius
+    property real cornerTopRight: root.buttonEffectiveRadius
+    property real cornerBottomLeft: root.buttonEffectiveRadius
+    property real cornerBottomRight: root.buttonEffectiveRadius
     property int rippleDuration: 1200
     property bool rippleEnabled: true
     property var downAction // When left clicking (down)
@@ -150,7 +157,10 @@ Button {
 
     background: Rectangle {
         id: buttonBackground
-        radius: root.buttonEffectiveRadius
+        topLeftRadius: root.cornerTopLeft
+        topRightRadius: root.cornerTopRight
+        bottomLeftRadius: root.cornerBottomLeft
+        bottomRightRadius: root.cornerBottomRight
         implicitHeight: 30
 
         color: root.buttonColor
@@ -165,7 +175,10 @@ Button {
             maskSource: Rectangle {
                 width: buttonBackground.width
                 height: buttonBackground.height
-                radius: root.buttonEffectiveRadius
+                topLeftRadius: root.cornerTopLeft
+                topRightRadius: root.cornerTopRight
+                bottomLeftRadius: root.cornerBottomLeft
+                bottomRightRadius: root.cornerBottomRight
             }
         }
 

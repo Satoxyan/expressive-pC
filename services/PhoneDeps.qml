@@ -179,7 +179,7 @@ Singleton {
         const table = {
             "scrcpy": {
                 name: Translation.tr("scrcpy"),
-                description: Translation.tr("Mirrors your phone screen in a floating SDL window. The main binary for screen mirroring."),
+                description: Translation.tr("Mirrors your phone screen in a floating SDL window, and streams the phone's camera into /dev/videoN for the webcam. Needs no app on the phone."),
                 commands: {
                     arch: "sudo pacman -S scrcpy",
                     fedora: "sudo dnf install scrcpy",
@@ -197,7 +197,7 @@ Singleton {
             },
             "droidcam-cli": {
                 name: Translation.tr("DroidCam CLI"),
-                description: Translation.tr("Connects to the DroidCam app on your phone and streams video to /dev/videoN"),
+                description: Translation.tr("The fallback microphone backend: it pulls the phone's mic out of the DroidCam app. The webcam no longer needs it — scrcpy writes /dev/videoN by itself."),
                 commands: {
                     arch: "yay -S droidcam",
                     fedora: "# Enable RPM Fusion first, then:\nsudo dnf install android-tools\n# Download from https://www.dev47apps.com/droidcam/linux/",
@@ -206,16 +206,16 @@ Singleton {
             },
             "v4l2loopback": {
                 name: Translation.tr("v4l2loopback kernel module"),
-                description: Translation.tr("Creates virtual /dev/videoN devices that DroidCam writes to. Without it, droidcam-cli has nowhere to stream."),
+                description: Translation.tr("Creates the virtual /dev/videoN the webcam writes to. Installing it is not enough — it has to be loaded, and the commands below load it and keep it loaded across reboots."),
                 commands: {
-                    arch: "yay -S v4l2loopback-dkms\nsudo modprobe v4l2loopback\necho v4l2loopback | sudo tee /etc/modules-load.d/v4l2loopback.conf",
+                    arch: "sudo pacman -S v4l2loopback-dkms\nsudo modprobe v4l2loopback\necho v4l2loopback | sudo tee /etc/modules-load.d/v4l2loopback.conf",
                     fedora: "sudo dnf install akmod-v4l2loopback\nsudo modprobe v4l2loopback\necho v4l2loopback | sudo tee /etc/modules-load.d/v4l2loopback.conf",
                     debian: "sudo apt install v4l2loopback-dkms\nsudo modprobe v4l2loopback\necho v4l2loopback | sudo tee /etc/modules-load.d/v4l2loopback.conf"
                 }
             },
             "v4l-utils": {
                 name: Translation.tr("v4l-utils (v4l2-ctl)"),
-                description: Translation.tr("Recommended for device detection and live mirror/flip controls"),
+                description: Translation.tr("Finds the /dev/videoN the webcam writes to — without it the stream has nowhere to be pointed."),
                 commands: {
                     arch: "sudo pacman -S v4l-utils",
                     fedora: "sudo dnf install v4l-utils",
@@ -276,9 +276,10 @@ Singleton {
     }
 
     // Which dependencies a feature is missing, given the presence flags.
-    // "mirror" is scrcpy + adb; "webcam" is DroidCam + the loopback module
-    // (loaded or merely installed), with v4l-utils and mpv recommended;
-    // "microphone" is pactl + either audio backend.
+    // "mirror" is scrcpy + adb; "webcam" is scrcpy + adb + the loopback
+    // module, which counts as present only once LOADED - installed but not
+    // loaded leaves scrcpy with nowhere to write - with v4l-utils and mpv
+    // recommended; "microphone" is pactl + either audio backend.
     //
     // A tool that is present and cannot start counts as missing here - the
     // click does nothing either way, which is the whole complaint - and its
@@ -297,8 +298,12 @@ Singleton {
             need("scrcpy", f.scrcpy === true, scrcpyBroken);
             need("android-tools", f.adb === true, adbBroken);
         } else if (feature === "webcam") {
-            need("droidcam-cli", f.droidcamCli === true, droidcamBroken);
-            need("v4l2loopback", f.v4l2loopbackLoaded === true || f.v4l2loopbackInstalled === true, "");
+            // The engine spawns scrcpy, and scrcpy reaches the phone through
+            // adb, so both are load-bearing here even though neither is a
+            // camera library. droidcam-cli used to be the required one.
+            need("scrcpy", f.scrcpy === true, scrcpyBroken);
+            need("android-tools", f.adb === true, adbBroken);
+            need("v4l2loopback", f.v4l2loopbackLoaded === true, "");
             need("v4l-utils", f.v4l2Ctl === true, "");
             need("mpv", f.mpv === true, "");
         } else if (feature === "microphone") {
@@ -516,6 +521,11 @@ Singleton {
     property string pairMessage: ""
     property string connectState: "idle"
     property string connectMessage: ""
+    // The address the last `adb connect` was ASKED for, which is not the
+    // address sitting in the field when the answer arrives - the user may have
+    // edited it while adb was running. Recorded here rather than read back off
+    // a text field, so whoever remembers it cannot remember a half-typed one.
+    property string wirelessAttemptAddress: ""
 
     function pairWireless(address: string, code: string): void {
         if (root.pairState === "busy") return;
@@ -555,6 +565,7 @@ Singleton {
         }
         root.connectState = "busy";
         root.connectMessage = "";
+        root.wirelessAttemptAddress = address;
         connectGuard.restart();
         connectProcess.exec(root.adbConnectArgv(address));
     }

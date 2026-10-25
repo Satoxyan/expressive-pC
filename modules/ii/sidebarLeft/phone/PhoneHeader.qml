@@ -8,13 +8,20 @@ import QtQuick.Layouts
 
 /**
  * The Phone tab's top row: the device on a chip whose arrow opens the
- * roster, a connection pill and a battery pill.
+ * roster, a connection pill, a battery pill, and the button that opens the
+ * adb link page.
  *
  * The connection pill says the most specific thing the daemon reported, in
  * that order: the cellular network type from connectivity_report ("LTE"),
  * else the first entry of reachableAddresses (the LAN address), else the
  * bare fact that the device is there. An unreachable device says so and
  * nothing else - an address is a claim about a link that is down.
+ *
+ * Which is the DAEMON's link. adb is a second one, and the two disagree more
+ * often than a phone lets on: KDE Connect reaches a device whose wireless
+ * debugging is off, and nothing on this tab that drives the phone can start
+ * over that. The pill has no way to say so - it is one device's summary, not
+ * two transports' - which is why the row carries the button instead.
  */
 Item {
     id: root
@@ -24,6 +31,7 @@ Item {
     property bool rosterOpen: false
 
     signal toggleRoster()
+    signal openAdbPage()
 
     // The wave member's one opt-in; StaggerEntrance installs the channels.
     property real appear: 1
@@ -92,6 +100,25 @@ Item {
 
         Item {
             Layout.fillWidth: true
+        }
+
+        // The one route to the adb link page, and therefore to the pair and
+        // connect form. It lives here rather than in the card stack because
+        // the cards are the surface that REPORTS a dead link: a user whose
+        // mirror, webcam and microphone are all refusing has to be offered the
+        // way out beside the diagnosis, not three clicks under it.
+        //
+        // Always drawn, device or none - "adb is not installed on this
+        // machine" is one of the answers the page gives, and it is not a
+        // question a chip's absence should hide. Thirty-two is the chip's own
+        // height, so the row is still one height.
+        IconButton {
+            id: adbLinkButton
+            objectName: "adbLinkButton"
+            buttonIcon: "usb"
+            buttonSize: 32
+            tooltip: Translation.tr("Phone link (ADB)")
+            onClicked: root.openAdbPage()
         }
     }
 }
