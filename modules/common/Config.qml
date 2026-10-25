@@ -270,6 +270,15 @@ Singleton {
                 property string uiBackground: "themed"
                 property bool extraBackgroundTint: true
                 property int fakeScreenRounding: 2 // 0: None | 1: Always | 2: When not fullscreen
+                property JsonObject icons: JsonObject {
+                    property string theme: "Tela"
+                    property bool followScheme: true
+                    property bool dynamicColor: true
+                    property bool preventBreezeOverride: true
+                    property int keepGenerated: 6
+                    property string lightVariant: "" // Optional explicit override, empty = auto
+                    property string darkVariant: ""
+                }
                 property JsonObject fonts: JsonObject {
                     property string main: "Google Sans Flex"
                     property string numbers: "Google Sans Flex"
@@ -288,6 +297,7 @@ Singleton {
                 property JsonObject wallpaperTheming: JsonObject {
                     property bool enableAppsAndShell: true
                     property bool enableQtApps: true
+                    property bool lockKonsoleColors: true
                     property bool enableTerminal: true
                     property JsonObject terminalGenerationProps: JsonObject {
                         property real harmony: 0.6

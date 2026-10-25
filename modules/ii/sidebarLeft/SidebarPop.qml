@@ -11,6 +11,9 @@ Item {
     property int staggerMs: 45
     property real minScale: 0.25
     property bool fade: true
+    property real damping: 0.32
+    property bool smooth: false
+    readonly property var smoothCurve: [0.32, 0.72, 0, 1, 1, 1]
     readonly property real speed: Math.max(0.5, Config.options.settings.animationSpeed ?? 1)
 
     property real animScale: active ? 1 : minScale
@@ -32,7 +35,7 @@ Item {
     property int enterDelay: 0
     property bool waiting: false
     // Lama bounce-out; dipakai PageSlot untuk menyelaraskan jeda.
-    readonly property int exitMs: Math.round(300 / root.speed)
+    readonly property int exitMs: Math.round((root.smooth ? 220 : 300) / root.speed)
 
     // animScale/offset punya binding ke `active`, jadi nilainya snap ke posisi
     // akhir begitu active berubah. Set balik ke state awal dulu, kalau tidak
@@ -48,11 +51,14 @@ Item {
         root.waiting = false
         if (!root.active) return
         root.resetEnterState()
-        enterAnim.restart()
+        if (root.smooth) smoothEnter.restart()
+        else enterAnim.restart()
     }
 
     onActiveChanged: {
         if (!root.initialized) return
+        const enter = root.smooth ? smoothEnter : enterAnim
+        const exit = root.smooth ? smoothExit : exitAnim
         if (root.active) {
             exitAnim.stop()
             enterDelayTimer.stop()
@@ -61,13 +67,14 @@ Item {
                 root.waiting = true
                 enterDelayTimer.restart()
             } else {
-                enterAnim.restart()
+                enter.restart()
             }
         } else {
-            enterAnim.stop()
+            enter.stop()
+            exit.stop()
             enterDelayTimer.stop()
             root.waiting = false
-            exitAnim.restart()
+            exit.restart()
         }
     }
 
@@ -85,17 +92,34 @@ Item {
             root.animOpacity = root.fade ? 0 : 1
             root.offsetX = root.travelX
             root.offsetY = root.travelY
-            enterAnim.start()
+            if (root.smooth) smoothEnter.start()
+            else enterAnim.start()
         }
+    }
+
+    ParallelAnimation {
+        id: smoothEnter
+        NumberAnimation { target: root; property: "animScale"; to: 1; duration: 420 / root.speed; easing.type: Easing.BezierSpline; easing.bezierCurve: root.smoothCurve }
+        NumberAnimation { target: root; property: "offsetX"; to: 0; duration: 420 / root.speed; easing.type: Easing.BezierSpline; easing.bezierCurve: root.smoothCurve }
+        NumberAnimation { target: root; property: "offsetY"; to: 0; duration: 420 / root.speed; easing.type: Easing.BezierSpline; easing.bezierCurve: root.smoothCurve }
+        NumberAnimation { target: root; property: "animOpacity"; to: 1; duration: 260 / root.speed; easing.type: Easing.OutCubic }
+    }
+
+    ParallelAnimation {
+        id: smoothExit
+        NumberAnimation { target: root; property: "animScale"; to: root.minScale; duration: 220 / root.speed; easing.type: Easing.OutCubic }
+        NumberAnimation { target: root; property: "offsetX"; to: root.travelX; duration: 220 / root.speed; easing.type: Easing.OutCubic }
+        NumberAnimation { target: root; property: "offsetY"; to: root.travelY; duration: 220 / root.speed; easing.type: Easing.OutCubic }
+        NumberAnimation { target: root; property: "animOpacity"; to: root.fade ? 0 : 1; duration: 160 / root.speed; easing.type: Easing.OutCubic }
     }
 
     SequentialAnimation {
         id: enterAnim
         PauseAnimation { duration: root.animIndex * root.staggerMs }
         ParallelAnimation {
-            SpringAnimation { target: root; property: "animScale"; to: 1; spring: 2.6 * root.speed; damping: 0.32 }
-            SpringAnimation { target: root; property: "offsetX"; to: 0; spring: 2.6 * root.speed; damping: 0.32 }
-            SpringAnimation { target: root; property: "offsetY"; to: 0; spring: 2.6 * root.speed; damping: 0.32 }
+            SpringAnimation { target: root; property: "animScale"; to: 1; spring: 2.6 * root.speed; damping: root.damping }
+            SpringAnimation { target: root; property: "offsetX"; to: 0; spring: 2.6 * root.speed; damping: root.damping }
+            SpringAnimation { target: root; property: "offsetY"; to: 0; spring: 2.6 * root.speed; damping: root.damping }
             NumberAnimation { target: root; property: "animOpacity"; to: 1; duration: 220 / root.speed; easing.type: Easing.OutQuad }
         }
     }

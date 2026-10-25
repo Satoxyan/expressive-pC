@@ -169,7 +169,10 @@ QtObject {
         "services:Prefix app": { type: "text", get: () => Config.options.search.prefix.app, set: v => { Config.options.search.prefix.app = v; } },
         "services:Prefix keybinds": { type: "text", get: () => Config.options.search.prefix.keybinds, set: v => { Config.options.search.prefix.keybinds = v; } },
         "services:City name": { type: "text", get: () => Config.options.bar.weather.city, set: v => { Config.options.bar.weather.city = v; } },
-        "general:Icon theme": { type: "select", get: () => SystemAppearance.iconTheme, set: v => SystemAppearance.setIcons(v), get options() { return SystemAppearance.toOptions(SystemAppearance.iconThemes); } },
+        "general:Icon theme": { type: "select", get: () => Config.options.appearance.icons.theme, set: v => { Config.options.appearance.icons.theme = v; SystemAppearance.applyIconScheme(); }, get options() { return SystemAppearance.toOptions(SystemAppearance.iconThemes); } },
+        "general:Follow icon color scheme": { type: "toggle", get: () => Config.options.appearance.icons.followScheme, set: v => { Config.options.appearance.icons.followScheme = v; SystemAppearance.applyIconScheme(); } },
+        "general:Dynamic icon accent colors": { type: "toggle", get: () => Config.options.appearance.icons.dynamicColor, set: v => { Config.options.appearance.icons.dynamicColor = v; SystemAppearance.applyIconScheme(); } },
+        "general:Prevent Breeze icon override": { type: "toggle", get: () => Config.options.appearance.icons.preventBreezeOverride, set: v => { Config.options.appearance.icons.preventBreezeOverride = v; SystemAppearance.applyIconScheme(); } },
         "general:Cursor theme": { type: "select", get: () => SystemAppearance.cursorTheme, set: v => SystemAppearance.setCursor(v, SystemAppearance.cursorSize), get options() { return SystemAppearance.toOptions(SystemAppearance.cursorThemes); } },
         "general:System font": { type: "select", get: () => SystemAppearance.fontFamily, set: v => SystemAppearance.setFont("ui", v, SystemAppearance.fontSize), get options() { return SystemAppearance.toOptions(SystemAppearance.fonts); } },
         "general:Monospace font": { type: "select", get: () => SystemAppearance.monoFamily, set: v => SystemAppearance.setFont("mono", v, SystemAppearance.monoSize), get options() { return SystemAppearance.toOptions(SystemAppearance.fonts); } },
@@ -684,6 +687,9 @@ QtObject {
         {
             page: Translation.tr("General"), title: Translation.tr("System Appearance"), icon: "palette", cards: [
                 { type: "combo", key: "general:Icon theme", title: Translation.tr("Icon theme"), icon: "category", kw: "icons" },
+                { type: "toggle", key: "general:Follow icon color scheme", title: Translation.tr("Follow color scheme"), icon: "brightness_6", kw: "icons light dark scheme" },
+                { type: "toggle", key: "general:Dynamic icon accent colors", title: Translation.tr("Dynamic accent colors"), icon: "palette", kw: "icons material you recolor" },
+                { type: "toggle", key: "general:Prevent Breeze icon override", title: Translation.tr("Prevent Breeze override"), icon: "shield", kw: "icons kde breeze kmyc" },
                 { type: "combo", key: "general:Cursor theme", title: Translation.tr("Cursor theme"), icon: "mouse" },
                 { type: "combo", key: "general:System font", title: Translation.tr("System font"), icon: "text_fields", kw: "typography" },
                 { type: "combo", key: "general:Monospace font", title: Translation.tr("Monospace font"), icon: "terminal", kw: "terminal code" },

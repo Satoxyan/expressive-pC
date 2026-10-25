@@ -15,6 +15,9 @@ layout(std140, binding = 0) uniform buf {
     float haze;
     float vividness;
     float sheen;
+    vec2 flares;
+    vec2 hangs;
+    float edge;
 };
 
 layout(binding = 1) uniform sampler2D backdrop;
@@ -24,6 +27,42 @@ float roundedDist(vec2 p, vec2 half_, vec4 radii) {
     r = min(r, min(half_.x, half_.y));
     vec2 q = abs(p) - half_ + r;
     return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
+}
+
+float boxDist(vec2 p, vec2 half_) {
+    vec2 q = abs(p) - half_;
+    return min(max(q.x, q.y), 0.0) + length(max(q, vec2(0.0)));
+}
+
+float filletDist(vec2 p, float s, vec2 center, vec2 boxCenter, vec2 boxHalf) {
+    return max(boxDist(p - boxCenter, boxHalf), -(length(p - center) - s));
+}
+
+float shapeDist(vec2 p) {
+    vec2 q = p + size * 0.5;
+    float hang = max(hangs.x, hangs.y);
+    bool vert = edge > 1.5;
+    float along = vert ? size.y : size.x;
+    float depth = (vert ? size.x : size.y) - hang;
+
+    float u = vert ? q.y : q.x;
+    float v = edge < 0.5 ? q.y : edge < 1.5 ? size.y - q.y : edge < 2.5 ? q.x : size.x - q.x;
+
+    vec2 lo = edge < 0.5 ? vec2(flares.x, 0.0)
+        : edge < 1.5 ? vec2(flares.x, size.y - depth)
+        : edge < 2.5 ? vec2(0.0, flares.x)
+        : vec2(size.x - depth, flares.x);
+    vec2 hi = edge < 0.5 ? vec2(along - flares.y, depth)
+        : edge < 1.5 ? vec2(along - flares.y, size.y)
+        : edge < 2.5 ? vec2(depth, along - flares.y)
+        : vec2(size.x, along - flares.y);
+    float d = roundedDist(q - (lo + hi) * 0.5, (hi - lo) * 0.5, radii);
+
+    if (flares.x > 0.0) d = min(d, filletDist(vec2(u, v), flares.x, vec2(0.0, flares.x), vec2(flares.x, flares.x * 0.5), vec2(flares.x, flares.x * 0.5)));
+    if (flares.y > 0.0) d = min(d, filletDist(vec2(along - u, v), flares.y, vec2(0.0, flares.y), vec2(flares.y, flares.y * 0.5), vec2(flares.y, flares.y * 0.5)));
+    if (hangs.x > 0.0) d = min(d, filletDist(vec2(u, v - depth), hangs.x, vec2(hangs.x), vec2(hangs.x * 0.5, 0.0), vec2(hangs.x * 0.5, hangs.x)));
+    if (hangs.y > 0.0) d = min(d, filletDist(vec2(along - u, v - depth), hangs.y, vec2(hangs.y), vec2(hangs.y * 0.5, 0.0), vec2(hangs.y * 0.5, hangs.y)));
+    return d;
 }
 
 vec3 softSample(vec2 px, float lod) {
@@ -42,7 +81,7 @@ vec3 hazeSample(vec2 px, float lod, float reach) {
 
 void main() {
     vec2 p = qt_TexCoord0 * size - size * 0.5;
-    float d = roundedDist(p, size * 0.5, radii);
+    float d = shapeDist(p);
     float cover = clamp(0.5 - d, 0.0, 1.0);
     if (cover <= 0.0) {
         fragColor = vec4(0.0);
@@ -52,8 +91,8 @@ void main() {
     float depth = max(-d, 0.0);
     vec2 e = vec2(0.8, 0.0);
     vec2 n = vec2(
-        roundedDist(p + e.xy, size * 0.5, radii) - roundedDist(p - e.xy, size * 0.5, radii),
-        roundedDist(p + e.yx, size * 0.5, radii) - roundedDist(p - e.yx, size * 0.5, radii));
+        shapeDist(p + e.xy) - shapeDist(p - e.xy),
+        shapeDist(p + e.yx) - shapeDist(p - e.yx));
     n = length(n) > 1e-4 ? normalize(n) : vec2(0.0, -1.0);
 
     float k = clamp(1.0 - depth / rimWidth, 0.0, 1.0);

@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 sync-repo-to-live.sh
 translations/es_MX.json
+__pycache__/
+*.pyc
+.pytest_cache/

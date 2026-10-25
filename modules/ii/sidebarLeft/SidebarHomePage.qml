@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import Qt5Compat.GraphicalEffects
+import Quickshell.Widgets
 import Quickshell.Services.Mpris
 import qs.services
 import qs.modules.common
@@ -105,21 +105,13 @@ Item {
                 travelX: 300
                 travelY: -120
 
-                Rectangle {
+                ClippingRectangle {
                     anchors.fill: parent
                     radius: Appearance.rounding.large
                     color: Appearance.colors.colPrimaryContainer
 
                     Item {
                         anchors.fill: parent
-                        layer.enabled: true
-                        layer.effect: OpacityMask {
-                            maskSource: Rectangle {
-                                width: clockCard.width
-                                height: clockCard.height
-                                radius: Appearance.rounding.large
-                            }
-                        }
 
                         MaterialShape {
                             id: sunShape

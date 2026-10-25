@@ -62,6 +62,8 @@ Scope {
             readonly property bool macos: DockStyle.magnifying
             readonly property bool hug: Config.options.dock.style === "hug"
             readonly property string position: modelData.position
+            readonly property bool glassHug: hug && Config.options.dock.showBackground && Config.options.background.widgets.glass.enable
+            readonly property real hugFlare: glassHug ? Appearance.rounding.screenRounding : 0
             readonly property bool vertical: position !== "bottom"
             readonly property real gap: Appearance.sizes.hyprlandGapsOut
             readonly property real shadowMargin: Appearance.sizes.elevationMargin
@@ -241,6 +243,13 @@ Scope {
                             id: dockVisualBackground
                             WindowGlass {
                                 anchors.fill: parent
+                                anchors.leftMargin: dockRoot.vertical ? 0 : -dockRoot.hugFlare
+                                anchors.rightMargin: dockRoot.vertical ? 0 : -dockRoot.hugFlare
+                                anchors.topMargin: dockRoot.vertical ? -dockRoot.hugFlare : 0
+                                anchors.bottomMargin: dockRoot.vertical ? -dockRoot.hugFlare : 0
+                                flareLeft: dockRoot.hugFlare
+                                flareRight: dockRoot.hugFlare
+                                edge: dockRoot.position === "left" ? 2 : dockRoot.position === "right" ? 3 : 1
                                 glassEnabled: (parent?.color.a ?? 0) > 0
                                 cardRadius: parent?.radius ?? 0
                                 // Hug docks are square at the bottom; match the
@@ -269,7 +278,7 @@ Scope {
 
                         RoundCorner {
                             glass: true
-                            visible: dockRoot.hug && Config.options.dock.showBackground
+                            visible: dockRoot.hug && Config.options.dock.showBackground && !dockRoot.glassHug
                             anchors.right: dockRoot.vertical ? (dockRoot.position === "right" ? dockVisualBackground.right : undefined) : dockVisualBackground.left
                             anchors.bottom: dockRoot.vertical ? dockVisualBackground.top : dockVisualBackground.bottom
                             anchors.left: dockRoot.position === "left" ? dockVisualBackground.left : undefined
@@ -280,7 +289,7 @@ Scope {
 
                         RoundCorner {
                             glass: true
-                            visible: dockRoot.hug && Config.options.dock.showBackground
+                            visible: dockRoot.hug && Config.options.dock.showBackground && !dockRoot.glassHug
                             anchors.left: dockRoot.vertical ? (dockRoot.position === "left" ? dockVisualBackground.left : undefined) : dockVisualBackground.right
                             anchors.bottom: dockRoot.vertical ? undefined : dockVisualBackground.bottom
                             anchors.top: dockRoot.vertical ? dockVisualBackground.bottom : undefined

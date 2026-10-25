@@ -17,6 +17,11 @@ Item {
     readonly property real haze: 6
     readonly property real vividness: 1.25
     readonly property real sheen: 0.31
+    property real flareLeft: 0
+    property real flareRight: 0
+    property real hangLeft: 0
+    property real hangRight: 0
+    property int edge: 0
     property real trackX: 0
     property real trackY: 0
 
@@ -49,8 +54,11 @@ Item {
         property real haze: root.haze
         property real vividness: root.vividness
         property real sheen: root.sheen
+        property vector2d flares: Qt.vector2d(root.flareLeft, root.flareRight)
+        property vector2d hangs: Qt.vector2d(root.hangLeft, root.hangRight)
+        property real edge: root.edge
         property color wash: Qt.rgba(root.tint.r, root.tint.g, root.tint.b, root.tintOpacity)
 
-        fragmentShader: Qt.resolvedUrl("shaders/frostedLens.frag.qsb")
+        fragmentShader: Qt.resolvedUrl("shaders/frostedEdge.frag.qsb")
     }
 }
