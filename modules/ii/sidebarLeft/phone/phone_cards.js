@@ -251,14 +251,24 @@ function commandFor(dependency, distro) {
 
 // A dependency's command may be several lines with `#` comments between them
 // (the DroidCam and v4l2loopback rows are). The whole block is what gets
-// copied; this is what the box's single-line preview shows.
+// copied; this is the first executable line, for callers with room for one.
 function firstCommand(text) {
+    const lines = commandLines(text);
+    return lines.length > 0 ? lines[0] : String(text || "").trim();
+}
+
+// Every executable line of a command block, comments and blanks dropped. The
+// install guide draws all of them: showing only the first made a block that
+// also loads and persists the module look like a bare package install, and the
+// copy button looked like it copied what was on screen.
+function commandLines(text) {
+    const lines = [];
     for (const line of String(text || "").split("\n")) {
         const trimmed = line.trim();
         if (trimmed.length === 0 || trimmed.charAt(0) === "#") continue;
-        return trimmed;
+        lines.push(trimmed);
     }
-    return String(text || "").trim();
+    return lines;
 }
 
 // wl-copy takes the text as an ARGUMENT, never through a shell. The fork

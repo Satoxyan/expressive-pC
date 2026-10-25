@@ -46,6 +46,12 @@ Item {
     // PhoneDeps flag starts false, and phone_cards.js reads `false` as a
     // refusal to draw. One derivation, because two cards ask it.
     readonly property var adbDevice: PhoneDeps.ready ? PhoneDeps.adbDevice : undefined
+    // The cap this card's preview chip hands the player, for the same reason the
+    // webcam page computes one: an over-tall floating window is not clamped by
+    // the compositor, and the action below is not a binding, so the window's
+    // height has to be read here for the expression to depend on it.
+    readonly property real ownWindowHeight: Window.window?.height ?? 0
+    readonly property int previewCapHeight: Math.round(root.ownWindowHeight * 0.88)
 
     // The elapsed clock for whichever cards are running. A Timer rather than
     // DateTime's own: that clock ticks per MINUTE unless the user asked for
@@ -63,18 +69,13 @@ Item {
 
     onAnyActiveChanged: root.nowMs = Date.now()
 
-    // Whether adb can see the phone is live state, and a card that says "no
-    // device over ADB" has to stop saying it once the user plugs the phone in.
-    // The probe answers once at construction like every other one in
-    // PhoneDeps; this re-asks it, and only while this stack is on screen AND
-    // adb has still seen nothing - so it stops the moment it has an answer to
-    // give, and costs nothing at all on a tab nobody has opened.
-    Timer {
-        interval: 5000
-        repeat: true
-        running: root.visible && PhoneDeps.adb && !PhoneDeps.adbDevice
-        onTriggered: PhoneDeps.refreshAdbDevices()
-    }
+    // Whether adb can see the phone is live state, but polling it was not the
+    // way to read it: every run dropped `ready`, and the cards' subtitles
+    // blinked with it. The re-ask happens once whenever this stack is shown,
+    // not on a timer; the Phone link page's "Check again" is the manual path,
+    // and a connect already triggers its own refresh.
+    onVisibleChanged: if (root.visible && PhoneDeps.adb && !PhoneDeps.adbDevice)
+        PhoneDeps.refreshAdbDevices()
 
     // PhoneScrcpy's session rows carry `startedAt` in milliseconds (Date.now()
     // at the moment the supervisor reported the window), where PhoneCamera and
@@ -267,7 +268,7 @@ Item {
                             : Translation.tr("Open a preview window"),
                         action: () => PhoneCamera.previewRunning
                             ? PhoneCamera.closePreview()
-                            : PhoneCamera.openPreview()
+                            : PhoneCamera.openPreview(root.previewCapHeight)
                     }] : []),
                 {
                     icon: "cameraswitch",

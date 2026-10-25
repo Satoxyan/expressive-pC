@@ -31,9 +31,13 @@ import qs.modules.common
  * preview is a view of that stream and its lifetime is the session's. See
  * the `previewProc` block for what "owned" buys and what it costs.
  *
- * Everything between the sync markers is kept byte-for-byte in sync with
- * the logic-only double (tests/imports/testservices/PhoneCamera.qml);
- * tests/test_phone_sessions_contract.py enforces it.
+ * Everything between the sync markers is meant to be kept byte-for-byte in
+ * sync with the logic-only double (tests/imports/testservices/PhoneCamera.qml),
+ * enforced by tests/test_phone_sessions_contract.py. NEITHER exists in this
+ * checkout - tests/ holds only icon_theme_manager/ - so that claim is debt, not
+ * a passing check (the same debt PhoneDeps.qml:32 records). The markers are
+ * still where argv-shaped logic belongs, and the double has to be regenerated
+ * from this file before the contract can be enforced again.
  */
 Singleton {
     id: root
@@ -108,7 +112,7 @@ Singleton {
         return "";
     }
 
-    // The webcam's scrcpy argv. Three of these flags are load-bearing and one
+    // The webcam's scrcpy argv. Four of these flags are load-bearing and one
     // is a matter of taste:
     //
     //   --camera-size  is NOT decoration. Left out, scrcpy asks the camera for
@@ -117,6 +121,11 @@ Singleton {
     //                  phone throws IllegalArgumentException in
     //                  SurfaceEncoder.streamCapture - a session that dies
     //                  before it produces a frame.
+    //   --crop         is what the aspect ratio row is. It changes the NODE's
+    //                  own size (measured: --crop=720:720:280:0 on a 1280x720
+    //                  capture makes a 720x720 node), so the crop is real for
+    //                  every application that opens the webcam rather than a
+    //                  trick the preview plays.
     //   --no-window    keeps a webcam out of the user's face; without it
     //                  scrcpy opens a window for every stream.
     //   --no-audio     because the microphone is a different feature with its
@@ -124,50 +133,151 @@ Singleton {
     //                  by default.
     //   --no-control   nothing here should be typing into the phone.
     //
-    // `--capture-orientation` carries the turn and the mirror together: `flipN`
-    // is "horizontally flipped, then turned N degrees", which is what the two
-    // config keys mean.
+    // `--capture-orientation` carries the turn and the mirror together, and the
+    // number it carries is NOT the turn the mirror rides on. scrcpy's own help
+    // says the `flip` keyword "applies a horizontal flip BEFORE the rotation",
+    // and a horizontal flip conjugated by a quarter turn is a VERTICAL flip of
+    // the upright picture - so `flip90` mirrors a Portrait stream up-down. The
+    // value that mirrors the picture as displayed is the other quarter,
+    // `(360 - upright) % 360`: measured on this POCO by classifying frames
+    // against a flop and a flipud of the same unmirrored frame (ImageMagick
+    // RMSE, lower is the match) - back lens upright at 90: flip90 -> flipud
+    // 8372 vs flop 30500, flip270 -> flop 9899 vs flipud 30553; front lens
+    // upright at 270, the pair reversed: flip270 -> flipud 3488, flip90 -> flop
+    // 5217. Landscape is upright at 0, and (360-0)%360 is 0, which is why the
+    // mirror was always correct there and only ever looked wrong in Portrait.
     //
     // Portrait is a turn, not a size. The phone only offers landscape capture
-    // sizes (`scrcpy --list-camera-sizes` on this device tops out at
-    // 1920x1080), and `--capture-orientation=90` makes scrcpy write a
-    // 720x1280 node - measured, both the node's format and the decoded frame
-    // swap. Which quarter turn is UPRIGHT differs per camera, because the
-    // front one is mirrored in the pipeline: on this POCO the back is upright
-    // at 90 and the front at 270, so the two are 180° apart and the facing
-    // picks the value rather than one constant serving both.
+    // sizes, and `--capture-orientation=90` makes scrcpy write a 720x1280 node -
+    // measured, both the node's format and the decoded frame swap. Which quarter
+    // turn is UPRIGHT differs per camera, because the front one is mirrored in
+    // the pipeline: on this POCO the back is upright at 90 and the front at 270,
+    // so the two are 180° apart and the facing picks the value rather than one
+    // constant serving both.
     function captureOrientation(conf: var): string {
         const c = conf ?? {};
-        const degrees = String(c.orientation ?? "").trim() === "portrait"
+        const upright = String(c.orientation ?? "").trim() === "portrait"
             ? (String(c.cameraFacing ?? "").trim() === "front" ? 270 : 90) : 0;
-        return (c.mirrorHorizontally ? "flip" : "") + degrees;
+        return c.mirrorHorizontally ? "flip" + ((360 - upright) % 360) : String(upright);
+    }
+
+    // The box scrcpy crops the CAPTURE to, as "w:h:x:y", or "" for no crop.
+    //
+    // The orientation does not enter this. A ratio's long edge is laid along the
+    // capture's long edge and the turn then turns the box with the picture
+    // (measured: --crop=960:720 on a 1280x720 capture is a 960x720 node in
+    // Landscape and a 720x960 one in Portrait), so "3:4" means the shape of the
+    // picture however it stands - which is also why every ratio is achievable
+    // from every capture size, rather than a tall ratio being impossible in
+    // Landscape.
+    //
+    // Even numbers, because the node is YUV420; centred, because a corner crop
+    // would cut the subject off to one side.
+    //
+    // "" is returned for "full", for anything unparsable, and for a crop that
+    // would be the whole capture - an identity crop buys nothing and "Fullscreen"
+    // means no crop at all. And no rect that overflows the capture is ever
+    // returned, because scrcpy's server does not clip it: measured,
+    // --crop=720:720:920:0 on a 1280-wide capture threw an IllegalStateException
+    // on the video thread and produced not one frame. A rect that fits by
+    // construction is the whole point; the alternative is a stream that dies.
+    function cropArgument(ratio: string, captureSize: string): string {
+        const r = /^(\d+):(\d+)$/.exec(String(ratio ?? "").trim());
+        const s = /^(\d+)x(\d+)$/.exec(String(captureSize ?? "").trim());
+        if (!r || !s) return "";
+        const cw = Number(s[1]), ch = Number(s[2]);
+        const a = Number(r[1]), b = Number(r[2]);
+        if (cw < 2 || ch < 2 || a < 1 || b < 1) return "";
+        const long = Math.max(a, b), short = Math.min(a, b);
+        const evenDown = v => Math.floor(v / 2) * 2;
+        // Fit the ratio box inside the capture: the edge that runs out of room
+        // first decides which of the two is taken whole. The taken edge is
+        // floored to even too, so an odd capture size cannot hand back an odd
+        // crop - the node is YUV420 and every size the phone offers is even
+        // already (measured, 176x144 through 4624x2080), which is why this only
+        // shows up for a size the list does not contain.
+        let w = evenDown(cw), h = evenDown(ch);
+        if (cw * short >= ch * long) { h = evenDown(ch); w = evenDown(ch * long / short); }
+        else { w = evenDown(cw); h = evenDown(cw * short / long); }
+        if (w < 2 || h < 2 || w > cw || h > ch) return "";
+        if (w === cw && h === ch) return "";
+        return `${w}:${h}:${evenDown((cw - w) / 2)}:${evenDown((ch - h) / 2)}`;
+    }
+
+    // The size /dev/videoN ends up at: the crop box, or the whole capture when
+    // there is none, turned by the quarter turn Portrait asks for. Checked
+    // against the node's own `v4l2-ctl --get-fmt-video` reply for every cell this
+    // produces, which is why the shell can name the webcam's size and shape its
+    // preview window from the settings rather than asking the kernel again.
+    function frameSize(captureSize: string, cropArg: string, orientation: string): var {
+        const parts = String(cropArg ?? "").length > 0
+            ? String(cropArg).split(":").slice(0, 2).join("x") : String(captureSize ?? "");
+        const s = /^(\d+)x(\d+)$/.exec(parts.trim());
+        if (!s) return { w: 0, h: 0 };
+        const w = Number(s[1]), h = Number(s[2]);
+        if (String(orientation ?? "").trim() === "portrait") return { w: h, h: w };
+        return { w: w, h: h };
+    }
+
+    // The preview window's size. `maxHeight` is what the caller can actually put
+    // on a screen; 0 means "do not cap". Shrinking is proportional, because the
+    // window matches the video only while the two aspects are the same.
+    function previewGeometry(width: int, height: int, maxHeight: int): var {
+        if (width < 2 || height < 2) return { w: 0, h: 0 };
+        const evenDown = v => Math.floor(v / 2) * 2;
+        if (maxHeight >= 2 && height > maxHeight) {
+            const h = evenDown(maxHeight);
+            const w = evenDown(width * h / height);
+            if (w >= 2 && h >= 2) return { w: w, h: h };
+        }
+        return { w: width, h: height };
     }
 
     function scrcpyWebcamArgs(conf: var, device: string): var {
         const c = conf ?? {};
         const facing = String(c.cameraFacing ?? "").trim();
         const size = String(c.resolution ?? "").trim();
+        const capture = size.length > 0 ? size : "1280x720";
+        const crop = root.cropArgument(String(c.aspectRatio ?? "").trim(), capture);
         const args = ["scrcpy",
             "--video-source=camera",
-            "--camera-size=" + (size.length > 0 ? size : "1280x720"),
+            "--camera-size=" + capture,
             "--v4l2-sink=" + device,
             "--capture-orientation=" + root.captureOrientation(c),
             "--no-window", "--no-control", "--no-audio"];
+        if (crop.length > 0) args.push("--crop=" + crop);
         if (facing === "front" || facing === "back" || facing === "external")
             args.push("--camera-facing=" + facing);
         return args;
     }
 
     // The preview player: mpv, else ffplay, else vlc. Empty when none is there.
-    function previewCommand(device: string, deps: var): var {
+    //
+    // `width`/`height` are the stream's own size and they are NOT decoration:
+    // --force-window below makes mpv build its window before it has seen a
+    // frame, so without a size it builds a 16:9-shaped box - measured on this
+    // machine, 1344x756 for a 720x1280 v4l2 node and 960x540 for a file of the
+    // same size - and --keepaspect spends the whole difference on black bars.
+    // With the geometry passed the window came up at exactly 534x950 for that
+    // node capped to 950, floating, all of it on the monitor.
+    // Only mpv gets them: ffplay has no size flag in this build (`-x`/`-y` are
+    // its initial window COORDINATES, and a probe with -x 400 -y 700 left it at
+    // 949x1024), and vlc is here a fallback for a machine that has no mpv.
+    function previewCommand(device: string, deps: var, width: int, height: int): var {
         const d = deps ?? {};
         if (!device) return [];
+        const geometry = width >= 2 && height >= 2 ? `${width}x${height}` : "";
         // --force-window: mpv creates its window when the FIRST FRAME arrives,
         // and a session whose phone has stopped producing frames yields none,
-        // so without it a click on preview appears to do nothing at all.
-        if (d.mpv) return ["mpv", "--profile=low-latency", "--no-fullscreen", "--no-osc",
-                           "--force-window=immediate",
-                           "--title=imi webcam preview", "av://v4l2:" + device];
+        // so without it a click on preview appears to do nothing at all. That
+        // is why the size is passed to it rather than the flag being dropped.
+        if (d.mpv) {
+            const args = ["mpv", "--profile=low-latency", "--no-fullscreen", "--no-osc",
+                          "--force-window=immediate"];
+            if (geometry.length > 0) args.push("--geometry=" + geometry);
+            args.push("--title=imi webcam preview", "av://v4l2:" + device);
+            return args;
+        }
         if (d.ffplay) return ["ffplay", "-fflags", "nobuffer", "-framedrop",
                               "-window_title", "imi webcam preview", "-f", "v4l2", "-i", device];
         if (d.vlc) return ["vlc", "--no-video-title-show", "--no-fullscreen", "v4l2://" + device];
@@ -401,8 +511,15 @@ Singleton {
     // So the player is started through startPreview() - a handle, never a
     // detached spawn - and a second click while one is up is not a second
     // window.
-    function openPreview(): void {
+    // `maxHeight` is how tall a window the caller can really show - the panel
+    // passes its own window's height. A caller that is not on a screen at all
+    // (a session re-adopted by a restarted shell) passes nothing and gets the
+    // cap the last real open remembered, which is the size the user was looking
+    // at.
+    function openPreview(maxHeight): void {
         if (root.previewRunning) return;
+        const asked = Number(maxHeight) || 0;
+        if (asked > 0) root.previewCapHeight = Math.round(asked);
         // Two different empties, and they used to share one report. The
         // command is empty both when there is no player to watch with and
         // when there is nothing to watch: a session that never started - the
@@ -414,7 +531,9 @@ Singleton {
             root.errorOccurred(root.lastError);
             return;
         }
-        const argv = root.previewCommand(root.device, PhoneDeps);
+        const geo = root.previewGeometry(root.streamWidth, root.streamHeight,
+                                         root.previewCapHeight);
+        const argv = root.previewCommand(root.device, PhoneDeps, geo.w, geo.h);
         if (argv.length === 0) {
             root.lastError = "No preview player found - install mpv";
             root.errorOccurred(root.lastError);
@@ -435,6 +554,24 @@ Singleton {
     // which reaches it through onActiveDeviceIdChanged's own stop().
     onActiveChanged: if (!root.active) root.closePreview();
     // END phone-camera logic
+
+    // ---- the shape the settings describe ----
+    //
+    // Computed once here rather than re-derived by each caller: the status line,
+    // the preview window's size and the crop in the argv have to be the same
+    // numbers, or a window sized for an uncropped stream shows exactly the black
+    // bars the aspect row was added to remove.
+    readonly property string webcamCrop: root.cropArgument(
+        Config.options.phone.webcam.aspectRatio, Config.options.phone.webcam.resolution)
+    readonly property var streamFrame: root.frameSize(
+        Config.options.phone.webcam.resolution, root.webcamCrop,
+        Config.options.phone.webcam.orientation)
+    readonly property int streamWidth: root.streamFrame.w
+    readonly property int streamHeight: root.streamFrame.h
+    // Kept, not passed along: a setting change closes the preview and reopens it
+    // with the session, and a reopen from the re-adopted status has no window of
+    // its own to measure, so the last real cap is the only bound it can use.
+    property int previewCapHeight: 0
 
     // ---- the preview player ----
     //

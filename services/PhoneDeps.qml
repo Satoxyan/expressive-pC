@@ -79,12 +79,15 @@ Singleton {
     // Whether `adb devices` currently lists a phone in the `device` state.
     // The one thing here that is LIVE rather than a fact about what is
     // installed: a phone is plugged in and unplugged while the shell runs, so
-    // `refreshAdbDevices()` exists and the card stack calls it while it is on
-    // screen and has seen nothing. It lives beside the tooling because the
-    // question a card asks before its click is the same shape - "can this
-    // feature start at all" - and `unavailable` already answers the other
-    // half of it.
+    // `refreshAdbDevices()` exists and the card stack re-asks it when it is
+    // shown. It lives beside the tooling because the question a card asks
+    // before its click is the same shape - "can this feature start at all" -
+    // and `unavailable` already answers the other half of it.
     property bool adbDevice: false
+    // Whether the adb-devices run now in flight belongs to the startup sweep.
+    // A run that does not is kept out of `probesPending`, so a background
+    // re-ask leaves `ready` - and the cards drawn from it - alone.
+    property bool adbDevicesCounted: false
 
     readonly property bool appModeSupported: root.scrcpy && root.scrcpyMajor >= 4
 
@@ -493,9 +496,21 @@ Singleton {
     // `exited`, so the flag would keep whatever it had while the probe count
     // still moved, and one that cannot start answers 127 to every question
     // there is.
+    //
+    // A re-ask is QUIET: the sweep at startup counts towards `ready`, a
+    // refresh does not. Dropping `ready` for the length of a run to learn the
+    // answer already on screen is what made every card's subtitle blink at
+    // each poll.
     function refreshAdbDevices(): void {
         if (!root.adb) return;
-        root.startProbe(adbDevicesProbe);
+        root.startAdbDevicesProbe(false);
+    }
+
+    function startAdbDevicesProbe(counted: bool): void {
+        if (adbDevicesProbe.running) return;
+        root.adbDevicesCounted = counted;
+        if (counted) root.probesPending++;
+        adbDevicesProbe.running = true;
     }
 
     function probeAnswered(): void {
@@ -793,7 +808,7 @@ Singleton {
         }
         onExited: (exitCode, exitStatus) => {
             root.adbRunError = root.parseLoaderFailure(exitCode, adbRunErr.text);
-            if (root.adb) root.startProbe(adbDevicesProbe);
+            if (root.adb) root.startAdbDevicesProbe(true);
             else root.adbDevice = false;
         }
     }
@@ -806,7 +821,10 @@ Singleton {
         command: ["adb", "devices"]
         stdout: StdioCollector { id: adbDevicesOut }
         stderr: StdioCollector {}
-        onRunningChanged: if (!running) root.probeAnswered()
+        onRunningChanged: if (!running) {
+            if (root.adbDevicesCounted) root.probeAnswered();
+            root.adbDevicesCounted = false;
+        }
         onExited: (exitCode, exitStatus) => {
             root.adbDevice = exitCode === 0 && root.parseAdbDevices(adbDevicesOut.text);
         }

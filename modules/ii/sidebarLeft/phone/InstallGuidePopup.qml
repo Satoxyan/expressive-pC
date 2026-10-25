@@ -18,8 +18,8 @@ import "phone_cards.js" as PhoneCards
  * found.
  *
  * The three distro pills preselect from `PhoneDeps.distro`; the arithmetic
- * (which pill, which command, what the one-line preview of a multi-line block
- * is) is phone_cards.js, driven by tests/tst_phone_cards.qml.
+ * (which pill, which command, which lines of a multi-line block are drawn) is
+ * phone_cards.js, driven by tests/tst_phone_cards.qml.
  *
  * Copy is `wl-copy -- <text>` as a constant argv. The sibling fork spelled it
  * `bash -c "wl-copy '" + quote(text) + "'"`, which puts its own quoting helper
@@ -279,17 +279,30 @@ Item {
                                         }
                                         spacing: Appearance.spacing.space75
 
-                                        StyledText {
+                                        // Every executable line, not just the
+                                        // first: a block that installs, loads
+                                        // and persists the module has to read
+                                        // as three steps on screen, because
+                                        // that is what the copy yields.
+                                        ColumnLayout {
                                             Layout.fillWidth: true
-                                            // The preview is one line; the copy
-                                            // takes the whole block, comments
-                                            // and all.
-                                            text: PhoneCards.firstCommand(dependencyRow.command)
-                                            font.pixelSize: Appearance.font.pixelSize.smallest
-                                            font.family: Appearance.font.family.monospace
-                                            color: Appearance.colors.colOnLayer4
-                                            elide: Text.ElideRight
-                                            maximumLineCount: 1
+                                            spacing: Appearance.spacing.space25
+
+                                            Repeater {
+                                                model: PhoneCards.commandLines(dependencyRow.command)
+
+                                                delegate: StyledText {
+                                                    required property string modelData
+
+                                                    Layout.fillWidth: true
+                                                    text: modelData
+                                                    font.pixelSize: Appearance.font.pixelSize.smallest
+                                                    font.family: Appearance.font.family.monospace
+                                                    color: Appearance.colors.colOnLayer4
+                                                    elide: Text.ElideRight
+                                                    maximumLineCount: 1
+                                                }
+                                            }
                                         }
 
                                         IconButton {

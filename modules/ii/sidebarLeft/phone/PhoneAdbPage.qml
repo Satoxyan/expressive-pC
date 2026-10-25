@@ -39,16 +39,12 @@ PhoneSubPage {
     // cards wear today, pointing the other way.
     readonly property bool linkUp: PhoneDeps.ready && PhoneDeps.adb && PhoneDeps.adbDevice
 
-    // The same shape PhoneFeatureCards runs: a re-ask, only while this page is
-    // on screen and adb has still seen nothing, so it stops the moment it has
-    // an answer to give. The cards' copy cannot serve a user waiting here - it
-    // is behind the sub-page that just slid over it.
-    Timer {
-        interval: 5000
-        repeat: true
-        running: root.visible && !root.linkUp && PhoneDeps.adb
-        onTriggered: PhoneDeps.refreshAdbDevices()
-    }
+    // The same shape PhoneFeatureCards runs: a re-ask when the page is shown,
+    // not on a timer. A poll here dropped `ready` and blinked the form every
+    // few seconds while adb had nothing to report; the "Check again" button
+    // below is the manual path for a phone plugged in while the page is open.
+    onVisibleChanged: if (root.visible && !root.linkUp && PhoneDeps.adb)
+        PhoneDeps.refreshAdbDevices()
 
     ContentPage {
         id: page

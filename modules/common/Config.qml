@@ -251,6 +251,11 @@ Singleton {
                 property JsonObject webcam: JsonObject {
                     property string cameraFacing: "front"
                     property string resolution: "1280x720"
+                    // Crops the STREAM to this shape, so /dev/videoN itself is
+                    // this size and everything that opens it agrees. "full"
+                    // means no crop at all. The numbers follow the orientation:
+                    // "3:4" is 720x960 in Portrait and 960x720 in Landscape.
+                    property string aspectRatio: "full"
                     property bool mirrorHorizontally: false
                     property string orientation: "landscape"
                 }
