@@ -208,14 +208,15 @@ Item {
                     property bool atInitPosition: (initX == x && initY == y)
                     property real dragStartX: 0
                     property real dragStartY: 0
+                    property bool dragMoved: false
 
                     // Offset on the canvas
                     property int workspaceColIndex: getWsColumn(windowData?.workspace.id)
                     property int workspaceRowIndex: getWsRow(windowData?.workspace.id)
                     xOffset: (root.workspaceImplicitWidth + workspaceSpacing) * workspaceColIndex
                     yOffset: (root.workspaceImplicitHeight + workspaceSpacing) * workspaceRowIndex
-                    property real xWithinWorkspaceWidget: Math.max((windowData?.at[0] - (monitor?.x ?? 0) - monitorData?.reserved[0]) * root.scale, 0)
-                    property real yWithinWorkspaceWidget: Math.max((windowData?.at[1] - (monitor?.y ?? 0) - monitorData?.reserved[1]) * root.scale, 0)
+                    property real xWithinWorkspaceWidget: (windowData?.at[0] - (monitor?.x ?? 0) - monitorData?.reserved[0]) * root.scale
+                    property real yWithinWorkspaceWidget: (windowData?.at[1] - (monitor?.y ?? 0) - monitorData?.reserved[1]) * root.scale
 
                     // Radius
                     property real minRadius: Appearance.rounding.small
@@ -266,6 +267,7 @@ Item {
                             root.draggingFromWorkspace = windowData?.workspace.id
                             window.pressed = true
                             window.dragging = true
+                            window.dragMoved = false
                             // Stop any lingering Behavior animation from previous release
                             window.x = window.x
                             window.y = window.y
@@ -278,10 +280,23 @@ Item {
                         }
                         onReleased: {
                             const targetWorkspace = root.draggingTargetWorkspace
+                            // A press that never moved the preview is a click, not a
+                            // drag: dropping it here would teleport the real window
+                            // (DropArea also reports the cell under an unmoved cursor).
+                            window.dragMoved = Math.abs(window.x - window.dragStartX) > 6
+                                || Math.abs(window.y - window.dragStartY) > 6
+                            const moved = window.dragMoved
                             window.pressed = false
                             window.dragging = false
                             window.Drag.active = false
                             root.draggingFromWorkspace = -1
+                            root.draggingTargetWorkspace = -1
+                            if (!moved) {
+                                // Re-attach the tracking binding the drag broke.
+                                window.x = Qt.binding(() => window.initX)
+                                window.y = Qt.binding(() => window.initY)
+                                return
+                            }
                             if (targetWorkspace !== -1 && targetWorkspace !== windowData?.workspace.id) {
                                 if (!window.windowData.floating) {
                                     Hyprland.dispatch(`hl.dsp.window.move({ workspace = ${targetWorkspace}, follow = false, window = "address:${window.windowData?.address}" })`)
@@ -326,13 +341,31 @@ Item {
                                     updateWindowPosition.restart()
                                     return
                                 }
-                                const percentageX = (window.x - xOffset) / root.workspaceImplicitWidth
-                                const percentageY = (window.y - yOffset) / root.workspaceImplicitHeight
-                                Hyprland.dispatch(`hl.dsp.window.move({ x = "${percentageX * root.screen.width}", y = "${percentageY * root.screen.height}", window = "address:${window.windowData?.address}" })`)
+                                // Float, same workspace: keep at least a sliver inside
+                                // its cell so the mapping below can't aim off-screen.
+                                const visibleMin = 10
+                                const minX = xOffset - window.width + visibleMin
+                                const maxX = xOffset + root.workspaceImplicitWidth - visibleMin
+                                const minY = yOffset - window.height + visibleMin
+                                const maxY = yOffset + root.workspaceImplicitHeight - visibleMin
+                                const clampedX = Math.max(minX, Math.min(maxX, window.x))
+                                const clampedY = Math.max(minY, Math.min(maxY, window.y))
+                                window.x = clampedX
+                                window.y = clampedY
+                                const m = window.monitor
+                                if (!m) return
+                                // Inverse of initX/initY: preview px -> monitor layout px.
+                                const r = m.reserved ?? [0, 0, 0, 0]
+                                const targetX = (m.x ?? 0) + r[0]
+                                    + (clampedX - xOffset) / (window.widthRatio * root.scale)
+                                const targetY = (m.y ?? 0) + r[1]
+                                    + (clampedY - yOffset) / (window.heightRatio * root.scale)
+                                Hyprland.dispatch(`hl.dsp.window.move({ x = "${Math.round(targetX)}", y = "${Math.round(targetY)}", window = "address:${window.windowData?.address}" })`)
                             }
                         }
                         onClicked: (event) => {
                             if (!windowData) return;
+                            if (window.dragMoved) return;
 
                             if (event.button === Qt.LeftButton) {
                                 GlobalStates.overviewOpen = false

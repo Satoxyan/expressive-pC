@@ -5,3 +5,4 @@ translations/es_MX.json
 __pycache__/
 *.pyc
 .pytest_cache/
+.qoder

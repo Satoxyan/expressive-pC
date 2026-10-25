@@ -35,7 +35,7 @@ Item { // Window
 
     property real initY: {
         if (singleTiled) return yOffset;
-        return Math.max((windowData?.at[1] - (monitorData?.y ?? 0) - monitorData?.reserved[1]) * heightRatio * root.scale, 0) + yOffset;
+        return (windowData?.at[1] - (monitorData?.y ?? 0) - monitorData?.reserved[1]) * heightRatio * root.scale + yOffset;
     }
     property real xOffset: 0
     property real yOffset: 0
