@@ -36,6 +36,22 @@ PhoneSubPage {
 
     title: Translation.tr("Android Apps")
 
+    // The settings page is another sub-page, hosted by Phone.qml; this page
+    // only raises the request, the same way its notices do.
+    signal openAppSettingsRequested()
+
+    // Top-right, like the tab header's adb button: the page's one action
+    // that is not about the list in front of it.
+    headerActions: [
+        IconButton {
+            objectName: "appSettingsButton"
+            buttonIcon: "settings"
+            buttonSize: 32
+            tooltip: Translation.tr("App Mode settings")
+            onClicked: root.openAppSettingsRequested()
+        }
+    ]
+
     property string query: ""
 
     readonly property var filteredApps: PhoneCards.filterApps(PhoneScrcpy.apps, root.query)

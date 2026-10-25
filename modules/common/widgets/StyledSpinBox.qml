@@ -42,9 +42,10 @@ SpinBox {
             font.variableAxes: Appearance.font.variableAxes.numbers
             font.pixelSize: Appearance.font.pixelSize.small
             validator: root.validator
-            onTextChanged: {
-                root.value = parseFloat(text);
-            }
+            // textEdited, not textChanged: the latter also fires when a
+            // caller's value binding updates `text`, and assigning `value`
+            // there would break that binding on the first change.
+            onTextEdited: root.value = parseFloat(text)
         }
     }
 

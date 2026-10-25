@@ -33,6 +33,9 @@ Item {
     signal openAdbPageRequested()
 
     default property alias content: contentHolder.data
+    // A page's own trailing header controls, in a row after the title. The
+    // alias is to `data`, so a page assigns them as children of that row.
+    property alias headerActions: headerTrailing.data
 
     ColumnLayout {
         anchors.fill: parent
@@ -57,6 +60,12 @@ Item {
                 text: root.title
                 font.pixelSize: Appearance.font.pixelSize.normal
                 color: Appearance.colors.colOnLayer2
+            }
+
+            RowLayout {
+                id: headerTrailing
+                Layout.alignment: Qt.AlignVCenter
+                spacing: Appearance.spacing.space50
             }
         }
 

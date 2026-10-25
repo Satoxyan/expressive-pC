@@ -122,6 +122,7 @@ Item {
 
             iconName: "smart_display"
             iconShape: MaterialShape.Shape.Cookie9Sided
+            hasSettings: true
             cardState: PhoneCards.mirrorState(mirrorCard.flags)
             title: {
                 switch (PhoneCards.mirrorTitleKey(mirrorCard.flags)) {
@@ -197,6 +198,7 @@ Item {
                 // decision.
                 PhoneScrcpy.launchMirror();
             }
+            onSettingsClicked: root.openPage("mirror")
             onStopClicked: PhoneScrcpy.stopMirror()
         }
 

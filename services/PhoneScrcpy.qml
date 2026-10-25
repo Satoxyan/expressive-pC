@@ -21,10 +21,13 @@ import qs.modules.common
  * DiscordVoice ladder (capped exponential backoff, five attempts), and one
  * that dies with nothing queued is simply gone until the next command.
  *
- * `mirrorArgs()` and `appModeArgs()` are the flag tables, pure: the mirror
- * takes Config.options.phone.scrcpy.*, app mode adds --start-app and the
- * virtual display. `targetArgs()` names a wireless target when the user
- * asked for one; the supervisor still prefers a USB serial over it.
+ * `mirrorArgs()` and `appModeArgs()` are the flag tables, pure: they share
+ * `videoArgs()`, and each takes its picture flags from its own table -
+ * Config.options.phone.scrcpy for the mirror, its `appMode` child for an
+ * app - so the two settings pages cannot leak into one another. App mode
+ * adds --start-app and the virtual display. `targetArgs()` names a
+ * wireless target when the user asked for one; the supervisor still
+ * prefers a USB serial over it.
  *
  * Everything between the sync markers is kept byte-for-byte in sync with
  * the logic-only double (tests/imports/testservices/PhoneScrcpy.qml);
@@ -51,6 +54,21 @@ Singleton {
     // else's error. Scoped here, a non-empty string means "the launch you
     // just asked for did not take".
     property string mirrorError: ""
+
+    // Facts about the phone that the settings page needs before a session
+    // exists: its real screen size ("1220x2712") and the video encoders its
+    // MediaCodec exposes. Both are answered by the supervisor, which is the
+    // one thing that already resolves WHICH phone a command is aimed at.
+    property string deviceScreenSize: ""
+    property bool deviceScreenSizeLoading: false
+    // [{ codec, name, label, hardware }] - the phone's video encoders, as
+    // the supervisor parsed them from `scrcpy --list-encoders`.
+    property var encoders: []
+    property bool encodersLoading: false
+    property string encodersError: ""
+    // Set when a setting change stops a live mirror: the exited event
+    // relaunches it with the new flags.
+    property bool mirrorRestartPending: false
 
     // [{ name, package, system }]
     property var apps: []
@@ -79,9 +97,75 @@ Singleton {
     }
 
     // BEGIN phone-scrcpy logic (synced with tests/imports/testservices/PhoneScrcpy.qml)
-    // The mirror's flags, from Config.options.phone.scrcpy - the sibling
-    // fork's table. `--video-buffer` is scrcpy >= 2's name for the display
-    // buffer.
+    // The long edge of "WIDTHxHEIGHT" or of a bare number. scrcpy has no
+    // exact-size flag: --max-size caps the long edge and derives the other
+    // one from the phone's aspect ratio. 0 for anything unparsable.
+    function resolutionLongEdge(text: string): int {
+        const raw = String(text ?? "").trim().toLowerCase().replace(/\s+/g, "");
+        let match = /^(\d{2,5})[x*](\d{2,5})$/.exec(raw);
+        if (match) return Math.max(parseInt(match[1]), parseInt(match[2]));
+        match = /^(\d{2,5})$/.exec(raw);
+        return match ? parseInt(match[1]) : 0;
+    }
+
+    // A resolution as the settings page needs it. `ok` is false for text
+    // that would become no flag at all; `text` is what gets stored.
+    function parseResolution(text: string): var {
+        const raw = String(text ?? "").trim().toLowerCase().replace(/\s+/g, "");
+        if (raw.length === 0) return { ok: true, width: 0, height: 0, longEdge: 0, text: "" };
+        let match = /^(\d{2,5})[x*](\d{2,5})$/.exec(raw);
+        if (match) {
+            const width = parseInt(match[1]);
+            const height = parseInt(match[2]);
+            if (width > 0 && height > 0)
+                return { ok: true, width: width, height: height,
+                         longEdge: Math.max(width, height), text: width + "x" + height };
+        }
+        match = /^(\d{2,5})$/.exec(raw);
+        if (match) {
+            const edge = parseInt(match[1]);
+            if (edge > 0)
+                return { ok: true, width: 0, height: 0, longEdge: edge, text: String(edge) };
+        }
+        return { ok: false, width: 0, height: 0, longEdge: 0, text: "" };
+    }
+
+    // "8M" / "8000000" / "8k" as whole Mbps, for the bit-rate spin box.
+    function bitRateMbps(text: string): int {
+        const match = /^(\d+(?:\.\d+)?)\s*([kmg]?)$/.exec(String(text ?? "").trim().toLowerCase());
+        if (!match) return 0;
+        const value = parseFloat(match[1]);
+        const factor = match[2] === "k" ? 0.001 : match[2] === "g" ? 1000
+            : match[2] === "m" ? 1 : 0.000001;
+        return Math.max(0, Math.round(value * factor));
+    }
+
+    // The picture's flags, shared by the mirror and App Mode so the two
+    // settings pages offer the same scrcpy table without either one owning
+    // the list. `--video-buffer` is scrcpy >= 2's name for the display
+    // buffer; empty options are no flag at all.
+    function videoArgs(opts: var): var {
+        const o = opts ?? {};
+        const args = [];
+        if (o.videoEnabled === false) args.push("--no-video");
+        if (Number(o.maxFps) > 0) args.push("--max-fps=" + Number(o.maxFps));
+        if (typeof o.bitRate === "string" && o.bitRate.trim() !== "") args.push("--video-bit-rate=" + o.bitRate.trim());
+        const longEdge = root.resolutionLongEdge(o.resolution);
+        if (longEdge > 0) args.push("--max-size=" + longEdge);
+        if (Number(o.videoBuffer) > 0) args.push("--video-buffer=" + Number(o.videoBuffer));
+        const codec = String(o.videoCodec ?? "").trim();
+        if (codec.length > 0) args.push("--video-codec=" + codec);
+        const encoder = String(o.videoEncoder ?? "").trim();
+        if (encoder.length > 0) args.push("--video-encoder=" + encoder);
+        // No flag at all is Auto (-1): scrcpy leaves the picture upright and
+        // a followed virtual display forwards its own turn unrotated.
+        const orientation = Number(o.captureOrientation);
+        if (orientation === 0 || orientation === 90 || orientation === 180 || orientation === 270)
+            args.push("--capture-orientation=" + orientation);
+        return args;
+    }
+
+    // The mirror's flags: the tab's own table plus the picture above.
     function mirrorArgs(opts: var): var {
         const o = opts ?? {};
         const args = [];
@@ -92,28 +176,68 @@ Singleton {
         if (o.showTouches) args.push("--show-touches");
         if (o.fullscreen) args.push("--fullscreen");
         if (o.alwaysOnTop) args.push("--always-on-top");
-        if (Number(o.maxFps) > 0) args.push("--max-fps=" + Number(o.maxFps));
-        if (typeof o.bitRate === "string" && o.bitRate.trim() !== "") args.push("--video-bit-rate=" + o.bitRate.trim());
-        if (Number(o.maxSize) > 0) args.push("--max-size=" + Number(o.maxSize));
-        if (Number(o.videoBuffer) > 0) args.push("--video-buffer=" + Number(o.videoBuffer));
-        return args;
+        return args.concat(root.videoArgs(o));
+    }
+
+    // The size the app's virtual display is created at. A stored
+    // resolution wins over displayWidth/Height: WIDTHxHEIGHT is used
+    // exactly, a single edge scales the configured shape. Sizing the
+    // display here matters because --max-size clamps a flex display's
+    // width and height SEPARATELY, which would turn anything but the
+    // display's own shape into a different one (a square, for a phone's
+    // portrait screen).
+    function appModeDisplaySize(appOpts: var): var {
+        const o = appOpts ?? {};
+        const width = Number(o.displayWidth) > 0 ? Number(o.displayWidth) : 1280;
+        const height = Number(o.displayHeight) > 0 ? Number(o.displayHeight) : 960;
+        const parsed = root.parseResolution(o.resolution);
+        if (!parsed.ok || parsed.text.length === 0)
+            return { width: width, height: height };
+        if (parsed.width > 0 && parsed.height > 0)
+            return { width: parsed.width, height: parsed.height };
+        const scale = parsed.longEdge / Math.max(width, height);
+        return {
+            width: Math.max(1, Math.round(width * scale)),
+            height: Math.max(1, Math.round(height * scale))
+        };
+    }
+
+    // Auto rotation only exists for a virtual display: the app can ask THAT
+    // display to turn. Without one it runs on the phone's own screen, which
+    // turns on its own, and the supervisor has no display of its own to
+    // watch.
+    function appFollowsOrientation(appOpts: var): bool {
+        const o = appOpts ?? {};
+        return Number(o.captureOrientation) === -1
+            && o.flexDisplay === true && o.videoEnabled !== false;
     }
 
     // App mode: one app on a virtual display of its own when flexDisplay is
-    // on, otherwise started on the phone's screen and mirrored.
+    // on, otherwise started on the phone's screen and mirrored. The picture
+    // flags come from the appMode table, never from the mirror's.
+    //
+    // scrcpy refuses --new-display together with --no-video, so a video-less
+    // session starts the app on the phone's own screen; the settings page
+    // says so. There is no virtual display to size then, and no keep-active
+    // or decoration flags to apply.
+    //
+    // Auto rotation drops --flex-display: flex makes the display chase the
+    // window while the supervisor makes the window chase the display, and
+    // the two oscillate. The display stays at the configured size unless the
+    // app turns it, which is exactly what the supervisor follows.
     function appModeArgs(packageName: string, appOpts: var): var {
         const o = appOpts ?? {};
         const args = ["--start-app=" + packageName];
-        if (o.flexDisplay) {
-            const w = Number(o.displayWidth) > 0 ? Number(o.displayWidth) : 1280;
-            const h = Number(o.displayHeight) > 0 ? Number(o.displayHeight) : 960;
+        if (o.flexDisplay && o.videoEnabled !== false) {
+            const size = root.appModeDisplaySize(o);
             const density = Number(o.density) > 0 ? Number(o.density) : 160;
-            args.push("--new-display=" + w + "x" + h + "/" + density);
-            args.push("--flex-display");
+            args.push("--new-display=" + size.width + "x" + size.height + "/" + density);
+            if (root.appFollowsOrientation(o)) args.push("--no-window-aspect-ratio-lock");
+            else args.push("--flex-display");
             if (o.keepActive) args.push("--keep-active");
             if (o.systemDecorations === false) args.push("--no-vd-system-decorations");
         }
-        return args;
+        return args.concat(root.videoArgs(o));
     }
 
     // The `-s` target for a wireless phone: the address KDE Connect reaches
@@ -252,20 +376,24 @@ Singleton {
             const index = root.sessionIndex(id);
             if (index >= 0) sessionsModel.remove(index);
             const failure = Number(msg.code ?? 0) !== 0 ? String(msg.error ?? "") : "";
+            const restarting = id === "mirror" && root.mirrorRestartPending;
             if (id === "mirror") {
                 const wasLaunching = root.mirrorLaunching;
                 root.cancelMirrorSettle();
                 root.mirrorRunning = false;
                 root.mirrorLaunching = false;
-                // A mirror that exits before it has settled never opened, so
-                // the click produced nothing at all - and the only other line
-                // the card has is the precondition the user already read
-                // before clicking, which is why a silent snap back to it
-                // reads as the card having ignored them.
-                root.mirrorError = failure.length > 0 ? failure
-                    : (wasLaunching ? "scrcpy exited before the mirror window opened" : "");
+                if (restarting) {
+                    root.mirrorRestartPending = false;
+                    root.launchMirror();
+                } else {
+                    // A launch that exits before the settle never opened a
+                    // window, so silence would read as the click being
+                    // ignored; say that rather than nothing.
+                    root.mirrorError = failure.length > 0 ? failure
+                        : (wasLaunching ? "scrcpy exited before the mirror window opened" : "");
+                }
             }
-            if (failure.length > 0) {
+            if (failure.length > 0 && !restarting) {
                 root.lastError = failure;
                 root.feedback(root.lastError, false);
             }
@@ -289,6 +417,19 @@ Singleton {
         } else if (msg.event === "apps_error") {
             root.appsLoading = false;
             root.appsError = String(msg.message ?? "Failed to list apps");
+        } else if (msg.event === "device_size") {
+            root.deviceScreenSize = Number(msg.width) + "x" + Number(msg.height);
+            root.deviceScreenSizeLoading = false;
+        } else if (msg.event === "device_size_error") {
+            root.deviceScreenSizeLoading = false;
+        } else if (msg.event === "encoders_list") {
+            root.encoders = Array.isArray(msg.encoders) ? msg.encoders : [];
+            root.encodersError = "";
+            root.encodersLoading = false;
+        } else if (msg.event === "encoders_error") {
+            root.encoders = [];
+            root.encodersError = String(msg.message ?? "Failed to list encoders");
+            root.encodersLoading = false;
         }
     }
 
@@ -348,6 +489,99 @@ Singleton {
         root.send({ cmd: "focus", id: "mirror" });
     }
 
+    // ---- the mirror's settings ------------------------------------------
+
+    // Every value on the settings page is a flag the session is STARTED
+    // with, so a change to a live mirror is a restart: the supervisor is
+    // told to stop, and the exited event relaunches it with the new table.
+    // A change while nothing runs is just the next launch's flags.
+    function applyMirrorSetting(key: string, value: var): void {
+        const conf = Config.options.phone.scrcpy;
+        if (conf[key] === value) return;
+        conf[key] = value;
+        root.restartMirrorForSettings();
+    }
+
+    // The encoder belongs to the codec: a name from another codec is a flag
+    // scrcpy refuses. Dropping it here keeps one config write and one
+    // restart rather than leaving a stale choice behind a disabled row.
+    function setMirrorCodec(codec: string): void {
+        const conf = Config.options.phone.scrcpy;
+        if (conf.videoCodec === codec) return;
+        conf.videoCodec = codec;
+        const encoder = String(conf.videoEncoder ?? "").trim();
+        if (encoder.length > 0 && !root.encoderForCodec(codec, encoder))
+            conf.videoEncoder = "";
+        root.restartMirrorForSettings();
+    }
+
+    function encoderForCodec(codec: string, name: string): bool {
+        for (const entry of root.encoders ?? [])
+            if (String(entry.codec) === codec && String(entry.name) === name) return true;
+        return false;
+    }
+
+    function restartMirrorForSettings(): void {
+        if (!root.mirrorRunning && !root.mirrorLaunching) return;
+        if (root.mirrorRestartPending) return;
+        root.mirrorRestartPending = true;
+        root.stopMirror();
+    }
+
+    // ---- App Mode's settings --------------------------------------------
+
+    // Every value is a launch flag, and App Mode can have several windows
+    // live at once: a change is the NEXT launch's flags rather than a
+    // restart of everything that is open. Nothing here touches a running
+    // session, and the settings page says so.
+    function applyAppSetting(key: string, value: var): void {
+        const conf = Config.options.phone.scrcpy.appMode;
+        if (conf[key] === value) return;
+        conf[key] = value;
+    }
+
+    // Same rule as the mirror's: an encoder from another codec is a flag
+    // scrcpy refuses, so the stale choice goes with the codec.
+    function setAppCodec(codec: string): void {
+        const conf = Config.options.phone.scrcpy.appMode;
+        if (conf.videoCodec === codec) return;
+        conf.videoCodec = codec;
+        const encoder = String(conf.videoEncoder ?? "").trim();
+        if (encoder.length > 0 && !root.encoderForCodec(codec, encoder))
+            conf.videoEncoder = "";
+    }
+
+    // ---- the phone facts the settings page asks for ---------------------
+
+    // The size the phone reports for its own display. Asked of the
+    // supervisor rather than adb directly: the supervisor already resolves
+    // which phone a command is for, USB before wireless, and a second
+    // resolution here could pick a different phone than the mirror does.
+    function refreshDeviceScreenSize(): void {
+        if (!root.available || root.deviceScreenSizeLoading) return;
+        root.deviceScreenSizeLoading = true;
+        root.send({ cmd: "device_size", target_args: root.scrcpyTarget() });
+    }
+
+    // The video encoders the phone exposes, grouped by codec by the
+    // supervisor. Listing them starts the scrcpy server on the phone, so
+    // this is asked when the settings page opens rather than at startup.
+    function refreshEncoders(): void {
+        if (!root.available || root.encodersLoading) return;
+        root.encodersLoading = true;
+        root.encodersError = "";
+        root.send({ cmd: "list_encoders", target_args: root.scrcpyTarget() });
+    }
+
+    // What the settings page calls when it appears. Both answers are cached
+    // for the life of the device, so reopening the page does not start the
+    // phone's scrcpy server again.
+    function ensureDeviceFacts(): void {
+        if (!root.available) return;
+        if (root.deviceScreenSize.length === 0) root.refreshDeviceScreenSize();
+        if (root.encoders.length === 0) root.refreshEncoders();
+    }
+
     function refreshApps(): void {
         if (!root.appModeSupported) return;
         root.appsLoading = true;
@@ -366,10 +600,12 @@ Singleton {
             root.focusApp(packageName);
             return;
         }
+        const appOpts = Config.options.phone.scrcpy.appMode;
         root.send({
             cmd: "launch", id: root.sessionIdFor(packageName), type: "app",
             target_args: root.scrcpyTarget(),
-            extra_args: root.appModeArgs(packageName, Config.options.phone.scrcpy.appMode)
+            extra_args: root.appModeArgs(packageName, appOpts),
+            follow_orientation: root.appFollowsOrientation(appOpts)
         });
         Persistent.states.phone.scrcpy.recentPackages =
             root.pushRecent(Persistent.states.phone.scrcpy.recentPackages, packageName, root.maxRecents);
@@ -464,7 +700,12 @@ Singleton {
         sessionsModel.clear();
         root.mirrorRunning = false;
         root.mirrorLaunching = false;
+        root.mirrorRestartPending = false;
         root.appsLoading = false;
+        // A query whose supervisor died will never answer; leaving these on
+        // would make the settings page refuse to ask again.
+        root.deviceScreenSizeLoading = false;
+        root.encodersLoading = false;
     }
 
     onSessionCountChanged: managerIdleTimer.restart()
@@ -526,8 +767,14 @@ Singleton {
     }
 
     // A device change is a different phone: what was mirrored is not what
-    // the tab is about any more.
+    // the tab is about any more, and the size and encoder list belonged to
+    // the old one.
     onActiveDeviceIdChanged: {
         if (sessionsModel.count > 0) root.send({ cmd: "stop_all" });
+        root.deviceScreenSize = "";
+        root.deviceScreenSizeLoading = false;
+        root.encoders = [];
+        root.encodersError = "";
+        root.encodersLoading = false;
     }
 }

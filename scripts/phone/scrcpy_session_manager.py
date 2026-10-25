@@ -7,18 +7,25 @@ every scrcpy child, its window title and its exit.
 
 Commands (one JSON object per line on stdin):
   {"cmd": "launch", "id": <session id>, "type": "mirror"|"app",
-   "target_args": [...], "extra_args": [...]}
+   "target_args": [...], "extra_args": [...],
+   "follow_orientation": <bool>}
   {"cmd": "stop", "id": <session id>}
   {"cmd": "stop_all"}
   {"cmd": "focus", "id": <session id>}
   {"cmd": "list_apps", "target_args": [...], "deviceId": <cache key>}
+  {"cmd": "device_size", "target_args": [...]}
+  {"cmd": "list_encoders", "target_args": [...]}
 
 Events (one JSON object per line on stdout):
   started    {id, pid, title[, alreadyRunning]}
-  exited     {id, code, error}          error = scrcpy's last stderr line
+  exited     {id, code, error}          error = scrcpy's last output line
   error      {id, message}
   apps_list  {deviceId, apps[, cached]} apps = [{package, name, system}]
   apps_error {message}
+  device_size       {width, height}
+  device_size_error {message}
+  encoders_list  {encoders}   encoders = [{codec, name, label, hardware}]
+  encoders_error {message}
 
 Every scrcpy child is spawned as
   scrcpy [-s <serial>] --window-title=imi-phone-<type>-<id> <extra_args...>
@@ -29,6 +36,18 @@ over any ip:port, and only when adb lists nothing do the caller's target_args
 stand. Among several USB devices the pick is sorted, not adb's print order. A
 wireless target the caller names is `adb connect`ed first, bounded, so a phone
 on wireless debugging that adb has not seen yet still resolves.
+
+App Mode may follow the app's orientation (`follow_orientation`). The
+virtual display is created with `--new-display`; scrcpy logs its id on
+stdout as "New display: WxH/DPI (id=N)". For a followed session this
+supervisor tells the phone to honour orientation requests on THAT display
+(`wm set-ignore-orientation-request -d N 0`), then watches the display's
+logical size and resizes the scrcpy window to the new shape. Hyprland
+ignores SDL's own resize, so the window is resized through the compositor,
+preserving the window's current scale and fitting within the usable screen
+minus scrcpy's own 96 px margins. A fixed rotation instead pins the display
+(`... 1`) so the picture flag is the only rotation applied. Nothing is
+polled or changed for a session without a virtual display.
 
 stdin closing means the shell went away; every session is stopped then, so a
 shell restart never leaves headless scrcpy windows behind.
@@ -46,7 +65,7 @@ import threading
 import time
 from pathlib import Path
 
-# scrcpy's last stderr line is what an `exited` event carries, so the drain
+# scrcpy's last output line is what an `exited` event carries, so the drain
 # below only has to keep the tail. Bounded because the drain runs for the
 # life of the child and a chatty one is exactly the case it exists for.
 STDERR_TAIL_LINES = 40
@@ -57,9 +76,43 @@ CACHE_DIR = (Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
              / "immaterial-impulse" / "phone" / "apps")
 TITLE_PREFIX = "imi-phone-"
 
+# How often a followed display's logical size is read back. The display turns
+# at speed the app chooses, so a short poll is the only reliable signal; the
+# follow thread only polls while such a session is live.
+FOLLOW_POLL_INTERVAL = 0.5
+# scrcpy's own window sizing reserves this much of the usable screen
+# (screen.c's DISPLAY_MARGINS, total per axis, not per side).
+DISPLAY_MARGINS = 96
+
+# Output line for a created virtual display (scrcpy's server logs are on
+# stdout, which is why the supervisor merges the child's streams):
+#   [server] INFO: New display: 960x1280/160 (id=39)
+NEW_DISPLAY_LINE = re.compile(r"New display: \d+x\d+/\d+ \(id=(\d+)\)")
+NEW_DISPLAY_ARG = re.compile(r"--new-display=(\d+)x(\d+)(?:/\d+)?")
+# `dumpsys window displays` groups each display as
+#   Display: mDisplayId=39
+#     init=960x1280 160dpi cur=1280x960 app=1280x960 ...
+# The logical size is `cur`; `wm size` reports the UNROTATED base size and is
+# useless after the display turned.
+DISPLAY_BLOCK_LINE = re.compile(r"^\s*Display: mDisplayId=(\d+)")
+DISPLAY_CUR_SIZE = re.compile(r"\bcur=(\d+)x(\d+)")
+
 # `scrcpy --list-apps` prints one app per line: `*` for a system app, `-` for
 # a user app, then the label, then the package. The label may carry spaces.
 APP_LINE = re.compile(r"^\s*([\*\-])\s+(.+?)\s+([a-zA-Z0-9_]+\.[a-zA-Z0-9_\.]+)\s*$")
+
+# `adb shell wm size` prints "Physical size: WxH", and an "Override size: WxH"
+# line when one is set. The override is what scrcpy mirrors, so it wins.
+WM_SIZE_LINE = re.compile(r"^\s*(Physical|Override) size:\s*(\d+)x(\d+)\s*$",
+                          re.IGNORECASE)
+
+# `scrcpy --list-encoders` prints one line per encoder:
+#   --video-codec=h264 --video-encoder=c2.qti.avc.encoder  (hw) [vendor]
+# Aliases repeat the same encoder under a second name; they are dropped
+# unless a codec has nothing else, because two rows that drive one encoder
+# are a choice the user cannot tell apart.
+VIDEO_ENCODER_LINE = re.compile(
+    r"--video-codec=([a-z0-9]+)\s+--video-encoder=(\S+)(.*)$")
 
 
 def session_title(type_str, session_id):
@@ -88,6 +141,94 @@ def parse_pm_list(lines):
     return apps
 
 
+def parse_wm_size(text):
+    """(width, height) of the display, or None.
+
+    An override wins over the physical size: `wm size` keeps the physical
+    line after an override is set, and the override is what the display -
+    and therefore scrcpy - actually draws.
+    """
+    physical = None
+    override = None
+    for line in (text or "").splitlines():
+        match = WM_SIZE_LINE.match(line)
+        if not match:
+            continue
+        size = (int(match.group(2)), int(match.group(3)))
+        if match.group(1).lower() == "override":
+            override = size
+        else:
+            physical = size
+    return override or physical
+
+
+def parse_new_display_size(args):
+    """(width, height) of a `--new-display` flag, or None."""
+    for arg in args or []:
+        match = NEW_DISPLAY_ARG.search(str(arg))
+        if match:
+            return (int(match.group(1)), int(match.group(2)))
+    return None
+
+
+def parse_display_sizes(text):
+    """The logical (cur=) size of every display in `dumpsys window displays`.
+
+    `init=` is the size the display was created at and `cur=` the size it
+    has now; only the latter turns when an app asks for another orientation.
+    """
+    sizes = {}
+    current = None
+    for line in (text or "").splitlines():
+        block = DISPLAY_BLOCK_LINE.match(line)
+        if block:
+            current = int(block.group(1))
+        elif line and not line[0].isspace():
+            current = None
+            continue
+        if current is None or current in sizes:
+            continue
+        match = DISPLAY_CUR_SIZE.search(line)
+        if match:
+            sizes[current] = (int(match.group(1)), int(match.group(2)))
+    return sizes
+
+
+def lua_quote(value):
+    """A Python string as the contents of a Lua string literal."""
+    return str(value).replace("\\", "\\\\").replace('"', '\\"')
+
+
+def parse_encoders(text):
+    """The phone's video encoders, one entry per real encoder.
+
+    `scrcpy --list-encoders` also prints the audio encoders; only lines that
+    name a video codec and a video encoder are read.
+    """
+    groups = collections.OrderedDict()
+    for line in (text or "").splitlines():
+        match = VIDEO_ENCODER_LINE.search(line)
+        if not match:
+            continue
+        codec, name, rest = match.groups()
+        qualifiers = rest or ""
+        alias = re.search(r"\(alias for ([^)]+)\)", qualifiers)
+        hardware = "(hw)" in qualifiers
+        label = name + (" (hw)" if hardware else " (sw)" if "(sw)" in qualifiers else "")
+        groups.setdefault(codec, []).append({
+            "codec": codec,
+            "name": name,
+            "label": label,
+            "hardware": hardware,
+            "aliasOf": alias.group(1) if alias else "",
+        })
+    encoders = []
+    for entries in groups.values():
+        primary = [entry for entry in entries if not entry["aliasOf"]]
+        encoders.extend(primary or entries)
+    return encoders
+
+
 def dedupe_sorted(apps):
     seen = set()
     unique = []
@@ -113,7 +254,13 @@ class ScrcpySessionManager:
         # together.
         self.emit_lock = threading.Lock()
         self.processes = {}     # session_id -> subprocess.Popen
-        self.session_info = {}  # session_id -> {id, type, title, pid, startedAt}
+        self.session_info = {}  # session_id -> {id, type, title, pid, startedAt, ...}
+        # Sessions whose virtual display follows the app: session_id ->
+        # {display_id, title, args, size}. `size` is the last logical size
+        # the window was fitted to (None until the first reading).
+        self.follow_displays = {}
+        self.follow_wake = threading.Event()
+        self.follow_thread = None
         # The app scan runs on a worker of its own (see request_apps).
         self.apps_queue = queue.Queue()
         self.apps_worker = None
@@ -293,9 +440,66 @@ class ScrcpySessionManager:
         except Exception as error:
             self.emit({"event": "apps_error", "message": f"Failed to list apps: {error}"})
 
+    # ---- device facts ----------------------------------------------------
+
+    def request_device_size(self, target_args=None):
+        """Ask the phone for its display size on a worker.
+
+        `resolve_adb_target` can spend up to 8 seconds on `adb connect` and
+        `adb devices`, and this runs while a mirror may be live; a blocking
+        call here would stop `stop` from being read off stdin for that long.
+        """
+        threading.Thread(target=self._device_size_worker,
+                         args=(target_args,), daemon=True).start()
+
+    def _device_size_worker(self, target_args):
+        try:
+            resolved = self.resolve_adb_target(target_args)
+            res = subprocess.run(["adb"] + resolved + ["shell", "wm", "size"],
+                                 capture_output=True, text=True, timeout=10)
+            size = parse_wm_size(res.stdout)
+            if size:
+                self.emit({"event": "device_size",
+                           "width": size[0], "height": size[1]})
+                return
+            lines = (res.stderr or res.stdout or "").strip().splitlines()
+            self.emit({"event": "device_size_error",
+                       "message": lines[0] if lines else "No display size reported"})
+        except Exception as error:
+            self.emit({"event": "device_size_error", "message": str(error)})
+
+    def request_encoders(self, target_args=None):
+        """List the phone's video encoders on a worker.
+
+        `scrcpy --list-encoders` pushes the server and starts it, so it takes
+        over a second even on a good link - the same reason the app scan has
+        a worker of its own.
+        """
+        threading.Thread(target=self._encoders_worker,
+                         args=(target_args,), daemon=True).start()
+
+    def _encoders_worker(self, target_args):
+        try:
+            resolved = self.resolve_adb_target(target_args)
+            res = subprocess.run(["scrcpy"] + resolved + ["--list-encoders"],
+                                 capture_output=True, text=True, timeout=15)
+            encoders = parse_encoders(res.stdout + "\n" + res.stderr)
+            if encoders:
+                self.emit({"event": "encoders_list", "encoders": encoders})
+                return
+            lines = [line.strip() for line in
+                     (res.stderr or res.stdout or "").splitlines() if line.strip()]
+            message = next((line for line in reversed(lines)
+                            if "ERROR" in line.upper()),
+                           lines[-1] if lines else "No video encoders reported")
+            self.emit({"event": "encoders_error", "message": message})
+        except Exception as error:
+            self.emit({"event": "encoders_error", "message": str(error)})
+
     # ---- sessions --------------------------------------------------------
 
-    def launch_session(self, session_id, type_str, target_args, extra_args):
+    def launch_session(self, session_id, type_str, target_args, extra_args,
+                       follow_orientation=False):
         if not session_id:
             self.emit({"event": "error", "id": "", "message": "launch needs an id"})
             return
@@ -313,11 +517,13 @@ class ScrcpySessionManager:
             return
 
         title = session_title(type_str, session_id)
-        cmd = (["scrcpy"] + self.resolve_adb_target(target_args)
-               + ["--window-title=" + title] + list(extra_args or []))
+        extra_args = list(extra_args or [])
+        adb_args = self.resolve_adb_target(target_args)
+        cmd = (["scrcpy"] + adb_args
+               + ["--window-title=" + title] + extra_args)
         try:
-            proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
-                                    stderr=subprocess.PIPE, text=True)
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT, text=True)
         except Exception as error:
             self.emit({"event": "error", "id": session_id,
                        "message": f"Failed to launch scrcpy: {error}"})
@@ -327,32 +533,52 @@ class ScrcpySessionManager:
             self.processes[session_id] = proc
             self.session_info[session_id] = {
                 "id": session_id, "type": type_str, "title": title,
-                "pid": proc.pid, "startedAt": int(time.time())}
+                "pid": proc.pid, "startedAt": int(time.time()),
+                # The display id is learned from scrcpy's output. The
+                # baseline comes from the launch flag so a turn that happens
+                # before the first poll is still a change to follow.
+                "followOrientation": bool(follow_orientation),
+                "adbArgs": adb_args,
+                "displayId": None,
+                "displaySize": parse_new_display_size(extra_args)}
         self.emit({"event": "started", "id": session_id, "pid": proc.pid, "title": title})
         threading.Thread(target=self._wait_process, args=(session_id, proc),
                          daemon=True).start()
 
-    @staticmethod
-    def _drain_stderr(proc, tail):
-        """Read the child's stderr for as long as it writes, keeping the tail.
+    def _drain_output(self, proc, tail, session_id):
+        """Read the child's output for as long as it writes, keeping the tail.
 
-        This used to be a single `proc.stderr.read()` AFTER `proc.wait()`.
-        A pipe holds ~64 KiB: past that, scrcpy blocks in `write()` with
-        nobody reading, so it never exits, `wait()` never returns, no
-        `exited` event is ever emitted, and the card sits on "running" over a
-        frozen mirror with nothing in any log. Draining while it runs is what
-        `communicate()` does; a thread is used so the wait below still
-        returns the moment the child is gone rather than when its stderr
-        reaches EOF (a grandchild can hold that open).
+        scrcpy's server logs go to STDOUT (the ADB push message and client
+        warnings are the stderr half), which is why the child's streams are
+        merged: the "New display ... (id=N)" line needed to apply a followed
+        display's orientation is only ever on stdout.
+
+        This used to be a single `read()` AFTER `proc.wait()`. A pipe holds
+        ~64 KiB: past that, scrcpy blocks in `write()` with nobody reading,
+        so it never exits, `wait()` never returns, no `exited` event is ever
+        emitted, and the card sits on "running" over a frozen mirror with
+        nothing in any log. Draining while it runs is what `communicate()`
+        does; a thread is used so the wait below still returns the moment the
+        child is gone rather than when its output reaches EOF (a grandchild
+        can hold that open).
         """
-        stream = proc.stderr
+        stream = proc.stdout
         if stream is None:
             return
         try:
             for line in stream:
                 stripped = line.strip()
-                if stripped:
-                    tail.append(stripped)
+                if not stripped:
+                    continue
+                tail.append(stripped)
+                match = NEW_DISPLAY_LINE.search(stripped)
+                if match:
+                    try:
+                        self._on_new_display(session_id, int(match.group(1)))
+                    except Exception as error:
+                        # Never let a handling error end this loop: the pipe
+                        # would fill and scrcpy would block in write().
+                        sys.stderr.write(f"orientation: {error}\n")
         except Exception:
             pass
         finally:
@@ -363,8 +589,8 @@ class ScrcpySessionManager:
 
     def _wait_process(self, session_id, proc):
         tail = collections.deque(maxlen=STDERR_TAIL_LINES)
-        drain = threading.Thread(target=self._drain_stderr, args=(proc, tail),
-                                 daemon=True)
+        drain = threading.Thread(target=self._drain_output,
+                                 args=(proc, tail, session_id), daemon=True)
         drain.start()
         code = proc.wait()
         drain.join(timeout=STDERR_DRAIN_TIMEOUT)
@@ -373,6 +599,8 @@ class ScrcpySessionManager:
             if self.processes.get(session_id) is proc:
                 del self.processes[session_id]
                 self.session_info.pop(session_id, None)
+                self.follow_displays.pop(session_id, None)
+        self.follow_wake.set()
         self.emit({"event": "exited", "id": session_id, "code": code, "error": err_msg})
 
     def stop_session(self, session_id):
@@ -401,11 +629,244 @@ class ScrcpySessionManager:
             info = self.session_info.get(session_id)
         if not info or not info.get("title"):
             return
+        selector = f"title:^{info['title']}$"
+        self.hypr_dispatch(
+            f'hl.dsp.focus({{ window = "{lua_quote(selector)}" }})',
+            ["focuswindow", selector])
+
+    # ---- followed orientation -------------------------------------------
+
+    def _on_new_display(self, session_id, display_id):
+        """scrcpy created this session's virtual display, id in hand.
+
+        scrcpy logs the id before `--start-app` starts the app, so applying
+        the policy here is the one point that beats the app's first
+        orientation request. A followed display is registered before the
+        `wm` command returns: the baseline size is known from the launch
+        flag, so an early turn is not lost while `adb` is still talking.
+        """
+        with self.lock:
+            info = self.session_info.get(session_id)
+            if info is None:
+                return
+            info["displayId"] = display_id
+            follow = bool(info.get("followOrientation"))
+            args = list(info.get("adbArgs") or [])
+            baseline = info.get("displaySize")
+            if follow:
+                self.follow_displays[session_id] = {
+                    "display_id": display_id,
+                    "title": info["title"],
+                    "args": args,
+                    "size": baseline,
+                }
+        if follow:
+            self._ensure_follow_thread()
+        threading.Thread(target=self._set_ignore_orientation,
+                         args=(args, display_id, not follow),
+                         daemon=True).start()
+
+    @staticmethod
+    def _set_ignore_orientation(adb_args, display_id, ignore):
+        """Honour (0) or ignore (1) app orientation requests on a display.
+
+        The value is an integer on this Android build; `true`/`false` are
+        rejected with a NumberFormatException.
+        """
+        value = "1" if ignore else "0"
         try:
-            subprocess.run(["hyprctl", "dispatch", "focuswindow", f"title:^{info['title']}$"],
-                           check=False, capture_output=True, timeout=4)
+            res = subprocess.run(
+                ["adb"] + list(adb_args)
+                + ["shell", "wm", "set-ignore-orientation-request",
+                   "-d", str(display_id), value],
+                capture_output=True, text=True, timeout=8)
+        except Exception as error:
+            sys.stderr.write(f"orientation: {error}\n")
+            return
+        if res.returncode != 0:
+            lines = (res.stderr or res.stdout or "").strip().splitlines()
+            sys.stderr.write(
+                f"orientation: wm set-ignore-orientation-request -d "
+                f"{display_id} {value} failed"
+                + (f": {lines[0]}" if lines else "") + "\n")
+        else:
+            sys.stderr.write(f"orientation: display {display_id} ignore={value}\n")
+
+    def _ensure_follow_thread(self):
+        with self.lock:
+            if self.follow_thread is None or not self.follow_thread.is_alive():
+                self.follow_thread = threading.Thread(target=self._follow_loop,
+                                                      daemon=True)
+                self.follow_thread.start()
+        # Even a live thread may be parked on the no-contexts wait; a new
+        # context has to wake it, not wait for another session to end.
+        self.follow_wake.set()
+
+    def _follow_loop(self):
+        while True:
+            with self.lock:
+                contexts = {sid: dict(entry)
+                            for sid, entry in self.follow_displays.items()}
+            if not contexts:
+                self.follow_wake.wait()
+                self.follow_wake.clear()
+                continue
+            try:
+                self._poll_followed_displays(contexts)
+            except Exception as error:
+                sys.stderr.write(f"orientation poll failed: {error}\n")
+            self.follow_wake.wait(FOLLOW_POLL_INTERVAL)
+            self.follow_wake.clear()
+
+    def _poll_followed_displays(self, contexts):
+        groups = collections.OrderedDict()
+        for session_id, context in contexts.items():
+            groups.setdefault(tuple(context.get("args") or ()), []).append(
+                (session_id, context))
+        for args, members in groups.items():
+            sizes = self._read_display_sizes(args)
+            if not sizes:
+                continue
+            for session_id, context in members:
+                display_id = context["display_id"]
+                observed = sizes.get(display_id)
+                if observed is None:
+                    continue
+                previous = context.get("size")
+                if observed == previous:
+                    continue
+                if previous is None:
+                    # First reading of a display with no known baseline: it
+                    # is where the window already is, not a turn to apply.
+                    self._remember_display_size(session_id, display_id, observed)
+                    continue
+                if not self._resize_window(context["title"], previous, observed):
+                    # The window may not be mapped yet; keep the old
+                    # baseline so the next poll tries again.
+                    continue
+                self._remember_display_size(session_id, display_id, observed)
+                sys.stderr.write(
+                    f"orientation: {context['title']} "
+                    f"{previous[0]}x{previous[1]} -> "
+                    f"{observed[0]}x{observed[1]}\n")
+
+    def _remember_display_size(self, session_id, display_id, size):
+        with self.lock:
+            entry = self.follow_displays.get(session_id)
+            if entry is not None and entry["display_id"] == display_id:
+                entry["size"] = size
+
+    @staticmethod
+    def _read_display_sizes(adb_args):
+        try:
+            res = subprocess.run(
+                ["adb"] + list(adb_args)
+                + ["shell", "dumpsys", "window", "displays"],
+                capture_output=True, text=True, timeout=6)
+        except Exception:
+            return {}
+        if res.returncode != 0:
+            return {}
+        return parse_display_sizes(res.stdout)
+
+    def _resize_window(self, title, old_size, new_size):
+        """Fit the scrcpy window to the display's new shape.
+
+        True means the window is now (or already was) at the target size, so
+        the new size may become the baseline. False leaves the old baseline
+        in place and the next poll retries - the window is often not mapped
+        yet when a fast app turns its display.
+        """
+        client = next((entry for entry in self._hypr_json(["clients"])
+                       if entry.get("title") == title
+                       and entry.get("mapped", True)), None)
+        if client is None:
+            return False
+        window_size = client.get("size") or []
+        if len(window_size) != 2 or window_size[0] <= 0 or window_size[1] <= 0:
+            return False
+        target = self._follow_target_size(
+            (int(window_size[0]), int(window_size[1])), old_size, new_size,
+            client.get("monitor"))
+        if target is None:
+            return False
+        if abs(target[0] - window_size[0]) <= 2 and abs(target[1] - window_size[1]) <= 2:
+            return True
+        selector = f"title:^{title}$"
+        expression = ('hl.dsp.window.resize({ x = %d, y = %d, window = "%s" })'
+                      % (target[0], target[1], lua_quote(selector)))
+        return self.hypr_dispatch(
+            expression,
+            ["resizewindowpixel",
+             f"exact {target[0]} {target[1]},{selector}"])
+
+    def _follow_target_size(self, window_size, old_size, new_size, monitor_id):
+        if old_size[0] <= 0 or old_size[1] <= 0:
+            return None
+        # Keep the scale the window was already showing the content at, so a
+        # window the user resized stays that size through the turn.
+        scale = min(window_size[0] / old_size[0], window_size[1] / old_size[1])
+        monitor = self._hypr_monitor(monitor_id)
+        if monitor is not None:
+            try:
+                monitor_scale = float(monitor.get("scale") or 1.0)
+            except (TypeError, ValueError):
+                monitor_scale = 1.0
+            if monitor_scale <= 0:
+                monitor_scale = 1.0
+            reserved = monitor.get("reserved") or [0, 0, 0, 0]
+            usable_w = (monitor.get("width", 0) / monitor_scale
+                        - reserved[0] - reserved[2] - DISPLAY_MARGINS)
+            usable_h = (monitor.get("height", 0) / monitor_scale
+                        - reserved[1] - reserved[3] - DISPLAY_MARGINS)
+            if usable_w > 0 and usable_h > 0:
+                scale = min(scale, usable_w / new_size[0],
+                            usable_h / new_size[1])
+        if scale <= 0:
+            return None
+        return (max(1, round(new_size[0] * scale)),
+                max(1, round(new_size[1] * scale)))
+
+    def _hypr_monitor(self, monitor_id):
+        monitors = self._hypr_json(["monitors"])
+        for monitor in monitors:
+            if monitor.get("id") == monitor_id:
+                return monitor
+        return monitors[0] if monitors else None
+
+    @staticmethod
+    def _hypr_json(args):
+        try:
+            res = subprocess.run(["hyprctl", "-j"] + list(args),
+                                 capture_output=True, text=True, timeout=4)
+            if res.returncode != 0:
+                return []
+            data = json.loads(res.stdout)
+        except Exception:
+            return []
+        return data if isinstance(data, list) else []
+
+    @staticmethod
+    def hypr_dispatch(expression, legacy_args):
+        """Run a dispatcher as Lua, falling back to the legacy argv syntax.
+
+        Hyprland with a Lua config rejects `dispatch focuswindow ...` (exit
+        7), and a legacy config rejects the Lua expression; trying Lua first
+        and the old form second is what lets one supervisor drive either.
+        """
+        try:
+            res = subprocess.run(["hyprctl", "dispatch", expression],
+                                 capture_output=True, text=True, timeout=4)
+            if res.returncode == 0:
+                return True
         except Exception:
             pass
+        try:
+            res = subprocess.run(["hyprctl", "dispatch"] + list(legacy_args),
+                                 capture_output=True, text=True, timeout=4)
+            return res.returncode == 0
+        except Exception:
+            return False
 
     # ---- protocol --------------------------------------------------------
 
@@ -424,13 +885,18 @@ class ScrcpySessionManager:
                               device_id=msg.get("deviceId", "default"))
         elif cmd == "launch":
             self.launch_session(msg.get("id"), msg.get("type", "app"),
-                                msg.get("target_args"), msg.get("extra_args"))
+                                msg.get("target_args"), msg.get("extra_args"),
+                                follow_orientation=msg.get("follow_orientation") is True)
         elif cmd == "stop":
             self.stop_session(msg.get("id"))
         elif cmd == "stop_all":
             self.stop_all()
         elif cmd == "focus":
             self.focus_session(msg.get("id"))
+        elif cmd == "device_size":
+            self.request_device_size(target_args=msg.get("target_args"))
+        elif cmd == "list_encoders":
+            self.request_encoders(target_args=msg.get("target_args"))
         else:
             sys.stderr.write(f"unknown command: {cmd}\n")
 

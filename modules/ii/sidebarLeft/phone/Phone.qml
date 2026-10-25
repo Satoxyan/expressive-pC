@@ -25,23 +25,24 @@ import Quickshell
  *
  *  - SUB-PAGES are `PhoneSubPage`-rooted Items with `signal back()`. This
  *    file hosts exactly ONE at a time in `subPageLoader`, selected by a
- *    string id - "contacts" | "apps" | "webcam" | "mic" | "adb" - resolved
- *    to a FILE NAME through `subPageSource()`, so a page that has not landed
- *    yet leaves the Loader in error with a null item rather than failing
- *    this file's compile. `PhoneContactsPage.qml`, `PhoneAppsPage.qml`,
- *    `PhoneWebcamPage.qml` and `PhoneMicPage.qml` are the other half's;
- *    `PhoneAdbPage.qml` is this file's, because the header's adb button is
- *    the only route to it and a route that dead-ends is the bug this page
- *    exists to fix.
+ *    string id - "contacts" | "apps" | "webcam" | "mic" | "mirror" | "adb" |
+ *    "appSettings" - resolved to a FILE NAME through `subPageSource()`, so a
+ *    page that has not landed yet leaves the Loader in error with a null
+ *    item rather than failing this file's compile. `PhoneContactsPage.qml`,
+ *    `PhoneAppsPage.qml`, `PhoneWebcamPage.qml` and `PhoneMicPage.qml` are
+ *    the other half's; `PhoneAdbPage.qml` is this file's, because the
+ *    header's adb button is the only route to it and a route that dead-ends
+ *    is the bug this page exists to fix.
  *    The page is popped by its own `back()` and by Escape; nothing else
  *    may write `subPage`.
  *
  *  - THE BOTTOM CARD STACK is `PhoneFeatureCards.qml` - the other half's
  *    too, along with `PhoneFeatureCard.qml` and `InstallGuidePopup.qml`.
  *    It is loaded last in the column with `Layout.fillWidth: true`, and
- *    its `signal openPage(string id)` opens "webcam" / "mic" / "adb" through
- *    the same loader the nav cards' "contacts" / "apps" go through. Absent,
- *    the Loader draws nothing and the column simply ends at the footer.
+ *    its `signal openPage(string id)` opens "webcam" / "mic" / "mirror" /
+ *    "adb" through the same loader the nav cards' "contacts" / "apps" go
+ *    through. Absent, the Loader draws nothing and the column simply ends
+ *    at the footer.
  *
  *  - PAIRING CARDS are drawn HERE, above that Loader, rather than in the
  *    feature stack the spec groups them with: answering a pairing request
@@ -81,7 +82,7 @@ Item {
         animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
     }
 
-    // "" | "contacts" | "apps" | "webcam" | "mic" | "adb"
+    // "" | "contacts" | "apps" | "webcam" | "mic" | "mirror" | "adb" | "appSettings"
     property string subPage: ""
     // What the loader is holding, which outlives `subPage` for the length
     // of the exit - clearing it with the request would destroy the page on
@@ -113,7 +114,9 @@ Item {
     }
 
     function popSubPage(): void {
-        root.subPage = "";
+        // App Mode's settings are opened from the apps page, so back lands
+        // there rather than on the tab; every other page goes back to the tab.
+        root.subPage = root.subPage === "appSettings" ? "apps" : "";
     }
 
     // A file name, never a type: the other half's pages are resolved by
@@ -125,6 +128,8 @@ Item {
         case "apps": return "PhoneAppsPage.qml";
         case "webcam": return "PhoneWebcamPage.qml";
         case "mic": return "PhoneMicPage.qml";
+        case "mirror": return "PhoneMirrorPage.qml";
+        case "appSettings": return "PhoneAppSettingsPage.qml";
         case "adb": return "PhoneAdbPage.qml";
         default: return "";
         }
@@ -380,6 +385,9 @@ Item {
                 // would call it with no argument.
                 if (subPageLoader.item?.openAdbPageRequested !== undefined)
                     subPageLoader.item.openAdbPageRequested.connect(() => root.openSubPage("adb"));
+                if (subPageLoader.item?.openAppSettingsRequested !== undefined)
+                    subPageLoader.item.openAppSettingsRequested.connect(
+                        () => root.openSubPage("appSettings"));
             }
         }
     }

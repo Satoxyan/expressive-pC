@@ -229,10 +229,17 @@ Singleton {
                     property bool showTouches: false
                     property bool fullscreen: false
                     property bool alwaysOnTop: false
-                    property int maxFps: 0
+                    property bool videoEnabled: true
+                    property int maxFps: 60
                     property string bitRate: "8M"
-                    property int maxSize: 0
                     property int videoBuffer: 0
+                    // WIDTHxHEIGHT or a single long edge; "" mirrors at the phone's own size.
+                    property string resolution: ""
+                    property string videoCodec: "h264"
+                    // "" lets scrcpy pick; the names come from the phone.
+                    property string videoEncoder: ""
+                    // Clockwise capture rotation: 0 | 90 | 180 | 270.
+                    property int captureOrientation: 0
                     property bool useWireless: false
                     property bool autoWirelessIp: true
                     property string wirelessIp: ""
@@ -246,6 +253,21 @@ Singleton {
                         property bool keepActive: true
                         property bool systemDecorations: true
                         property list<string> favoritePackages: []
+                        // The app window's picture flags, kept apart from the
+                        // mirror's so a value set on one page never reaches
+                        // the other.
+                        property bool videoEnabled: true
+                        property int maxFps: 60
+                        property string bitRate: "8M"
+                        property int videoBuffer: 0
+                        property string resolution: ""
+                        property string videoCodec: "h264"
+                        property string videoEncoder: ""
+                        // -1 follows the app: the virtual display turns as
+                        // the app requests and the window takes its shape.
+                        // 0 | 90 | 180 | 270 rotate the picture and hold the
+                        // display still.
+                        property int captureOrientation: -1
                     }
                 }
                 property JsonObject webcam: JsonObject {
