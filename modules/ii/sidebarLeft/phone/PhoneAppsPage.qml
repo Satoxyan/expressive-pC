@@ -62,7 +62,9 @@ PhoneSubPage {
     // rather than measured off the glyph. `IconImage` decodes its picture at
     // `min(width, height)`, so a slot whose size is borrowed from a child that
     // fills it is a loop QtQuick answers with zero - and zero is an icon that
-    // never appears, however good the cached file is.
+    // never appears, however good the cached file is. Nothing asks for a mipmap
+    // chain: the cached pictures are already at most 96 px and are drawn into
+    // this, so the chain would be a cost per row and no gain.
     readonly property int appIconSlot: Appearance.font.pixelSize.huge
             + Appearance.spacing.space100
 
@@ -133,21 +135,22 @@ PhoneSubPage {
     // scrcpy dependency has not settled - every PhoneDeps flag starts false -
     // and a dropped ask is a glyph in front of a cache that is already good.
     //
-    // Three per tick rather than the whole list at once keeps the queue short,
-    // and short is what lets a row that appears be answered next rather than in
-    // two minutes: those asks are marked urgent and the supervisor drains them
-    // before this fill. A tick with nothing left to ask is a scan of a couple of
-    // hundred strings, so the timer is not stopped - stopping it once made every
-    // later hole permanent for the session.
+    // A few per tick rather than the whole list at once keeps the supervisor's
+    // queue short, which is what lets a row that appears be answered next rather
+    // than after two hundred: its own ask is urgent and the worker drains those
+    // first. A tick with nothing left to ask is only a scan of a couple of
+    // hundred strings, so the timer is never stopped - stopping it once used to
+    // make every later hole permanent for the session. It does pause while the
+    // list is moving, because an ask writes a line of JSON, wakes an adb call
+    // and replaces the map every row's picture binds to, and none of that wants
+    // to happen inside a scroll.
     Timer {
         id: appIconFiller
         interval: 500
         repeat: true
         triggeredOnStart: true
         running: root.visible && PhoneScrcpy.apps.length > 0
-        // A few per tick rather than one: the whole list is asked for, and every
-        // one of these yields to a row that appears, because the supervisor
-        // drains the urgent queue first.
+                && !appList.moving && !appList.dragging
         onTriggered: {
             for (let pass = 0; pass < 3; ++pass)
                 if (!PhoneScrcpy.fillAppIconQueue())
@@ -413,7 +416,6 @@ PhoneSubPage {
                                     implicitSize: root.appIconSlot
                                     visible: status === Image.Ready
                                     asynchronous: true
-                                    mipmap: true
                                     source: PhoneScrcpy.appIconSource(favouriteChip.appPackage)
                                 }
                             }
@@ -445,6 +447,15 @@ PhoneSubPage {
                 model: root.filteredApps
                 animateAppearance: false
                 visible: root.filteredApps.length > 0
+                // A row costs a shaped glyph, a shaped plate, and a picture, so
+                // building one per pixel of scroll is what makes scrolling here
+                // drop frames: the default buffer is 0, which throws every row
+                // away the moment it leaves the viewport. Rows are kept around
+                // instead - four screens deep - and reused between models, so a
+                // scroll mostly moves items it already has rather than making
+                // new ones.
+                cacheBuffer: 1600
+                reuseItems: true
 
                 delegate: Rectangle {
                     id: appRow
@@ -534,7 +545,6 @@ PhoneSubPage {
                                         implicitSize: root.appIconSlot
                                         visible: status === Image.Ready
                                         asynchronous: true
-                                        mipmap: true
                                         source: PhoneScrcpy.appIconSource(appRow.appPackage)
                                     }
                                 }
