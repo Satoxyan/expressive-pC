@@ -77,6 +77,23 @@ Singleton {
     property bool appsLoading: false
     property string appsError: ""
 
+    // Launcher icons: package -> the picture the supervisor wrote for it, and
+    // "" once the phone has answered that it has none. `appIconsAsked` keeps a
+    // second row from asking while the first answer is still on its way, and
+    // `appIconsPending` is what holds the supervisor alive through a burst.
+    property var appIcons: ({})
+    property var appIconsAsked: ({})
+    // When each package was last asked, for the cooldown on re-asking one that
+    // was answered "none". A bookkeeping map, never a binding source.
+    property var appIconsAskedAt: ({})
+    readonly property int appIconRetryMs: 5000
+    // How long an ask with no answer coming back is taken to be in flight. Past
+    // it the package is asked again: an answer can be lost when the supervisor
+    // is stopped with a queue still in it, and a row must not stay empty because
+    // of a request nobody remembers making any more.
+    readonly property int appIconStaleMs: 15000
+    property int appIconsPending: 0
+
     // One row per live scrcpy window: { id, type, title, pid, package, startedAt }.
     readonly property alias sessions: sessionsModel
     readonly property int sessionCount: sessionsModel.count
@@ -353,10 +370,12 @@ Singleton {
     }
 
     // The supervisor is wanted while anything is live or pending - the
-    // idle timer stops it otherwise.
+    // idle timer stops it otherwise. Icons count as pending: a page that has
+    // just asked for forty of them must not have its supervisor shut down
+    // halfway through the queue, and an unanswered package is never re-asked.
     function managerWanted(): bool {
         return sessionsModel.count > 0 || root.mirrorLaunching || root.appsLoading
-            || (root.pendingMessages?.length ?? 0) > 0;
+            || root.appIconsPending > 0 || (root.pendingMessages?.length ?? 0) > 0;
     }
 
     function parseManagerLine(line: string): var {
@@ -459,6 +478,23 @@ Singleton {
         } else if (msg.event === "apps_error") {
             root.appsLoading = false;
             root.appsError = String(msg.message ?? "Failed to list apps");
+        } else if (msg.event === "app_icon") {
+            const pkg = String(msg.package ?? "");
+            if (pkg.length === 0) return;
+            const path = String(msg.path ?? "");
+            // A new object, because a plain mutation would not notify: the
+            // rows bind their image source to this map. An empty path is an
+            // answer too - it is what stops a row from asking again.
+            //
+            // An empty answer never replaces a picture that is already held,
+            // though: "" is also what a link that timed out leaves behind, and
+            // overwriting with it turns an icon the user can see into one they
+            // cannot, for the rest of the session, with nothing left to retry it.
+            const icons = Object.assign({}, root.appIcons);
+            if (path.length > 0 || icons[pkg] === undefined)
+                icons[pkg] = path;
+            root.appIcons = icons;
+            root.appIconsPending = Math.max(0, root.appIconsPending - 1);
         } else if (msg.event === "device_size") {
             root.deviceScreenSize = Number(msg.width) + "x" + Number(msg.height);
             root.deviceScreenSizeLoading = false;
@@ -692,6 +728,112 @@ Singleton {
         Config.options.phone.scrcpy.appMode.favoritePackages =
             root.toggleInList(Config.options.phone.scrcpy.appMode.favoritePackages, packageName);
     }
+
+    // ---- launcher icons --------------------------------------------------
+
+    // The file the supervisor put on disk, as an Image source. Empty for a
+    // package the phone has no picture for, which is what keeps its row's
+    // generic glyph up instead of a hole.
+    function appIconSource(packageName: string): string {
+        const path = String(root.appIcons[packageName] ?? "");
+        return path.length > 0 ? "file://" + path : "";
+    }
+
+    // Rows ask as they appear: a phone's whole catalogue is not worth one
+    // ADB call per package before anyone has scrolled to it, and the
+    // supervisor's cache answers the next shell without asking it again.
+    // `urgent` is the ask of a row that is on screen: the supervisor drains
+    // those before the background fill, so what the user is looking at never
+    // waits behind the rest of the phone's app list.
+    function requestAppIcon(packageName: string, urgent: bool): void {
+        if (!packageName || !root.available) return;
+        const answer = root.appIcons[packageName];
+        if (answer !== undefined && answer !== "")
+            return;                     // a picture is already held
+        const since = root.appIconsAskedAt[packageName] ?? 0;
+        if (answer === undefined && root.appIconsAsked[packageName] === true
+                && Date.now() - since < root.appIconStaleMs)
+            return;                     // asked, and the answer is still in flight
+        // A "none" answer is asked again when the row is looked at, because ""
+        // is also what a link that blinked and an icon that was not cached yet
+        // leave behind - and the row would otherwise stay a glyph beside a file
+        // the phone has already written. The cooldown is what keeps a fast scroll
+        // from turning that into a query per frame.
+        if (answer === "" && Date.now() - since < root.appIconRetryMs)
+            return;
+        root.appIconsAsked[packageName] = true;
+        root.appIconsAskedAt[packageName] = Date.now();
+        root.appIconsPending++;
+        root.send({
+            cmd: "app_icon", package: packageName,
+            priority: urgent === true,
+            target_args: root.scrcpyTarget(), deviceId: root.deviceId()
+        });
+    }
+
+    // When the page is opened, the packages answered "none" lose their asked
+    // mark so the background fill walks them again - an empty answer is often a
+    // link that was not up yet, and the record makes the retry a single
+    // `pm path`. What bounds the chatter is the cooldown in `requestAppIcon`,
+    // not this: an app with no icon is re-asked a few seconds after it is
+    // looked at, and never on a timer while nobody is looking.
+    function forgetEmptyAppIcons(): void {
+        const asked = Object.assign({}, root.appIconsAsked);
+        let forgotten = 0;
+        for (const pkg of Object.keys(asked)) {
+            if (root.appIcons[pkg] !== "") continue;
+            delete asked[pkg];
+            ++forgotten;
+        }
+        if (forgotten > 0) root.appIconsAsked = asked;
+    }
+
+    // Rows ask as they appear, which leaves a hole wherever the list has not
+    // been scrolled: a package nobody has opened a row for has no icon to show
+    // even though the phone has one. This asks the rest, one package per call,
+    // and answers whether anything is left to ask.
+    //
+    // Asking in ones rather than handing over the whole list at once keeps the
+    // queue short; the row the user just opened is first in line because its own
+    // ask is urgent and this fill is not, so the two queues do the ordering that
+    // this function's pace cannot.
+    property int iconRetryTick: 0
+    property int iconRetryCursor: 0
+
+    function fillAppIconQueue(): bool {
+        if (!root.available) return false;
+        ++root.iconRetryTick;
+        const now = Date.now();
+        const apps = root.apps;
+        if (!Array.isArray(apps)) return false;
+        for (let index = 0; index < apps.length; ++index) {
+            const pkg = String(apps[index]?.package ?? "");
+            if (pkg.length === 0) continue;
+            if (root.appIcons[pkg] !== undefined) continue;
+            if (root.appIconsAsked[pkg] === true
+                    && now - (root.appIconsAskedAt[pkg] ?? 0) < root.appIconStaleMs)
+                continue;
+            root.requestAppIcon(pkg, false);
+            return true;
+        }
+        // Nothing left to ask, which is not the same as everything answered: an
+        // empty answer is also what a link that blinked leaves behind, and a row
+        // told "no icon" before the phone had written its cache stays a glyph for
+        // the rest of the session, because its ask is spent. So one of them is
+        // asked again, in rotation, every twentieth tick - ten seconds of this
+        // timer - and a package whose icon is cached by then answers with a
+        // single `pm path`.
+        const empties = Object.keys(root.appIcons)
+            .filter(pkg => root.appIcons[pkg] === "");
+        if (empties.length === 0 || root.iconRetryTick % 20 !== 0) return false;
+        const retry = empties[root.iconRetryCursor % empties.length];
+        ++root.iconRetryCursor;
+        const asked = Object.assign({}, root.appIconsAsked);
+        delete asked[retry];
+        root.appIconsAsked = asked;
+        root.requestAppIcon(retry, false);
+        return true;
+    }
     // END phone-scrcpy logic
 
     // ---- the mirror's settle ----
@@ -768,11 +910,20 @@ Singleton {
         // would make the settings page refuse to ask again.
         root.deviceScreenSizeLoading = false;
         root.encodersLoading = false;
+        // Same for an icon ask that died mid-flight: forgetting it lets the
+        // row ask again, while an answered package keeps its answer.
+        const unanswered = Object.keys(root.appIconsAsked)
+            .filter(pkg => root.appIcons[pkg] === undefined);
+        for (const pkg of unanswered)
+            delete root.appIconsAsked[pkg];
+            delete root.appIconsAskedAt[pkg];
+        root.appIconsPending = Math.max(0, root.appIconsPending - unanswered.length);
     }
 
     onSessionCountChanged: managerIdleTimer.restart()
     onAppsLoadingChanged: managerIdleTimer.restart()
     onMirrorLaunchingChanged: managerIdleTimer.restart()
+    onAppIconsPendingChanged: managerIdleTimer.restart()
 
     Timer {
         id: managerIdleTimer
@@ -838,5 +989,11 @@ Singleton {
         root.encoders = [];
         root.encodersError = "";
         root.encodersLoading = false;
+        // Icons are cached per phone, so the old one's answers - and the fact
+        // that a package was already asked - belong to a different device.
+        root.appIcons = {};
+        root.appIconsAsked = {};
+        root.appIconsAskedAt = {};
+        root.appIconsPending = 0;
     }
 }

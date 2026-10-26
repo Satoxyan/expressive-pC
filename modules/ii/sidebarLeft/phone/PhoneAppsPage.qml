@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell.Widgets
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
@@ -13,10 +14,13 @@ import "phone_cards.js" as PhoneCards
  * Rooted on `PhoneSubPage` (W5a's; the interface is pinned by the stub at
  * tests/imports/qs/modules/imi/sidebarLeft/phone/PhoneSubPage.qml).
  *
- * Every app draws the generic `android` glyph. Pulling launcher icons off the
- * phone is explicitly out of scope this round (spec, "Non-goals"), and the
- * glyph is what the fork falls back to anyway whenever its extractor cannot
- * resolve one.
+ * A row carries the app's own launcher picture once the supervisor has read it
+ * out of the APK, and the generic `android` glyph until then - and after that,
+ * for a package whose archive holds no entry a name can be trusted to be the
+ * launcher's. `PhoneScrcpy.requestAppIcon` asks per package, once, and
+ * `appIconFiller` asks the packages no row has been scrolled to yet, so a hole
+ * in the list is a picture that has not been read rather than one that does not
+ * exist.
  *
  * The page has three states and draws exactly one message in each: App Mode
  * with no transport (`PhoneAdbPairPanel`, which owns the diagnosis and the
@@ -53,6 +57,14 @@ PhoneSubPage {
     ]
 
     property string query: ""
+
+    // The box an app's leading visual is drawn in, stated from the token scale
+    // rather than measured off the glyph. `IconImage` decodes its picture at
+    // `min(width, height)`, so a slot whose size is borrowed from a child that
+    // fills it is a loop QtQuick answers with zero - and zero is an icon that
+    // never appears, however good the cached file is.
+    readonly property int appIconSlot: Appearance.font.pixelSize.huge
+            + Appearance.spacing.space100
 
     readonly property var filteredApps: PhoneCards.filterApps(PhoneScrcpy.apps, root.query)
 
@@ -92,7 +104,14 @@ PhoneSubPage {
             PhoneScrcpy.refreshApps();
     }
 
-    Component.onCompleted: root.askForApps()
+    Component.onCompleted: {
+        // An empty answer from an earlier open of this page is worth a second
+        // ask before anything else: the supervisor's record makes it cheap, and
+        // the row that was told "no icon" while adb was down is the hole this
+        // page is meant to close.
+        PhoneScrcpy.forgetEmptyAppIcons();
+        root.askForApps();
+    }
 
     // ...and once more when a phone appears on ADB while the page is open,
     // which is the one event that turns an unanswerable request into an
@@ -104,6 +123,35 @@ PhoneSubPage {
         function onAdbDeviceChanged() {
             if (PhoneDeps.adbDevice)
                 root.askForApps();
+        }
+    }
+
+    // A row asks for its picture when it is created, so an app the list has
+    // not been scrolled to has none - the phone has it, nobody asked. This
+    // walks the rest while the page is open, a few packages per tick, which also
+    // picks up the asks that `requestAppIcon` dropped: it returns while the
+    // scrcpy dependency has not settled - every PhoneDeps flag starts false -
+    // and a dropped ask is a glyph in front of a cache that is already good.
+    //
+    // Three per tick rather than the whole list at once keeps the queue short,
+    // and short is what lets a row that appears be answered next rather than in
+    // two minutes: those asks are marked urgent and the supervisor drains them
+    // before this fill. A tick with nothing left to ask is a scan of a couple of
+    // hundred strings, so the timer is not stopped - stopping it once made every
+    // later hole permanent for the session.
+    Timer {
+        id: appIconFiller
+        interval: 500
+        repeat: true
+        triggeredOnStart: true
+        running: root.visible && PhoneScrcpy.apps.length > 0
+        // A few per tick rather than one: the whole list is asked for, and every
+        // one of these yields to a row that appears, because the supervisor
+        // drains the urgent queue first.
+        onTriggered: {
+            for (let pass = 0; pass < 3; ++pass)
+                if (!PhoneScrcpy.fillAppIconQueue())
+                    return;
         }
     }
 
@@ -318,6 +366,7 @@ PhoneSubPage {
                         id: favouriteChip
                         required property var modelData
 
+                        readonly property string appPackage: String(favouriteChip.modelData?.package ?? "")
                         readonly property bool running: PhoneScrcpy.isAppRunning(favouriteChip.modelData.package)
                         implicitHeight: Appearance.font.pixelSize.huge + Appearance.spacing.space150
                         buttonRadius: Appearance.rounding.full
@@ -325,17 +374,48 @@ PhoneSubPage {
                         colBackgroundHover: favouriteChip.running ? Appearance.colors.colPrimaryContainerHover : Appearance.colors.colLayer3Hover
                         colRipple: favouriteChip.running ? Appearance.colors.colPrimaryContainerActive : Appearance.colors.colLayer3Active
                         onClicked: PhoneScrcpy.launchApp(favouriteChip.modelData.package)
+                        // A favourite is visible before anyone has scrolled the
+                        // list that holds its app, so it asks for its own icon.
+                        Component.onCompleted: PhoneScrcpy.requestAppIcon(favouriteChip.appPackage,
+                                     true)
 
                         contentItem: RowLayout {
                             spacing: Appearance.spacing.space50
 
-                            MaterialSymbol {
+                            Item {
+                                implicitWidth: root.appIconSlot
+                                implicitHeight: root.appIconSlot
                                 Layout.alignment: Qt.AlignVCenter
-                                text: "android"
-                                iconSize: Appearance.font.pixelSize.small
-                                color: favouriteChip.running
-                                    ? Appearance.colors.colOnPrimaryContainer
-                                    : Appearance.colors.colOnLayer3
+
+                                MaterialSymbol {
+                                    id: chipGlyph
+                                    // Same reason as in the list: the size is
+                                    // stated, so the picture beside it is never
+                                    // asked to decode at zero.
+                                    width: root.appIconSlot
+                                    height: root.appIconSlot
+                                    anchors.centerIn: parent
+                                    visible: chipPicture.status !== Image.Ready
+                                    text: "android"
+                                    iconSize: Appearance.font.pixelSize.small
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    color: favouriteChip.running
+                                        ? Appearance.colors.colOnPrimaryContainer
+                                        : Appearance.colors.colOnLayer3
+                                }
+
+                                IconImage {
+                                    id: chipPicture
+                                    width: root.appIconSlot
+                                    height: root.appIconSlot
+                                    anchors.centerIn: parent
+                                    implicitSize: root.appIconSlot
+                                    visible: status === Image.Ready
+                                    asynchronous: true
+                                    mipmap: true
+                                    source: PhoneScrcpy.appIconSource(favouriteChip.appPackage)
+                                }
                             }
                             StyledText {
                                 Layout.alignment: Qt.AlignVCenter
@@ -370,7 +450,15 @@ PhoneSubPage {
                     id: appRow
                     required property var modelData
 
+                    readonly property string appPackage: String(appRow.modelData?.package ?? "")
                     readonly property bool running: PhoneScrcpy.isAppRunning(appRow.modelData.package)
+
+                    // Both routes ask, because a ListView recycles: the first
+                    // paint of a delegate comes with `onCompleted`, a row that
+                    // is re-used for another app only ever changes its package.
+                    Component.onCompleted: PhoneScrcpy.requestAppIcon(appRow.appPackage, true)
+                    onAppPackageChanged: PhoneScrcpy.requestAppIcon(appRow.appPackage,
+                                                        true)
 
                     width: appList.width
                     // A constant off the token scale rather than the content's
@@ -404,20 +492,51 @@ PhoneSubPage {
                             rowSpacing: Appearance.spacing.space125
 
                             iconComponent: Component {
-                                MaterialShapeWrappedMaterialSymbol {
-                                    // The generic glyph, deliberately: pulling
-                                    // launcher icons off the phone is a follow-up
-                                    // (spec, "Non-goals").
-                                    text: "android"
-                                    wrappedShape: MaterialShape.Shape.Cookie9Sided
-                                    iconSize: Appearance.font.pixelSize.small
-                                    padding: Appearance.spacing.space75
-                                    color: appRow.running
-                                        ? Appearance.colors.colPrimary
-                                        : Appearance.colors.colSecondaryContainer
-                                    colSymbol: appRow.running
-                                        ? Appearance.colors.colOnPrimary
-                                        : Appearance.colors.colOnSecondaryContainer
+                                Item {
+                                    implicitWidth: root.appIconSlot
+                                    implicitHeight: root.appIconSlot
+
+                                    MaterialShapeWrappedMaterialSymbol {
+                                        id: appGlyph
+                                        width: root.appIconSlot
+                                        height: root.appIconSlot
+                                        anchors.centerIn: parent
+                                        // Up until the phone's picture lands,
+                                        // and stays up for a package that has
+                                        // none: an answered "" counts as never
+                                        // ready.
+                                        visible: appPicture.status !== Image.Ready
+                                        text: "android"
+                                        wrappedShape: MaterialShape.Shape.Cookie9Sided
+                                        iconSize: Appearance.font.pixelSize.small
+                                        padding: Appearance.spacing.space75
+                                        color: appRow.running
+                                            ? Appearance.colors.colPrimary
+                                            : Appearance.colors.colSecondaryContainer
+                                        colSymbol: appRow.running
+                                            ? Appearance.colors.colOnPrimary
+                                            : Appearance.colors.colOnSecondaryContainer
+                                    }
+
+                                    IconImage {
+                                        id: appPicture
+                                        // Stated size, never `anchors.fill`:
+                                        // `IconImage` decodes at `min(width,
+                                        // height)`, so a child that fills a box
+                                        // which is briefly zero asks for the
+                                        // picture at zero - and the image cache
+                                        // keeps that answer, which is how an icon
+                                        // misses at random, per session, from a
+                                        // file that is perfectly good.
+                                        width: root.appIconSlot
+                                        height: root.appIconSlot
+                                        anchors.centerIn: parent
+                                        implicitSize: root.appIconSlot
+                                        visible: status === Image.Ready
+                                        asynchronous: true
+                                        mipmap: true
+                                        source: PhoneScrcpy.appIconSource(appRow.appPackage)
+                                    }
                                 }
                             }
 
