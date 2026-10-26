@@ -22,10 +22,12 @@ import qs.modules.common
  * that dies with nothing queued is simply gone until the next command.
  *
  * `mirrorArgs()` and `appModeArgs()` are the flag tables, pure: they share
- * `videoArgs()`, and each takes its picture flags from its own table -
+ * `videoArgs()` and `audioArgs()`, and each takes its picture and sound
+ * flags from its own table -
  * Config.options.phone.scrcpy for the mirror, its `appMode` child for an
  * app - so the two settings pages cannot leak into one another. App mode
- * adds --start-app and the virtual display. `targetArgs()` names a
+ * adds --start-app, plus --new-display when its Virtual Display is on.
+ * `targetArgs()` names a
  * wireless target when the user asked for one; the supervisor still
  * prefers a USB serial over it.
  *
@@ -140,14 +142,26 @@ Singleton {
         return Math.max(0, Math.round(value * factor));
     }
 
+    // "128K" / "128000" / "0.128M" as whole Kbps, for the audio bit-rate box.
+    function bitRateKbps(text: string): int {
+        const match = /^(\d+(?:\.\d+)?)\s*([kmg]?)$/.exec(String(text ?? "").trim().toLowerCase());
+        if (!match) return 0;
+        const value = parseFloat(match[1]);
+        const factor = match[2] === "k" ? 1 : match[2] === "m" ? 1000
+            : match[2] === "g" ? 1000000 : 0.001;
+        return Math.max(0, Math.round(value * factor));
+    }
+
     // The picture's flags, shared by the mirror and App Mode so the two
     // settings pages offer the same scrcpy table without either one owning
     // the list. `--video-buffer` is scrcpy >= 2's name for the display
-    // buffer; empty options are no flag at all.
-    function videoArgs(opts: var): var {
+    // buffer; empty options are no flag at all. App Mode leaves the video
+    // toggle out: a virtual display needs a picture, and a mirrored app
+    // without one would open with no window.
+    function videoArgs(opts: var, includeVideoToggle = true): var {
         const o = opts ?? {};
         const args = [];
-        if (o.videoEnabled === false) args.push("--no-video");
+        if (includeVideoToggle && o.videoEnabled === false) args.push("--no-video");
         if (Number(o.maxFps) > 0) args.push("--max-fps=" + Number(o.maxFps));
         if (typeof o.bitRate === "string" && o.bitRate.trim() !== "") args.push("--video-bit-rate=" + o.bitRate.trim());
         const longEdge = root.resolutionLongEdge(o.resolution);
@@ -165,6 +179,25 @@ Singleton {
         return args;
     }
 
+    // The sound's flags, shared by the two features and read from the same
+    // per-feature table as the picture's. A disabled audio is just
+    // `--no-audio`: the other flags would describe a stream nobody captures.
+    // `--audio-dup` is refused on any source but playback, so the duplicate
+    // flag only ever travels with that source.
+    function audioArgs(opts: var): var {
+        const o = opts ?? {};
+        if (o.audioEnabled === false) return ["--no-audio"];
+        const args = [];
+        const source = String(o.audioSource ?? "").trim();
+        if (source.length > 0) args.push("--audio-source=" + source);
+        if (source === "playback" && o.audioDup === true) args.push("--audio-dup");
+        const codec = String(o.audioCodec ?? "").trim();
+        if (codec.length > 0) args.push("--audio-codec=" + codec);
+        const bitRate = String(o.audioBitRate ?? "").trim();
+        if (bitRate.length > 0) args.push("--audio-bit-rate=" + bitRate);
+        return args;
+    }
+
     // The mirror's flags: the tab's own table plus the picture above.
     function mirrorArgs(opts: var): var {
         const o = opts ?? {};
@@ -172,14 +205,13 @@ Singleton {
         if (o.stayAwake) args.push("--stay-awake");
         if (o.turnScreenOff) args.push("--turn-screen-off");
         if (o.noPowerOn) args.push("--no-power-on");
-        if (o.noAudio) args.push("--no-audio");
         if (o.showTouches) args.push("--show-touches");
         if (o.fullscreen) args.push("--fullscreen");
         if (o.alwaysOnTop) args.push("--always-on-top");
         // A followed window is resized by the compositor, which the aspect
         // lock would fight; same trade as App Mode's Auto.
         if (root.mirrorFollowsOrientation(o)) args.push("--no-window-aspect-ratio-lock");
-        return args.concat(root.videoArgs(o));
+        return args.concat(root.videoArgs(o), root.audioArgs(o));
     }
 
     // The size the app's virtual display is created at. A stored
@@ -211,8 +243,7 @@ Singleton {
     // not offer Auto. The mirror has its own follow path below, on display 0.
     function appFollowsOrientation(appOpts: var): bool {
         const o = appOpts ?? {};
-        return Number(o.captureOrientation) === -1
-            && o.flexDisplay === true && o.videoEnabled !== false;
+        return Number(o.captureOrientation) === -1 && o.flexDisplay === true;
     }
 
     // The mirror can follow the phone's own screen (display 0), whose logical
@@ -225,14 +256,12 @@ Singleton {
             && o.videoEnabled !== false && o.fullscreen !== true;
     }
 
-    // App mode: one app on a virtual display of its own when flexDisplay is
-    // on, otherwise started on the phone's screen and mirrored. The picture
-    // flags come from the appMode table, never from the mirror's.
-    //
-    // scrcpy refuses --new-display together with --no-video, so a video-less
-    // session starts the app on the phone's own screen; the settings page
-    // says so. There is no virtual display to size then, and no keep-active
-    // or decoration flags to apply.
+    // App mode: one app on a virtual display of its own when Virtual Display
+    // is on, otherwise started on the phone's screen and mirrored. The
+    // picture flags come from the appMode table, never from the mirror's,
+    // and always include the picture - a virtual display needs video, and a
+    // mirrored app without one would open with no window. There is no
+    // virtual display to size, keep active or decorate when it is off.
     //
     // Auto rotation drops --flex-display: flex makes the display chase the
     // window while the supervisor makes the window chase the display, and
@@ -241,7 +270,7 @@ Singleton {
     function appModeArgs(packageName: string, appOpts: var): var {
         const o = appOpts ?? {};
         const args = ["--start-app=" + packageName];
-        if (o.flexDisplay && o.videoEnabled !== false) {
+        if (o.flexDisplay) {
             const size = root.appModeDisplaySize(o);
             const density = Number(o.density) > 0 ? Number(o.density) : 160;
             args.push("--new-display=" + size.width + "x" + size.height + "/" + density);
@@ -250,7 +279,7 @@ Singleton {
             if (o.keepActive) args.push("--keep-active");
             if (o.systemDecorations === false) args.push("--no-vd-system-decorations");
         }
-        return args.concat(root.videoArgs(o));
+        return args.concat(root.videoArgs(o, false), root.audioArgs(o));
     }
 
     // The `-s` target for a wireless phone: the address KDE Connect reaches
@@ -536,6 +565,17 @@ Singleton {
         return false;
     }
 
+    // --audio-dup only exists for the playback source, so moving away from
+    // playback drops the stored duplicate rather than leaving a choice no
+    // flag can carry - the rule the video encoder already follows its codec.
+    function setMirrorAudioSource(source: string): void {
+        const conf = Config.options.phone.scrcpy;
+        if (conf.audioSource === source) return;
+        conf.audioSource = source;
+        if (source !== "playback") conf.audioDup = false;
+        root.restartMirrorForSettings();
+    }
+
     function restartMirrorForSettings(): void {
         if (!root.mirrorRunning && !root.mirrorLaunching) return;
         if (root.mirrorRestartPending) return;
@@ -564,6 +604,13 @@ Singleton {
         const encoder = String(conf.videoEncoder ?? "").trim();
         if (encoder.length > 0 && !root.encoderForCodec(codec, encoder))
             conf.videoEncoder = "";
+    }
+
+    function setAppAudioSource(source: string): void {
+        const conf = Config.options.phone.scrcpy.appMode;
+        if (conf.audioSource === source) return;
+        conf.audioSource = source;
+        if (source !== "playback") conf.audioDup = false;
     }
 
     // ---- the phone facts the settings page asks for ---------------------

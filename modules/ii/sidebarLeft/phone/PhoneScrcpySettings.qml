@@ -30,14 +30,14 @@ PhoneSubPage {
     // notify, so the rows follow a config write without a second copy.
     property var scrcpyConfig: null
     // What the resolution row shows while the stored value is empty: the
-    // phone's screen for a mirror, the virtual display's for App Mode.
-    // Empty until the fact is known.
+    // phone's screen for a mirror (or a mirrored App Mode app), the virtual
+    // display's for App Mode. Empty until the fact is known.
     property string nativeResolution: PhoneScrcpy.deviceScreenSize
 
     property string introText: ""
     property string noAdbText: ""
     property string resolutionDescription: ""
-    property string videoInfoText: Translation.tr("scrcpy's picture of the phone's screen. Turning it off launches with --no-video: the session keeps running, but the phone's screen is not forwarded.")
+    property string videoInfoText: Translation.tr("scrcpy's picture of the phone's screen. Turning it off launches with\nA--no-video: the session keeps running, but the phone's screen is not forwarded.")
     property string dependencyFeature: "mirror"
     property string installGuideTitle: Translation.tr("scrcpy — missing dependencies")
 
@@ -51,6 +51,10 @@ PhoneSubPage {
     // App Mode puts Auto in a toggle of its own above the fixed Rotation row;
     // the mirror keeps it inside the selection array.
     property bool separateAutoRotationToggle: false
+    // App Mode's first Video row is the Virtual Display switch: it picks
+    // whether the app runs on a display of its own or is mirrored off the
+    // phone. The mirror keeps Video forwarding in that spot.
+    property bool virtualDisplayToggle: false
     readonly property bool autoRotation: Number(root.scrcpyConfig?.captureOrientation ?? 0) === -1
     // Auto owns the picture while it is on: the fixed Rotation row stays in
     // place but fades out and stops taking input until the toggle goes off.
@@ -63,8 +67,17 @@ PhoneSubPage {
     // Not `codecChanged`: that is the change signal of the `codec` property
     // above, and QML refuses a second signal with the same name.
     signal codecSelected(string codec)
+    // The source owns the duplicate flag - only playback offers it - so the
+    // service clears that pair rather than the page writing one key.
+    signal audioSourceSelected(string source)
 
     readonly property string codec: String(root.scrcpyConfig?.videoCodec ?? "h264")
+
+    // Audio's rows read the same per-feature table as the picture's. The
+    // duplicate row waits for the one source that offers it.
+    readonly property bool audioOn: root.scrcpyConfig?.audioEnabled ?? true
+    readonly property bool audioSourceIsPlayback:
+        String(root.scrcpyConfig?.audioSource ?? "output") === "playback"
 
     // A stored -1 is Auto only where Auto exists; a page that does not offer
     // it reads a carried-over value as 0°.
@@ -255,13 +268,27 @@ PhoneSubPage {
 
             GroupedList {
                 ConfigSwitch {
-                    buttonIcon: "videocam"
-                    text: Translation.tr("Video forwarding")
-                    infoText: root.videoInfoText
-                    checked: root.scrcpyConfig?.videoEnabled ?? true
+                    buttonIcon: root.virtualDisplayToggle
+                        ? "picture_in_picture_alt" : "videocam"
+                    text: root.virtualDisplayToggle
+                        ? Translation.tr("Virtual Display")
+                        : Translation.tr("Video forwarding")
+                    infoText: root.virtualDisplayToggle
+                        ? Translation.tr("On: the app runs on a virtual display, so the phone's screen is left alone.\nOff: the phone is mirrored and the app opens on the phone itself.")
+                        : root.videoInfoText
+                    checked: root.virtualDisplayToggle
+                        ? (root.scrcpyConfig?.flexDisplay ?? true)
+                        : (root.scrcpyConfig?.videoEnabled ?? true)
                     selfToggle: false
-                    onToggleRequested: root.settingChanged(
-                        "videoEnabled", !(root.scrcpyConfig?.videoEnabled ?? true))
+                    onToggleRequested: {
+                        if (root.virtualDisplayToggle) {
+                            root.settingChanged("flexDisplay",
+                                !(root.scrcpyConfig?.flexDisplay ?? true));
+                            return;
+                        }
+                        root.settingChanged(
+                            "videoEnabled", !(root.scrcpyConfig?.videoEnabled ?? true));
+                    }
                 }
 
                 ConfigSpinBox {
@@ -311,6 +338,9 @@ PhoneSubPage {
                     text: Translation.tr("Resolution")
                     description: root.resolutionDescription
                     buttonIcon: "aspect_ratio"
+                    // The page's description is a paragraph, so the field goes
+                    // under it rather than beside it.
+                    stacked: true
                     fieldWidth: 160
                     placeholderText: root.nativeResolution
                     confirmButtonVisible: true
@@ -348,6 +378,80 @@ PhoneSubPage {
                     model: root.encoderOptions
                     currentValue: String(root.scrcpyConfig?.videoEncoder ?? "")
                     onSelected: value => root.settingChanged("videoEncoder", value)
+                }
+            }
+        }
+
+        ContentSection {
+            icon: "music_note"
+            shape: MaterialShape.Shape.Slanted
+            title: Translation.tr("Audio")
+
+            GroupedList {
+                ConfigSwitch {
+                    buttonIcon: "volume_up"
+                    text: Translation.tr("Audio forwarding")
+                    infoText: Translation.tr("Scrcpy's sound from the phone. Turning it off launches with --no-audio:\nthe session keeps running, but no sound reaches this PC.")
+                    checked: root.audioOn
+                    selfToggle: false
+                    onToggleRequested: root.settingChanged("audioEnabled", !root.audioOn)
+                }
+
+                ConfigComboBox {
+                    text: Translation.tr("Audio source")
+                    buttonIcon: "graphic_eq"
+                    description: Translation.tr("Output forwards the phone's whole audio output and mutes the phone. Playback captures what the apps play; Mic reads the microphone.")
+                    model: [
+                        { displayName: "Output", value: "output" },
+                        { displayName: "Playback", value: "playback" },
+                        { displayName: "Mic", value: "mic" }
+                    ]
+                    currentValue: String(root.scrcpyConfig?.audioSource ?? "output")
+                    onSelected: value => root.audioSourceSelected(value)
+                }
+
+                ConfigComboBox {
+                    text: Translation.tr("Audio codec")
+                    buttonIcon: "memory"
+                    description: Translation.tr("The audio codec scrcpy asks the phone for. Opus is scrcpy's default and the safest choice.")
+                    model: [
+                        { displayName: "Opus", value: "opus" },
+                        { displayName: "AAC", value: "aac" },
+                        { displayName: "FLAC", value: "flac" },
+                        { displayName: "Raw", value: "raw" }
+                    ]
+                    currentValue: String(root.scrcpyConfig?.audioCodec ?? "opus")
+                    onSelected: value => root.settingChanged("audioCodec", value)
+                }
+
+                ConfigSpinBox {
+                    icon: "network_check"
+                    text: Translation.tr("Audio bit rate (Kbps)")
+                    infoText: Translation.tr("scrcpy's own default is 128 Kbps. Opus and AAC are encoded to it;\nFLAC and Raw are lossless, so this changes nothing.")
+                    value: PhoneScrcpy.bitRateKbps(root.scrcpyConfig?.audioBitRate ?? "128K")
+                    from: 24
+                    to: 512
+                    stepSize: 8
+                    onValueChanged: {
+                        if (value === PhoneScrcpy.bitRateKbps(root.scrcpyConfig?.audioBitRate ?? "128K")) return;
+                        root.settingChanged("audioBitRate", value + "K");
+                    }
+                }
+            }
+
+            // A box of its own because scrcpy refuses --audio-dup on any
+            // source but playback: the row only exists where it can be kept.
+            GroupedList {
+                visible: root.audioOn && root.audioSourceIsPlayback
+
+                ConfigSwitch {
+                    buttonIcon: "hearing"
+                    text: Translation.tr("Keep device audio")
+                    infoText: Translation.tr("On: the phone keeps playing the sound while scrcpy receives it too.\nOff: it only comes out of this PC.")
+                    checked: root.scrcpyConfig?.audioDup ?? false
+                    selfToggle: false
+                    onToggleRequested: root.settingChanged(
+                        "audioDup", !(root.scrcpyConfig?.audioDup ?? false))
                 }
             }
         }

@@ -18,6 +18,9 @@ RowLayout {
     property bool showBorder: !filled
     property bool rounded: false
     property bool multiline: false
+    // Stacked puts the field under the title and its description instead of
+    // beside them: the shape a long description needs in a narrow panel.
+    property bool stacked: false
     property real fieldWidth: 220
     property real fieldHeight: 40
     property color colBackground: filled ? Appearance.colors.colLayer1 : "transparent"
@@ -44,12 +47,27 @@ RowLayout {
         icon: root.buttonIcon
         iconSize: Appearance.font.pixelSize.larger
         opacity: root.enabled ? 1 : 0.4
+        // Stacked: the title has a line of its own and this icon's box is
+        // 0-tall, so the box grows to that line and pins to the top. That
+        // keeps the glyph level with the title instead of with the whole row,
+        // and the icon stays the row's first item.
+        Layout.alignment: root.stacked ? Qt.AlignTop : Qt.AlignVCenter
+        Layout.preferredHeight: root.stacked ? titleRow.implicitHeight : 0
     }
 
     ColumnLayout {
+        id: labelColumn
         Layout.fillWidth: true
-        spacing: 0
+        spacing: root.stacked ? 6 : 0
+        // The title's own line when the row is stacked, so its left edge and
+        // baseline match the titled rows above and below it.
+        RowLayout {
+            id: titleRow
+            visible: root.stacked
+            Layout.fillWidth: true
+        }
         StyledText {
+            parent: root.stacked ? titleRow : labelColumn
             Layout.fillWidth: true
             Layout.maximumWidth: root.floatingLabel ? root.width * 0.45 : Number.POSITIVE_INFINITY
             text: root.text
@@ -66,11 +84,21 @@ RowLayout {
             wrapMode: Text.Wrap
             opacity: root.enabled ? 1 : 0.4
         }
+        // The field's line when the row is stacked. `fieldBg` and
+        // `confirmBtn` reparent into this, so the plain row keeps its shape.
+        RowLayout {
+            id: fieldRow
+            visible: root.stacked
+            Layout.fillWidth: true
+            spacing: 10
+        }
     }
 
     Rectangle {
         id: fieldBg
-        Layout.preferredWidth: root.fieldWidth
+        parent: root.stacked ? fieldRow : root
+        Layout.fillWidth: root.stacked
+        Layout.preferredWidth: root.stacked ? 40 : root.fieldWidth
         Layout.preferredHeight: root.fieldHeight
         Layout.alignment: Qt.AlignVCenter
         radius: root.cornerRadius
@@ -141,6 +169,7 @@ RowLayout {
     Rectangle {
         id: confirmBtn
         visible: root.confirmButtonVisible
+        parent: root.stacked ? fieldRow : root
         Layout.preferredWidth: 40
         Layout.preferredHeight: 40
         Layout.alignment: Qt.AlignVCenter

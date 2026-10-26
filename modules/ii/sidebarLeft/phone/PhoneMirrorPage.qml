@@ -29,4 +29,5 @@ PhoneScrcpySettings {
 
     onSettingChanged: (key, value) => PhoneScrcpy.applyMirrorSetting(key, value)
     onCodecSelected: codec => PhoneScrcpy.setMirrorCodec(codec)
+    onAudioSourceSelected: source => PhoneScrcpy.setMirrorAudioSource(source)
 }

@@ -225,7 +225,6 @@ Singleton {
                     property bool stayAwake: false
                     property bool turnScreenOff: false
                     property bool noPowerOn: false
-                    property bool noAudio: false
                     property bool showTouches: false
                     property bool fullscreen: false
                     property bool alwaysOnTop: false
@@ -242,12 +241,27 @@ Singleton {
                     // follows the phone: the supervisor resizes the window
                     // when the screen turns.
                     property int captureOrientation: 0
+                    // The mirror's audio flags, kept apart from App Mode's so
+                    // a value set on one page never reaches the other.
+                    property bool audioEnabled: true
+                    // output | playback | mic. "output" is scrcpy's default
+                    // and mutes the phone.
+                    property string audioSource: "output"
+                    // Keep playing on the phone while capturing: only the
+                    // playback source offers it.
+                    property bool audioDup: false
+                    // opus | aac | flac | raw.
+                    property string audioCodec: "opus"
+                    property string audioBitRate: "128K"
                     property bool useWireless: false
                     property bool autoWirelessIp: true
                     property string wirelessIp: ""
                     property string wirelessPort: "5555"
                     property JsonObject appMode: JsonObject {
                         property bool enabled: true
+                        // Virtual Display: the app runs on a --new-display
+                        // display of its own and the phone stays untouched.
+                        // Off mirrors the phone and opens the app on it.
                         property bool flexDisplay: true
                         property int displayWidth: 1280
                         property int displayHeight: 960
@@ -258,7 +272,6 @@ Singleton {
                         // The app window's picture flags, kept apart from the
                         // mirror's so a value set on one page never reaches
                         // the other.
-                        property bool videoEnabled: true
                         property int maxFps: 60
                         property string bitRate: "8M"
                         property int videoBuffer: 0
@@ -270,6 +283,17 @@ Singleton {
                         // 0 | 90 | 180 | 270 rotate the picture and hold the
                         // display still.
                         property int captureOrientation: -1
+                        // App Mode's audio flags, on this table of its own.
+                        property bool audioEnabled: true
+                        // output | playback | mic. "output" is scrcpy's
+                        // default and mutes the phone.
+                        property string audioSource: "output"
+                        // Keep playing on the phone while capturing: only the
+                        // playback source offers it.
+                        property bool audioDup: false
+                        // opus | aac | flac | raw.
+                        property string audioCodec: "opus"
+                        property string audioBitRate: "128K"
                     }
                 }
                 property JsonObject webcam: JsonObject {
