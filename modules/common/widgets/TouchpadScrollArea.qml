@@ -55,6 +55,12 @@ MouseArea {
                     event.accepted = true
                     return
                 }
+                // ContentPage/DashboardSettings pages scroll through the engine instead.
+                if (child instanceof InertialScrollEngine) {
+                    child.handleWheel(event)
+                    event.accepted = true
+                    return
+                }
             }
         }
     }

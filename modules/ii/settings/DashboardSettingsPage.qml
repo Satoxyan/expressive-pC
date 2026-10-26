@@ -518,7 +518,13 @@ Item {
                 enabled: chipsRow.contentWidth > chipsRow.width
                 acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                 onWheel: event => {
-                    const delta = Math.abs(event.angleDelta.x) > Math.abs(event.angleDelta.y) ? event.angleDelta.x : event.angleDelta.y;
+                    const sc = Config.options.interactions.scrolling;
+                    const factor = sc.touchpadScrollFactor > 10 ? sc.touchpadScrollFactor / 450 : Math.max(0, sc.touchpadScrollFactor);
+                    const px = Math.abs(event.pixelDelta.x) > Math.abs(event.pixelDelta.y) ? event.pixelDelta.x : event.pixelDelta.y;
+                    const angle = Math.abs(event.angleDelta.x) > Math.abs(event.angleDelta.y) ? event.angleDelta.x : event.angleDelta.y;
+                    if (angle === 0 && px === 0) return;
+                    // Mouse notches stay 1:1; touchpad uses the shared sensitivity.
+                    const delta = angle !== 0 && Math.abs(angle) % 120 === 0 ? angle : (px !== 0 ? px : angle / 12) * sc.touchpadSensitivity * factor;
                     chipsRow.contentX = Math.max(0, Math.min(chipsRow.contentWidth - chipsRow.width, chipsRow.contentX - delta));
                 }
             }

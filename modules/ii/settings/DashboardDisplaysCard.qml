@@ -33,6 +33,8 @@ DashboardCard {
 
         ScrollBar.vertical: StyledScrollBar {}
 
+        TouchpadScrollArea { flickable: flick }
+
         ColumnLayout {
             id: col
             width: flick.width

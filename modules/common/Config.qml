@@ -932,18 +932,15 @@ Singleton {
                     // Legacy factors > 10 are divided by 450 to preserve relative
                     // preferences and per-list ratios, not the old absolute speed.
 
-                    // Legacy fling/bounce options retained for config compatibility;
-                    // direct touchpad tracking no longer adds inertia after release.
+                    // Fling used by InertialScrollEngine (settings pages, dashboard
+                    // strips). Views using TouchpadScrollArea stop with the finger.
                     property real flingFriction: 0.002
                     property real flingStopThreshold: 0.01
-                    property real bounceDamping: 0.3
 
-                    // Legacy mouse options retained for config compatibility only.
-                    // Native Qt scrolling does not use these or per-list boosts.
+                    // Mouse-wheel animation used by InertialScrollEngine.
                     property int wheelScrollAmount: 100
                     property int wheelDurationMin: 200
                     property int wheelDurationMax: 400
-                    property int mouseScrollDeltaThreshold: 120
                     property real mouseScrollFactor: 1.0
                 }
                 property JsonObject deadPixelWorkaround: JsonObject { // Hyprland leaves out 1 pixel on the right for interactions

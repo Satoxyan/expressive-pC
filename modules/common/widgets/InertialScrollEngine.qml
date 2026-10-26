@@ -30,17 +30,22 @@ Item {
     // === Touchpad physics ===
     property real flingFriction: Config?.options.interactions.scrolling.flingFriction ?? 0.002
     property real flingStopThreshold: Config?.options.interactions.scrolling.flingStopThreshold ?? 0.01
-    readonly property real flingMinVelocity: 0.0625 // px/ms — ContentPage's |v*16| >= 1 gate; 0.5 killed gentle swipes at lift
+    readonly property real flingMinVelocity: 0.0625 // px/ms — 0.5 killed gentle swipes at lift
+    readonly property real touchpadScrollFactor: Config?.options.interactions.scrolling.touchpadScrollFactor ?? 1.0
+    // Same knob semantics as TouchpadScrollArea: legacy absolute factors normalize to 1.0.
     property real touchpadSensitivity: (Config?.options.interactions.scrolling.touchpadSensitivity ?? 3.5)
-                                       * (Config?.options.interactions.scrolling.touchpadScrollFactor ?? 1.0)
+                                       * (touchpadScrollFactor > 10 ? touchpadScrollFactor / 450 : Math.max(0, touchpadScrollFactor))
 
     // === Mouse wheel physics ===
+    // Legacy configs store pixels per notch (120); new configs store a 1.0 multiplier.
+    readonly property real mouseScrollFactor: {
+        const f = Config?.options.interactions.scrolling.mouseScrollFactor ?? 1.0
+        return f > 10 ? f / 120 : Math.max(0, f)
+    }
     property int wheelScrollAmount: Math.round(
-        (Config?.options.interactions.scrolling.wheelScrollAmount ?? 100)
-        * (Config?.options.interactions.scrolling.mouseScrollFactor ?? 1.0))
+        (Config?.options.interactions.scrolling.wheelScrollAmount ?? 100) * mouseScrollFactor)
     property int wheelDurationMin: Config?.options.interactions.scrolling.wheelDurationMin ?? 200
     property int wheelDurationMax: Config?.options.interactions.scrolling.wheelDurationMax ?? 400
-    property int mouseScrollDeltaThreshold: Config?.options.interactions.scrolling.mouseScrollDeltaThreshold ?? 120
 
     // === Internal state ===
     property real _velocity: 0
@@ -103,7 +108,6 @@ Item {
         // Mouse wheel: exact multiples of 120. Touchpad: non-multiples or
         // pixelDelta-only (high-res Wayland scroll).
         var isMouseWheel = d !== 0 && (Math.abs(d) % 120 === 0)
-        if (isMouseWheel && p !== 0) console.log("[ISE] wheel-with-px d=" + d + " px=" + p + " h=" + horizontal)
         if (isMouseWheel) {
             root._handleMouseWheel(event)
         } else {
@@ -122,12 +126,9 @@ Item {
         // the host Behavior animates this first write and that running
         // animation fights every direct write after it (stutter).
         liftTimer.restart()
-        // Prefer pixelDelta; fallback converts angleDelta at this compositor's native
-        // ratio (wheel pair d=-240 ↔ px=-20 → 12 units = 1px; slow scrolls arrive px=0
-        // with fine d). touchpadSensitivity is a relative knob: 3.5 = native, so
-        // touchpadScrollFactor overrides (×1.4) still scale it.
-        var deltaPx = (px !== 0) ? -px : -d / 12 * (root.touchpadSensitivity / 3.5)
-        if (px === 0 && d !== 0) console.log("[ISE] angle-fallback d=" + d + " -> " + deltaPx.toFixed(1) + "px h=" + horizontal)
+        // Same units as TouchpadScrollArea: pixelDelta is already pixels; the angle
+        // fallback converts at this compositor's 12-units-per-pixel ratio.
+        var deltaPx = -(px !== 0 ? px : d / 12) * root.touchpadSensitivity
         var now = Date.now()
         var dt = now - root._lastEventTime
         if (dt > 0 && dt < 150) {
@@ -148,8 +149,6 @@ Item {
             var w = i + 1; total += root._velocitySamples[i] * w; weightSum += w
         }
         root._velocity = total / weightSum
-        console.log("[ISE-FLING] v=" + root._velocity.toFixed(3) + " n=" + root._velocitySamples.length
-            + " gap=" + (Date.now() - root._lastEventTime) + " h=" + root.horizontal)
         root._velocitySamples = []
         if (Math.abs(root._velocity) >= root.flingMinVelocity) { physicsLoop.running = true }
         else { root._velocity = 0 }
