@@ -61,6 +61,7 @@ import argparse
 import collections
 import io
 import json
+import math
 import os
 import queue
 import re
@@ -72,8 +73,21 @@ import sys
 import threading
 import time
 from base64 import b64encode
+
+try:
+    # Only ever used to make a cached icon fill its circle; without Pillow the
+    # archive's own bytes are kept as they are, so no icon depends on it.
+    from PIL import Image, ImageStat
+except ImportError:
+    Image = ImageStat = None
+try:
+    # Framing asks which pixels of an icon are drawn and which are its own flat
+    # background, and that is a question about a few tens of thousands of pixels.
+    import numpy
+except ImportError:
+    numpy = None
 from pathlib import Path
-from xml.sax.saxutils import escape
+from xml.sax.saxutils import escape, unescape
 
 # scrcpy's last output line is what an `exited` event carries, so the drain
 # below only has to keep the tail. Bounded because the drain runs for the
@@ -171,9 +185,9 @@ ICON_DENSITY_RANK = {"xxxhdpi": 60, "xxhdpi": 50, "xhdpi": 40, "nodpi": 35,
 # ad's feature graphic live in the same folder as the icon does.
 ICON_ASSET_WORDS = ("banner", "splash", "promo", "feature_graphic", "header",
                     "card", "hero", "placeholder")
-# Bumped whenever the rules for finding a picture change, so an old verdict is
-# re-tried once instead of sticking to the app's icon forever.
-ICON_RECORD_VERSION = 15
+# Bumped whenever the rules for finding or framing a picture change, so an old
+# verdict is re-tried once instead of sticking to the app's icon forever.
+ICON_RECORD_VERSION = 17
 # A name that still carries the launcher's own word - `ic_launcher`,
 # `launcher` - is trusted without downloading the resource table, because that
 # download is the expensive part of answering and one worker answers the whole
@@ -191,6 +205,11 @@ ICON_POLL_SECONDS = 0.2
 ICON_TIMEOUT = 10
 ICON_READ_TIMEOUT = 15
 ICON_TABLE_TIMEOUT = 10
+# How long one `pm list packages -f` is believed. A cached icon only has to prove
+# that the install it was read from is still the install that is there, and one
+# call says that for every package on the phone - so the queue answers a whole
+# list from the cache without a round trip per row. See `installed_base_map`.
+ICON_BASES_TTL = 30
 ICON_TABLE_MAX_BYTES = 24 << 20
 # The two apps whose launcher icon is named nowhere but a table over that budget
 # are Google's own - 28MB and 90MB - and reading one is a wait no visible row is
@@ -284,6 +303,30 @@ LAYER_DEPTH_MAX = 4
 ICON_PICTURE_MAX_SIDE = 96
 ICON_PICTURE_WEBP_QUALITY = 80
 ICON_PICTURE_MAX_BYTES = 2 << 20
+# What an icon is laid on so a circle of it reads filled: white, or a mid grey
+# when the icon's own ink is light and white would swallow it. `ICON_TRIM_PAD`
+# is the air left around trimmed ink before the circle cuts, the way a launcher's
+# own safe zone does, and `ADAPTIVE_SAFE_ZONE` is the part of an adaptive icon's
+# canvas a launcher actually shows. `ICON_TRIM_SPAN` is the other half of the
+# same decision: art that already reaches its canvas is a complete picture and
+# only needs the plate under it, so it is left at its own size, and an ink that
+# comes up short of this fraction of the frame is the small-logo case the
+# enlargement exists for.
+ICON_PICTURE_WHITE = "#ffffff"
+ICON_PICTURE_GREY = "#b4b4b4"
+ICON_PICTURE_LIGHT_INK = 208.0
+ICON_TRIM_PAD = 1.12
+ICON_TRIM_SPAN = 0.9
+# How unlike a colour a pixel has to be to count as drawn rather than as part of
+# an icon's own flat background - the sum over the three channels, so about
+# fourteen per channel, which a dithered or compressed edge fails and a printed
+# field of one colour does not.
+ICON_BORDER_TOLERANCE = 40
+# How far a drawn icon is enlarged to reach its frame. A path whose bounds are a
+# tenth of the canvas is a hairline, and three times is where growing it turns
+# into smearing it.
+SVG_ZOOM_MAX = 3.0
+ADAPTIVE_SAFE_ZONE = 72.0
 # The size the generated SVG reports for itself, so a viewer that ignores
 # `sourceSize` still gets a picture worth downscaling rather than an upscale.
 SVG_RENDER_SCALE = 4
@@ -960,6 +1003,32 @@ def gradient_node(element, key):
     return None
 
 
+def plate_for_inks(inks):
+    """The plate to draw under a picture made of these paints.
+
+    White under ink that is itself white is the icon lost twice over, so light
+    drawings get grey and everything else the white that was asked for. An
+    average is crude on purpose: it only has to tell a white logo from a dark
+    one, and a drawn adaptive icon covers the plate with its own background
+    before the question matters.
+    """
+    total, count = 0.0, 0
+    for color in inks or ():
+        value = (color or "").lstrip("#")
+        if len(value) not in (6, 8):
+            continue
+        try:
+            rgb = [int(value[i:i + 2], 16) for i in (0, 2, 4)]
+            alpha = int(value[6:8], 16) / 255.0 if len(value) == 8 else 1.0
+        except ValueError:
+            continue
+        total += (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) * alpha
+        count += 1
+    if count and total / count > ICON_PICTURE_LIGHT_INK:
+        return ICON_PICTURE_GREY
+    return ICON_PICTURE_WHITE
+
+
 def gradient_svg(node, table, gid):
     """A compiled `<gradient>` as a paint SVG can draw, or None.
 
@@ -1010,8 +1079,14 @@ def gradient_svg(node, table, gid):
     return None
 
 
-def vector_svg_document(root, table, paint, defs=()):
-    """A `<vector>` tree as a standalone SVG document, or None."""
+def vector_svg_document(root, table, paint, defs=(), inks=()):
+    """A `<vector>` tree as a standalone SVG document, or None.
+
+    The document is square whatever the viewport's own ratio was, so a row's
+    circle has nothing of the page behind it to show, and the drawing is grown to
+    its frame the way a bitmap's ink is - a vector that spends a third of its
+    viewport on padding is the same small logo in the same list.
+    """
     if not root or root["name"] != "vector":
         return None
     body = svg_children(root, table, paint)
@@ -1024,7 +1099,12 @@ def vector_svg_document(root, table, paint, defs=()):
         # cannot do; the intrinsic dp size is the best canvas there is.
         width = axml_number(root, "width", table) or 48.0
         height = axml_number(root, "height", table) or width
-    return svg_document(body, width, height, defs)
+    canvas = max(width, height)
+    centred = '<g transform="translate({:g},{:g})">{}</g>'.format(
+        (canvas - width) / 2, (canvas - height) / 2, body)
+    return svg_document(color_rect_svg(plate_for_inks(inks), canvas)
+                        + enlarge_svg_markup(centred, canvas),
+                        canvas, canvas, defs)
 
 
 def vector_svg_group(root, table, paint, canvas=ADAPTIVE_CANVAS):
@@ -1042,17 +1122,26 @@ def vector_svg_group(root, table, paint, canvas=ADAPTIVE_CANVAS):
         canvas / view_w, canvas / view_h, body)
 
 
-def adaptive_svg_document(markups, canvas=ADAPTIVE_CANVAS, defs=()):
-    """The layers of an adaptive icon, painted into one SVG document.
+def adaptive_svg_document(markups, canvas=ADAPTIVE_CANVAS, defs=(), inks=(),
+                          safe_zone=ADAPTIVE_SAFE_ZONE):
+    """The layers of an adaptive icon, filling one square SVG document.
 
-    Each layer was authored on the 108dp canvas and is drawn onto it as is -
-    what the launcher then crops to its mask is its own business, and the
-    shell shapes the picture it is given anyway.
+    An adaptive icon is authored on a 108dp canvas of which the launcher shows
+    the middle ~72dp - the rest is the room its masks slide over - so drawing
+    those layers as they are gives a picture whose subject sits at two thirds
+    the size of everything next to it. It is zoomed by that ratio about the
+    centre first, which is what makes a row of apps read as one shape.
     """
     body = "".join(part for part in markups if part)
     if not body:
         return None
-    return svg_document(body, canvas, canvas, defs)
+    zoom = canvas / safe_zone
+    centred = '<g transform="translate({:g},{:g}) scale({:g}) translate({:g},{:g})' \
+              '">{}</g>'.format(canvas / 2, canvas / 2, zoom, -canvas / 2,
+                                -canvas / 2, body)
+    return svg_document(color_rect_svg(plate_for_inks(inks), canvas)
+                        + enlarge_svg_markup(centred, canvas),
+                        canvas, canvas, defs)
 
 
 def color_rect_svg(color, canvas=ADAPTIVE_CANVAS):
@@ -1071,6 +1160,240 @@ def raster_image_svg(data, mime="image/png", canvas=ADAPTIVE_CANVAS):
     href = "data:{};base64,{}".format(mime, b64encode(data).decode("ascii"))
     return ('<image x="0" y="0" width="{:g}" height="{:g}" href="{}" '
             'xlink:href="{}"/>').format(canvas, canvas, href, href)
+
+
+IDENTITY_MATRIX = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+SVG_TAG = re.compile(r"<(g|path|image|rect|circle)\b([^>]*?)/?>|</g\s*>")
+SVG_ATTR = re.compile(r'(\w+)="([^"]*)"')
+SVG_NUMBER = re.compile(r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?")
+SVG_TRANSFORM = re.compile(r"(translate|scale|rotate|matrix)\s*\(([^)]*)\)")
+# Path commands and how many numbers each one takes, in the order they follow
+# the letter. `Z` takes none, and a command's parameters may repeat without the
+# letter being written again - which is how a path of twenty line segments fits
+# in one `L`.
+SVG_PATH_ARGS = {"m": 2, "l": 2, "t": 2, "h": 1, "v": 1, "c": 6, "s": 4, "q": 4,
+                 "a": 7, "z": 0}
+
+
+def matrix_dot(first, second):
+    """The matrix of `first` with `second` applied inside it, the way SVG joins a
+    transform list."""
+    return tuple(first[row * 3 + 0] * second[0 * 3 + column]
+                 + first[row * 3 + 1] * second[1 * 3 + column]
+                 + first[row * 3 + 2] * second[2 * 3 + column]
+                 for row in range(3) for column in range(3))
+
+
+def matrix_of(function, values):
+    """One SVG transform function as a matrix, or None if it is not a known one."""
+    if function == "translate":
+        x = values[0] if values else 0.0
+        y = values[1] if len(values) > 1 else 0.0
+        return (1.0, 0.0, x, 0.0, 1.0, y, 0.0, 0.0, 1.0)
+    if function == "scale":
+        x = values[0] if values else 1.0
+        y = values[1] if len(values) > 1 else x
+        return (x, 0.0, 0.0, 0.0, y, 0.0, 0.0, 0.0, 1.0)
+    if function == "rotate":
+        radians = math.radians(values[0] if values else 0.0)
+        cosine, sine = math.cos(radians), math.sin(radians)
+        turned = (cosine, -sine, 0.0, sine, cosine, 0.0, 0.0, 0.0, 1.0)
+        if len(values) > 2:
+            centre = matrix_dot(matrix_of("translate", values[1:3]),
+                                matrix_dot(turned,
+                                           matrix_of("translate",
+                                                     [-values[1], -values[2]])))
+            return centre
+        return turned
+    if function == "matrix" and len(values) == 6:
+        a, b, c, d, e, f = values
+        return (a, c, e, b, d, f, 0.0, 0.0, 1.0)
+    return None
+
+
+def transform_matrix(attribute):
+    """The matrix of a `transform` string, or None when something in it is not
+    a function this understands - an unknown transform is a shape whose bounds
+    cannot be guessed at, and no enlargement is better than a wrong one."""
+    matrix = IDENTITY_MATRIX
+    for name, arguments in SVG_TRANSFORM.findall(attribute or ""):
+        numbers = [float(item) for item in SVG_NUMBER.findall(arguments)]
+        step = matrix_of(name, numbers)
+        if step is None:
+            return None
+        matrix = matrix_dot(matrix, step)
+    if len(SVG_TRANSFORM.findall(attribute or "")) != \
+            len(re.findall(r"[A-Za-z]+\s*\(", attribute or "")):
+        return None
+    return matrix
+
+
+def path_points(data, cursor=(0.0, 0.0)):
+    """The points a path's own coordinates pass through, in absolute units.
+
+    Curve control points are included, which can only make the box bigger than
+    the drawing, and a bigger box means a smaller zoom - the safe direction for
+    a picture that is about to be enlarged and cropped by a circle.
+    """
+    tokens = re.findall(
+        r"[A-Za-z]|[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?", data or "")
+    points, index = [], 0
+    x, y = cursor
+    start_x, start_y = x, y
+    command = None
+    while index < len(tokens):
+        token = tokens[index]
+        if token.isalpha():
+            command = token
+            index += 1
+            if command in ("z", "Z"):
+                x, y = start_x, start_y
+            continue
+        if command is None:
+            break
+        count = SVG_PATH_ARGS.get(command.lower())
+        if count is None:
+            break
+        relative = command.islower()
+        numbers = []
+        while len(numbers) < count and index < len(tokens) \
+                and not tokens[index].isalpha():
+            try:
+                numbers.append(float(tokens[index]))
+            except ValueError:
+                break
+            index += 1
+        if len(numbers) < count:
+            break
+        if command in ("h", "H"):
+            x = x + numbers[0] if relative else numbers[0]
+            points.append((x, y))
+        elif command in ("v", "V"):
+            y = y + numbers[0] if relative else numbers[0]
+            points.append((x, y))
+        elif command in ("a", "A"):
+            # rx, ry, the axis rotation and the two flags are not points; only
+            # the arc's endpoint is.
+            x = x + numbers[5] if relative else numbers[5]
+            y = y + numbers[6] if relative else numbers[6]
+            points.append((x, y))
+        else:
+            pairs = [(numbers[step], numbers[step + 1])
+                     for step in range(0, count, 2)]
+            if relative:
+                pairs = [(x + first, y + second) for first, second in pairs]
+            points.extend(pairs)
+            x, y = pairs[-1]
+            if command in ("m", "M"):
+                start_x, start_y = x, y
+                # A moveto followed by more pairs is a lineto, which is the one
+                # command that changes what the repeated parameters mean.
+                command = "l" if relative else "L"
+    return points
+
+
+def flat_background_shape(tag, attributes, moved, canvas):
+    """Whether a shape is one flat colour spread over the whole canvas.
+
+    That is an adaptive icon's printed field, and it is the plate rather than the
+    drawing: counting it as artwork is what pins the composition's bounds to the
+    frame and leaves the logo inside it small.
+    """
+    if tag not in ("rect", "path") or attributes.get("fill-opacity") \
+            or attributes.get("opacity"):
+        return False
+    colour = attributes.get("fill") or ""
+    if not re.fullmatch(r"#[0-9a-fA-F]{6}", colour):
+        return False
+    xs = [point[0] for point in moved]
+    ys = [point[1] for point in moved]
+    return (min(xs) <= canvas * 0.05 and max(xs) >= canvas * 0.95
+            and min(ys) <= canvas * 0.05 and max(ys) >= canvas * 0.95
+            and (max(xs) - min(xs)) * (max(ys) - min(ys)) >= canvas * canvas * 0.9)
+
+
+def markup_bounds(markup, matrix=IDENTITY_MATRIX, canvas=None):
+    """The box a piece of this file's own SVG markup draws into, or None.
+
+    Only the shapes this generator emits are read: groups, paths, and the rects
+    and images that carry a layer's background. Anything whose bounds are not
+    certain comes back as None rather than as a guess. `canvas` is what lets a
+    flat printed field be recognised as one and left out.
+    """
+    box = None
+    stack = [matrix]
+    for match in SVG_TAG.finditer(markup or ""):
+        if match.group(0).startswith("</"):
+            if len(stack) > 1:
+                stack.pop()
+            continue
+        attributes = dict(SVG_ATTR.findall(match.group(2) or ""))
+        own = transform_matrix(attributes.get("transform"))
+        if own is None:
+            return None
+        local = matrix_dot(stack[-1], own)
+        if match.group(1) == "g":
+            stack.append(local)
+            continue
+        if match.group(1) == "path":
+            points = path_points(unescape(attributes.get("d") or ""))
+        elif match.group(1) == "image":
+            x = float(attributes.get("x") or 0.0)
+            y = float(attributes.get("y") or 0.0)
+            width = float(attributes.get("width") or 0.0)
+            height = float(attributes.get("height") or 0.0)
+            points = [(x, y), (x + width, y + height)]
+        elif match.group(1) == "rect":
+            x = float(attributes.get("x") or 0.0)
+            y = float(attributes.get("y") or 0.0)
+            width = float(attributes.get("width") or 0.0)
+            height = float(attributes.get("height") or 0.0)
+            points = [(x, y), (x + width, y + height)]
+        else:
+            centre = (float(attributes.get("cx") or 0.0),
+                      float(attributes.get("cy") or 0.0))
+            radius = float(attributes.get("r") or 0.0)
+            points = [centre, (centre[0] + radius, centre[1] + radius),
+                      (centre[0] - radius, centre[1] - radius)]
+        moved = [(local[0] * x + local[1] * y + local[2],
+                  local[3] * x + local[4] * y + local[5])
+                 for x, y in points]
+        if any(math.isnan(value) for point in moved for value in point):
+            return None
+        if canvas and flat_background_shape(match.group(1), attributes, moved,
+                                            canvas):
+            continue
+        for moved_x, moved_y in moved:
+            box = [moved_x, moved_y, moved_x, moved_y] if box is None else [
+                min(box[0], moved_x), min(box[1], moved_y),
+                max(box[2], moved_x), max(box[3], moved_y)]
+    if box is None or box[2] - box[0] <= 0 or box[3] - box[1] <= 0:
+        return None
+    return box
+
+
+def enlarge_svg_markup(markup, canvas):
+    """Markup grown about its own centre so its drawing reaches the frame.
+
+    The vector twin of trimming a bitmap to its ink: a launcher draws a mask over
+    the middle ~72dp of an adaptive canvas and a logo authored that way fills a
+    row, while a logo authored inside that safe zone does not, and the two next
+    to each other are the uneven list. The box can only be too big, so the zoom
+    is only ever too small, and `SVG_ZOOM_MAX` keeps a sliver of a path from
+    becoming a blur.
+    """
+    box = markup_bounds(markup, canvas=canvas)
+    if not box:
+        return markup
+    width, height = box[2] - box[0], box[3] - box[1]
+    zoom = (canvas / ICON_TRIM_PAD) / max(width, height)
+    if zoom <= 1.0:
+        return markup
+    zoom = min(zoom, SVG_ZOOM_MAX)
+    centre_x, centre_y = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+    return ('<g transform="translate({:g},{:g}) scale({:g}) translate({:g},{:g})'
+            '">{}</g>').format(canvas / 2, canvas / 2, zoom, -centre_x, -centre_y,
+                               markup)
 
 
 def icon_id_from_query(text):
@@ -1150,29 +1473,35 @@ def image_suffix(data):
     return None
 
 
-def shrink_icon_picture(data, suffix):
-    """One icon picture as it is kept: no bigger than it is drawn, and bounded.
+def frame_icon_picture(data, suffix):
+    """One icon picture as it is kept: filled to a circle, small, and bounded.
 
-    A row paints these into a slot of about 39 CSS pixels, so `ICON_PICTURE_MAX_SIDE`
-    is already twice what the largest monitor scale samples from, and the
-    192-432 px originals are several times the disk for pixels that are thrown
-    away. PNG and WebP are both encoded and the smaller is kept, because a flat
-    logo is a third of its size as a PNG while a shaded one is a sixth of it as a
-    WebP.
+    Three things happen in one PIL pass. The ink is trimmed and re-centred - an
+    app that puts a 40% logo in a 100% frame is why a list of icons reads as
+    uneven - then it is laid on a plate so whatever transparency the art carries
+    shows as a filled disc rather than as the page behind it, then it is resized
+    to `ICON_PICTURE_MAX_SIDE`, which is already twice what a row samples from.
 
-    Pillow is not a condition for having an icon. Without it - or without the
-    patience to shrink - the archive's own bytes are kept when they fit
-    `ICON_PICTURE_MAX_BYTES` and dropped when they do not: the bound is the
-    promise, and a file over it is the one thing that cannot be stored.
+    `shrink_icon_picture` is the same without the trimming and the plate: a layer
+    inlined into a drawn SVG has to keep its place on that SVG's canvas.
     """
+    return prepare_icon_picture(data, suffix, framed=True)
+
+
+def shrink_icon_picture(data, suffix):
+    """One icon picture resized and re-encoded, its art untouched."""
+    return prepare_icon_picture(data, suffix, framed=False)
+
+
+def prepare_icon_picture(data, suffix, framed):
+    """See `frame_icon_picture`. Returns (bytes, suffix), or (None, None) when the
+    `ICON_PICTURE_MAX_BYTES` promise cannot be kept."""
     def fits_as_is():
         return (data, suffix) if len(data) <= ICON_PICTURE_MAX_BYTES else (None, None)
 
     if not data:
         return None, None
-    try:
-        from PIL import Image
-    except ImportError:
+    if Image is None:
         return fits_as_is()
     side = ICON_PICTURE_MAX_SIDE
     while True:
@@ -1183,15 +1512,18 @@ def shrink_icon_picture(data, suffix):
             # are its own business; the archive's bytes keep both.
             if getattr(image, "n_frames", 1) > 1:
                 return fits_as_is()
-            if max(image.size) <= side and len(data) <= ICON_PICTURE_MAX_BYTES:
+            if (max(image.size) <= side and len(data) <= ICON_PICTURE_MAX_BYTES
+                    and not framed):
                 return data, suffix
-            if image.mode not in ("RGB", "RGBA"):
-                image = image.convert("RGBA")
+            image = image.convert("RGBA")
+            if framed:
+                # Framing first is the difference between an enlarged logo drawn
+                # from the APK's own pixels and one enlarged from whatever was
+                # left after the shrink threw them away.
+                image = ink_on_plate(image)
             if max(image.size) > side:
                 image = image.resize((min(image.width, side),
                                       min(image.height, side)), Image.LANCZOS)
-                if image.mode not in ("RGB", "RGBA"):
-                    image = image.convert("RGBA")
             png = io.BytesIO()
             image.save(png, "PNG", optimize=True)
             webp = io.BytesIO()
@@ -1205,6 +1537,100 @@ def shrink_icon_picture(data, suffix):
         if side <= 32:
             return fits_as_is()
         side //= 2
+
+
+def frame_colour(image, tolerance=None):
+    """The colour an icon paints its own frame with, or None when its frame is
+    not one colour.
+
+    A logo drawn small on a flat field of its own is the same small logo as one
+    drawn small on nothing, and that field is what the row's circle should keep
+    showing - so it is measured, kept as the plate, and ignored when looking for
+    the ink. A frame that is a photograph, a gradient or a dithered edge is not a
+    flat field, and comes back as None.
+    """
+    tolerance = ICON_BORDER_TOLERANCE if tolerance is None else tolerance
+    if numpy is None:
+        return None
+    pixels = numpy.asarray(image)
+    height, width = pixels.shape[:2]
+    if width < 8 or height < 8:
+        return None
+    corner = pixels[0, 0]
+    if corner[3] < 250:
+        return None
+    ring = numpy.concatenate([pixels[0, :, :3], pixels[-1, :, :3],
+                              pixels[:, 0, :3], pixels[:, -1, :3]])
+    if int(numpy.abs(ring - corner[:3]).sum(-1).max()) <= tolerance:
+        return tuple(int(value) for value in corner[:3])
+    return None
+
+
+def ink_box(image, alpha_box, colour):
+    """The box of the pixels that carry the drawing, a flat frame colour ignored."""
+    if colour is None or numpy is None:
+        return alpha_box
+    pixels = numpy.asarray(image)
+    drawn = ((numpy.abs(pixels[:, :, :3] - numpy.array(colour)).sum(-1)
+              > ICON_BORDER_TOLERANCE) | (pixels[:, :, 3] < 250))
+    ys, xs = numpy.nonzero(drawn)
+    if not len(xs):
+        return alpha_box
+    return (int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1)
+
+
+def ink_on_plate(image):
+    """The icon's own ink, centred and grown to fill the frame, on a plate.
+
+    The plate is the icon's own flat background where it has one, and white
+    otherwise - white is what the request asked for and is invisible behind
+    nothing - but a logo drawn in white on a white plate is the same icon lost, so
+    light ink with no background of its own gets grey.
+
+    Only an ink that misses its frame gets moved and grown. An icon that already
+    draws to its edges is a finished picture, and trimming it would cut the
+    canvas' own margin out of its artwork.
+    """
+    alpha = image.getchannel("A")
+    box = alpha.getbbox()
+    if not box:
+        return image
+    colour = frame_colour(image)
+    ink = image.crop(ink_box(image, box, colour))
+    w, h = ink.size
+    # The widest axis is the one that decides whether there is room to grow: art
+    # that already reaches its frame cannot be enlarged without cropping it, and
+    # cropping the artwork is not what the plate is for.
+    span = max(w, h) / max(1, max(image.width, image.height))
+    if span >= ICON_TRIM_SPAN:
+        side = max(w, h)
+    else:
+        side = max(1, int(round(max(w, h) * ICON_TRIM_PAD)))
+    plate = ("#%02x%02x%02x" % colour) if colour is not None else (
+        ICON_PICTURE_GREY if ink_luminance(ink) > ICON_PICTURE_LIGHT_INK
+        else ICON_PICTURE_WHITE)
+    # Composited rather than pasted over: the picture that comes out is opaque
+    # all the way across, so the circle a row cuts has something solid at every
+    # pixel of it and the file keeps no alpha channel it does not need.
+    canvas = Image.new("RGB", (side, side), plate)
+    canvas.paste(ink, ((side - w) // 2, (side - h) // 2), ink)
+    return canvas.convert("RGBA")
+
+
+def ink_luminance(ink):
+    """How bright an icon's own drawing is, its transparent parts ignored."""
+    try:
+        # Compositing over black first means a white logo on a transparent field
+        # is not averaged with a hundred and something fully transparent pixels.
+        base = Image.new("RGB", ink.size, (0, 0, 0))
+        shown = Image.composite(ink.convert("RGB"), base, ink.getchannel("A"))
+        counts = ink.getchannel("A").histogram()
+        opaque = sum(counts[9:]) or 1
+        means = ImageStat.Stat(shown).mean
+        luma = 0.299 * means[0] + 0.587 * means[1] + 0.114 * means[2]
+        return min(255.0, luma * ink.size[0] * ink.size[1] / opaque)
+    except Exception:
+        return 128.0
 
 
 def safe_name(value):
@@ -1404,6 +1830,10 @@ class ScrcpySessionManager:
         # Which phone the icon queue is reading from, and when that was asked.
         self.icon_target_cache = None
         self.icon_target_at = 0.0
+        # What the phone has installed, by base archive, and when that was asked.
+        self.installed_base_cache = None
+        self.installed_base_at = 0.0
+        self.installed_base_target = None
 
     def emit(self, event):
         """One lock around one write.
@@ -1647,6 +2077,20 @@ class ScrcpySessionManager:
             except queue.Empty:
                 continue
 
+    def emit_cached_icon(self, device_id, package, record):
+        """The picture a record says is already on disk, if it is.
+
+        A record whose file has gone is not an answer about the app, so nothing is
+        emitted here and the caller goes back to the install for it.
+        """
+        suffix = record.get("suffix")
+        path = icon_picture_path(device_id, package, suffix) if suffix else None
+        if path is not None and not path.is_file():
+            return False
+        self.emit({"event": "app_icon", "package": package,
+                   "path": str(path) if path else ""})
+        return True
+
     def fetch_app_icon(self, package, target_args=None, device_id="default",
                        hopeful=False):
         """Read one icon out of the install without pulling it.
@@ -1681,18 +2125,21 @@ class ScrcpySessionManager:
         device_id = device_id or "default"
         self.icon_entry_hits = {}
         target = self.icon_target(target_args)
+        record = read_icon_record(device_id, package)
+        base = self.installed_base(package, target)
+        # The answer a cached icon needs is one path and one proof that the
+        # install behind it is still there, and the proof is the batch listing -
+        # not a `pm path` per row.
+        if (base and record
+                and record.get("apk", "").split("+")[0] == base):
+            if self.emit_cached_icon(device_id, package, record):
+                return
         apks = self.icon_archives(package, target)
         installed = "+".join(apks)
-        record = read_icon_record(device_id, package)
         if installed and record and record.get("apk") == installed:
-            suffix = record.get("suffix")
-            path = icon_picture_path(device_id, package, suffix) if suffix else None
-            if path is None or path.is_file():
-                self.emit({"event": "app_icon", "package": package,
-                           "path": str(path) if path else ""})
+            if self.emit_cached_icon(device_id, package, record):
                 return
         if not apks:
-
             # No archive to read is a fact about this moment, not about the
             # app: nothing is recorded, so the next ask tries again.
             self.emit({"event": "app_icon", "package": package, "path": ""})
@@ -1769,11 +2216,12 @@ class ScrcpySessionManager:
             self.emit({"event": "app_icon", "package": package, "path": ""})
             return
 
-        # Kept at the size it is drawn at and under the bound one icon may take;
-        # a layer that cannot be brought under it answers as no icon rather than
-        # as a file the promise said it would not be.
+        # Framed to fill the circle the shell cuts it into, kept at the size it
+        # is drawn at, and under the bound one icon may take; a picture that
+        # cannot be brought under that bound answers as no icon rather than as a
+        # file the promise said it would not be.
         if suffix in ICON_IMAGE_MIME:
-            data, suffix = shrink_icon_picture(data, suffix)
+            data, suffix = frame_icon_picture(data, suffix)
         if data is None or suffix is None:
             self.emit({"event": "app_icon", "package": package, "path": ""})
             return
@@ -1809,6 +2257,59 @@ class ScrcpySessionManager:
             self.icon_target_cache = self.resolve_adb_target(target_args)
             self.icon_target_at = time.time()
         return self.icon_target_cache
+
+    def installed_base_map(self, target):
+        """`{package: base archive}` for the phone, from one call, remembered
+        for `ICON_BASES_TTL`.
+
+        This is what a cached icon has to be checked against, and it is the only
+        adb work a cache hit needs - so it is asked once for the whole phone
+        instead of once per row. An update moves an install to a new directory
+        with a new random name in it, which changes the base path, so the base
+        alone says whether the picture is still this install's picture; splits
+        cannot come and go without that.
+
+        Nothing is returned when the call does not answer, and the caller reads
+        the one install it was asked about, the way it used to for everything.
+        """
+        now = time.time()
+        key = tuple(target or ())
+        fresh = (self.installed_base_cache is not None
+                 and self.installed_base_target == key
+                 and now - self.installed_base_at < ICON_BASES_TTL)
+        if fresh:
+            return self.installed_base_cache
+        try:
+            res = subprocess.run(["adb"] + target + ["shell", "pm", "list",
+                                                     "packages", "-f"],
+                                 capture_output=True, text=True,
+                                 timeout=ICON_TIMEOUT)
+        except Exception:
+            # A stale listing is not a proof, and an unproven record is read from
+            # the install again rather than trusted: what this shortcut may cost
+            # is the old per-package lookup, never an icon nobody installed.
+            return None
+        bases = {}
+        for line in res.stdout.splitlines():
+            if not line.startswith("package:"):
+                continue
+            # `package:/data/app/~~abcd==/com.x-Y==/base.apk=com.x`, and the
+            # padding of the directory's own name is full of `=`: the package is
+            # what follows the last one.
+            path, _, package = line[len("package:"):].rpartition("=")
+            if path and package:
+                bases[package] = path
+        if not bases:
+            return None
+        self.installed_base_cache = bases
+        self.installed_base_at = now
+        self.installed_base_target = key
+        return bases
+
+    def installed_base(self, package, target):
+        """The base archive the phone says this package is installed from, or
+        None when the phone did not say."""
+        return (self.installed_base_map(target) or {}).get(package)
 
     def icon_archives(self, package, target):
         """Every archive the install is made of, the base first."""
@@ -1931,7 +2432,7 @@ class ScrcpySessionManager:
                              capture_output=True, text=True, timeout=timeout)
         return res.stdout if res.returncode == 0 else None
 
-    def icon_paint(self, table, apks, target, defs):
+    def icon_paint(self, table, apks, target, defs, inks=None):
         """The brush one icon is drawn with, recording the gradients it finds.
 
         A `fillColor` is a colour until a build decides otherwise: AGP pulls a
@@ -1941,9 +2442,12 @@ class ScrcpySessionManager:
         that names it - and a path that only has this kind of paint is drawn by
         the same rule as one with a colour.
         """
+        inks = inks if inks is not None else []
+
         def paint(element, key):
             color = axml_color(element, key, table)
             if color:
+                inks.append(color)
                 return color
             node = gradient_node(element, key)
             attr = element["attrs"].get(key)
@@ -2054,8 +2558,8 @@ class ScrcpySessionManager:
         rows = table.paths(res_id)
         if not rows:
             return None  # the tables name nothing for this id
-        defs = []
-        paint = self.icon_paint(table, apks, target, defs)
+        defs, inks = [], []
+        paint = self.icon_paint(table, apks, target, defs, inks)
         # A document first: an id's other rows are bitmaps, which the caller has
         # already tried, and reading them again to learn they are not XML is a
         # download for nothing.
@@ -2066,7 +2570,7 @@ class ScrcpySessionManager:
             if not root:
                 continue
             if root["name"] == "vector":
-                return vector_svg_document(root, table, paint, defs)
+                return vector_svg_document(root, table, paint, defs, inks)
             if root["name"] == "adaptive-icon":
                 painted = {}
                 for role, layer in adaptive_icon_layers(root):
@@ -2079,13 +2583,15 @@ class ScrcpySessionManager:
                 # it is drawn only when there is nothing else to draw.
                 body = [markup for role, markup in painted.items()
                         if role != "monochrome"] or list(painted.values())
-                return adaptive_svg_document(body, defs=defs)
+                return adaptive_svg_document(body, defs=defs, inks=inks)
             # A selector, a layer list, an inset: whatever it composes, it
             # composes onto the launcher's canvas like any other icon.
             markup = self.element_layer_markup(root, apks, target, table, paint,
                                                defs)
             if markup:
-                return svg_document(markup, ADAPTIVE_CANVAS, ADAPTIVE_CANVAS, defs)
+                return svg_document(
+                    color_rect_svg(plate_for_inks(inks), ADAPTIVE_CANVAS) + markup,
+                    ADAPTIVE_CANVAS, ADAPTIVE_CANVAS, defs)
         return None
 
     # ---- device facts ----------------------------------------------------

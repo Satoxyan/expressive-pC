@@ -83,6 +83,12 @@ Singleton {
     // `appIconsPending` is what holds the supervisor alive through a burst.
     property var appIcons: ({})
     property var appIconsAsked: ({})
+    // Answers that have arrived but are not published yet. A sweep asks for a
+    // phone's whole catalogue at once and the supervisor answers it in a few
+    // hundred milliseconds; publishing per answer would rebuild the map and
+    // rebind every visible row once per app, which is the scroll lag this list
+    // paid for years. See `appIconAnswerTimer`.
+    property var appIconAnswers: ({})
     // When each package was last asked, for the cooldown on re-asking one that
     // was answered "none". A bookkeeping map, never a binding source.
     property var appIconsAskedAt: ({})
@@ -482,19 +488,21 @@ Singleton {
             const pkg = String(msg.package ?? "");
             if (pkg.length === 0) return;
             const path = String(msg.path ?? "");
-            // A new object, because a plain mutation would not notify: the
-            // rows bind their image source to this map. An empty path is an
-            // answer too - it is what stops a row from asking again.
+            root.appIconsPending = Math.max(0, root.appIconsPending - 1);
+            // Buffered rather than published: a sweep asks for a phone's whole
+            // catalogue and the answers land within a few hundred milliseconds,
+            // and a rebuilt map per answer is a rebinding pass over every visible
+            // row per answer.
             //
             // An empty answer never replaces a picture that is already held,
             // though: "" is also what a link that timed out leaves behind, and
             // overwriting with it turns an icon the user can see into one they
             // cannot, for the rest of the session, with nothing left to retry it.
-            const icons = Object.assign({}, root.appIcons);
-            if (path.length > 0 || icons[pkg] === undefined)
-                icons[pkg] = path;
-            root.appIcons = icons;
-            root.appIconsPending = Math.max(0, root.appIconsPending - 1);
+            const held = root.appIcons[pkg] ?? root.appIconAnswers[pkg];
+            if (path.length === 0 && held !== undefined && held !== "") return;
+            const answers = Object.assign({}, root.appIconAnswers);
+            answers[pkg] = path;
+            root.appIconAnswers = answers;
         } else if (msg.event === "device_size") {
             root.deviceScreenSize = Number(msg.width) + "x" + Number(msg.height);
             root.deviceScreenSizeLoading = false;
@@ -747,7 +755,8 @@ Singleton {
     // waits behind the rest of the phone's app list.
     function requestAppIcon(packageName: string, urgent: bool): void {
         if (!packageName || !root.available) return;
-        const answer = root.appIcons[packageName];
+        const answer = root.appIcons[packageName]
+            ?? root.appIconAnswers[packageName];
         if (answer !== undefined && answer !== "")
             return;                     // a picture is already held
         const since = root.appIconsAskedAt[packageName] ?? 0;
@@ -788,15 +797,16 @@ Singleton {
         if (forgotten > 0) root.appIconsAsked = asked;
     }
 
-    // Rows ask as they appear, which leaves a hole wherever the list has not
-    // been scrolled: a package nobody has opened a row for has no icon to show
-    // even though the phone has one. This asks the rest, one package per call,
-    // and answers whether anything is left to ask.
+    // Rows ask as they appear, which leaves a hole wherever the list has not been
+    // scrolled: a package nobody has opened a row for has no icon to show even
+    // though the phone has one. This asks for every one of them at once, and
+    // answers whether it asked for anything.
     //
-    // Asking in ones rather than handing over the whole list at once keeps the
-    // queue short; the row the user just opened is first in line because its own
-    // ask is urgent and this fill is not, so the two queues do the ordering that
-    // this function's pace cannot.
+    // A sweep rather than one ask per tick, because a cached icon is now checked
+    // against one listing of the phone instead of a lookup of its own: a whole
+    // catalogue answers in the time this used to take to ask for three of them.
+    // The order is still the supervisor's to choose - a row the user is looking at
+    // asks with `priority`, which jumps the queue, and this fill does not.
     property int iconRetryTick: 0
     property int iconRetryCursor: 0
 
@@ -806,33 +816,54 @@ Singleton {
         const now = Date.now();
         const apps = root.apps;
         if (!Array.isArray(apps)) return false;
+        let asked = 0;
         for (let index = 0; index < apps.length; ++index) {
             const pkg = String(apps[index]?.package ?? "");
             if (pkg.length === 0) continue;
-            if (root.appIcons[pkg] !== undefined) continue;
+            if (root.appIcons[pkg] !== undefined
+                    || root.appIconAnswers[pkg] !== undefined) continue;
             if (root.appIconsAsked[pkg] === true
                     && now - (root.appIconsAskedAt[pkg] ?? 0) < root.appIconStaleMs)
                 continue;
             root.requestAppIcon(pkg, false);
-            return true;
+            ++asked;
         }
+        if (asked > 0) return true;
         // Nothing left to ask, which is not the same as everything answered: an
         // empty answer is also what a link that blinked leaves behind, and a row
         // told "no icon" before the phone had written its cache stays a glyph for
         // the rest of the session, because its ask is spent. So one of them is
         // asked again, in rotation, every twentieth tick - ten seconds of this
-        // timer - and a package whose icon is cached by then answers with a
-        // single `pm path`.
+        // timer - and a package whose icon is cached by then answers out of the
+        // listing this sweep already paid for.
         const empties = Object.keys(root.appIcons)
             .filter(pkg => root.appIcons[pkg] === "");
         if (empties.length === 0 || root.iconRetryTick % 20 !== 0) return false;
         const retry = empties[root.iconRetryCursor % empties.length];
         ++root.iconRetryCursor;
-        const asked = Object.assign({}, root.appIconsAsked);
-        delete asked[retry];
-        root.appIconsAsked = asked;
+        const askedMap = Object.assign({}, root.appIconsAsked);
+        delete askedMap[retry];
+        root.appIconsAsked = askedMap;
         root.requestAppIcon(retry, false);
         return true;
+    }
+
+    // What the buffer is for: one rebuilt map per burst instead of one per answer,
+    // because every visible row binds its picture source to this map and a rebuild
+    // re-evaluates all of them. A package already held is never handed an empty
+    // answer, which is the same rule the arrival used to enforce on its own.
+    function publishAppIconAnswers(): void {
+        const answers = root.appIconAnswers;
+        if (Object.keys(answers).length === 0) return;
+        const icons = Object.assign({}, root.appIcons);
+        for (const pkg of Object.keys(answers)) {
+            const path = String(answers[pkg]);
+            if (path.length === 0 && icons[pkg] !== undefined && icons[pkg] !== "")
+                continue;
+            icons[pkg] = path;
+        }
+        root.appIcons = icons;
+        root.appIconAnswers = {};
     }
     // END phone-scrcpy logic
 
@@ -862,6 +893,17 @@ Singleton {
         id: mirrorSettleTimer
         interval: root.mirrorSettleMs
         onTriggered: root.mirrorSettled()
+    }
+
+    // The burst that a sweep's worth of answers is, published as one change. Long
+    // enough that a phone's catalogue lands inside a single pass over the rows,
+    // short enough that an icon is on its row before anyone has looked for it.
+    Timer {
+        id: appIconAnswerTimer
+        interval: 120
+        repeat: true
+        running: Object.keys(root.appIconAnswers).length > 0
+        onTriggered: root.publishAppIconAnswers()
     }
 
     // ---- the supervisor's lifetime ----
@@ -911,12 +953,16 @@ Singleton {
         root.deviceScreenSizeLoading = false;
         root.encodersLoading = false;
         // Same for an icon ask that died mid-flight: forgetting it lets the
-        // row ask again, while an answered package keeps its answer.
+        // row ask again, while an answered package keeps its answer. An answer
+        // that had only reached the buffer is still an answer, so it is published
+        // before the in-flight list is pruned.
+        root.publishAppIconAnswers();
         const unanswered = Object.keys(root.appIconsAsked)
             .filter(pkg => root.appIcons[pkg] === undefined);
-        for (const pkg of unanswered)
+        for (const pkg of unanswered) {
             delete root.appIconsAsked[pkg];
             delete root.appIconsAskedAt[pkg];
+        }
         root.appIconsPending = Math.max(0, root.appIconsPending - unanswered.length);
     }
 
@@ -994,6 +1040,7 @@ Singleton {
         root.appIcons = {};
         root.appIconsAsked = {};
         root.appIconsAskedAt = {};
+        root.appIconAnswers = {};
         root.appIconsPending = 0;
     }
 }

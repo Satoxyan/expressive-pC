@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
+import Qt5Compat.GraphicalEffects
 import Quickshell.Widgets
 import qs.services
 import qs.modules.common
@@ -141,9 +142,10 @@ PhoneSubPage {
     // first. A tick with nothing left to ask is only a scan of a couple of
     // hundred strings, so the timer is never stopped - stopping it once used to
     // make every later hole permanent for the session. It does pause while the
-    // list is moving, because an ask writes a line of JSON, wakes an adb call
-    // and replaces the map every row's picture binds to, and none of that wants
-    // to happen inside a scroll.
+    // list is moving, because an ask writes a line of JSON and wakes an adb call,
+    // and none of that wants to happen inside a scroll. The answers themselves
+    // arrive whenever the phone gets to them: `PhoneScrcpy` publishes them a few
+    // at a time rather than one rebuild per icon.
     Timer {
         id: appIconFiller
         interval: 500
@@ -151,11 +153,7 @@ PhoneSubPage {
         triggeredOnStart: true
         running: root.visible && PhoneScrcpy.apps.length > 0
                 && !appList.moving && !appList.dragging
-        onTriggered: {
-            for (let pass = 0; pass < 3; ++pass)
-                if (!PhoneScrcpy.fillAppIconQueue())
-                    return;
-        }
+        onTriggered: PhoneScrcpy.fillAppIconQueue()
     }
 
     ColumnLayout {
@@ -416,6 +414,16 @@ PhoneSubPage {
                                     implicitSize: root.appIconSlot
                                     visible: status === Image.Ready
                                     asynchronous: true
+                                    // The same disc as a list row, so a starred
+                                    // app and that app in the list are one shape.
+                                    layer.enabled: true
+                                    layer.effect: OpacityMask {
+                                        maskSource: Rectangle {
+                                            width: root.appIconSlot
+                                            height: root.appIconSlot
+                                            radius: Appearance.rounding.full
+                                        }
+                                    }
                                     source: PhoneScrcpy.appIconSource(favouriteChip.appPackage)
                                 }
                             }
@@ -518,7 +526,7 @@ PhoneSubPage {
                                         // ready.
                                         visible: appPicture.status !== Image.Ready
                                         text: "android"
-                                        wrappedShape: MaterialShape.Shape.Cookie9Sided
+                                        wrappedShape: MaterialShape.Shape.Circle
                                         iconSize: Appearance.font.pixelSize.small
                                         padding: Appearance.spacing.space75
                                         color: appRow.running
@@ -545,6 +553,20 @@ PhoneSubPage {
                                         implicitSize: root.appIconSlot
                                         visible: status === Image.Ready
                                         asynchronous: true
+                                        // The one shape every app is shown in. The
+                                        // pictures arrive as squares with their
+                                        // plate already baked under the ink, so
+                                        // cutting them to a circle is all that is
+                                        // left, and every row reads as the same
+                                        // filled disc.
+                                        layer.enabled: true
+                                        layer.effect: OpacityMask {
+                                            maskSource: Rectangle {
+                                                width: root.appIconSlot
+                                                height: root.appIconSlot
+                                                radius: Appearance.rounding.full
+                                            }
+                                        }
                                         source: PhoneScrcpy.appIconSource(appRow.appPackage)
                                     }
                                 }
