@@ -73,6 +73,8 @@ MouseArea {
         const px = event.pixelDelta.x
         const py = event.pixelDelta.y
         if (dx === 0 && dy === 0 && px === 0 && py === 0) {
+            // A chained gesture owns the page above us; hand it the end too.
+            if (root._enhancedGesture) root.chainScroll(event)
             root._pixelGesture = false
             root._enhancedGesture = false
             scrollTimer.stop()

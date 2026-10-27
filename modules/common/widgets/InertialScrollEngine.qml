@@ -31,7 +31,8 @@ Item {
     property real flingFriction: Config?.options.interactions.scrolling.flingFriction ?? 0.002
     property real flingStopThreshold: Config?.options.interactions.scrolling.flingStopThreshold ?? 0.01
     readonly property real flingMinVelocity: 0.0625 // px/ms — 0.5 killed gentle swipes at lift
-    readonly property real maxOverscroll: 56
+    // Firefox asymptotes at composition length; viewport is the closest QML analogue.
+    readonly property real maxOverscroll: Math.max(1, horizontal ? flickable.width : flickable.height)
     readonly property real touchpadScrollFactor: Config?.options.interactions.scrolling.touchpadScrollFactor ?? 1.0
     // Same knob semantics as TouchpadScrollArea: legacy absolute factors normalize to 1.0.
     property real touchpadSensitivity: (Config?.options.interactions.scrolling.touchpadSensitivity ?? 3.5)
@@ -53,17 +54,33 @@ Item {
     property real _wheelTargetY: 0
     property real _lastEventTime: 0
     property var  _velocitySamples: []
+    // True between ScrollBegin and ScrollEnd; an idle timer cannot fake a lift.
+    property bool _phaseGesture: false
+
+    // === Overscroll spring (Firefox AxisPhysicsMSDModel: unit mass, k=200, zeta=1.1) ===
+    readonly property real _springStiffness: 200
+    readonly property real _springDampingRatio: 1.1
+    readonly property real _springDamping: 2 * _springDampingRatio * Math.sqrt(_springStiffness)
+    readonly property real _springStep: 1 / 120
+    property real _springOverscroll: 0
+    property real _springVelocity: 0 // px/s
+    property real _springEdge: 0
+    property int _springSign: -1
+    property real _springAccumulator: 0
 
     // True while physics are writing the scroll position — hosts disable
     // their own position Behaviors during this so the two don't fight.
     readonly property bool active: physicsLoop.running || wheelAnim.running || liftTimer.running
-                                   || bounceTimer.running || bounceAnim.running
+                                   || overscrollLoop.running
 
     Timer {
         id: liftTimer
         interval: 80
         repeat: false
-        onTriggered: root._computeAndStartFling()
+        onTriggered: {
+            // Phase-aware input releases on ScrollEnd, not on idle.
+            if (!root._phaseGesture) root._computeAndStartFling()
+        }
     }
 
     FrameAnimation {
@@ -76,17 +93,11 @@ Item {
             var maxPos = root._max
             var next = root._pos + root._velocity * dt // samples are d(pos)/dt — continue the finger's direction
             if (maxPos > 0) {
-                // Keep a rubber-band overscroll at the edge so the spring-back is visible.
-                if (next < 0) {
-                    next = Math.max(-root.maxOverscroll, next)
-                    root._velocity = 0
-                    bounceTimer.interval = 90
-                    bounceTimer.restart()
-                } else if (next > maxPos) {
-                    next = Math.min(maxPos + root.maxOverscroll, next)
-                    root._velocity = 0
-                    bounceTimer.interval = 90
-                    bounceTimer.restart()
+                // Enter the overscroll spring at the edge with the fling's velocity.
+                if (next < 0 || next > maxPos) {
+                    running = false
+                    root._startOverscrollSpring(next < 0 ? -1 : 1, root._velocity)
+                    return
                 }
             } else { next = 0 }
             root.flickable[root._posProp] = next
@@ -94,27 +105,18 @@ Item {
         }
     }
 
+    // shortcut: fixed 120 Hz without interpolation; add interpolation if 144+ Hz looks steppy.
+    FrameAnimation {
+        id: overscrollLoop
+        running: false
+        onTriggered: root._stepOverscroll(frameTime)
+    }
+
     NumberAnimation {
         id: wheelAnim
         target: root.flickable
         property: root._posProp
         easing.type: Easing.OutCubic
-    }
-
-    Timer {
-        id: bounceTimer
-        interval: 90
-        onTriggered: root._startBounce()
-    }
-
-    NumberAnimation {
-        id: bounceAnim
-        target: root.flickable
-        property: root._posProp
-        duration: 360
-        // One small overshoot; OutElastic wobbles too much.
-        easing.type: Easing.OutBack
-        easing.overshoot: 1.3
     }
 
     // =========================================================
@@ -128,7 +130,11 @@ Item {
     function handleWheel(event) {
         var d = horizontal ? event.angleDelta.x : event.angleDelta.y
         var p = horizontal ? event.pixelDelta.x : event.pixelDelta.y
-        if (d === 0 && p === 0) return
+        if (d === 0 && p === 0) {
+            // Wayland sends a final zero-delta event; release the gesture now.
+            if (event.phase === Qt.ScrollEnd) root._handleScrollEnd()
+            return
+        }
         var enabled = Config?.options?.interactions?.scrolling?.fasterTouchpadScroll
         if (enabled === false) return
         // Mouse wheel: exact multiples of 120. Touchpad: non-multiples or
@@ -143,12 +149,15 @@ Item {
     }
 
     function _handleTouchpad(event) {
+        root._phaseGesture = event.phase === Qt.ScrollBegin || event.phase === Qt.ScrollUpdate
         var d = horizontal ? event.angleDelta.x : event.angleDelta.y
         var px = horizontal ? event.pixelDelta.x : event.pixelDelta.y
-        if (d === 0 && px === 0) return
+        if (d === 0 && px === 0) {
+            if (event.phase === Qt.ScrollEnd) root._handleScrollEnd()
+            return
+        }
         if (root._max <= 0) return
-        bounceAnim.stop()
-        bounceTimer.stop()
+        root._stopOverscrollSpring()
         if (wheelAnim.running) { wheelAnim.stop(); root._wheelTargetY = root._pos }
         physicsLoop.running = false
         // Restart lift BEFORE writing: active() must be true at write time or
@@ -158,52 +167,56 @@ Item {
         // Same units as TouchpadScrollArea: pixelDelta is already pixels; the angle
         // fallback converts at this compositor's 12-units-per-pixel ratio.
         var deltaPx = -(px !== 0 ? px : d / 12) * root.touchpadSensitivity
-        var now = Date.now()
-        var dt = now - root._lastEventTime
-        if (dt > 0 && dt < 150) {
-            root._velocitySamples.push(deltaPx / dt)
-            if (root._velocitySamples.length > 6) root._velocitySamples.shift()
-        } else if (dt >= 150) {
-            root._velocitySamples = []
-        }
-        root._lastEventTime = now
-        var raw = root._pos + deltaPx
+        var prev = root._pos
+        var raw = prev + deltaPx
         var top = deltaPx < 0 && raw < 0
         var bottom = deltaPx > 0 && raw > root._max
         var next = raw
         if (top || bottom) {
-            // Rubber band: each additional px of pull moves the content less
-            // until it stops at maxOverscroll.
+            // Firefox Axis::ApplyResistance: 1/16 at the edge, 0 at viewport length,
+            // max 8 px added per event.
             var edge = top ? 0 : root._max
-            var current = top ? Math.max(0, -root._pos) : Math.max(0, root._pos - root._max)
-            var gap = top ? Math.max(0, root._pos) : Math.max(0, root._max - root._pos)
+            var current = top ? Math.max(0, -prev) : Math.max(0, prev - root._max)
+            var gap = top ? Math.max(0, prev) : Math.max(0, root._max - prev)
             var room = Math.max(0, 1 - current / root.maxOverscroll)
-            var step = Math.max(0, Math.abs(deltaPx) - gap) * room
+            var step = Math.min(8, Math.max(0, Math.abs(deltaPx) - gap) * room / 16)
             next = edge + (top ? -1 : 1) * Math.min(root.maxOverscroll, current + step)
-        } else if (root._pos < 0) {
+        } else if (prev < 0) {
             next = Math.min(raw, root._max)
-        } else if (root._pos > root._max) {
+        } else if (prev > root._max) {
             next = Math.max(raw, 0)
         } else {
             next = Math.max(0, Math.min(raw, root._max))
         }
         root.flickable[root._posProp] = next
-        if (next < 0 || next > root._max) {
-            liftTimer.stop()
-            root._velocity = 0
+
+        // Firefox tracks velocity after resistance, not the raw finger delta.
+        var now = Date.now()
+        var dt = now - root._lastEventTime
+        var visual = next - prev
+        if (dt > 0 && dt < 150) {
+            root._velocitySamples.push(visual / dt)
+            if (root._velocitySamples.length > 6) root._velocitySamples.shift()
+        } else if (dt >= 150) {
             root._velocitySamples = []
-            bounceTimer.interval = 90
-            bounceTimer.restart()
         }
+        root._lastEventTime = now
+        if (event.phase === Qt.ScrollEnd) root._handleScrollEnd()
     }
 
-    function _computeAndStartFling() {
-        if (root._velocitySamples.length === 0) { root._velocity = 0; return }
+    function _weightedVelocity() {
+        // Samples older than the 150 ms window mean a pause, not a moving finger.
+        if (Date.now() - root._lastEventTime > 150) { root._velocitySamples = []; return 0 }
         var total = 0, weightSum = 0
         for (var i = 0; i < root._velocitySamples.length; i++) {
             var w = i + 1; total += root._velocitySamples[i] * w; weightSum += w
         }
-        root._velocity = total / weightSum
+        return weightSum > 0 ? total / weightSum : 0
+    }
+
+    function _computeAndStartFling() {
+        if (root._pos < 0 || root._pos > root._max) { root._startBounce(); return }
+        root._velocity = root._weightedVelocity()
         root._velocitySamples = []
         if (Math.abs(root._velocity) >= root.flingMinVelocity) { physicsLoop.running = true }
         else { root._velocity = 0 }
@@ -211,50 +224,127 @@ Item {
 
     function _handleMouseWheel(event) {
         if (root._max <= 0) return
-        bounceAnim.stop()
-        bounceTimer.stop()
+        var base = Math.max(0, Math.min(root._max, wheelAnim.running ? root._wheelTargetY : root._pos))
+        root._stopOverscrollSpring()
         physicsLoop.running = false; liftTimer.stop(); root._velocity = 0; root._velocitySamples = []
         var delta = horizontal ? event.angleDelta.x : event.angleDelta.y
         var direction = delta > 0 ? -1 : 1
-        var base = wheelAnim.running ? root._wheelTargetY : root._pos
-        var raw = base + direction * root.wheelScrollAmount
-        var top = direction < 0 && raw < 0
-        var bottom = direction > 0 && raw > root._max
-        if (top || bottom) {
-            // Mouse wheel gets the same rubber band, at half pull strength.
-            var edge = top ? 0 : root._max
-            var current = top ? Math.max(0, -base) : Math.max(0, base - root._max)
-            var gap = top ? Math.max(0, base) : Math.max(0, root._max - base)
-            var room = Math.max(0, 1 - current / root.maxOverscroll)
-            var step = Math.max(0, Math.abs(root.wheelScrollAmount) - gap) * 0.5 * room
-            root._wheelTargetY = edge + (top ? -1 : 1) * Math.min(root.maxOverscroll, current + step)
-        } else if (base > root._max && direction < 0) {
-            // Releasing the bottom overscroll: follow the notch inward.
-            root._wheelTargetY = Math.max(raw, 0)
-        } else if (base < 0 && direction > 0) {
-            root._wheelTargetY = Math.min(raw, root._max)
-        } else {
-            root._wheelTargetY = Math.max(0, Math.min(raw, root._max))
-        }
+        // Firefox only applies the elastic effect to touchpad/touchscreen input.
+        root._wheelTargetY = Math.max(0, Math.min(root._max, base + direction * root.wheelScrollAmount))
         var distance = Math.abs(root._wheelTargetY - root._pos)
         var duration = Math.max(root.wheelDurationMin, Math.min(root.wheelDurationMax, distance * 2))
         wheelAnim.stop(); wheelAnim.from = root._pos
         wheelAnim.to = root._wheelTargetY; wheelAnim.duration = duration; wheelAnim.start()
-        if (root._wheelTargetY < 0 || root._wheelTargetY > root._max) {
-            bounceTimer.interval = duration + 80
-            bounceTimer.restart()
+    }
+
+    function _handleScrollEnd() {
+        if (overscrollLoop.running || physicsLoop.running) return
+        if (root._pos < 0 || root._pos > root._max) { root._startBounce(); return }
+        // Phase end is the real release: don't wait for the fallback timer.
+        if (liftTimer.running) {
+            liftTimer.stop()
+            root._computeAndStartFling()
         }
     }
 
     function _startBounce() {
+        if (overscrollLoop.running) return
         if (root._pos >= 0 && root._pos <= root._max) return
-        wheelAnim.stop()
-        physicsLoop.running = false
+        var velocity = root._weightedVelocity()
+        root._velocitySamples = []
         liftTimer.stop()
+        root._startOverscrollSpring(root._pos < 0 ? -1 : 1, velocity)
+    }
+
+    function _stopOverscrollSpring() {
+        if (!overscrollLoop.running) return
+        overscrollLoop.running = false
+        root._springAccumulator = 0
+        root._springVelocity = 0
+    }
+
+    function _startOverscrollSpring(side, velocityPxPerMs) {
+        var edge = side < 0 ? 0 : root._max
+        // A fling colliding from inside counts as zero overscroll, not as invalid input.
+        var current = side < 0 ? Math.min(0, root._pos) : Math.max(0, root._pos - root._max)
+        var outward = side < 0 ? velocityPxPerMs < 0 : velocityPxPerMs > 0
+        if (Math.abs(current) < 0.01 && !outward) return
+
+        var limit = root.maxOverscroll
+        root._springEdge = edge
+        root._springSign = side
+        root._springOverscroll = Math.max(-limit, Math.min(limit, current))
+        // Firefox halves the release velocity and clamps it to 10 ParentLayer px/ms.
+        root._springVelocity = Math.max(-10, Math.min(10, (Number(velocityPxPerMs) || 0) / 2)) * 1000
+        root._springAccumulator = 0
         root._velocity = 0
-        bounceAnim.stop()
-        bounceAnim.from = root._pos
-        bounceAnim.to = root._pos < 0 ? 0 : root._max
-        bounceAnim.start()
+        root._velocitySamples = []
+        physicsLoop.running = false
+        wheelAnim.stop()
+        liftTimer.stop()
+        // Start the loop before writing: active must be true or the host's
+        // Behavior animates this write and then fights every spring frame.
+        overscrollLoop.running = true
+        root.flickable[root._posProp] = edge + root._springOverscroll
+    }
+
+    function _finishOverscroll() {
+        root.flickable[root._posProp] = root._springEdge
+        root._springOverscroll = 0
+        root._springVelocity = 0
+        root._springAccumulator = 0
+        overscrollLoop.running = false
+    }
+
+    function _stepOverscroll(dt) {
+        if (!overscrollLoop.running || !(dt > 0)) return
+        var h = root._springStep
+        var k = root._springStiffness
+        var c = root._springDamping
+        var limit = root.maxOverscroll
+        root._springAccumulator += Math.min(dt, 0.05)
+
+        while (root._springAccumulator >= h) {
+            root._springAccumulator -= h
+            var o = root._springOverscroll
+            var v = root._springVelocity
+
+            // RK4 for o'' = -k*o - c*v, unit mass.
+            var a1 = -k * o - c * v
+            var v1 = v
+            var o2 = o + v1 * h / 2
+            var v2 = v + a1 * h / 2
+            var a2 = -k * o2 - c * v2
+            var o3 = o + v2 * h / 2
+            var v3 = v + a2 * h / 2
+            var a3 = -k * o3 - c * v3
+            var o4 = o + v3 * h
+            var v4 = v + a3 * h
+            var a4 = -k * o4 - c * v4
+            var nextO = o + h * (v1 + 2 * v2 + 2 * v3 + v4) / 6
+            var nextV = v + h * (a1 + 2 * a2 + 2 * a3 + a4) / 6
+
+            if (nextO < -limit) {
+                nextO = -limit
+                if (nextV < 0) nextV = 0
+            } else if (nextO > limit) {
+                nextO = limit
+                if (nextV > 0) nextV = 0
+            }
+            root._springOverscroll = nextO
+            root._springVelocity = nextV
+
+            // Firefox stops as soon as the spring would cross the edge.
+            if (root._springSign < 0 ? nextO >= 0 : nextO <= 0) {
+                root._finishOverscroll()
+                return
+            }
+            if (Math.abs(nextO) < 1 && Math.abs(nextV) < 2) {
+                root._finishOverscroll()
+                return
+            }
+        }
+
+        root.flickable[root._posProp] = root._springEdge + root._springOverscroll
     }
 }
