@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 
 import qs
+import qs.services
 import qs.modules.common
 import qs.modules.ii.background
 import qs.modules.ii.bar
@@ -56,4 +57,27 @@ Scope {
     PanelLoader { extraCondition: GlobalStates.dropShelfOpen; component: DropShelfPanel {} }
     PanelLoader { component: NiriBackdrop {} }
     PanelLoader { component: ScreenFrame {} }
+
+    // Alt+X is answered by the bridge itself while it holds the keyboards, and it
+    // is answered here as well because a board that cannot be held - one the
+    // `input` group does not reach - would otherwise leave no key that gives the
+    // machine back. Both mouse buttons together is the third way, inside the
+    // bridge, for the moments the keyboards are not reachable at all.
+    CompositorGlobalShortcut {
+        name: "phoneRemoteInputRelease"
+        description: "Gives the mouse back from phone remote input"
+
+        onPressed: PhoneConnect.setRemoteInputActive(false)
+    }
+
+    // A locked screen is the end of a session: the pointer devices are held from
+    // below the compositor, so nothing on that screen would ever answer the hand
+    // and the mouse would stay dead behind a wall of wallpaper.
+    Connections {
+        target: GlobalStates
+        function onScreenLockedChanged() {
+            if (GlobalStates.screenLocked)
+                PhoneConnect.setRemoteInputActive(false);
+        }
+    }
 }

@@ -62,6 +62,12 @@ Singleton {
     readonly property string persistedActiveDeviceId: Persistent.states?.phone?.activeDeviceId ?? ""
     readonly property var activeDevice: root.preferredActiveDevice(root.devices, root.persistedActiveDeviceId)
     readonly property string materialSymbol: (root.available && root.activeDevice) ? "mobile" : "mobile_off"
+    // The device list is applied from a D-Bus callback, so anything that needs a
+    // device has to be asked when one APPEARS rather than when the request for
+    // the list went out. One string, because the device object is rebuilt on
+    // every sweep and a handler on it would fire once a poll.
+    readonly property string activeDeviceId: root.activeDevice?.id ?? ""
+    onActiveDeviceIdChanged: root.refreshRemoteInput()
 
     // Valent action names beyond findmyphone.ring were not verifiable against
     // a live daemon, so only the verified surface is offered there.
@@ -69,6 +75,33 @@ Singleton {
     readonly property bool canSendClipboard: root.backend === "kdeconnect"
     readonly property bool canShare: root.backend === "kdeconnect"
     readonly property bool canBrowseFiles: root.backend === "kdeconnect"
+    // Remote input: this machine's pointer drives the phone. The desktop cursor
+    // is stopped below the compositor, at the devices themselves - the bridge
+    // takes an `EVIOCGRAB` on every pointer node it can open, and takes it before
+    // anything else it does, so the hand feels the freeze as soon as the session
+    // starts. Holding a node needs the `input` group, which is why the same grab
+    // is asked for rather than assumed, and a node that will not be held is left
+    // unread: travel that reaches the phone and the desktop at once is worse than
+    // travel that reaches neither. The keyboards are held for the same reason -
+    // Escape belongs to the phone now, and Hyprland would answer it by clearing
+    // the focus grab that keeps the sidebars open - which is why Alt+X is answered
+    // inside the bridge rather than by the shortcut below. The sending half is KDE
+    // Connect's `remotecontrol` interface, which takes one packet per call: a
+    // `busctl` per pointer frame is out, so the frames go to a bridge that holds
+    // one D-Bus connection open, reads the motion, buttons and wheel off those
+    // devices - a touchpad is held through both of its nodes and its fingers are
+    // folded into that same motion, since it reports where they are rather than
+    // how far they went - and sends a packet per beat of the mouse.
+    readonly property bool canRemoteInput: root.backend === "kdeconnect"
+    readonly property string remoteInputPlugin: "kdeconnect_remotecontrol"
+    // Whether the phone accepts shared input AND the daemon has the sender
+    // loaded for it. A device nobody has read is neither, so the row hides the
+    // button instead of lighting one that would be refused.
+    property bool remoteInputSupported: false
+    // Whether this machine's pointer devices are held right now. The phone has no
+    // idea who is moving its cursor.
+    property bool remoteInputActive: false
+    property string remoteInputDeviceId: ""
 
     // What the last action had to say: the toast reads the signal, an
     // inline line reads the string. Cleared by the next action that starts.
@@ -530,6 +563,10 @@ Singleton {
                 return;
             }
             root.refresh();
+            // Plugin state rides along with the device list it describes: a
+            // phone arriving, going out of range or changing pairing can take
+            // the peer half of pointer sharing with it.
+            root.refreshRemoteInput();
             root.deviceChangeSettled();
         }
     }
@@ -751,6 +788,94 @@ Singleton {
         sftpMountWait.restart();
     }
 
+    // ---- remote input (this machine's pointer, driving the phone) ----------
+
+    // What the phone will accept, read the same way the other capabilities are:
+    // the peer has to advertise `remotecontrol`, and the daemon has to have it
+    // loaded for this pairing.
+    function refreshRemoteInput(device: var): void {
+        const d = device ?? root.activeDevice;
+        if (!d || root.backend !== "kdeconnect" || !root.validDeviceId(d.id)) {
+            root.remoteInputDeviceId = "";
+            root.remoteInputSupported = false;
+            // A cage with no phone behind it is only a screen that eats the
+            // mouse.
+            root.remoteInputActive = false;
+            return;
+        }
+        if (root.remoteInputDeviceId !== d.id) {
+            root.remoteInputDeviceId = d.id;
+            root.remoteInputSupported = false;
+            root.remoteInputActive = false;
+        }
+        const path = `/modules/kdeconnect/devices/${d.id}`;
+        const iface = "org.kde.kdeconnect.device";
+        root.enqueue(root.busctlCall("org.kde.kdeconnect.daemon", path, iface,
+            "hasPlugin", ["s", root.remoteInputPlugin]), text => {
+            if (root.remoteInputDeviceId !== d.id) return;
+            const peerAccepts = root.parseBusctlReply(text)?.[0] === true;
+            root.enqueue(root.busctlCall("org.kde.kdeconnect.daemon", path, iface,
+                "isPluginEnabled", ["s", root.remoteInputPlugin]), enabledText => {
+                if (root.remoteInputDeviceId !== d.id) return;
+                root.remoteInputSupported = peerAccepts
+                    && root.parseBusctlReply(enabledText)?.[0] === true;
+            });
+        });
+    }
+
+    // Take the pointer or give it back. This only starts the bridge and names the
+    // phone to send to; the bridge is what holds the machine's pointer devices, so
+    // the desktop cursor stops the moment the session begins.
+    function setRemoteInputActive(active: bool): void {
+        if (active === root.remoteInputActive) return;
+        if (active) {
+            const d = root.activeDevice;
+            if (!d || root.backend !== "kdeconnect" || !root.validDeviceId(d.id))
+                return;
+            root.remoteInputDeviceId = d.id;
+            root.remoteInputActive = true;
+            root.actionFeedback(Translation.tr(
+                "Remote input on — Alt+X or both mouse buttons give the mouse back"), true);
+            return;
+        }
+        root.remoteInputActive = false;
+        root.actionFeedback(Translation.tr("Remote input off"), true);
+    }
+
+    Process {
+        id: remoteInputBridge
+        // One process for the whole session, and the session is what binds it:
+        // a bridge that dies lets go of the pointer devices with it, rather than
+        // leaving the mouse held with nothing to send to.
+        running: root.remoteInputActive
+        command: ["python3", `${Directories.scriptPath}/phone/kdeconnect_input_bridge.py`]
+        stdinEnabled: true
+        stdout: StdioCollector {}
+        stderr: StdioCollector { id: remoteInputErr }
+        onStarted: {
+            if (!root.validDeviceId(root.remoteInputDeviceId)) {
+                // No phone named is no session to have: end it here rather than
+                // sit behind a screen that eats the mouse.
+                root.remoteInputActive = false;
+                root.reportFailure(Translation.tr("Remote input needs a phone first"));
+                return;
+            }
+            write(JSON.stringify({ device: root.remoteInputDeviceId }) + "\n");
+        }
+        onExited: (exitCode, exitStatus) => {
+            if (!root.remoteInputActive) return;
+            root.remoteInputActive = false;
+            if (exitCode === 0) {
+                // Either Alt+X was answered, or the hand closed the session with
+                // both buttons at once. The mouse is back either way.
+                root.actionFeedback(Translation.tr("Remote input off"), true);
+                return;
+            }
+            root.reportFailure(remoteInputErr.text.trim()
+                || Translation.tr("Remote input stopped"));
+        }
+    }
+
     function pollSftpMount(): void {
         const id = root.sftpBrowseDeviceId;
         if (!root.validDeviceId(id)) return;
@@ -794,6 +919,9 @@ Singleton {
         if (!root.validDeviceId(id) || !Persistent.ready) return;
         Persistent.states.phone.activeDeviceId = id;
         Persistent.states.phone.recentDeviceIds = root.recentDeviceIdsAfterSelect(Persistent.states.phone.recentDeviceIds, id, 5);
+        // The pick is a different phone's answer, and it is not one the daemon
+        // announces; ask it now rather than at the next reconcile.
+        root.refreshRemoteInput(root.devices.find(other => other.id === id));
     }
 
     // Both answer a request the PEER made, so neither falls back to the
@@ -920,6 +1048,9 @@ Singleton {
         running: root.enableService && root.installed
         repeat: true
         triggeredOnStart: true
-        onTriggered: root.refresh()
+        onTriggered: {
+            root.refresh();
+            root.refreshRemoteInput();
+        }
     }
 }
