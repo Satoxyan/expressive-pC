@@ -14,9 +14,34 @@ Scope {
 
     required property Component lockSurface
     property alias context: lockContext
+
+    // Session lock surfaces get destroyed when the compositor recreates outputs
+    // (e.g. on resume) and Quickshell does not always recreate them, which leaves
+    // Hyprland showing its "lockscreen app died" screen. Track them to detect that.
+    property var lockSurfaces: []
+    property int visibleLockSurfaces: 0
+    property bool lockRepairStarted: false
+
+    function registerLockSurface(surface) {
+        root.lockSurfaces.push(surface);
+        root.updateLockSurfaceVisibility();
+    }
+    function unregisterLockSurface(surface) {
+        root.lockSurfaces = root.lockSurfaces.filter(s => s !== surface);
+        root.updateLockSurfaceVisibility();
+    }
+    function updateLockSurfaceVisibility() {
+        root.visibleLockSurfaces = root.lockSurfaces.filter(s => s.visible).length;
+    }
+
     property Component sessionLockSurface: WlSessionLockSurface {
         id: sessionLockSurface
         color: "transparent"
+
+        Component.onCompleted: root.registerLockSurface(sessionLockSurface)
+        Component.onDestruction: root.unregisterLockSurface(sessionLockSurface)
+        onVisibleChanged: root.updateLockSurfaceVisibility()
+
         Loader {
             active: GlobalStates.screenLocked
             anchors.fill: parent
@@ -93,6 +118,56 @@ Scope {
         surface: root.sessionLockSurface
         onSecureChanged: {
             if (lock.secure) GlobalStates.startupLockPending = false;
+            else root.lockRepairStarted = false;
+        }
+    }
+
+    // Hyprland renders its "lockscreen app died" screen when no lock client owns a
+    // mapped surface. Hyprlock can take over such a dead lock, so use it as a
+    // fallback and then drop the stale Quickshell lock state.
+    // shortcut: only catches losing every surface (the single-monitor case), not
+    // one dead output in a multi-monitor lock.
+    Timer {
+        interval: 10000
+        running: lock.secure && root.visibleLockSurfaces === 0
+        onTriggered: {
+            if (root.lockRepairStarted) return;
+            root.lockRepairStarted = true;
+            lockStateCheck.running = true;
+        }
+    }
+
+    Process {
+        id: lockStateCheck
+        command: ["bash", "-c", "out=$(hyprctl locked 2>/dev/null) || { echo error; exit; }; [ \"$out\" = true ] || { echo unlocked; exit; }; pidof hyprlock >/dev/null && { echo busy; exit; }; echo locked"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const state = text.trim();
+                if (state === "unlocked") {
+                    // Someone else already unlocked the session; only our state is stale.
+                    GlobalStates.screenLocked = false;
+                    lockContext.reset();
+                } else if (state === "locked") {
+                    console.warn("LockScreen: lock surfaces are gone; starting hyprlock fallback");
+                    repairLockProc.running = true;
+                } else if (state !== "busy") {
+                    console.warn("LockScreen: cannot determine lock state, leaving it alone");
+                }
+            }
+        }
+    }
+
+    Process {
+        id: repairLockProc
+        command: ["hyprlock"]
+        onExited: (exitCode, exitStatus) => {
+            // hyprlock exits 0 only after it unlocked the session.
+            if (exitCode === 0) {
+                GlobalStates.screenLocked = false;
+                lockContext.reset();
+            } else {
+                console.warn("LockScreen: hyprlock fallback exited with", exitCode);
+            }
         }
     }
 

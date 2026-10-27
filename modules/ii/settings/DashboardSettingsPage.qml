@@ -440,8 +440,8 @@ Item {
     readonly property var layoutResult: computeLayout(tokens)
     readonly property var layoutMap: layoutResult.map
 
-    onTokensChanged: flick.contentY = 0
-    onGroupChanged: flick.contentY = 0
+    onTokensChanged: { _engine.stop(); flick.contentY = 0 }
+    onGroupChanged: { _engine.stop(); flick.contentY = 0 }
 
     Component.onCompleted: {
         if (WM.compositor === "hyprland") HyprlandOptions.refresh();
@@ -479,11 +479,13 @@ Item {
     }
 
     function scrollToSection(index) {
+        _engine.stop();
         const place = layoutMap["section:" + index];
         if (place) flick.contentY = Math.max(0, Math.min(place.y, Math.max(0, flick.contentHeight - flick.height)));
     }
 
     function scrollBy(delta) {
+        _engine.stop();
         flick.contentY = Math.max(0, Math.min(Math.max(0, flick.contentHeight - flick.height), flick.contentY + delta));
     }
 
@@ -514,18 +516,13 @@ Item {
             flickableDirection: Flickable.HorizontalFlick
             boundsBehavior: Flickable.StopAtBounds
 
+            // The strip scrolls horizontally natively; vertical wheel belongs
+            // to the page engine so the cursor never becomes a dead zone.
             WheelHandler {
-                enabled: chipsRow.contentWidth > chipsRow.width
                 acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                 onWheel: event => {
-                    const sc = Config.options.interactions.scrolling;
-                    const factor = sc.touchpadScrollFactor > 10 ? sc.touchpadScrollFactor / 450 : Math.max(0, sc.touchpadScrollFactor);
-                    const px = Math.abs(event.pixelDelta.x) > Math.abs(event.pixelDelta.y) ? event.pixelDelta.x : event.pixelDelta.y;
-                    const angle = Math.abs(event.angleDelta.x) > Math.abs(event.angleDelta.y) ? event.angleDelta.x : event.angleDelta.y;
-                    if (angle === 0 && px === 0) return;
-                    // Mouse notches stay 1:1; touchpad uses the shared sensitivity.
-                    const delta = angle !== 0 && Math.abs(angle) % 120 === 0 ? angle : (px !== 0 ? px : angle / 12) * sc.touchpadSensitivity * factor;
-                    chipsRow.contentX = Math.max(0, Math.min(chipsRow.contentWidth - chipsRow.width, chipsRow.contentX - delta));
+                    event.accepted = false;
+                    _engine.handleWheel(event);
                 }
             }
 
@@ -597,6 +594,7 @@ Item {
             contentWidth: width
             contentHeight: root.layoutResult.total
             boundsBehavior: Flickable.StopAtBounds
+            onDraggingChanged: if (dragging) _engine.stop()
             flickDeceleration: 4000
             maximumFlickVelocity: 2500
 

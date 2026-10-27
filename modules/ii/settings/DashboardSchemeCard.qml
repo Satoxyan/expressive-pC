@@ -66,11 +66,13 @@ DashboardCard {
     }
 
     function scrollBy(delta) {
+        stripEngine.stop();
         const maxX = Math.max(0, chipsFlick.contentWidth - chipsFlick.width);
         chipsFlick.contentX = Math.max(0, Math.min(maxX, chipsFlick.contentX + delta));
     }
 
     function revealSelected() {
+        stripEngine.stop();
         for (let i = 0; i < tileRepeater.count; i++) {
             const tile = tileRepeater.itemAt(i);
             if (tile && tile.selected) {
@@ -278,25 +280,6 @@ DashboardCard {
                     }
                 }
 
-                // Vertical events: mouse wheel scrolls the strip (original
-                // behavior). Touchpad vertical is rejected here so it falls
-                // through to the page's inertial engine instead.
-                WheelHandler {
-                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                    onWheel: event => {
-                        if (Math.abs(event.angleDelta.y) % 120 !== 0) {
-                            event.accepted = false;
-                            return;
-                        }
-                        const maxX = Math.max(0, chipsFlick.contentWidth - chipsFlick.width);
-                        const raw = event.angleDelta.x !== 0 ? event.angleDelta.x : event.angleDelta.y;
-                        const dx = -raw;
-                        const canScroll = (dx < 0 && chipsFlick.contentX > 0) || (dx > 0 && chipsFlick.contentX < maxX);
-                        if (canScroll) chipsFlick.contentX = Math.max(0, Math.min(maxX, chipsFlick.contentX + dx * 0.8));
-                        else if (root.pager) root.pager.scrollSettingsBy(-event.angleDelta.y);
-                        event.accepted = true;
-                    }
-                }
                 // Horizontal touchpad swipe (orientation default Qt.Vertical
                 // rejects these). Routed through the horizontal engine for
                 // finger-tracking + fling.

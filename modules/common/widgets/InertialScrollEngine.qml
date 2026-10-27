@@ -35,8 +35,12 @@ Item {
     readonly property real maxOverscroll: Math.max(1, horizontal ? flickable.width : flickable.height)
     readonly property real touchpadScrollFactor: Config?.options.interactions.scrolling.touchpadScrollFactor ?? 1.0
     // Same knob semantics as TouchpadScrollArea: legacy absolute factors normalize to 1.0.
-    property real touchpadSensitivity: (Config?.options.interactions.scrolling.touchpadSensitivity ?? 3.5)
-                                       * (touchpadScrollFactor > 10 ? touchpadScrollFactor / 450 : Math.max(0, touchpadScrollFactor))
+    property real touchpadSensitivity: {
+        const sc = Config?.options?.interactions?.scrolling
+        if (sc?.fasterTouchpadScroll === false) return 1
+        return (sc?.touchpadSensitivity ?? 3.5)
+            * (touchpadScrollFactor > 10 ? touchpadScrollFactor / 450 : Math.max(0, touchpadScrollFactor))
+    }
 
     // === Mouse wheel physics ===
     // Legacy configs store pixels per notch (120); new configs store a 1.0 multiplier.
@@ -72,6 +76,19 @@ Item {
     // their own position Behaviors during this so the two don't fight.
     readonly property bool active: physicsLoop.running || wheelAnim.running || liftTimer.running
                                    || overscrollLoop.running
+
+    // Stop every animation without moving the view; the caller writes the target.
+    function stop() {
+        root.flickable.cancelFlick()
+        physicsLoop.running = false
+        wheelAnim.stop()
+        liftTimer.stop()
+        root._stopOverscrollSpring()
+        root._velocity = 0
+        root._velocitySamples = []
+        root._phaseGesture = false
+        root._wheelTargetY = root._pos
+    }
 
     Timer {
         id: liftTimer
@@ -135,8 +152,6 @@ Item {
             if (event.phase === Qt.ScrollEnd) root._handleScrollEnd()
             return
         }
-        var enabled = Config?.options?.interactions?.scrolling?.fasterTouchpadScroll
-        if (enabled === false) return
         // Mouse wheel: exact multiples of 120. Touchpad: non-multiples or
         // pixelDelta-only (high-res Wayland scroll).
         var isMouseWheel = d !== 0 && (Math.abs(d) % 120 === 0)

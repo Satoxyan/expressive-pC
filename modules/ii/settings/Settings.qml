@@ -130,12 +130,8 @@ Scope {
 
             if (event.key === Qt.Key_Down || event.key === Qt.Key_Up) {
                 const instance = GlobalStates.currentPageInstance;
-                if (instance && instance.contentY !== undefined) {
-                    const step = 60;
-                    const delta = event.key === Qt.Key_Down ? step : -step;
-                    const maxY = Math.max(0, (instance.contentHeight ?? 0) - instance.height);
-                    instance.contentY = Math.max(0, Math.min(maxY, instance.contentY + delta));
-                }
+                if (instance && typeof instance.scrollBy === "function")
+                    instance.scrollBy(event.key === Qt.Key_Down ? 60 : -60);
                 event.accepted = true;
                 return;
             }

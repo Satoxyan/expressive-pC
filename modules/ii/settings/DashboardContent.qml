@@ -211,10 +211,6 @@ Item {
         });
     }
 
-    function scrollSettingsBy(delta) {
-        settingsLoader.item?.scrollBy(delta);
-    }
-
     readonly property bool isSearchablePage: currentPage === settingsPage || currentPage === wallpapersPage || currentPage === presetsPage
 
     function typedCharacter(event) {

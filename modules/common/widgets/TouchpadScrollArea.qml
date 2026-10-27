@@ -13,7 +13,6 @@ MouseArea {
     required property Flickable flickable
     property real touchpadScrollFactor: Config.options.interactions.scrolling.touchpadScrollFactor
     property real touchpadSensitivity: Config.options.interactions.scrolling.touchpadSensitivity
-    readonly property bool scrolling: scrollTimer.running
 
     // Normalize old absolute values against 450, preserving ratios rather
     // than the old absolute movement speed.

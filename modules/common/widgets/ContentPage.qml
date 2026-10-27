@@ -27,8 +27,12 @@ Item {
         contentHeight: contentColumn.implicitHeight + root.bottomContentPadding
         maximumFlickVelocity: 3500
         boundsBehavior: Flickable.StopAtBounds
+        onDraggingChanged: if (dragging) scrollEngine.stop()
 
-        ScrollBar.vertical: StyledScrollBar {}
+        ScrollBar.vertical: StyledScrollBar {
+            id: vbar
+            onPressedChanged: if (pressed) scrollEngine.stop()
+        }
 
         InertialScrollEngine {
             id: scrollEngine
@@ -44,6 +48,12 @@ Item {
                 _scrollAnim.stop();
                 scrollEngine.handleWheel(event);
             }
+        }
+
+        // Keyboard scrollBy() steps animate; wheel, drag and fling stay instant.
+        Behavior on contentY {
+            enabled: !flickable.moving && !flickable.dragging && !scrollEngine.active && !vbar.pressed && !_scrollAnim.running
+            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
         }
 
         ColumnLayout {
@@ -113,6 +123,12 @@ Item {
         return Math.max(0, Math.min(y, Math.max(0, flickable.contentHeight - flickable.height)))
     }
 
+    function scrollBy(delta) {
+        scrollEngine.stop()
+        _scrollAnim.stop()
+        flickable.contentY = _clampY(flickable.contentY + delta)
+    }
+
     function _findItem(rootItem, predicate) {
         for (let i = 0; i < rootItem.children.length; i++) {
             const child = rootItem.children[i]
@@ -180,6 +196,7 @@ Item {
         const pos = target.mapToItem(flickable.contentItem, 0, 0)
         const wanted = root._clampY(pos.y - 24)
         if (root._goToPass > 0 && Math.abs(wanted - flickable.contentY) < 4) return
+        scrollEngine.stop()
         _scrollAnim.stop()
         _scrollAnim.to = wanted
         _scrollAnim.start()
