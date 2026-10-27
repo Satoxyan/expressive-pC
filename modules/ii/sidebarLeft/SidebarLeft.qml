@@ -302,6 +302,28 @@ Scope { // Scope
                     onClicked: (mouse) => { mouse.accepted = true }
                 }
 
+                // The three chords are claimed at the window rather than read
+                // off the focus chain, because a page is free to consume the key
+                // on its way up to this Rectangle, and then the chord works on
+                // the home page and nowhere else. A Shortcut is matched before
+                // the chain is given the event at all, so it holds in every tab,
+                // and only for these three sequences - Ctrl+Shift+O stays the
+                // chat's own binding. The Keys handler below remains for the
+                // day a window is not considered active: whichever of the two
+                // sees the key first is the only one that ever sees it.
+                Shortcut {
+                    sequence: "Ctrl+O"
+                    onActivated: panelWindow.extend = !panelWindow.extend
+                }
+                Shortcut {
+                    sequence: "Ctrl+P"
+                    onActivated: root.togglePin()
+                }
+                Shortcut {
+                    sequence: "Ctrl+D"
+                    onActivated: root.toggleDetach()
+                }
+
                 Keys.onPressed: (event) => {
                     if (event.key === Qt.Key_Escape) {
                         panelWindow.hide();
@@ -347,6 +369,11 @@ Scope { // Scope
                 id: detachedSidebarBackground
                 anchors.fill: parent
                 color: Config.options.background.widgets.glass.enable ? "transparent" : Appearance.colors.colUiBackground
+
+                Shortcut {
+                    sequence: "Ctrl+D"
+                    onActivated: root.toggleDetach()
+                }
 
                 Keys.onPressed: (event) => {
                     if (event.modifiers === Qt.ControlModifier) {
