@@ -50,9 +50,16 @@ follow too: it has no virtual display, so the display watched is the phone's
 own (id 0) and no `wm` policy is applied - the phone's rotation stands and
 only the window follows it. Hyprland ignores SDL's own resize, so the window
 is resized through the compositor, preserving the window's current scale and
-fitting within the usable screen minus scrcpy's own 96 px margins. A fixed
-rotation instead pins the virtual display (`... 1`) so the picture flag is
-the only rotation applied.
+fitting within the desktop minus scrcpy's own 96 px margins - that box and no
+other, the compositor's reserved bars included, so a window that turns is never
+a different size from one that was born in the shape it turned to. scrcpy's own
+fit spends the picture's long edge on whichever axis that picture lies, so a
+phone upright gets a small window while the same phone on its side gets one as
+wide as the desktop; a mirror that starts on its side is therefore launched
+asking for the upright one's shape turned, and the poll fits it to the same size
+if that question could not be answered - because no later turn corrects a window
+that never turned. A fixed rotation instead pins the virtual display (`... 1`)
+so the picture flag is the only rotation applied.
 
 stdin closing means the shell went away; every session is stopped then, so a
 shell restart never leaves headless scrcpy windows behind.
@@ -2674,7 +2681,8 @@ class ScrcpySessionManager:
         extra_args = list(extra_args or [])
         adb_args = self.resolve_adb_target(target_args)
         cmd = (["scrcpy"] + adb_args
-               + ["--window-title=" + title] + extra_args)
+               + ["--window-title=" + title] + extra_args
+               + self._launch_size_flags(type_str, extra_args, adb_args))
         try:
             proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT, text=True)
@@ -2696,22 +2704,30 @@ class ScrcpySessionManager:
                 "displayId": None,
                 "displaySize": parse_new_display_size(extra_args)}
             self.session_info[session_id] = info
-            # A followed session without a virtual display is the mirror. Its
-            # display is the phone's own (id 0), which swaps its logical size
-            # when the phone turns; no wm policy applies - the phone's own
-            # rotation stands - but the window still has to follow. The first
-            # poll records the baseline, so the shape the phone starts in is
-            # never treated as a turn.
-            mirror_follow = (bool(follow_orientation)
-                             and info["displaySize"] is None)
-            if mirror_follow:
+            # A mirror without a virtual display shows the phone's own screen
+            # (display 0), which swaps its logical size when the phone turns.
+            # No wm policy applies - the phone's own rotation stands - but a
+            # followed window still has to. The first poll records the
+            # baseline, so the shape the phone starts in is never treated as
+            # a turn.
+            #
+            # A mirror that follows nothing needs the same first reading for a
+            # different reason: scrcpy fits the picture to whichever axis it
+            # lies on, so a phone started on its side gets a window as wide as
+            # the desktop. One reading corrects it to the upright one's shape
+            # turned, and then the window is scrcpy's own again.
+            mirror_no_display = (type_str == "mirror"
+                                 and info["displaySize"] is None)
+            mirror_follow = (bool(follow_orientation) and mirror_no_display)
+            if mirror_no_display:
                 self.follow_displays[session_id] = {
                     "display_id": 0,
                     "title": title,
                     "args": adb_args,
                     "size": None,
+                    "once": not mirror_follow,
                 }
-        if mirror_follow:
+        if mirror_no_display:
             self._ensure_follow_thread()
         self.emit({"event": "started", "id": session_id, "pid": proc.pid, "title": title})
         threading.Thread(target=self._wait_process, args=(session_id, proc),
@@ -2908,9 +2924,19 @@ class ScrcpySessionManager:
                 if observed == previous:
                     continue
                 if previous is None:
-                    # First reading of a display with no known baseline: it
-                    # is where the window already is, not a turn to apply.
+                    # First reading of a display with no known baseline: it is
+                    # where the window already is, not a turn to apply - except
+                    # for a picture that started on its side, whose size came
+                    # from scrcpy's axis-dependent fit rather than from anyone's
+                    # choice, and which no turn is going to correct.
+                    if not self._fit_launch_window(context, observed):
+                        continue
                     self._remember_display_size(session_id, display_id, observed)
+                    if context.get("once"):
+                        # One shot done: the window is the upright one's, and
+                        # from here a turn is scrcpy's business, not ours.
+                        with self.lock:
+                            self.follow_displays.pop(session_id, None)
                     continue
                 if not self._resize_window(context["title"], previous, observed):
                     # The window may not be mapped yet; keep the old
@@ -2929,19 +2955,99 @@ class ScrcpySessionManager:
                 entry["size"] = size
 
     @staticmethod
-    def _read_display_sizes(adb_args):
+    def _read_display_sizes(adb_args, timeout=6):
         try:
             res = subprocess.run(
                 ["adb"] + list(adb_args)
                 + ["shell", "dumpsys", "window", "displays"],
-                capture_output=True, text=True, timeout=6)
+                capture_output=True, text=True, timeout=timeout)
         except Exception:
             return {}
         if res.returncode != 0:
             return {}
         return parse_display_sizes(res.stdout)
 
-    def _resize_window(self, title, old_size, new_size):
+    @staticmethod
+    def _upright_fit_size(size, free_w, free_h):
+        """The window this picture would have been born wearing, turned.
+
+        Stand the picture upright, fit it into the box scrcpy measures itself,
+        and take the edges the way scrcpy takes them - the short one truncated,
+        the long one derived from the truncated short, since the edges it writes
+        down are the ones the other is computed from. This is both the size a
+        launch asks scrcpy for and the size a poll resizes a sideways window to,
+        so the two cannot disagree.
+        """
+        upright_w, upright_h = min(size), max(size)
+        if upright_w <= 0 or free_w <= 0 or free_h <= 0:
+            return None
+        scale = min(free_w / upright_w, free_h / upright_h)
+        short_edge = max(1, int(upright_w * scale))
+        long_edge = max(short_edge, round(short_edge * upright_h / upright_w))
+        if size[0] > size[1]:
+            return (long_edge, short_edge)
+        return (short_edge, long_edge)
+
+    def _desktop_free_box(self, monitor_id=None):
+        """The box scrcpy fits a picture into: the monitor minus its margins."""
+        monitor = self._hypr_monitor(monitor_id)
+        if monitor is None:
+            return 0.0, 0.0
+        try:
+            scale = float(monitor.get("scale") or 1.0)
+        except (TypeError, ValueError):
+            scale = 1.0
+        if scale <= 0:
+            scale = 1.0
+        return (monitor.get("width", 0) / scale - DISPLAY_MARGINS,
+                monitor.get("height", 0) / scale - DISPLAY_MARGINS)
+
+    def _launch_size_flags(self, type_str, extra_args, adb_args):
+        """Ask scrcpy for the window a sideways mirror should be born with.
+
+        A mirror opened while the phone is on its side is created as wide as the
+        desktop, because that is the axis the picture lies on, and the poll then
+        has to shrink it - which reads as the window flashing big and settling.
+        A window can instead be born at any size, so the size is asked for up
+        front. Only the mirror's own display is fitted this way: an app on a
+        virtual display of its own was sized by the user, and a capture rotation
+        or a fullscreen or hand-sized window is a shape of its own again. Bounded
+        by a short read - a phone that does not answer must not hold up the
+        launch, the poll still corrects what this one misses.
+        """
+        if type_str != "mirror" or parse_new_display_size(extra_args) is not None:
+            return []
+        for arg in extra_args:
+            if arg in ("-f", "--fullscreen") or arg.startswith("--window-width") \
+                    or arg.startswith("--window-height"):
+                return []
+            if arg.startswith("--capture-orientation"):
+                # A turned picture is a shape of its own, not the phone's.
+                value = arg.split("=", 1)[1] if "=" in arg else ""
+                if value in ("90", "180", "270"):
+                    return []
+        size = self._read_display_sizes(adb_args, timeout=2).get(0)
+        if not size or size[0] <= size[1]:
+            return []
+        fit = self._upright_fit_size(size, *self._desktop_free_box())
+        if fit is None:
+            return []
+        return ["--window-width=%d" % fit[0], "--window-height=%d" % fit[1]]
+
+    def _fit_launch_window(self, context, size):
+        """Give a session that started on its side the upright one's size.
+
+        True when the baseline may be recorded: the picture stood upright
+        anyway, or the window is now at the budget. False leaves the retry to
+        the next poll, because a window that is not mapped yet cannot be
+        resized and a landscape launch is often read before SDL is done.
+        """
+        if size[0] <= size[1]:
+            return True
+        return self._resize_window(context["title"], size, size,
+                                   long_edge_budget=True)
+
+    def _resize_window(self, title, old_size, new_size, long_edge_budget=False):
         """Fit the scrcpy window to the display's new shape.
 
         True means the window is now (or already was) at the target size, so
@@ -2959,7 +3065,7 @@ class ScrcpySessionManager:
             return False
         target = self._follow_target_size(
             (int(window_size[0]), int(window_size[1])), old_size, new_size,
-            client.get("monitor"))
+            client.get("monitor"), long_edge_budget)
         if target is None:
             return False
         if abs(target[0] - window_size[0]) <= 2 and abs(target[1] - window_size[1]) <= 2:
@@ -2972,30 +3078,31 @@ class ScrcpySessionManager:
             ["resizewindowpixel",
              f"exact {target[0]} {target[1]},{selector}"])
 
-    def _follow_target_size(self, window_size, old_size, new_size, monitor_id):
+    def _follow_target_size(self, window_size, old_size, new_size, monitor_id,
+                            long_edge_budget=False):
         if old_size[0] <= 0 or old_size[1] <= 0:
             return None
         # Keep the scale the window was already showing the content at, so a
         # window the user resized stays that size through the turn.
         scale = min(window_size[0] / old_size[0], window_size[1] / old_size[1])
-        monitor = self._hypr_monitor(monitor_id)
-        if monitor is not None:
-            try:
-                monitor_scale = float(monitor.get("scale") or 1.0)
-            except (TypeError, ValueError):
-                monitor_scale = 1.0
-            if monitor_scale <= 0:
-                monitor_scale = 1.0
-            reserved = monitor.get("reserved") or [0, 0, 0, 0]
-            usable_w = (monitor.get("width", 0) / monitor_scale
-                        - reserved[0] - reserved[2] - DISPLAY_MARGINS)
-            usable_h = (monitor.get("height", 0) / monitor_scale
-                        - reserved[1] - reserved[3] - DISPLAY_MARGINS)
-            if usable_w > 0 and usable_h > 0:
-                scale = min(scale, usable_w / new_size[0],
-                            usable_h / new_size[1])
+        free_w, free_h = self._desktop_free_box(monitor_id)
+        if free_w > 0 and free_h > 0:
+            scale = min(scale, free_w / new_size[0], free_h / new_size[1])
         if scale <= 0:
             return None
+        if long_edge_budget:
+            # A launch of a picture lying on its side. scrcpy sized that window
+            # by whichever axis the picture lies on, not by anyone's choice, so
+            # it takes the upright one's shape turned: the same size the launch
+            # asks scrcpy for with --window-width and --window-height, and the
+            # size a window born upright is scaled into when it turns. Bounded by
+            # the scale the window already shows, so a small --max-size window or
+            # one the user sized himself is never made bigger by this.
+            fit = self._upright_fit_size(new_size, free_w, free_h)
+            if fit is None:
+                return None
+            return (min(fit[0], max(1, round(new_size[0] * scale))),
+                    min(fit[1], max(1, round(new_size[1] * scale))))
         return (max(1, round(new_size[0] * scale)),
                 max(1, round(new_size[1] * scale)))
 
