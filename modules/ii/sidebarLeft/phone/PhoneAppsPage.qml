@@ -24,8 +24,8 @@ import "phone_cards.js" as PhoneCards
  * exist.
  *
  * The page has three states and draws exactly one message in each: App Mode
- * with no transport (`PhoneAdbPairPanel`, which owns the diagnosis and the
- * pairing job, and no placeholder under it), a phone that answered with
+ * with no transport (a notice that names the dead link and opens the Phone link
+ * (ADB) page, which owns the pairing form), a phone that answered with
  * nothing (the placeholder), and a phone with apps (the list). What
  * separates the first from the second is the probe - `PhoneDeps.adbDevice`
  * and the two states around it - never `PhoneScrcpy.appsError`, which is the
@@ -79,11 +79,13 @@ PhoneSubPage {
     // would draw the panel below for the first frames of every session.
     readonly property var adbDevice: PhoneDeps.ready ? PhoneDeps.adbDevice : undefined
     // App Mode is installed and has no transport: nothing on this page can
-    // start, and the reason is the whole content of the page. WHICH reason is
-    // the panel's own question now - adb absent, adb unable to start, or adb
-    // working with nothing on it - because the old wording assumed the first
-    // two away and told everybody to go and look at their phone.
-    readonly property bool adbOffline: PhoneScrcpy.appModeSupported && adbPanel.shown
+    // start, and the reason is the whole content of the page. WHICH of the
+    // three reasons it is - adb absent, adb unable to start, adb working with
+    // nothing on it - is the Phone link page's question, and `adbDevice ===
+    // false` is the answer to all three, so this page only has to say that the
+    // link is down and hand the click over.
+    readonly property bool adbOffline: PhoneScrcpy.appModeSupported
+        && root.adbDevice === false
 
     // The live sessions, as a plain list. PhoneScrcpy.sessions is a ListModel,
     // which is not a binding source - `sessionCount` is read so this
@@ -120,7 +122,7 @@ PhoneSubPage {
     // which is the one event that turns an unanswerable request into an
     // answerable one. That is an observation of a state change rather than a
     // second trigger borrowed from something else, so it fires once per plug-in
-    // and the panel below can honestly say the list arrives on its own.
+    // and the notice below can honestly say the list arrives on its own.
     Connections {
         target: PhoneDeps
         function onAdbDeviceChanged() {
@@ -200,9 +202,9 @@ PhoneSubPage {
         }
 
         // The count, or whatever there is to say instead of one. It stands
-        // down while the panel below is up: with no device on ADB the list
+        // down while the notice below is up: with no device on ADB the list
         // request fails with "Phone not reachable over ADB", and a red line
-        // saying that over a panel saying it at length is the same sentence
+        // saying that over a notice saying it at length is the same sentence
         // twice.
         StyledText {
             Layout.fillWidth: true
@@ -225,15 +227,26 @@ PhoneSubPage {
         // ---- no transport, and what to do about it ----
         //
         // A page with nothing in it because a link is missing owes the reader
-        // the link. It used to owe them a recipe - open a terminal and type
-        // `adb pair host:port code` - and the shell can run that instead, so
-        // the panel is a job now rather than a paragraph. It answers three
-        // states rather than one, because "no phone on ADB" was hiding "adb
-        // is not installed" and "adb cannot start" inside it.
-        PhoneAdbPairPanel {
-            id: adbPanel
+        // the link. The pairing form used to be drawn here as well, which made
+        // it a refusal that only appeared when the list was empty; it lives on
+        // the Phone link (ADB) page now, where it is shown whether or not a
+        // phone answers, so this page says which link is down and hands the
+        // click to the page that owns the fix.
+        NoticeBox {
             Layout.fillWidth: true
-            visible: PhoneScrcpy.appModeSupported && adbPanel.shown
+            visible: root.adbOffline
+            materialIcon: "usb_off"
+            text: Translation.tr("Nothing is listed over ADB, and App Mode drives the phone over ADB.")
+
+            DialogButton {
+                Layout.alignment: Qt.AlignRight
+                buttonText: Translation.tr("Pair or reconnect the phone")
+                colBackground: Appearance.colors.colPrimary
+                colBackgroundHover: Appearance.colors.colPrimaryHover
+                colRipple: Appearance.colors.colPrimaryActive
+                colText: Appearance.colors.colOnPrimary
+                onClicked: root.openAdbPageRequested()
+            }
         }
 
         // ---- what is running right now ----

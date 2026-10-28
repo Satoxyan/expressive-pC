@@ -224,7 +224,7 @@ Item {
             iconName: "videocam"
             iconShape: MaterialShape.Shape.Cookie7Sided
             hasSettings: true
-            cardState: PhoneCamera.state
+            cardState: PhoneCards.webcamState(webcamCard.flags)
             title: PhoneCards.webcamTitleKey(PhoneCamera.available) === "install"
                 ? Translation.tr("Install scrcpy")
                 : Translation.tr("Phone Webcam")

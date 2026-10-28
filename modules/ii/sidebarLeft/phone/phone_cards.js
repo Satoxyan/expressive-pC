@@ -75,6 +75,20 @@ function micState(flags) {
     return cardState(f.available, linked, f.connecting, f.active);
 }
 
+// The webcam's. `PhoneCamera.stateFor` cannot answer it: the service knows
+// whether a phone is reachable over KDE Connect and nothing about the other
+// link, and scrcpy - the only thing that ever writes the video node now that
+// the Wi-Fi engine is gone - has nothing to attach to when `adb devices` is
+// empty. So the card asked the service for a state that could only ever say
+// "ready" on a phone adb did not list, and drew it in full colour while the
+// subtitle said there was no device. TRI-STATE like the mirror's: `undefined`
+// is the probe not having answered, which is not a refusal.
+function webcamState(flags) {
+    const f = flags || {};
+    const linked = f.reachable && f.adbDevice !== false;
+    return cardState(f.available, linked, f.connecting, f.active);
+}
+
 // A service's lastError is whatever the process wrote; only its first line
 // fits on a card's subtitle.
 function errorHeadline(text) {

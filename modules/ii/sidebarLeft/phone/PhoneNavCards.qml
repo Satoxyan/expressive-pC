@@ -14,6 +14,10 @@ import QtQuick.Layouts
  * wasted trip. While the monitor has not answered, the subtitle says so
  * rather than claiming zero.
  *
+ * The Apps card answers that second problem twice: it says when nothing is on
+ * ADB, and opens the page that can put something there instead of the page
+ * that can only report it.
+ *
  * The pages themselves are the other half of the Phone tab's split (see
  * Phone.qml's interface note); the card only names the id.
  */
@@ -32,6 +36,15 @@ Item {
         property string subtitle
         property color colGlyphBackground: Appearance.colors.colPrimaryContainer
         property color colGlyph: Appearance.colors.colOnPrimaryContainer
+
+        // Both cards get half the row, whatever their text happens to say. A
+        // fillWidth item's share is still computed from its PREFERRED width,
+        // which for these is the implicit width of the longest title and
+        // subtitle - so one long description quietly grew its own box and left
+        // the other one short. `preferredWidth: 0` is the same cure the
+        // equalizer's chip row uses.
+        Layout.fillWidth: true
+        Layout.preferredWidth: 0
 
         implicitHeight: 58
         buttonRadius: Appearance.rounding.normal
@@ -96,7 +109,6 @@ Item {
 
         NavCard {
             id: contactsCard
-            Layout.fillWidth: true
             glyph: "contacts"
             colGlyphBackground: Appearance.colors.colPrimaryContainer
             colGlyph: Appearance.colors.colOnPrimaryContainer
@@ -113,18 +125,26 @@ Item {
 
         NavCard {
             id: appsCard
-            Layout.fillWidth: true
             glyph: "apps"
             colGlyphBackground: Appearance.colors.colSecondaryContainer
             colGlyph: Appearance.colors.colOnSecondaryContainer
             title: Translation.tr("Android Apps")
+            // App Mode has exactly one way to fail before it starts, and it is
+            // not on this page: nothing on ADB is a list that cannot be read.
+            // So the card says which link is down and opens the page that owns
+            // the fix, rather than a page whose whole content is a notice
+            // pointing at it. `PhoneDeps.ready` is waited for because every
+            // flag there starts false - a trip in the first frames of a session
+            // must not be read as a refusal.
+            readonly property bool linkDown: PhoneScrcpy.appModeSupported
+                && PhoneDeps.ready && !PhoneDeps.adbDevice
             subtitle: {
                 if (!PhoneScrcpy.available) return Translation.tr("scrcpy is not installed");
-                return PhoneScrcpy.appModeSupported
-                    ? Translation.tr("scrcpy App Mode")
-                    : Translation.tr("Requires scrcpy 4.0+");
+                if (!PhoneScrcpy.appModeSupported) return Translation.tr("Requires scrcpy 4.0+");
+                if (appsCard.linkDown) return Translation.tr("No device on ADB");
+                return Translation.tr("scrcpy App Mode");
             }
-            onClicked: root.openPage("apps")
+            onClicked: root.openPage(appsCard.linkDown ? "adb" : "apps")
         }
     }
 }

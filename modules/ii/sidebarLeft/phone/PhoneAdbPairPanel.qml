@@ -68,8 +68,9 @@ ColumnLayout {
     // The link page hosts this form on purpose, and a device already answering
     // is no reason to take the pair and connect fields away from it: that is
     // the state a second phone, or a phone whose port just re-rolled, is
-    // walked into. The Apps page shows the panel as a REFUSAL and leaves this
-    // at its default, where every binding below is what it always was.
+    // walked into. It used to be drawn by the Android Apps page as well, as an
+    // apology for an empty list; that page names the dead link and points here
+    // now, so this default stays off and only the link page turns it on.
     property bool formAlwaysShown: false
 
     readonly property bool shown: root.formAlwaysShown || root.mode.length > 0
