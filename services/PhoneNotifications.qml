@@ -44,10 +44,6 @@ Singleton {
     readonly property bool tabEnabled: Config.options.sidebar?.phone?.enable ?? true
     readonly property bool serviceEnabled: root.tabEnabled && PhoneConnect.enableService
     readonly property string activeDeviceId: PhoneConnect.activeDevice?.id ?? ""
-    // The gate services/Notifications.qml drops the daemon's own desktop
-    // notifications behind: only while this tab is showing them. Off, the
-    // daemon's copy is the only one the user would get.
-    readonly property bool mirrorActive: root.tabEnabled && (PhoneConnect.activeDevice?.reachable ?? false)
 
     // [{ publicId, deviceId, internalId, package, appName, title, text, ticker,
     //    iconPath, dismissable, replyId, actions, receivedAt }]
@@ -236,13 +232,6 @@ Singleton {
         if (deviceId !== root.activeDeviceId) return;
         root.notifications = root.carryReceivedAt(root.notifications, list);
         cacheSave.restart();
-    }
-
-    // Whether a desktop notification arriving at services/Notifications.qml
-    // is the daemon's copy of something this tab shows.
-    function mirrorsDesktopNotification(appName: var): bool {
-        return root.mirrorActive
-            && root.mirrorsAppName(appName, PhoneConnect.devices.filter(d => d.paired).map(d => d.name));
     }
 
     function notificationsPath(deviceId: string): string {

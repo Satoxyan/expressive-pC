@@ -67,7 +67,11 @@ Singleton {
             const index = root.list.findIndex((notif) => notif.notificationId === notificationId);
             const notifObject = root.list[index];
             print("[Notifications] Notification timer triggered for ID: " + notificationId + ", transient: " + notifObject?.isTransient);
-            if (notifObject.isTransient) root.discardNotification(notificationId);
+            // The Phone tab is this notification's archive, so the card is
+            // dropped rather than dismissed: dismissing would tell the daemon
+            // the notification closed, and take the row out of the tab too.
+            if (root.isPhoneOwnedNotification(notifObject)) root.forgetNotification(notificationId);
+            else if (notifObject?.isTransient) root.discardNotification(notificationId);
             else root.timeoutNotification(notificationId);
             destroy()
         }
@@ -79,22 +83,16 @@ Singleton {
     property list<Notif> list: []
     property var popupList: list.filter((notif) => notif.popup);
     property bool popupInhibited: (GlobalStates?.sidebarRightOpen ?? false) || silent
-    // KDE Connect's desktop notifications are the daemon's copy of what the
-    // Phone tab shows. They belong to that tab: keep them out of this list
-    // (and so out of the popup and the right sidebar).
+    // KDE Connect pushes the phone's notifications to the desktop like any
+    // other app's. They belong to the Phone tab, which reads them from the
+    // daemon, so the desktop copy is only a flash: it pops up, then is dropped
+    // instead of settling into the sidebarRight list, and it never reaches the
+    // history file. Two identical archives of one message would disagree.
     readonly property bool phoneNotificationsOwnedByTab: Config.options.sidebar?.phone?.enable ?? true
     function isPhoneOwnedNotification(notif) {
         return root.phoneNotificationsOwnedByTab
             && PhoneNotifications.mirrorsAppName(notif?.appName, PhoneConnect.devices.filter(d => d.paired).map(d => d.name));
     }
-    function prunePhoneOwnedNotifications() {
-        if (!root.phoneNotificationsOwnedByTab) return;
-        const remaining = root.list.filter((notif) => !root.isPhoneOwnedNotification(notif));
-        if (remaining.length === root.list.length) return;
-        root.list = remaining;
-        notifFileView.setText(stringifyList(root.list));
-    }
-    onPhoneNotificationsOwnedByTabChanged: root.prunePhoneOwnedNotifications()
     property var latestTimeForApp: ({})
     Component {
         id: notifComponent
@@ -106,7 +104,9 @@ Singleton {
     }
 
     function stringifyList(list) {
-        return JSON.stringify(list.map((notif) => notifToJSON(notif)), null, 2);
+        return JSON.stringify(list
+            .filter((notif) => !root.isPhoneOwnedNotification(notif))
+            .map((notif) => notifToJSON(notif)), null, 2);
     }
     
     onListChanged: {
@@ -176,9 +176,13 @@ Singleton {
         persistenceSupported: true
 
         onNotification: (notification) => {
-            // Ignored, not dismissed: dismissing would close it on the phone
-            // too. It expires on its own; the Phone tab reads it from the daemon.
-            if (root.isPhoneOwnedNotification(notification)) return;
+            // KDE Connect hands us the phone's notifications like anyone else's.
+            // They are a flash, not a record, so a popup that cannot show -
+            // sidebar open, or the shell muted - has nothing to fall back on
+            // and is dropped here instead.
+            const phoneCopy = root.isPhoneOwnedNotification(notification);
+            if (phoneCopy && root.popupInhibited)
+                return;
             notification.tracked = true
             const newNotifObject = notifComponent.createObject(root, {
                 "notificationId": notification.id + root.idOffset,
@@ -190,13 +194,17 @@ Singleton {
             // Popup
             if (!root.popupInhibited) {
                 newNotifObject.popup = true;
-                if (notification.expireTimeout != 0) {
+                // The phone asks for no expiry, which would otherwise leave the
+                // card sitting in the list once the popup band hides.
+                const statedTimeout = notification.expireTimeout > 0 ? notification.expireTimeout : 0;
+                if (phoneCopy || notification.expireTimeout != 0) {
                     newNotifObject.timer = notifTimerComponent.createObject(root, {
                         "notificationId": newNotifObject.notificationId,
-                        "interval": notification.expireTimeout < 0 ? (Config?.options.notifications.timeout ?? 7000) : notification.expireTimeout,
+                        "interval": statedTimeout || (Config?.options.notifications.timeout ?? 7000),
                     });
                 }
-                root.unread++;
+                if (!phoneCopy)
+                    root.unread++;
             }
             root.notify(newNotifObject);
             // console.log(notifToString(newNotifObject));
@@ -210,6 +218,17 @@ Singleton {
 
     function discardNotification(id) {
         root.discardNotifications([id]);
+    }
+
+    // Forgetting without dismissing: the shell drops its own record and the
+    // sender is left alone with the notification it handed us.
+    function forgetNotification(id) {
+        const remaining = root.list.filter((notif) => notif.notificationId !== id);
+        if (remaining.length !== root.list.length) {
+            root.list = remaining;
+            notifFileView.setText(stringifyList(root.list));
+        }
+        root.discard(id);
     }
 
     function discardNotifications(ids) {
@@ -300,8 +319,7 @@ Singleton {
             try {
                 const fileContents = notifFileView.text()
                 const stored = JSON.parse(fileContents)
-                const kept = stored.filter((notif) => !root.isPhoneOwnedNotification(notif))
-                root.list = kept.map((notif) => {
+                root.list = stored.map((notif) => {
                     return notifComponent.createObject(root, {
                         "notificationId": notif.notificationId,
                         "actions": [], // Notification actions are meaningless if they're not tracked by the server or the sender is dead
@@ -314,8 +332,6 @@ Singleton {
                         "urgency": notif.urgency,
                     });
                 });
-                if (kept.length !== stored.length)
-                    notifFileView.setText(stringifyList(root.list));
                 // Find largest notificationId
                 let maxId = 0
                 root.list.forEach((notif) => {
