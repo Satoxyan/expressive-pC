@@ -207,6 +207,7 @@ Singleton {
         "interface:Follow Album Colors": root.optionSwitch("sidebar.media.artColors"),
         "interface:Enable Translator": root.optionSwitch("sidebar.translator.enable"),
         "interface:Enable Football": root.optionSwitch("sidebar.football.enable"),
+        "interface:Enable Phone": root.optionSwitch("sidebar.phone.enable"),
         "interface:Football/Alerts": root.optionSwitch("sidebar.football.alerts"),
         "interface:Football/Scope": root.optionSelect("sidebar.football.alertsScope", [
             { displayName: Translation.tr("My parlay"), icon: "layers", value: "parlay" },

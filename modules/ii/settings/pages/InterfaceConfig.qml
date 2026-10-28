@@ -377,6 +377,12 @@ ContentPage {
                             checked: Config.options.sidebar.football.enable
                             onCheckedChanged: { Config.options.sidebar.football.enable = checked }
                         }
+                        ConfigSwitch {
+                            buttonIcon: "smartphone"
+                            text: Translation.tr("Phone")
+                            checked: Config.options.sidebar.phone.enable
+                            onCheckedChanged: { Config.options.sidebar.phone.enable = checked }
+                        }
                     }
                 }
             }
