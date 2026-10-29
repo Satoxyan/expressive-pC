@@ -132,8 +132,8 @@ Item {
         heroEntries.forEach(e => list.push(Object.assign({ kind: "card", hero: true, group: e.section }, e)));
         catalog.sections.forEach((section, si) => {
             list.push({ id: "section:" + si, kind: "header", requires: section.requires ?? "", when: section.when ?? "", title: section.title, icon: section.icon, page: section.page ?? "", group: section.page ?? "", section: section.title, sectionIndex: si, count: section.cards.length });
-            section.cards.forEach(card => list.push(Object.assign({
-                id: card.key, kind: "card", ordered: section.ordered ?? false, requires: section.requires ?? "", when: card.when ?? section.when ?? "", group: section.page ?? "", section: section.title, sectionIndex: si, kw: card.kw ?? ""
+            section.cards.forEach((card, ci) => list.push(Object.assign({
+                id: `${card.key}#${si}#${ci}`, kind: "card", ordered: section.ordered ?? false, requires: section.requires ?? "", when: card.when ?? section.when ?? "", group: section.page ?? "", section: section.title, sectionIndex: si, kw: card.kw ?? ""
             }, card)));
         });
         const heroGroups = {};

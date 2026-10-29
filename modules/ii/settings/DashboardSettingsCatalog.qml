@@ -575,8 +575,6 @@ QtObject {
                 { type: "toggle", key: "desktop:Animate time change", title: Translation.tr("Animate change"), icon: "animation" },
                 { type: "toggle", key: "desktop:Show date", title: Translation.tr("Show date"), icon: "calendar_today" },
                 { type: "toggle", key: "desktop:Use adaptive alignment", title: Translation.tr("Adaptive alignment"), icon: "format_align_center" },
-                { type: "toggle", key: "desktop:Clock auto colors", title: Translation.tr("Automatic colors"), icon: "auto_awesome" },
-                { type: "swatch", key: "desktop:Clock color", title: Translation.tr("Color"), icon: "palette", w: 2 },
                 { type: "combo", key: "desktop:Clock font family", title: Translation.tr("Font family"), icon: "font_download" },
                 { type: "slider", key: "desktop:Font weight", title: Translation.tr("Weight"), icon: "format_bold", percent: false },
                 { type: "slider", key: "desktop:Font size", title: Translation.tr("Size"), icon: "format_size", percent: false },
