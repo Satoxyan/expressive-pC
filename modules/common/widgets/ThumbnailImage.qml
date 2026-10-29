@@ -57,16 +57,32 @@ StyledImage {
         id: thumbnailGeneration
         command: {
             const maxSize = Images.thumbnailSizes[root.thumbnailSizeName];
-            const thumb = FileUtils.trimFileProtocol(root.thumbnailPath);
-            const thumbDir = thumb.substring(0, thumb.lastIndexOf("/"));
+            const thumbPath = FileUtils.trimFileProtocol(root.thumbnailPath);
+            // Paths are passed as positional args ($1..$3), never interpolated into the
+            // script, so quotes in file names can neither break nor inject into it.
+            // Exit codes: 0 = already cached, 1 = generated, 2 = failed.
             if (root.isVideo) {
-                return ["bash", "-c",
-                    `mkdir -p '${thumbDir}' && [ -f '${thumb}' ] && exit 0; tmp='${thumb}.$$.tmp.png'; ffmpeg -y -ss 0 -i '${root.sourcePath}' -frames:v 1 -vf scale=${maxSize}:-1 -q:v 2 -update 1 '\${tmp}' 2>/dev/null && mv '\${tmp}' '${thumb}' && exit 1 || { rm -f '\${tmp}'; exit 0; }`
-                ]
+                return ["bash", "-c", `
+                    thumb="$1"; src="$2"; max="$3"
+                    mkdir -p "$(dirname "$thumb")"
+                    [ -f "$thumb" ] && exit 0
+                    tmp="$thumb.$$.tmp.png"
+                    trap 'kill "$pid" 2>/dev/null; rm -f "$tmp"' EXIT
+                    ffmpeg -y -ss 0 -i "$src" -frames:v 1 -vf "scale=$max:-1" -q:v 2 -update 1 "$tmp" 2>/dev/null & pid=$!
+                    wait "$pid" && mv "$tmp" "$thumb" && exit 1
+                    exit 2
+                `, "_", thumbPath, root.sourcePath, `${maxSize}`]
             }
-            return ["bash", "-c",
-                `mkdir -p '${thumbDir}' && [ -f '${thumb}' ] && exit 0 || { tmp='${thumb}.$$.tmp.png'; magick '${root.sourcePath}' -resize ${maxSize}x${maxSize} '\${tmp}' && mv '\${tmp}' '${thumb}' && exit 1; exit 2; }`
-            ]
+            return ["bash", "-c", `
+                thumb="$1"; src="$2"; max="$3"
+                mkdir -p "$(dirname "$thumb")"
+                [ -f "$thumb" ] && exit 0
+                tmp="$thumb.$$.tmp.png"
+                trap 'kill "$pid" 2>/dev/null; rm -f "$tmp"' EXIT
+                magick "$src" -resize "$max"x"$max" "$tmp" & pid=$!
+                wait "$pid" && mv "$tmp" "$thumb" && exit 1
+                exit 2
+            `, "_", thumbPath, root.sourcePath, `${maxSize}`]
         }
         onExited: (exitCode, exitStatus) => {
             if (exitCode === 1) {
