@@ -225,8 +225,15 @@ Scope {
         }
     }
 
+    property bool startupHandled: false
     function initIfReady() {
+        // This component is created by a LazyLoader that only activates once
+        // Config.ready is true, so onReadyChanged has already fired and will not
+        // fire again. Run once from Component.onCompleted instead of relying on
+        // that signal, or startup locking is skipped.
+        if (root.startupHandled) return;
         if (!Config.ready || !Persistent.ready) return;
+        root.startupHandled = true;
         if (Config.options.lock.launchOnStartup && Persistent.isNewHyprlandInstance) {
             root.lock();
         } else {
@@ -234,6 +241,7 @@ Scope {
             GlobalStates.startupLockPending = false;
         }
     }
+    Component.onCompleted: root.initIfReady()
     Connections {
         target: Config
         function onReadyChanged() {
