@@ -15,7 +15,7 @@ QtObject {
     property real activeWordProgress: 0
     property real activeLineProgress: 0
 
-oder    // The loading overlay's tap target calls this; no test clicks it, so it
+    // The loading overlay's tap target calls this; no test clicks it, so it
     // only has to exist.
     function restartLyrics() {}
 

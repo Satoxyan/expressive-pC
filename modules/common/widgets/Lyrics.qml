@@ -293,37 +293,52 @@ Item {
         // The sung part: the same text in white, clipped to the fraction the
         // sweep has crossed, so the light grows from the left of the word
         // instead of the whole word lighting at once.
+        //
+        // The glow layer sits on this item and not on the word: the word also
+        // holds the dim copy, whose glyphs are opaque dark, and a glow reads
+        // alpha — so a layer on the word haloed every letter of the word from
+        // the first pixel of progress. Here the source is only what has been
+        // sung, so the light follows the sweep.
         Item {
+            id: litWord
             anchors {
                 top: dimText.top
                 bottom: dimText.bottom
                 left: dimText.left
             }
-            clip: true
+            width: dimText.width
+            height: dimText.height
             visible: wordItem.progress > 0
-            width: dimText.width * wordItem.progress
 
-            StyledText {
-                anchors.fill: parent
-                font: dimText.font
+            // The layer stays on from the moment any part of the word is lit until
+            // the line is replaced, so the fade never toggles it and blinks.
+            layer.enabled: root.glowEnabled && wordItem.progress > 0
+            layer.effect: Glow {
+                radius: 7
+                samples: 15
+                spread: 0.15
                 color: wordItem.litColor
-                text: wordItem.word
+                opacity: wordItem.glowStrength
+                // Without this the layer is exactly the lit rectangle, and the
+                // glow — which reaches about a radius past the ink — is cut flat
+                // at every edge instead of spilling past the sweep line.
+                transparentBorder: true
             }
-        }
 
-        // The layer stays on from the moment any part of the word is lit until
-        // the line is replaced, so the fade never toggles it and blinks.
-        layer.enabled: root.glowEnabled && wordItem.progress > 0
-        layer.effect: Glow {
-            radius: 7
-            samples: 15
-            spread: 0.15
-            color: wordItem.litColor
-            opacity: wordItem.glowStrength
-            // Without this the layer is exactly the word's own rectangle, and
-            // the glow — which reaches about a radius past the ink — is cut
-            // flat at the left and right of every word.
-            transparentBorder: true
+            // The cut lives on an item of its own: `clip` would trim the glow
+            // back to this rectangle and take the spill with it.
+            Item {
+                clip: true
+                width: litWord.width * wordItem.progress
+                height: litWord.height
+
+                StyledText {
+                    anchors.fill: parent
+                    font: dimText.font
+                    color: wordItem.litColor
+                    text: wordItem.word
+                }
+            }
         }
 
         // Two separate Translate objects on purpose: the entrance rise and the

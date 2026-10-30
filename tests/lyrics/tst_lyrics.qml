@@ -192,10 +192,17 @@ TestCase {
         return row.children.filter(c => c.word !== undefined)
     }
 
-    // The sung part of a word: the one child that clips. The dim copy and the
-    // glow behind it do not, and neither does the entrance animation.
+    // The sung part of a word: the item that clips the white copy to the sweep.
+    // It sits one level under the glow layer, because a clip on the layer itself
+    // would trim the glow's spill back to the rectangle. The dim copy, the layer
+    // and the entrance animation do not clip.
     function fillOf(word) {
-        return word.children.find(c => c.clip === true)
+        for (const c of word.children) {
+            if (c.clip === true) return c
+            const inner = (c.children ?? []).find(g => g.clip === true)
+            if (inner) return inner
+        }
+        return null
     }
 
     // ── the sweep, and the rise on top of it ───────────────────────────────
@@ -221,6 +228,11 @@ TestCase {
             const fill = fillOf(word)
             verify(fill !== null, "the word has a lit fill")
             if (fill === null) return
+            // A glow reads alpha, and the dim copy is opaque dark ink, so the
+            // layer must sit on the lit copy alone — on the word it would halo
+            // every letter the sweep has not reached yet.
+            verify(word.layer?.enabled !== true, "the word itself carries no glow layer")
+            verify(fill.parent.layer?.enabled === true, "the lit copy carries the glow layer")
             compare(Math.round(fill.width), Math.round(p * word.width),
                 "lit to " + p + " of the word (" + fill.width.toFixed(1)
                 + " of " + word.width.toFixed(1) + ")")
