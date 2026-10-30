@@ -138,6 +138,7 @@ It doesn't need one — the launcher already does that job. Open the launcher (`
 Huge thanks to the people who made this possible:
 
 - **[@end-4](https://github.com/end-4)** — for creating the original [dots-hyprland](https://github.com/end-4/dots-hyprland) / illogical-impulse shell. An absolute masterpiece of a dotfiles project 🫡
+- **[@XephyLon](https://github.com/XephyLon)** — for KDE Integration and lyric refrence
 - **[@gh0stzk](https://github.com/gh0stzk)** — for providing the weather API integration that made the weather widget possible 🙌
 - **[@StarS2112](https://github.com/StarS2112)** — for showcasing this fork 🙌
 - **[@simeulinuxkaliaiwr](https://github.com/simeulinuxkaliaiwr)** — for some shader transitions 🎨
