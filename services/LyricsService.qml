@@ -7,6 +7,7 @@ import Quickshell.Io
 import Quickshell.Services.Mpris
 import qs.modules.common
 import qs.modules.common.functions
+import "../modules/common/functions/lyric_gaps.js" as Gaps
 
 Singleton {
     id: root
@@ -65,6 +66,14 @@ Singleton {
     // sung on its own timings, so it cannot ride the lead's index.
     property int activeBgWordIndex: -1
     property real activeBgWordProgress: 0
+
+    // The instrumental stretches of this song as [{time, end}], worked out once
+    // when the payload lands. A long enough one takes a row of the lyric list
+    // of its own, so the widget counts down to the next line instead of
+    // freezing on the last one sung.
+    property var interludes: []
+    property int activeInterludeIndex: -1
+    property real activeInterludeProgress: 0
 
     // The same capping rules as updateActiveWords(), copied on purpose rather
     // than shared: that function is the production word path and nothing in
@@ -150,6 +159,24 @@ Singleton {
         }
     }
 
+    // Which break the cursor stands in, and how far through it. Asked on the
+    // same shifted position as the line lookup, so the handover back to the
+    // vocal happens on the tick the next line starts, not a frame apart from it.
+    function updateInterlude() {
+        const pos = root.shiftedPos()
+        const gaps = root.interludes ?? []
+        for (let i = 0; i < gaps.length; i++) {
+            if (gaps[i].time <= pos && pos < gaps[i].end) {
+                const span = Math.max(0.001, gaps[i].end - gaps[i].time)
+                root.activeInterludeIndex = i
+                root.activeInterludeProgress = Math.min(1, Math.max(0, (pos - gaps[i].time) / span))
+                return
+            }
+        }
+        root.activeInterludeIndex = -1
+        root.activeInterludeProgress = 0
+    }
+
     readonly property bool playing: root.activePlayer?.isPlaying ?? false
     readonly property bool synced: root.status === "ok" && root.lyricsLines.length > 0
     // Derived from lyricOffsetMs: update()'s line lookup and syncTimer's word
@@ -204,6 +231,7 @@ Singleton {
             root.activeIndex = idx
             root.updateActiveWords()
             root.updateActiveBgWords()
+            root.updateInterlude()
         }
     }
 
@@ -212,6 +240,7 @@ Singleton {
         if (!root.synced) return
         const idx = root.indexAt(root.currentPosition() + root.leadSeconds)
         root.activeIndex = idx
+        root.updateInterlude()
         const next = root.lyricsLines[idx + 1]
         if (!root.playing || !next) return
         const delay = (next.time - root.leadSeconds - root.currentPosition()) * 1000
@@ -293,6 +322,11 @@ Singleton {
                 }
                 root.providerInfo = info
 
+                // Worked out before the lines are published, so the list never
+                // lays out a song and then has to grow rows under it.
+                root.interludes = Gaps.findInterludes(lines, root.maxWordSpan)
+                root.activeInterludeIndex = -1
+                root.activeInterludeProgress = 0
                 root.lyricsLines = lines
                 root.activeIndex = -1
                 root.status = "ok"
@@ -365,12 +399,15 @@ Singleton {
         lyricsProc.running = false
         boundaryTimer.stop()
         root.lyricsLines = []
+        root.interludes = []
         root.activeIndex = -1
         root.providedBy = ""
         root.activeWordIndex = -1
         root.activeWordProgress = 0
         root.activeBgWordIndex = -1
         root.activeBgWordProgress = 0
+        root.activeInterludeIndex = -1
+        root.activeInterludeProgress = 0
         root.activeLineProgress = 0
         root.status = "loading"
 

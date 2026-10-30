@@ -5,6 +5,7 @@ import qs.modules.common.widgets
 import qs.services
 import Qt5Compat.GraphicalEffects
 import QtQuick
+import "../functions/lyric_gaps.js" as Gaps
 
 Item {
     id: root
@@ -30,6 +31,10 @@ Item {
     property color indicatorShapeColor: Appearance.colors.colOnPrimaryContainer
     property int textAlignment: Text.AlignLeft
     property real fontScale: 1.0
+    // The break dots are the one thing in the widget that is not text, so a
+    // host that shows the lyrics small says so here rather than dragging
+    // fontScale, which would shrink the words too.
+    property real dotScale: 1.0
     property bool karaoke: true
     // Air between the lines of the list. Hosts that show the lyrics big ask
     // for more (the dashboard uses 28); the default is one Material spacing
@@ -85,20 +90,56 @@ Item {
     readonly property int motionDuration: 320
     readonly property real rowSpacing: 4
 
-    // The list is every lyric line plus the provider attribution trailing the
-    // last one, so the note scrolls up with the end of the song instead of
-    // being pinned inside the widget.
-    readonly property var lineRows: {
-        const lines = LyricsService.lyricsLines ?? []
-        const rows = []
-        for (let i = 0; i < lines.length; i++)
-            rows.push({ text: lines[i].text || "♪", note: false,
-                        otherVoice: lines[i].align === "end",
-                        bgText: lines[i].bg?.text ?? "" })
-        if (lines.length > 0 && LyricsService.providedBy.length > 0)
-            rows.push({ text: "Lyrics provided by " + LyricsService.providedBy, note: true })
-        return rows
+    // The provider attribution trailing the last line, so the note scrolls up
+    // with the end of the song instead of being pinned inside the widget.
+    readonly property string noteText: LyricsService.providedBy.length > 0
+        ? "Lyrics provided by " + LyricsService.providedBy : ""
+
+    // The list is every lyric line, an extra row wherever an instrumental
+    // break is long enough to count down through, and the note at the end.
+    // The break rows are why nothing in here may read a row position as a line
+    // index any more; the layout comes back with the maps that do that.
+    readonly property var rowLayout: Gaps.mergeRows(
+        LyricsService.lyricsLines ?? [], LyricsService.interludes ?? [], root.noteText)
+    readonly property var lineRows: root.rowLayout.rows
+
+    // Whether the song is standing in a break right now. The bounds test is
+    // the guard: the service can still be pointing at a break of the song that
+    // just ended, and reading past the end of a QML list hands back something
+    // that "?? -1" does not catch.
+    //
+    // Neither of these reads the other: a binding can be handed a stale
+    // sibling while its own layout is already new, and that is how an
+    // out-of-range row sneaks into an int property.
+    readonly property bool inBreak: {
+        const gaps = root.rowLayout.gapAt
+        const gi = LyricsService.activeInterludeIndex
+        return gi >= 0 && gi < gaps.length
     }
+
+    // The row the song is on: the break's dots while an instrumental runs, the
+    // line being sung otherwise. The list pans to this row and every font and
+    // opacity step is measured from it.
+    readonly property int anchorRow: {
+        const laid = root.rowLayout
+        const gi = LyricsService.activeInterludeIndex
+        if (gi >= 0 && gi < laid.gapAt.length)
+            return laid.gapAt[gi]
+        const line = LyricsService.activeIndex
+        if (line < 0 || line >= laid.lineAt.length)
+            return -1
+        return laid.lineAt[line]
+    }
+
+    // ── the break ───────────────────────────────────────────────────────────
+    // Three dots that fill one after another across the gap, so a thirty second
+    // solo reads as time passing rather than as the widget having stopped.
+    readonly property real dotSize: 6 * root.fontScale * root.dotScale
+    readonly property real dotSpacing: 11 * root.fontScale * root.dotScale
+    // Where a dot stands before its slice of the gap arrives, and how far the
+    // one being filled swells — the same two states the words have.
+    readonly property real dotRestAlpha: 0.35
+    readonly property real dotFocusSwell: 0.55
 
     // A song with more than one voice says so by putting lines on the far edge.
     // Then the lead keeps the near edge and the other voice the far one, which
@@ -286,6 +327,13 @@ Item {
         return lead * hotMetrics.height + Math.max(0, lead - 1) * rowSpacing + subH
     }
 
+    // A break claims a line's height even though its dots are small: the row
+    // it replaces was a line tall, and anything less makes the list jump as the
+    // anchor moves off it.
+    readonly property real interludeRowGuess: hotMetrics.height
+    readonly property real anchorHeightGuess:
+        root.inBreak ? root.interludeRowGuess : root.hotLineGuess
+
     // One karaoke word: the base look this widget already had — a dim copy with
     // a pure white copy clipped to the fraction the karaoke has crossed, the
     // pair behind a glow — plus the two motions taken from the reference: the
@@ -303,7 +351,14 @@ Item {
         // word of it jumping to the foreground would sing over the lead.
         property bool sub: false
 
-        readonly property bool current: wordItem.progress > 0 && wordItem.progress < 1
+        // The line this word belongs to is the one being sung. An instrumental
+        // break takes the foreground from it: the words keep their layout and
+        // lose their light, their lift and their glow, so the row reads as an
+        // ordinary line again while the dots count the pause out.
+        readonly property bool active: !root.inBreak
+
+        readonly property bool current: wordItem.active
+            && wordItem.progress > 0 && wordItem.progress < 1
 
         // Words that have been sung (or are being sung) are pure white, the
         // maximum brightness. Future words stay dim so the karaoke progress is
@@ -313,6 +368,13 @@ Item {
         readonly property color dimColor:
             wordItem.sub ? Qt.rgba(1, 1, 1, 0.2) : root.dimColor
 
+        // What the word is drawn in once it is not being sung: the colour a
+        // plain line of this widget uses, echo included.
+        readonly property color restingColor: wordItem.sub
+            ? Qt.rgba(root.textColor.r, root.textColor.g, root.textColor.b,
+                      root.textColor.a * 0.75)
+            : root.textColor
+
         // Glow fades in on the active word and stays on after the word is
         // passed (slightly dimmed) so sung words keep glowing. The value is
         // driven from onProgressChanged instead of a binding so it can start at
@@ -321,13 +383,14 @@ Item {
         // pop in bright on the first word of each line.
         property real glowStrength: 0
         property bool glowReady: false
-        onProgressChanged: {
+        function updateGlow() {
             if (!wordItem.glowReady) return
-            const target = wordItem.progress > 0
-                ? (wordItem.current ? 1 : 0.6)
-                : 0
+            const target = !wordItem.active ? 0
+                : wordItem.progress > 0 ? (wordItem.current ? 1 : 0.6) : 0
             if (target !== wordItem.glowStrength) wordItem.glowStrength = target
         }
+        onProgressChanged: wordItem.updateGlow()
+        onActiveChanged: wordItem.updateGlow()
         Behavior on glowStrength { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
 
         // Entrance state; flipped true once the staggered pause for this word
@@ -364,8 +427,12 @@ Item {
             id: dimText
             anchors.fill: parent
             font.pixelSize: root.fontSizeFor(wordItem.sub ? root.subLineOffset : 0)
-            color: wordItem.dimColor
+            // The colour a line that is not being sung is drawn in, so stepping
+            // out of the foreground is a change of colour and not a change of
+            // layout: the echo stays a step behind its lead either way.
+            color: wordItem.active ? wordItem.dimColor : wordItem.restingColor
             text: wordItem.word
+            Behavior on color { ColorAnimation { duration: 250; easing.type: Easing.OutCubic } }
         }
 
         // The sung part: the same text in white, clipped to the fraction the
@@ -387,6 +454,11 @@ Item {
             width: dimText.width
             height: dimText.height
             visible: wordItem.progress > 0
+            // The light goes out on the line as the break takes over, and the
+            // glow inside it goes with it: this item's own opacity is applied
+            // after the layer is rendered.
+            opacity: wordItem.active ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
 
             // The layer stays on from the moment any part of the word is lit until
             // the line is replaced, so the fade never toggles it and blinks.
@@ -469,7 +541,7 @@ Item {
         boundsBehavior: Flickable.StopAtBounds
         interactive: false
 
-        currentIndex: LyricsService.activeIndex
+        currentIndex: root.anchorRow
         // The glide to the next line comes from the highlight: the list pans so
         // that the current item stays inside the band around the middle, and it
         // pans over motionDuration instead of jumping. The band is stated
@@ -487,7 +559,8 @@ Item {
         // what lands there: stating the middle as the line's top left the whole
         // block, and the two lines behind it, a line too low to fit.
         readonly property real widgetMiddle: root.overflowY + root.height / 2
-        readonly property real sungPoint: Math.max(0, widgetMiddle - root.hotLineGuess / 2)
+        readonly property real sungPoint: Math.max(0,
+            widgetMiddle - root.anchorHeightGuess / 2)
         highlightFollowsCurrentItem: true
         highlightRangeMode: ListView.StrictlyEnforceRange
         preferredHighlightBegin: root.lineContext < 0
@@ -508,8 +581,23 @@ Item {
             required property var modelData
 
             readonly property bool isNote: modelData.note
-            readonly property bool isHot: index === LyricsService.activeIndex
-            readonly property int dist: Math.abs(index - LyricsService.activeIndex)
+            // A break, the note, or a sung line: only the last of these has a
+            // line index, and the two that have none must never be taken for
+            // the line being sung when the service has not picked one yet.
+            readonly property bool isInterlude: modelData.interlude === true
+            readonly property bool isHot: modelData.lineIndex >= 0
+                && modelData.lineIndex === LyricsService.activeIndex
+            // Measured in rows, not lines: what the eye judges is how far a
+            // line sits from whatever the song is standing on, and a break row
+            // takes up room like any other.
+            readonly property int dist: Math.abs(lineRow.index - root.anchorRow)
+            // How far through its own gap this row's dots stand. Only the break
+            // the song is standing on has any light at all: the moment the next
+            // line takes the anchor back, the dots that counted it out go quiet
+            // with the rest of the list instead of keeping a white hole in it.
+            readonly property real rowProgress: lineRow.isInterlude
+                && lineRow.index === root.anchorRow
+                ? LyricsService.activeInterludeProgress : 0
             // Sung by a voice other than the lead: this line goes to the far
             // edge of the text area instead of the near one.
             readonly property bool otherVoice: modelData.otherVoice === true
@@ -530,6 +618,7 @@ Item {
 
             width: lineList.width
             implicitHeight: lineRow.isNote ? noteRow.implicitHeight
+                : lineRow.isInterlude ? hotMetrics.height
                 : (lineRow.useKaraoke ? hotColumn.implicitHeight : plainColumn.implicitHeight)
             height: implicitHeight
 
@@ -552,6 +641,12 @@ Item {
                 width: root.textWidth
                 spacing: root.rowSpacing
                 visible: lineRow.useKaraoke
+                // The line recedes while a break is being counted: it keeps its
+                // words filled and its layout, and only steps back on the same
+                // ladder the neighbours use. Inert while singing, because the
+                // line is then the anchor and the step is a full 1.0.
+                opacity: root.opacityFor(lineRow.dist)
+                Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
                 anchors.verticalCenter: lineRow.verticalCenter
                 // Which edge the sung line belongs to. The column only ever
                 // holds the active line, so it can carry that one flag for the
@@ -624,7 +719,7 @@ Item {
                 width: root.textWidth
                 anchors.verticalCenter: lineRow.verticalCenter
                 spacing: root.rowSpacing
-                visible: !lineRow.isNote && !lineRow.useKaraoke
+                visible: !lineRow.isNote && !lineRow.isInterlude && !lineRow.useKaraoke
 
                 StyledText {
                     id: plainRow
@@ -662,6 +757,94 @@ Item {
                     opacity: root.opacityFor(lineRow.dist) * 0.75
                     color: lineRow.isHot ? root.activeColor : root.textColor
                     Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
+                }
+            }
+
+            // An instrumental long enough to count down through: three dots,
+            // filling one after another across the gap so the pause arrives at
+            // the line that ends it. The row is a line tall even though the dots
+            // are not, so the list does not jump as the anchor moves off the
+            // line it just dimmed; the dots themselves are only as tall as they
+            // are, which is what keeps the air above them the same as below.
+            // They go to whatever edge the host puts its words on, and a break
+            // belongs to no voice, so in a two-voice song they take the near
+            // edge like every other line there.
+            Row {
+                id: interludeRow
+                height: root.dotSize
+                spacing: root.dotSpacing
+                anchors.verticalCenter: lineRow.verticalCenter
+                anchors.horizontalCenter: lineRow.textHAlign === Text.AlignHCenter
+                    ? lineRow.horizontalCenter : undefined
+                anchors.left: lineRow.textHAlign !== Text.AlignHCenter
+                    ? lineRow.left : undefined
+                anchors.leftMargin: root.contentInset
+                visible: lineRow.isInterlude
+
+                Repeater {
+                    model: Gaps.DOTS
+                    delegate: Rectangle {
+                        id: dot
+                        // The dot's own place in the row, not the row's place
+                        // in the list: a bare `index` here belongs to this
+                        // delegate.
+                        required property int index
+
+                        readonly property real filled:
+                            Gaps.dotFill(lineRow.rowProgress, index)
+                        // The dot whose third is running is the one that swells;
+                        // a finished or untouched one sits at rest.
+                        // (Named `swell`, not `focus`: `focus` is final on Item.)
+                        readonly property real swell: filled > 0 && filled < 1
+                            ? 1 - Math.abs(2 * filled - 1) : 0
+                        // The same two states a word has: the accent while it
+                        // waits, the pure white of a sung word as its third goes
+                        // by. A dot has no half-lit ink to sweep across, so the
+                        // colour itself carries the progress.
+                        readonly property color ink: Qt.rgba(
+                            root.activeColor.r + (1 - root.activeColor.r) * dot.filled,
+                            root.activeColor.g + (1 - root.activeColor.g) * dot.filled,
+                            root.activeColor.b + (1 - root.activeColor.b) * dot.filled,
+                            root.activeColor.a)
+                        // The same rule the words follow: full light while its
+                        // third is running, a lesser shine kept once it is over.
+                        readonly property real shine: filled >= 1 ? 0.6 : filled
+
+                        width: root.dotSize
+                        height: root.dotSize
+                        radius: width / 2
+                        color: dot.ink
+                        opacity: root.dotRestAlpha
+                            + (1 - root.dotRestAlpha) * filled
+                        scale: 1 + root.dotFocusSwell * swell
+
+                        // The service pushes a new value every 50ms and the
+                        // fill is a third of a gap long, so this is the smooth
+                        // stand-in for upstream's per-frame easing.
+                        Behavior on opacity { NumberAnimation { duration: 180 } }
+                        Behavior on scale { NumberAnimation { duration: 180 } }
+                        // The white is the part the eye is on, so it has to leave
+                        // on the same clock as the brightness rather than snap
+                        // back to the accent while the dot is still fading.
+                        Behavior on color { ColorAnimation { duration: 180 } }
+
+                        // No Behavior on the shine: it is a read-only property,
+                        // and 20Hz of steps is smooth enough on its own.
+                        layer.enabled: root.glowEnabled && dot.filled > 0
+                        layer.effect: Glow {
+                            // The words glow at radius 7 off a glyph several
+                            // times the dot's size; a wider, more present
+                            // spread is what gets a dot to the same whiteness.
+                            radius: dot.width * 1.5
+                            samples: 15
+                            spread: 0.35
+                            color: dot.ink
+                            opacity: dot.shine
+                            // The dot is a few pixels of ink; without the border
+                            // the halo is cut at the edge of that square.
+                            transparentBorder: true
+                        }
+                    }
                 }
             }
         }

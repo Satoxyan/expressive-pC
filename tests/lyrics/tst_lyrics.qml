@@ -3,6 +3,7 @@ import QtTest
 import qs.modules.common
 import qs.services
 import qs.modules.common.widgets
+import "../../modules/common/functions/lyric_gaps.js" as Gaps
 
 // The karaoke view: line list, wrapped word rows, and the glide that carries
 // the active line to the middle band.
@@ -26,6 +27,16 @@ TestCase {
         width: 400
         height: 300
         lineContext: 2
+    }
+
+    // The sidebar, the dashboard and the media widget: words down the middle of
+    // the column, so anything else the widget draws has to follow them there.
+    Lyrics {
+        id: centredLyrics
+        width: 400
+        height: 300
+        lineContext: 2
+        textAlignment: Text.AlignHCenter
     }
 
     // The ListView lives inside the widget; reach it the way the widget's own
@@ -54,6 +65,24 @@ TestCase {
                     { text: "the", time: i * 3 + 1.5 },
                     { text: "song", time: i * 3 + 2 }
                 ]
+            })
+        }
+        return lines
+    }
+
+    // The same song with an instrumental after the first line: its words end at
+    // +2.0, so the sweep is over by +3.2, and nothing is sung again until +9 —
+    // 5.8s of nothing, which is a break. The rest of the lines stay 3s apart.
+    function breakSong() {
+        const times = [0, 9, 12, 15, 18]
+        const lines = []
+        for (let i = 0; i < times.length; i++) {
+            const t = times[i]
+            lines.push({
+                text: "line " + i + " of the song",
+                time: t,
+                words: ["line", String(i), "of", "the", "song"]
+                    .map((w, k) => ({ text: w, time: t + k * 0.5 }))
             })
         }
         return lines
@@ -203,6 +232,27 @@ TestCase {
             if (inner) return inner
         }
         return null
+    }
+
+    // The column that holds the wrapped word rows of a laid-out line, so its
+    // opacity can be read: the rows' own parent.
+    function karaokeColumnOf(row) {
+        const rows = wordRows(row)
+        return rows.length > 0 ? rows[0].parent : null
+    }
+
+    // The three dots of a break row — the row's only children that are drawn
+    // squares. A dot whose glow is on parents a shader effect to itself, and
+    // that effect has a `radius` of its own but no `border`, so filtering on
+    // the radius alone would count it as a dot.
+    function dotsOf(row) {
+        for (const c of row.children) {
+            const dots = (c.children ?? []).filter(d => d.radius !== undefined
+                && d.border !== undefined)
+            if (dots.length > 0)
+                return dots
+        }
+        return []
     }
 
     // ── the sweep, and the rise on top of it ───────────────────────────────
@@ -614,6 +664,254 @@ TestCase {
         verify(list().currentItem.height > height,
             "and the line really is taller (" + height.toFixed(1)
             + " -> " + list().currentItem.height.toFixed(1) + ")")
+    }
+
+    // ── the instrumental break ─────────────────────────────────────────────
+    // A gap is only knowable once the line before it has finished being sung,
+    // and a provider that times lines but not words never says when that is —
+    // so a break is marked from the last word, and an intro from the first.
+    function test_a_break_needs_five_clear_seconds_after_the_sweep() {
+        const lines = breakSong()
+        const gaps = Gaps.findInterludes(lines, 1.2)
+        compare(gaps.length, 1, "one break in the fixture song")
+        compare(Math.round(gaps[0].time * 100) / 100, 3.2, "from the end of the sweep")
+        compare(gaps[0].end, 9, "to the line that ends it")
+        // The threshold. Landing on 5.0 exactly is a float coin flip — 8.2 -
+        // 3.2 comes out 4.9999999999999995 — so the pass and the miss stand a
+        // hundredth apart rather than arguing about the last bit.
+        const edge = breakSong()
+        edge[1].time = 8.21
+        compare(Gaps.findInterludes(edge, 1.2).length, 1, "five seconds is a break")
+        edge[1].time = 8.1
+        compare(Gaps.findInterludes(edge, 1.2).length, 0, "and a hair less is a breath")
+    }
+
+    function test_a_long_intro_is_a_break() {
+        const lines = breakSong()
+        for (const l of lines) l.time += 7
+        const gaps = Gaps.findInterludes(lines, 1.2)
+        compare(gaps[0].time, 0, "the count down starts at the top of the track")
+        compare(gaps[0].end, 7, "and ends where the singing does")
+        const short = breakSong()
+        for (const l of short) l.time += 4
+        compare(Gaps.findInterludes(short, 1.2).filter(g => g.time === 0).length, 0,
+            "4s of intro is not worth marking")
+    }
+
+    function test_line_synced_lyrics_get_no_mid_song_breaks() {
+        // No word timings: there is no knowing where the line stops, and the
+        // sentence sweep runs to the next line's start through the gap anyway.
+        const lines = [
+            { text: "one line", time: 0 },
+            { text: "the next, after a minute", time: 40 }
+        ]
+        compare(Gaps.findInterludes(lines, 1.2).length, 0)
+        lines[0].words = [{ text: "one", time: 0 }, { text: "line", time: 1 }]
+        const gaps = Gaps.findInterludes(lines, 1.2)
+        compare(gaps.length, 1, "with words the same gap is knowable")
+        compare(gaps[0].time, 2.2)
+    }
+
+    function test_every_row_of_a_merged_list_knows_its_line() {
+        const lines = breakSong()
+        const laid = Gaps.mergeRows(lines, Gaps.findInterludes(lines, 1.2), "note")
+        compare(laid.rows.length, lines.length + 2, "five lines, a break, a note")
+        compare(laid.rows[0].lineIndex, 0)
+        compare(laid.rows[1].interlude, true, "the break took a row of its own")
+        compare(laid.rows[1].lineIndex, -1, "and it is nobody's line")
+        compare(laid.rows[2].lineIndex, 1, "the rows after it are shifted")
+        compare(laid.lineAt[1], 2)
+        compare(laid.gapAt[0], 1)
+        compare(laid.rows[laid.rows.length - 1].note, true)
+        // A song with no break is addressed by line index, as it always was.
+        const plain = Gaps.mergeRows(song(3), [], "")
+        compare(plain.lineAt.join(","), "0,1,2")
+        compare(plain.rows.length, 3)
+    }
+
+    function test_the_dots_take_the_gap_in_thirds() {
+        for (const [p, expect] of [[0, [0, 0, 0]], [0.5, [1, 0.5, 0]], [1, [1, 1, 1]]]) {
+            for (let i = 0; i < 3; i++)
+                compare(Math.round(Gaps.dotFill(p, i) * 100) / 100, expect[i],
+                    "dot " + i + " at progress " + p)
+        }
+        verify(Gaps.dotFill(0.33, 5) >= 0 && Gaps.dotFill(-1, 0) === 0, "never out of range")
+    }
+
+    // ── the break in the widget ────────────────────────────────────────────
+    function test_a_break_takes_the_row_the_list_centres_on() {
+        const view = list()
+        LyricsService.load(breakSong(), "")
+        LyricsService.activate(0)
+        wait(300)
+        compare(view.currentIndex, 0, "the sung line is the anchor to begin with")
+        LyricsService.activateGap(0, 0.5)
+        wait(400)
+        compare(view.currentIndex, 1, "the break takes it over")
+        verify(view.currentItem.modelData.interlude === true, "and it is the break's row")
+        compare(lyrics.anchorRow, 1)
+        compare(lyrics.lineRows[0].lineIndex, 0, "the line is still the active line")
+    }
+
+    // The handover: the line gives the foreground to the dots, and gives it
+    // back as the next line arrives. It keeps its layout while it waits, so
+    // only the light and the colour move.
+    function test_the_line_before_a_break_steps_out_of_the_foreground() {
+        LyricsService.load(breakSong(), "")
+        LyricsService.activate(0)
+        wait(300)
+        const row = list().itemAtIndex(0)
+        const column = karaokeColumnOf(row)
+        verify(column !== null, "the sung line is laid out as words")
+        compare(column.opacity, 1.0, "no dimming while it is the anchor")
+        LyricsService.activeWordIndex = 4
+        LyricsService.activeWordProgress = 1
+        wait(300)
+        const words = wordsOf(wordRows(row)[0])
+        verify(fillOf(words[4]).parent.opacity > 0.9, "the line is lit while it is sung")
+        LyricsService.activateGap(0, 0.5)
+        wait(500)
+        compare(Math.round(karaokeColumnOf(row).opacity * 100) / 100, 0.6,
+            "the line steps back one rung of the ladder the neighbours use")
+        verify(fillOf(words[4]).parent.opacity < 0.1,
+            "and its light goes out with the handover")
+        compare(words[4].children.find(c => c.text !== undefined).color, lyrics.textColor,
+            "leaving the colour an unsung line is drawn in")
+        compare(fillOf(words[4]).width, words[4].width,
+            "but the word it ended on is still where it was: no reflow")
+    }
+
+    // The dots take the light up: full shine across their own third, a lesser
+    // one kept behind them, none ahead.
+    function test_the_dots_shine_one_after_another() {
+        LyricsService.load(breakSong(), "")
+        LyricsService.activate(0)
+        LyricsService.activateGap(0, 0.5)
+        wait(400)
+        const dots = dotsOf(list().itemAtIndex(1))
+        compare(dots.length, 3)
+        if (dots.length !== 3) return
+        compare(dots[0].shine, 0.6, "the dot whose third has passed keeps a lesser shine")
+        compare(Math.round(dots[1].shine * 100) / 100, 0.5,
+            "the one being filled shines with how much of it is over")
+        compare(dots[2].shine, 0, "and the one that has not started shines not at all")
+        verify(!dots[2].layer.enabled, "whose glow layer is off, not merely dark")
+        // The ink, not just the halo: a dot waits in the accent and arrives in
+        // the same white a sung word is drawn in.
+        compare(dots[0].ink, Qt.rgba(1, 1, 1, lyrics.activeColor.a),
+            "a finished dot is white")
+        compare(dots[2].ink, lyrics.activeColor, "an untouched one is still the accent")
+    }
+
+    function test_the_dots_fill_one_after_another() {
+        LyricsService.load(breakSong(), "")
+        LyricsService.activate(0)
+        LyricsService.activateGap(0, 0)
+        wait(400)
+        const dots = dotsOf(list().itemAtIndex(1))
+        compare(dots.length, 3, "three dots")
+        if (dots.length !== 3) return
+        // 0.35 at rest, 1.0 once its third of the gap has gone by. The dot
+        // standing mid-third is also the one standing swollen.
+        for (const [p, alpha, swell] of [[0.15, [0.64, 0.35, 0.35], [1.495, 1.0, 1.0]],
+                                         [0.5,  [1.0,  0.68, 0.35], [1.0,   1.55, 1.0]],
+                                         [0.9,  [1.0,  1.0,  0.81], [1.0,   1.0,  1.33]]]) {
+            LyricsService.activateGap(0, p)
+            wait(300)
+            for (let i = 0; i < 3; i++) {
+                verify(Math.abs(dots[i].opacity - alpha[i]) < 0.01,
+                    "dot " + i + " at progress " + p + " is " + dots[i].opacity.toFixed(2)
+                    + ", expected " + alpha[i])
+                verify(Math.abs(dots[i].scale - swell[i]) < 0.02,
+                    "dot " + i + " at progress " + p + " scales " + dots[i].scale.toFixed(3)
+                    + ", expected " + swell[i])
+            }
+        }
+    }
+
+    // The handover back to the vocal: the dots gave the pause its light, and
+    // they hand it back rather than keeping a white hole in the list.
+    function test_the_dots_go_quiet_when_the_next_line_arrives() {
+        LyricsService.load(breakSong(), "")
+        LyricsService.activate(0)
+        LyricsService.activateGap(0, 1)
+        wait(400)
+        const gapRow = list().itemAtIndex(1)
+        const dots = dotsOf(gapRow)
+        compare(dots.length, 3)
+        if (dots.length !== 3) return
+        for (const d of dots)
+            verify(d.opacity > 0.99, "the gap counted out to full (" + d.opacity + ")")
+        verify(dots[0].shine > 0.5, "and its shine with it")
+        LyricsService.activate(1)
+        wait(500)
+        for (const d of dotsOf(gapRow)) {
+            compare(Math.round(d.opacity * 100) / 100, 0.35,
+                "the dots are back at rest once the line takes the light")
+            compare(d.shine, 0, "nothing of the glow is left on them")
+            compare(d.ink, lyrics.activeColor, "and the white went with it")
+        }
+        compare(list().currentIndex, 2, "the list is centred on the new line")
+    }
+
+    function test_the_band_centres_the_dots() {
+        const view = list(tallLyrics)
+        LyricsService.load(breakSong(), "")
+        LyricsService.activate(0)
+        wait(300)
+        LyricsService.activateGap(0, 0.5)
+        wait(900)
+        const item = view.currentItem
+        verify(item !== null && item.modelData.interlude === true, "the break is centred on")
+        if (item === null) return
+        compare(Math.round(viewTop(view, item) + item.height / 2),
+            Math.round(view.widgetMiddle),
+            "a break row is placed like a line, not by its own small height")
+    }
+
+    // Where the dots sit inside their row: the eye reads them as the pause
+    // between two lines, so the air above them has to be the air below them.
+    function test_the_dots_sit_in_the_middle_of_their_line() {
+        LyricsService.load(breakSong(), "")
+        LyricsService.activate(0)
+        LyricsService.activateGap(0, 0.5)
+        wait(400)
+        const dots = dotsOf(list().itemAtIndex(1))
+        compare(dots.length, 3)
+        if (dots.length !== 3) return
+        const row = dots[0].parent // the Row the dots are laid out in
+        compare(Math.round(row.y + row.height / 2), Math.round(row.parent.height / 2),
+            "halfway between the line they follow and the one they precede")
+    }
+
+    function test_the_dots_go_where_the_host_puts_its_words() {
+        LyricsService.load(breakSong(), "")
+        LyricsService.activate(0)
+        LyricsService.activateGap(0, 0.5)
+        wait(400)
+        const near = dotsOf(list().itemAtIndex(1))[0].parent
+        compare(Math.round(near.x), Math.round(lyrics.contentInset),
+            "a host that flushes its words to the near edge does the same to the dots")
+        const middle = dotsOf(list(centredLyrics).itemAtIndex(1))[0].parent
+        compare(Math.round(middle.x + middle.width / 2), Math.round(middle.parent.width / 2),
+            "a host that centres its words centres the dots in with them")
+    }
+
+    function test_a_host_can_ask_for_smaller_dots() {
+        compare(lyrics.dotSize, 6, "a host that says nothing gets the full dot")
+        lyrics.dotScale = 0.75
+        compare(lyrics.dotSize, 4.5, "and one that does, gets that much of it")
+        compare(lyrics.dotSpacing, 8.25, "the air between them shrinks with them")
+        lyrics.dotScale = 1.0
+    }
+
+    function test_a_song_without_breaks_adds_no_rows() {
+        LyricsService.load(song(6), "lrclib")
+        wait(200)
+        compare(LyricsService.interludes.length, 0, "3s apart is never a break")
+        compare(lyrics.lineRows.length, 7, "six lines and the note")
+        for (let i = 0; i < 6; i++)
+            compare(lyrics.rowLayout.lineAt[i], i, "line " + i + " is still row " + i)
     }
 
     // Flatten the wrapped rows back into one list of pieces.

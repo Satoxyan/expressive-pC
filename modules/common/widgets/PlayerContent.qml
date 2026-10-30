@@ -174,6 +174,9 @@ Item {
             // one being sung, instead of the whole list fading away into the top
             // and bottom of the strip.
             lineContext: 2
+            // The strip shows its words smaller than the sidebar does, and the
+            // dots are not text, so they need asking for separately.
+            dotScale: 0.75
             textColor: root.blendedColors.colOnLayer0
             activeColor: root.blendedColors.colPrimary
             dimColor: root.blendedColors.colSubtext
