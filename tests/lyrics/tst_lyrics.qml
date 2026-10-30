@@ -410,6 +410,64 @@ TestCase {
             "active row is taller than a neighbour (" + hot.height + " vs " + near.height + ")")
     }
 
+    // The delegate's plain text item. The provider note is aligned too and
+    // shows the same text while merely hidden, so what singles the plain row
+    // out is that it is the one that gets elided.
+    function plainOf(row) {
+        return row.children.find(c => c.horizontalAlignment !== undefined
+            && c.text === row.modelData.text && c.elide === Text.ElideRight)
+    }
+
+    // ── who sings what, read off the edges ─────────────────────────────────
+    // A TTML source marks the voice of every line, and the script calls any
+    // line that is not the lead's "end". Only then do the two sides mean
+    // something; with one voice the host's own alignment stands.
+    function test_a_second_voice_sits_on_the_far_edge() {
+        const lines = song(4)
+        lines[1].align = "end"
+        lines[3].align = "end"
+        LyricsService.load(lines, "")
+        wait(250)
+        verify(lyrics.duet, "a far-edge line makes it a duet")
+        const view = list()
+        const lead = plainOf(view.itemAtIndex(0))
+        const other = plainOf(view.itemAtIndex(1))
+        verify(lead !== undefined && other !== undefined, "both lines have plain text")
+        if (lead === undefined || other === undefined) return
+        compare(lead.horizontalAlignment, Text.AlignLeft, "the lead holds the near edge")
+        compare(other.horizontalAlignment, Text.AlignRight, "the other voice goes to the far edge")
+    }
+
+    function test_a_single_voice_song_keeps_the_hosts_alignment() {
+        lyrics.textAlignment = Text.AlignHCenter
+        LyricsService.load(song(3), "")
+        wait(250)
+        verify(!lyrics.duet, "one voice has nothing to tell apart")
+        compare(plainOf(list().itemAtIndex(0)).horizontalAlignment, Text.AlignHCenter,
+            "the centre the host asked for is not overridden")
+        lyrics.textAlignment = Text.AlignLeft
+    }
+
+    function test_a_sung_second_voice_wraps_against_the_far_edge() {
+        const lines = song(3)
+        lines[0].align = "end"
+        LyricsService.load(lines, "")
+        LyricsService.activate(0)
+        wait(300)
+        const rows = wordRows(list().currentItem)
+        compare(rows.length, 1, "the line fits one row")
+        // The rows are placed inside the column, which carries the inset, so
+        // they line up with the column's own edges rather than the widget's.
+        const column = rows[0].parent
+        compare(Math.round(rows[0].x + rows[0].width), Math.round(column.width),
+            "a sung far voice ends at the far edge")
+
+        LyricsService.activate(1)
+        wait(300)
+        compare(Math.round(wordRows(list().currentItem)[0].x), 0,
+            "and a sung lead starts at the near edge")
+    }
+
     // Flatten the wrapped rows back into one list of pieces.
     function rows_flat() {
         const out = []

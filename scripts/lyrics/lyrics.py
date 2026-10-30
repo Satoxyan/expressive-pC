@@ -174,11 +174,36 @@ def _ttml_time(t):
         return 0.0
 
 
-def _ttml_role(el):
-    for attr, val in el.attrib.items():
-        if attr.rsplit("}", 1)[-1] == "role":
+def _ttml_attr(el, name):
+    """Attribute of an element looked up by local name.
+
+    The namespace prefix differs between the Apple, BetterLyrics and BiniLyrics
+    deployments (itunes:, lrc:, plain), so only the local name is stable.
+    """
+    for key, val in el.attrib.items():
+        if key.rsplit("}", 1)[-1] == name:
             return val
-    return ""
+    return None
+
+
+def _ttml_role(el):
+    return _ttml_attr(el, "role") or ""
+
+
+def _ttml_primary_agent(root):
+    """xml:id of the first voice declared in the head, or None.
+
+    Apple tags every line with the voice that sings it, and the first declared
+    agent is the lead: in its own client those lines stay on the near edge and
+    every other voice — the second singer, the group parts — goes to the far
+    one. A document without agents has one voice as far as we can tell.
+    """
+    for el in root.iter():
+        if el.tag.rsplit("}", 1)[-1] == "agent":
+            agent = _ttml_attr(el, "id")
+            if agent:
+                return agent
+    return None
 
 
 def _ttml_line_text(p):
@@ -266,6 +291,7 @@ def ttml_to_lrc(ttml):
     except Exception:
         return []
     lines = []
+    primary = _ttml_primary_agent(root)
     for p in root.iter():
         if p.tag.rsplit("}", 1)[-1] != "p":
             continue
@@ -275,10 +301,12 @@ def ttml_to_lrc(ttml):
         text = _ttml_line_text(p)
         if not text:
             continue
+        agent = _ttml_attr(p, "agent")
         lines.append({
             "time": _ttml_time(begin),
             "text": text,
             "words": _ttml_line_words(p),
+            "align": "end" if primary and agent and agent != primary else "start",
         })
     return sorted(lines, key=lambda x: x["time"])
 
@@ -1468,6 +1496,7 @@ def main():
                         "t": line["time"],
                         "x": line["text"].replace("§", ""),
                         "w": [[w["t"], w["w"]] for w in line.get("words") or []],
+                        "a": line.get("align") or "start",
                     }
                     for line in lines
                 ],

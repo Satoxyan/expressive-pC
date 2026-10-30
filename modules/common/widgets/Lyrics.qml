@@ -92,11 +92,20 @@ Item {
         const lines = LyricsService.lyricsLines ?? []
         const rows = []
         for (let i = 0; i < lines.length; i++)
-            rows.push({ text: lines[i].text || "♪", note: false })
+            rows.push({ text: lines[i].text || "♪", note: false,
+                        otherVoice: lines[i].align === "end" })
         if (lines.length > 0 && LyricsService.providedBy.length > 0)
             rows.push({ text: "Lyrics provided by " + LyricsService.providedBy, note: true })
         return rows
     }
+
+    // A song with more than one voice says so by putting lines on the far edge.
+    // Then the lead keeps the near edge and the other voice the far one, which
+    // is the whole point of the marking, so it overrides whatever alignment the
+    // host asked for. With one voice there is nothing to tell apart and the
+    // host's own alignment stands.
+    readonly property bool duet: (LyricsService.lyricsLines ?? [])
+        .some(l => l.align === "end")
 
     // ── Karaoke word layout for the active line ────────────────────────────
     // Only the active line needs per-word items; the neighbours stay one plain
@@ -432,6 +441,9 @@ Item {
             readonly property bool isNote: modelData.note
             readonly property bool isHot: index === LyricsService.activeIndex
             readonly property int dist: Math.abs(index - LyricsService.activeIndex)
+            // Sung by a voice other than the lead: this line goes to the far
+            // edge of the text area instead of the near one.
+            readonly property bool otherVoice: modelData.otherVoice === true
             // The window: the same number of lines on each side, and nothing
             // beyond it. A line three steps away says nothing about the moment
             // the song is in, however much room the host has for it.
@@ -470,6 +482,10 @@ Item {
                 spacing: root.rowSpacing
                 visible: lineRow.useKaraoke
                 anchors.verticalCenter: lineRow.verticalCenter
+                // Which edge the sung line belongs to. The column only ever
+                // holds the active line, so it can carry that one flag for the
+                // rows inside it to read.
+                readonly property bool far: lineRow.otherVoice
 
                 Repeater {
                     model: lineRow.useKaraoke ? root.hotRows : []
@@ -481,10 +497,15 @@ Item {
                         // otherwise flush with the inset left edge. Centering on
                         // the column rather than the row keeps the line in the
                         // middle of the text area, not of the clipped widget.
-                        anchors.horizontalCenter: root.textAlignment === Text.AlignHCenter
+                        // A song with two voices overrides the host: the far
+                        // voice reads as the far voice only if it sits there.
+                        anchors.horizontalCenter: !root.duet
+                            && root.textAlignment === Text.AlignHCenter
                             ? hotColumn.horizontalCenter : undefined
-                        anchors.left: root.textAlignment === Text.AlignHCenter
-                            ? undefined : hotColumn.left
+                        anchors.left: !hotColumn.far
+                            && (root.duet || root.textAlignment !== Text.AlignHCenter)
+                            ? hotColumn.left : undefined
+                        anchors.right: hotColumn.far ? hotColumn.right : undefined
 
                         Repeater {
                             model: wordRow.modelData
@@ -527,7 +548,9 @@ Item {
                 width: root.textWidth
                 height: implicitHeight
                 anchors.verticalCenter: lineRow.verticalCenter
-                horizontalAlignment: root.textAlignment
+                horizontalAlignment: root.duet
+                    ? (lineRow.otherVoice ? Text.AlignRight : Text.AlignLeft)
+                    : root.textAlignment
                 verticalAlignment: Text.AlignVCenter
                 wrapMode: lineRow.isHot ? Text.WrapAtWordBoundaryOrAnywhere : Text.NoWrap
                 maximumLineCount: lineRow.isHot ? 3 : 1

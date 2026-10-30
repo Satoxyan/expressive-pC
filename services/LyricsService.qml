@@ -229,7 +229,7 @@ Singleton {
                         time: parseFloat(w[0]),
                         text: String(w[1] ?? "")
                     })).filter(w => !isNaN(w.time))
-                    lines.push({ time: t, text: txt, words })
+                    lines.push({ time: t, text: txt, words, align: line.a === "end" ? "end" : "start" })
                 }
 
                 if (lines.length === 0) { root.status = "not_found"; return }
