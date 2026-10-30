@@ -1027,7 +1027,7 @@ Singleton {
             }
 
             property JsonObject lyrics: JsonObject {
-                property string providers: "musixmatch,paxsenix,unison,netease,youlyplus,betterlyric,simpmusic,lrclib,kugou" // Comma-separated priority order
+                property string providers: "musixmatch,paxsenix,unison,netease,youlyplus,betterlyric,binilyrics,simpmusic,lrclib,kugou" // Comma-separated priority order
             }
 
             property JsonObject networking: JsonObject {

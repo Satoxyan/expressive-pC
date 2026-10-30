@@ -14,7 +14,7 @@ import urllib.request
 import urllib.parse
 import uuid
 
-DEFAULT_PROVIDERS = "musixmatch,youlyplus,unison,netease,paxsenix,betterlyric,simpmusic,lrclib,kugou"
+DEFAULT_PROVIDERS = "musixmatch,youlyplus,unison,netease,paxsenix,betterlyric,binilyrics,simpmusic,lrclib,kugou"
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
@@ -945,6 +945,101 @@ def fetch_betterlyric(title, artist, duration):
 
 
 # ---------------------------------------------------------------------------
+# Provider: binilyrics (lyrics-api.binimum.org)
+# Ported from m-obeid/Mixtapes src/lyrics/providers/binilyrics.rs (GPL-3.0):
+# the open TTML database behind the BetterLyrics extension, with good
+# word-level coverage for Western pop and Japanese tracks. The endpoint does a
+# fuzzy free-text lookup and returns rows carrying a timing type and a URL at
+# which the TTML document lives.
+# ---------------------------------------------------------------------------
+
+BINILYRICS_URL = "https://lyrics-api.binimum.org/getLyrics"
+BINILYRICS_HEADERS = {"User-Agent": "BetterLyrics/1.0"}
+# Titles so common that they identify no recording on their own.
+BINILYRICS_GENERIC_TITLES = {
+    "intro", "outro", "interlude", "skit", "prelude", "overture", "untitled",
+    "bonus", "bonustrack", "instrumental", "reprise", "epilogue", "prologue",
+}
+
+
+def _binilyrics_is_generic(title):
+    norm = re.sub(r"[^a-z0-9 ]", "", title.lower()).strip()
+    if not norm:
+        return True
+    return (norm.replace(" ", "") in BINILYRICS_GENERIC_TITLES
+            or re.match(r"^track\s*0*\d+$", norm) is not None)
+
+
+def _binilyrics_hits(data):
+    hits = []
+    for row in data.get("results") or []:
+        if not isinstance(row, dict):
+            continue
+        url = (row.get("lyricsUrl") or "").strip()
+        name = (row.get("track_name") or row.get("name") or "").strip()
+        if not url or not name:
+            continue
+        try:
+            duration = int(float(row.get("duration") or 0))
+        except (TypeError, ValueError):
+            duration = 0
+        hits.append({
+            "name": name,
+            "artist": (row.get("artist_name") or "").strip(),
+            "duration": duration,
+            # A syllable is timed as finely as a word is.
+            "word_level": (row.get("timing_type") or "") in ("word", "syllable"),
+            "url": url,
+        })
+    return hits
+
+
+def _binilyrics_pick(hits, title, artist, duration):
+    qa = clean_artist(artist).lower()
+    if qa:
+        matched = [h for h in hits
+                   if qa in h["artist"].lower() or (h["artist"].lower() and h["artist"].lower() in qa)]
+        if matched:
+            hits = matched
+        elif _binilyrics_is_generic(title):
+            # "Intro" from some other artist cannot be claimed as these
+            # lyrics, and there is no artist left to verify against.
+            return None
+    # The same-recording scoring used for Apple Music, then word timing on top
+    # of it: the search is fuzzy, so the reward has to outweigh a closer
+    # duration rather than merely tie with one.
+    scored = _score_apple_results(hits, title, artist, duration)
+    if not scored:
+        return None
+    scored.sort(key=lambda r: r[1] + (100 if r[0]["word_level"] else 0), reverse=True)
+    return scored[0][0]
+
+
+def fetch_binilyrics(title, artist, duration):
+    query = f"{clean_title(title)} {clean_artist(artist)}".strip()
+    try:
+        data = _http_json(BINILYRICS_URL + "?q=" + _q(query), headers=BINILYRICS_HEADERS)
+    except Exception:
+        return []
+    best = _binilyrics_pick(_binilyrics_hits(data), title, artist, duration)
+    if not best:
+        return []
+    try:
+        ttml = _http(best["url"], headers=BINILYRICS_HEADERS)
+    except Exception:
+        return []
+    lines = ttml_to_lrc(ttml)
+    if not lines:
+        return []
+    if best["word_level"] and not any(l.get("words") for l in lines):
+        # The row promised word timing and the document does not have it, so
+        # handing over a line-only result would leave the sweep guessing; let
+        # the next provider try instead.
+        return []
+    return lines
+
+
+# ---------------------------------------------------------------------------
 # Provider: simpmusic (YouTube videoId based)
 # ---------------------------------------------------------------------------
 
@@ -1224,6 +1319,7 @@ PROVIDERS = {
     "netease": fetch_netease,
     "paxsenix": fetch_paxsenix,
     "betterlyric": fetch_betterlyric,
+    "binilyrics": fetch_binilyrics,
     "simpmusic": fetch_simpmusic,
     "lrclib": fetch_lrclib,
     "kugou": fetch_kugou,
