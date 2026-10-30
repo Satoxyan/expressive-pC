@@ -1,7 +1,3 @@
-
-
-
-
 <div align="center">
 
 # 💠 expressive-pC
@@ -29,14 +25,15 @@ Customized and maintained by **Satoxyan**
 ---
 
 ## 📸 Screenshots
+
 <div align="center">
 
-| 🎵 Lyrics | 🖼️ Online Wallpapers |
-|:---:|:---:|
+|             🎵 Lyrics              |        🖼️ Online Wallpapers        |
+| :--------------------------------: | :--------------------------------: |
 | ![Screenshot 1](screenshots/1.png) | ![Screenshot 2](screenshots/2.png) |
-| 🪟 Desktop Widgets | 🔧 Hyprland Configs |
+|         🪟 Desktop Widgets         |        🔧 Hyprland Configs         |
 | ![Screenshot 5](screenshots/5.png) | ![Screenshot 6](screenshots/6.png) |
-| ⚙️ Configurable Bar | ✨ And More |
+|        ⚙️ Configurable Bar         |            ✨ And More             |
 | ![Screenshot 3](screenshots/3.png) | ![Screenshot 4](screenshots/4.png) |
 
 </div>
@@ -74,10 +71,11 @@ git clone https://github.com/Satoxyan/dots-hyprfork.git
 cd dots-hyprfork
 ./setup install
 ```
+
 Then press `Ctrl + Alt + D` to open the dots switcher and select expressive-pC
 
-
 ### 📝 Manual Install
+
 if you already had setup from [dots-hyprfork](https://github.com/Satoxyan/dots-hyprfork/tree/main), you could do this instead
 
 ```bash
@@ -103,7 +101,7 @@ hl.env("qsConfig", "ii")
 to:
 
 ```lua
-hl.env("qsConfig", "end4-pC")
+hl.env("qsConfig", "expressive-pC")
 ```
 
 > [!TIP]

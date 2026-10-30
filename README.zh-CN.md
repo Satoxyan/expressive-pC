@@ -1,7 +1,3 @@
-
-
-
-
 <div align="center">
 
 # 💠 end4-pC
@@ -28,14 +24,15 @@
 ---
 
 ## 📸 截图
+
 <div align="center">
 
-| 🎵 歌词 | 🖼️ 在线壁纸 |
-|:---:|:---:|
+|           🎵 歌词            |         🖼️ 在线壁纸          |
+| :--------------------------: | :--------------------------: |
 | ![截图 1](screenshots/1.png) | ![截图 2](screenshots/2.png) |
-| 🪟 桌面小组件 | 🔧 Hyprland 配置 |
+|        🪟 桌面小组件         |       🔧 Hyprland 配置       |
 | ![截图 5](screenshots/5.png) | ![截图 6](screenshots/6.png) |
-| ⚙️ 可配置的状态栏 | ✨ 以及更多功能 |
+|      ⚙️ 可配置的状态栏       |       ✨ 以及更多功能        |
 | ![截图 3](screenshots/3.png) | ![截图 4](screenshots/4.png) |
 
 </div>
@@ -84,7 +81,7 @@ hl.env("qsConfig", "ii")
 改为：
 
 ```lua
-hl.env("qsConfig", "end4-pC")
+hl.env("qsConfig", "expressive-pC")
 ```
 
 > [!TIP]
