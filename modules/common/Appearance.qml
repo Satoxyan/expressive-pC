@@ -31,7 +31,11 @@ Singleton {
     property real autoBackgroundTransparency: { // y = 0.5768x^2 - 0.759x + 0.2896
         let x = wallpaperVibrancy
         let y = 0.5768 * (x * x) - 0.759 * (x) + 0.2896
-        return Math.max(0, Math.min(0.22, y)) - 0.12 * (m3colors.darkmode ? 0 : 1)
+        // Ceiling 0.20, not 0.22: Hyprland's layer rule for quickshell skips
+        // blur below an alpha of 0.79, and a dark low-chroma wallpaper drives
+        // the raw curve past that — the dock and desktop menu then show the
+        // wallpaper unblurred.
+        return Math.max(0, Math.min(0.20, y)) - 0.12 * (m3colors.darkmode ? 0 : 1)
     }
     property real autoContentTransparency: 0.9
     property real backgroundTransparency: Config?.options.appearance.transparency.enable ? Config?.options.appearance.transparency.automatic ? autoBackgroundTransparency : Config?.options.appearance.transparency.backgroundTransparency : 0
