@@ -410,12 +410,32 @@ TestCase {
             "active row is taller than a neighbour (" + hot.height + " vs " + near.height + ")")
     }
 
+    // The texts a row holds. The plain line sits inside a column with its echo,
+    // so one level down is where the lines live; the karaoke words are deeper
+    // and are not texts.
+    function textsOf(row) {
+        const out = []
+        for (const c of row.children) {
+            out.push(c)
+            for (const g of c.children ?? [])
+                out.push(g)
+        }
+        return out
+    }
+
     // The delegate's plain text item. The provider note is aligned too and
     // shows the same text while merely hidden, so what singles the plain row
     // out is that it is the one that gets elided.
     function plainOf(row) {
-        return row.children.find(c => c.horizontalAlignment !== undefined
+        return textsOf(row).find(c => c.horizontalAlignment !== undefined
             && c.text === row.modelData.text && c.elide === Text.ElideRight)
+    }
+
+    // The echo under a neighbour line, when that line has one.
+    function subOf(row) {
+        if (row.bgText.length === 0) return undefined
+        return textsOf(row).find(c => c.text === row.bgText
+            && c.elide === Text.ElideRight)
     }
 
     // ── who sings what, read off the edges ─────────────────────────────────
@@ -466,6 +486,134 @@ TestCase {
         wait(300)
         compare(Math.round(wordRows(list().currentItem)[0].x), 0,
             "and a sung lead starts at the near edge")
+    }
+
+    // ── the voice from the back of the room ────────────────────────────────
+    // A background vocal is marked in the source (TTML `role="x-bg"`), not
+    // guessed from the parentheses a lyric happens to contain, so the echo
+    // arrives as a line of its own with its own word timings.
+    function echoSong() {
+        return [{
+            text: "Can I get a kiss?",
+            time: 0,
+            words: ["Can", "I", "get", "a", "kiss?"]
+                .map((w, i) => ({ text: w, time: i * 0.4 })),
+            bg: {
+                text: "(Can I?)",
+                words: [{ text: "(Can", time: 2 }, { text: "I?)", time: 2.4 }]
+            }
+        }]
+    }
+
+    function test_the_background_vocal_is_not_in_the_lead_line() {
+        LyricsService.load(echoSong(), "")
+        LyricsService.activate(0)
+        wait(300)
+        compare(lyrics.lineRows[0].bgText, "(Can I?)", "the echo travels beside the line")
+        const lead = rows_flat()
+        compare(lead.length, 5, "the lead keeps its own five words")
+        for (const p of lead)
+            verify(!p.text.includes("(") && !p.text.includes(")"),
+                "the echo did not leak into the lead: " + p.text)
+        const echo = lyrics.subRows
+        compare(echo.length, 1, "the echo lays out as one row")
+        compare(echo[0].map(p => p.text).join(" "), "(Can I?)")
+        verify(echo[0][0].isSub === true, "and its pieces say so")
+    }
+
+    function test_the_background_line_sweeps_on_its_own_clock() {
+        LyricsService.load(echoSong(), "")
+        LyricsService.activate(0)
+        wait(300)
+        const rows = wordRows(list().currentItem)
+        compare(rows.length, 2, "the lead row and the echo under it")
+        const lead = wordsOf(rows[0]), echo = wordsOf(rows[1])
+        compare(lead.length, 5)
+        compare(echo.length, 2)
+
+        // The lead has finished its last word while the echo is only halfway
+        // through its first: the two are sung at different moments.
+        LyricsService.activeWordIndex = 4
+        LyricsService.activeWordProgress = 1
+        LyricsService.activeBgWordIndex = 0
+        LyricsService.activeBgWordProgress = 0.5
+        wait(80)
+        compare(fillOf(echo[0]).width.toFixed(1),
+            (0.5 * echo[0].width).toFixed(1),
+            "the echo lit to its own progress")
+        verify(fillOf(echo[1]).width < 1, "the echo's next word is still unsung")
+        compare(fillOf(lead[0]).width, lead[0].width,
+            "the lead does not borrow the echo's position")
+        verify(Math.abs(lead[0].width - echo[0].width) > 1,
+            "the two are not the same size (" + lead[0].width.toFixed(1)
+            + " vs " + echo[0].width.toFixed(1) + ")")
+    }
+
+    function test_the_background_line_is_smaller_and_dimmer() {
+        LyricsService.load(echoSong(), "")
+        LyricsService.activate(0)
+        wait(300)
+        const rows = wordRows(list().currentItem)
+        const lead = wordsOf(rows[0])[0], echo = wordsOf(rows[1])[0]
+        verify(echo.sub, "the echo words say so")
+        verify(echo.height < lead.height,
+            "smaller (" + echo.height.toFixed(1) + " < " + lead.height.toFixed(1) + ")")
+        verify(echo.dimColor.a < lead.dimColor.a, "dimmer before it is sung")
+        verify(echo.litColor.a < lead.litColor.a, "and dimmer once it is")
+        // The echo sits under the lead rather than beside or above it.
+        verify(rows[1].y > rows[0].y + rows[0].height - 1,
+            "the echo is below the line it answers")
+        // The second voice does not jump to the foreground when sung: only the
+        // lead rises and grows.
+        LyricsService.activeBgWordIndex = 0
+        LyricsService.activeBgWordProgress = 0.5
+        wait(80)
+        verify(echo.current, "the echo word is the one being sung")
+        compare(echo.scale, 1.0, "and it does not grow")
+    }
+
+    function test_a_neighbour_line_keeps_its_background_under_it() {
+        const lines = song(6)
+        lines[2].bg = { text: "(ooh ooh)", words: [] }
+        LyricsService.load(lines, "")
+        LyricsService.activate(0)
+        wait(300)
+        const row = list().itemAtIndex(2)
+        verify(row !== null, "the neighbour line is instantiated")
+        if (row === null) return
+        const plain = plainOf(row), echo = subOf(row)
+        verify(echo !== undefined, "and shows its echo")
+        if (echo === undefined) return
+        compare(echo.text, "(ooh ooh)")
+        verify(echo.y > plain.y + plain.height - 1, "directly under the lead line")
+        compare(echo.horizontalAlignment, plain.horizontalAlignment,
+            "on the same edge as the line it answers")
+        verify(echo.font.pixelSize < plain.font.pixelSize, "smaller than the lead")
+        verify(echo.opacity < plain.opacity, "and dimmer")
+        compare(subOf(list().itemAtIndex(3)), undefined, "a line with no echo shows none")
+    }
+
+    function test_the_sung_line_height_counts_the_background() {
+        const lines = echoSong()
+        const bare = echoSong()[0]
+        bare.bg = null
+        LyricsService.load([bare], "")
+        LyricsService.activate(0)
+        wait(400)
+        const guess = lyrics.hotLineGuess
+        const height = list().currentItem.height
+        verify(lyrics.subRows.length === 0, "without an echo there is nothing to count")
+
+        LyricsService.load(lines, "")
+        LyricsService.activate(0)
+        wait(400)
+        verify(lyrics.subRows.length > 0, "the echo laid out")
+        verify(lyrics.hotLineGuess > guess,
+            "the band leaves room for the echo (" + guess.toFixed(1)
+            + " -> " + lyrics.hotLineGuess.toFixed(1) + ")")
+        verify(list().currentItem.height > height,
+            "and the line really is taller (" + height.toFixed(1)
+            + " -> " + list().currentItem.height.toFixed(1) + ")")
     }
 
     // Flatten the wrapped rows back into one list of pieces.

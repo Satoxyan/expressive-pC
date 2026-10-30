@@ -206,82 +206,97 @@ def _ttml_primary_agent(root):
     return None
 
 
-def _ttml_line_text(p):
-    """Extract plain text from a TTML <p> element, merging syllables.
+def _ttml_parse_line(p):
+    """Walk ONE level of a <p>: the words, the bare text, and the echoes.
 
-    Consecutive spans without a space between them (tail is None or empty)
-    are joined into single words, matching the karaoke word boundaries.
+    Returns (spans, others, bg_spans) where spans is [{t, w, space}] for the
+    line's own spans and others collects the plain text around them. Roles are
+    checked before timing because a background span carries begin/end too, and
+    descending into it would sing the echo as part of the lead line — which is
+    what an all-descendants walk used to do here. The tail of a background span
+    is still collected, so dropping the echo does not take its space with it.
     """
     spans = []
-    for span in p.iter():
-        tag = span.tag.rsplit("}", 1)[-1]
-        if tag != "span":
+    others = []
+    bg_spans = []
+    head = (p.text or "").strip()
+    if head:
+        others.append(head)
+    for child in p:
+        tag = child.tag.rsplit("}", 1)[-1] if isinstance(child.tag, str) else ""
+        role = _ttml_role(child) if tag == "span" else ""
+        tail = child.tail or ""
+        if tag == "span" and role == "x-bg":
+            bg_spans.append(child)
+            if tail:
+                others.append(tail)
             continue
-        role = _ttml_role(span)
-        if role in ("x-translation", "x-roman", "x-bg"):
+        if tag == "span" and role in ("x-translation", "x-roman"):
             continue
-        if span.text and span.text.strip():
-            has_space = span.tail is not None and len(span.tail) > 0
-            spans.append((span.text.strip(), has_space))
-
-    if spans:
-        words = []
-        for text, has_space in spans:
-            if words and not words[-1][1]:
-                words[-1] = (words[-1][0] + text, has_space)
-            else:
-                words.append((text, has_space))
-        return " ".join(w[0] for w in words)
-
-    return " ".join("".join(p.itertext()).split())
+        text = "".join(child.itertext()).strip()
+        # tail is the text node AFTER </span>; non-empty = space = word boundary
+        has_space = len(tail) > 0
+        if tag == "span" and text:
+            spans.append({"t": child.get("begin"), "w": text, "space": has_space})
+        elif text:
+            others.append(text)
+        if tail:
+            others.append(tail)
+    return spans, others, bg_spans
 
 
-def _ttml_line_words(p):
-    """Extract per-word timings from a TTML <p> element (Apple Music style).
+def _ttml_merge_syllables(spans):
+    """Join consecutive spans that have no space between them into one word.
 
-    Each <span> typically carries its own begin time. Consecutive spans
-    without a space between them (tail is None or empty) are merged into
-    a single word (syllable merging) so the karaoke sweep highlights
-    whole words instead of individual syllables.
+    A provider that times syllables ("Ha","ppy") rather than words would
+    otherwise hand the sweep one lit piece per syllable.
     """
-    words = []
-    for span in p.iter():
-        tag = span.tag.rsplit("}", 1)[-1]
-        if tag != "span":
-            continue
-        role = _ttml_role(span)
-        if role in ("x-translation", "x-roman", "x-bg"):
-            continue
-        begin = span.get("begin")
-        if begin:
-            text = "".join(span.itertext()).strip()
-            if text:
-                # tail is the text node AFTER </span>; non-empty = space = word boundary
-                tail = span.tail
-                has_space = tail is not None and len(tail) > 0
-                words.append({"t": _ttml_time(begin), "w": text, "_space": has_space})
-
-    if not words:
-        # Sentence-level timing only. Return no words instead of one
-        # whole-line "word": a single word spanning the line renders every
-        # piece with the same index, so the whole sentence lights at once
-        # instead of sweeping word by word.
-        return []
-
-    # Merge syllables: if the previous word had NO space after it,
-    # the current span is a syllable of the same word.
     merged = []
-    for w in words:
-        has_space = w.pop("_space", True)
-        if merged and not merged[-1]["_space"]:
-            merged[-1]["w"] += w["w"]
-            merged[-1]["_space"] = has_space  # carry forward the boundary flag
+    for s in spans:
+        if merged and not merged[-1]["space"]:
+            merged[-1]["w"] += s["w"]
+            merged[-1]["space"] = s["space"]
         else:
-            merged.append({"t": w["t"], "w": w["w"], "_space": has_space})
-
-    for w in merged:
-        w.pop("_space", None)
+            merged.append({"t": s["t"], "w": s["w"], "space": s["space"]})
     return merged
+
+
+def _ttml_line_words(spans):
+    """Per-word timings of a line (Apple Music style), or [] for line-synced.
+
+    Spans without a begin are skipped before the syllable merge, so an
+    un-timed fragment cannot glue itself into the middle of a timed word.
+    """
+    timed = [s for s in spans if s["t"]]
+    if not timed:
+        # Sentence-level timing only. Return no words instead of one whole-line
+        # "word": a single word spanning the line renders every piece with the
+        # same index, so the whole sentence lights at once instead of sweeping.
+        return []
+    return [{"t": _ttml_time(s["t"]), "w": s["w"]} for s in _ttml_merge_syllables(timed)]
+
+
+def _ttml_line_text(spans, others):
+    if spans:
+        return " ".join(w["w"] for w in _ttml_merge_syllables(spans))
+    return " ".join(" ".join(others).split())
+
+
+def _ttml_bg_text(bg_spans):
+    """The echoes of a line: one text plus their own word timings.
+
+    Several echo spans in one line answer the same phrase, so they read as a
+    single background line rather than one line per span.
+    """
+    texts = []
+    words = []
+    for bg in bg_spans:
+        spans, others, _ = _ttml_parse_line(bg)
+        timed = _ttml_line_words(spans)
+        texts.append(_ttml_line_text(spans, others))
+        words.extend(timed)
+    words.sort(key=lambda w: w["t"])
+    return {"text": " ".join(t for t in texts if t).strip(), "words": words}
 
 
 def ttml_to_lrc(ttml):
@@ -298,14 +313,16 @@ def ttml_to_lrc(ttml):
         begin = p.get("begin")
         if not begin:
             continue
-        text = _ttml_line_text(p)
+        spans, others, bg_spans = _ttml_parse_line(p)
+        text = _ttml_line_text(spans, others)
         if not text:
             continue
         agent = _ttml_attr(p, "agent")
         lines.append({
             "time": _ttml_time(begin),
             "text": text,
-            "words": _ttml_line_words(p),
+            "words": _ttml_line_words(spans),
+            "bg": _ttml_bg_text(bg_spans),
             "align": "end" if primary and agent and agent != primary else "start",
         })
     return sorted(lines, key=lambda x: x["time"])
@@ -1459,6 +1476,26 @@ def probe_all(title, artist, duration, providers=None):
                      ensure_ascii=False, separators=(",", ":")), flush=True)
 
 
+def _payload_line(line):
+    """One line as the widget reads it: t, x, w (words), a (voice edge).
+
+    The background vocal of a line — the echo the source tags x-bg, like
+    "(can I?)" answering "can I get a kiss?" — goes in b/bw only when the
+    provider actually marked one, so an ordinary line costs nothing extra.
+    """
+    out = {
+        "t": line["time"],
+        "x": line["text"].replace("§", ""),
+        "w": [[w["t"], w["w"]] for w in line.get("words") or []],
+        "a": line.get("align") or "start",
+    }
+    bg = line.get("bg") or {}
+    if bg.get("text"):
+        out["b"] = bg["text"].replace("§", "")
+        out["bw"] = [[w["t"], w["w"]] for w in bg.get("words") or []]
+    return out
+
+
 def main():
     if len(sys.argv) < 4:
         print("no_info", flush=True)
@@ -1491,15 +1528,7 @@ def main():
             payload = {
                 "ok": True,
                 "provider": name,
-                "lines": [
-                    {
-                        "t": line["time"],
-                        "x": line["text"].replace("§", ""),
-                        "w": [[w["t"], w["w"]] for w in line.get("words") or []],
-                        "a": line.get("align") or "start",
-                    }
-                    for line in lines
-                ],
+                "lines": [_payload_line(line) for line in lines],
             }
             print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), flush=True)
             return

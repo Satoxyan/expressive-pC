@@ -60,6 +60,44 @@ Singleton {
     // the sweep tracks the real song instead of guessed per-word times.
     property real activeLineProgress: 0
 
+    // Word-level state of the background vocal of the active line: the echo
+    // the source tags x-bg ("(can I?)" answering "can I get a kiss?"). It is
+    // sung on its own timings, so it cannot ride the lead's index.
+    property int activeBgWordIndex: -1
+    property real activeBgWordProgress: 0
+
+    // The same capping rules as updateActiveWords(), copied on purpose rather
+    // than shared: that function is the production word path and nothing in
+    // the suite exercises it (the QML tests run against a double), so pulling
+    // its body out to reuse it here would move tested-by-nobody timing code
+    // for no measurable gain. Change one, change both.
+    function updateActiveBgWords() {
+        const words = root.lyricsLines[root.activeIndex]?.bg?.words ?? []
+        if (words.length === 0) {
+            root.activeBgWordIndex = -1
+            root.activeBgWordProgress = 0
+            return
+        }
+        const pos = root.shiftedPos()
+        let idx = -1
+        for (let i = 0; i < words.length; i++) {
+            if (words[i].time <= pos) idx = i
+            else break
+        }
+        root.activeBgWordIndex = idx
+        if (idx < 0) {
+            root.activeBgWordProgress = 0
+            return
+        }
+        // A background echo ends with the line, not with a next echo word, so
+        // the last of them sweeps to the next line's start instead of snapping.
+        const to = idx + 1 < words.length
+            ? words[idx + 1].time
+            : root.lyricsLines[root.activeIndex + 1]?.time ?? words[idx].time + root.maxWordSpan
+        const span = Math.min(Math.max(0.001, to - words[idx].time), root.maxWordSpan)
+        root.activeBgWordProgress = Math.min(1, Math.max(0, (pos - words[idx].time) / span))
+    }
+
     function updateActiveWords() {
         const line = root.lyricsLines[root.activeIndex]
         const words = line?.words ?? []
@@ -165,6 +203,7 @@ Singleton {
             const idx = root.indexAt(root.shiftedPos())
             root.activeIndex = idx
             root.updateActiveWords()
+            root.updateActiveBgWords()
         }
     }
 
@@ -229,7 +268,17 @@ Singleton {
                         time: parseFloat(w[0]),
                         text: String(w[1] ?? "")
                     })).filter(w => !isNaN(w.time))
-                    lines.push({ time: t, text: txt, words, align: line.a === "end" ? "end" : "start" })
+                    // The echo of this line, on its own timings. Absent for
+                    // every provider that does not mark one.
+                    const bg = (line.b && String(line.b).trim()) ? {
+                        text: String(line.b),
+                        words: (line.bw || []).map(w => ({
+                            time: parseFloat(w[0]),
+                            text: String(w[1] ?? "")
+                        })).filter(w => !isNaN(w.time))
+                    } : null
+                    lines.push({ time: t, text: txt, words, bg,
+                                 align: line.a === "end" ? "end" : "start" })
                 }
 
                 if (lines.length === 0) { root.status = "not_found"; return }
@@ -320,6 +369,8 @@ Singleton {
         root.providedBy = ""
         root.activeWordIndex = -1
         root.activeWordProgress = 0
+        root.activeBgWordIndex = -1
+        root.activeBgWordProgress = 0
         root.activeLineProgress = 0
         root.status = "loading"
 

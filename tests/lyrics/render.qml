@@ -30,10 +30,13 @@ Window {
     Component.onCompleted: {
         LyricsService.load([
             { text: "far behind the sweep", time: 0 },
-            { text: "just behind the sweep", time: 1 },
+            { text: "just behind the sweep", time: 1, bg: { text: "(answering back)", words: [] } },
             { text: "the line being sung beautifully right now with words in it", time: 2,
               words: "the line being sung beautifully right now with words in it".split(" ")
-                  .map((w, i) => ({ text: w, time: 2 + i * 0.3 })) },
+                  .map((w, i) => ({ text: w, time: 2 + i * 0.3 })),
+              bg: { text: "(ooh, singing along)",
+                    words: [{ text: "(ooh,", time: 3 }, { text: "singing", time: 3.4 },
+                            { text: "along)", time: 3.8 }] } },
             { text: "just ahead of the sweep", time: 6 },
             { text: "far ahead of the sweep", time: 7 },
             { text: "even further ahead", time: 8 }
@@ -41,6 +44,10 @@ Window {
         LyricsService.activate(2)
         LyricsService.activeWordIndex = 4
         LyricsService.activeWordProgress = 0.5
+        // The echo is sung after the line it answers, so its own clock is well
+        // behind the lead's at this moment.
+        LyricsService.activeBgWordIndex = 1
+        LyricsService.activeBgWordProgress = 0.4
         timer.restart()
     }
 
