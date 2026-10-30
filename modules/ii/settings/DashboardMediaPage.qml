@@ -385,11 +385,14 @@ Item {
             Lyrics {
                 id: lyricsView
                 anchors.fill: parent
+                // A fixed block of nine lines: four behind the one being sung and
+                // four ahead of it, held centred in the card. The lines this high
+                // and this big are read by their position rather than their
+                // distance, so an endless scroll past them only makes the card
+                // busy; four is what the box actually fits whole.
+                lineContext: 4
                 fontScale: 1.8
-                animateTransitions: true
                 lineSpacing: 28
-                contextBefore: 4
-                contextAfter: 4
                 textAlignment: Text.AlignHCenter
                 textColor: root.fg
                 activeColor: root.colors.colPrimary

@@ -1,0 +1,4 @@
+module qs.modules.common.widgets
+Lyrics 1.0 ../../../../../../modules/common/widgets/Lyrics.qml
+StyledText 1.0 ../../../../../../modules/common/widgets/StyledText.qml
+MaterialLoadingIndicator 1.0 MaterialLoadingIndicator.qml

@@ -286,6 +286,11 @@ Item {
                 Lyrics {
                     id: lyricsComp
                     anchors.fill: parent
+                    // A fixed block of seven lines: three behind the one being
+                    // sung, three ahead of it, and the opacity ladder carries the
+                    // distance instead of an endless scroll of dead lines running
+                    // off the top and bottom of this column.
+                    lineContext: 3
                     opacity: (MprisController.activePlayer !== null && Config.options.sidebar.media.showLyrics) ? 1 : 0
                     textAlignment: Text.AlignHCenter
                     textColor: blendedColors.colOnLayer0
@@ -420,7 +425,7 @@ Item {
                                     value: (sliderLoader.player?.position ?? 0) / (sliderLoader.player?.length ?? 1)
                                     onMoved: {
                                         sliderLoader.player.position = value * sliderLoader.player.length
-                                        lyricsComp.restartLyrics()
+                                        LyricsService.resync()
                                     }
                                 }
                             }

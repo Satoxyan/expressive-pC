@@ -746,6 +746,16 @@ AbstractBackgroundWidget {
                         anchors.fill: parent
                         anchors.leftMargin: 16
                         anchors.rightMargin: 16
+                        // Never cut a line in half: the strip is 250px of a card
+                        // that has room around it, so the lines on their way in
+                        // and out are allowed to paint past its edges. The card
+                        // itself still clips at its own border.
+                        clipOverflowY: -1
+                        // Two lines behind the sung one and two ahead of it: the
+                        // card is taller than that block needs, and the lines
+                        // further away than this are not worth the room they
+                        // would take.
+                        lineContext: 2
                         textAlignment: Text.AlignHCenter
                         textColor: Appearance.colors.colOnPrimaryContainer
                         activeColor: Appearance.colors.colPrimary
@@ -884,11 +894,16 @@ AbstractBackgroundWidget {
                     topRightRadius: 0
                     bottomLeftRadius: card.radius
                     bottomRightRadius: card.radius
-                    clip: true
+                    // Not clipped: this area is only as tall as it is, and a
+                    // line cut in half at its edge is worse than one that runs
+                    // a little past it. The card itself still clips at its border.
+                    clip: false
 
                     Lyrics {
                         anchors.fill: parent
                         anchors.margins: 10
+                        clipOverflowY: -1
+                        lineContext: 2
                         textAlignment: Text.AlignHCenter
                         textColor: Appearance.colors.colOnPrimaryContainer
                         activeColor: Appearance.colors.colPrimary

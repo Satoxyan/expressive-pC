@@ -26,19 +26,6 @@ Singleton {
     property int activeIndex: -1
     property string status: "loading"
     property string providedBy: ""
-    property var slots: []
-
-    // Slot index (0..total-1) where the "Lyrics provided by …" note sits,
-    // right after the last lyric line once it scrolls into the window.
-    // -1 = not visible yet.
-    property int noteSlot: -1
-
-    // Jendela baris di sekitar baris aktif yang dibangun service. Tiap
-    // instance Lyrics memotong sesuai contextBefore/After masing-masing;
-    // harus >= instance terlebar (dashboard: 4/4).
-    readonly property int before: 4
-    readonly property int after:  4
-    readonly property int total:  before + after + 1
 
     // Fixed lyric sync offset (ms). Negative = words/lines light up EARLIER,
     // positive = later. Hardcoded so it can't disturb the lyric logic.
@@ -65,31 +52,13 @@ Singleton {
     }
 
     // Word-level karaoke state for the active line
-    property var activeLineWords: []
     property int activeWordIndex: -1
     property real activeWordProgress: 0
 
     // Sentence-level sweep (0..1) across the active line, used when the
     // source only carries line timing: line start -> next line start, so
-    // the glow tracks the real song instead of guessed per-word times.
+    // the sweep tracks the real song instead of guessed per-word times.
     property real activeLineProgress: 0
-
-    function buildSlots(idx) {
-        let result = []
-        for (let i = 0; i < root.total; i++) {
-            let lineIdx = idx - root.before + i
-            if (lineIdx >= 0 && lineIdx < root.lyricsLines.length)
-                result.push(root.lyricsLines[lineIdx].text || "♪")
-            else
-                result.push("")
-        }
-        // Note sits one slot after the last lyric line once that line is
-        // inside the window, and scrolls up with it toward the end.
-        const lastSlot = root.lyricsLines.length - 1 - idx + root.before
-        root.noteSlot = (root.lyricsLines.length > 0 && lastSlot >= 0 && lastSlot <= root.total - 2)
-            ? lastSlot + 1 : -1
-        return result
-    }
 
     function updateActiveWords() {
         const line = root.lyricsLines[root.activeIndex]
@@ -102,7 +71,6 @@ Singleton {
             ? Math.min(1, Math.max(0, (pos - line.time) / (lineEnd - line.time)))
             : (line && pos >= line.time ? 1 : 0)
         if (!words || words.length === 0) {
-            root.activeLineWords = []
             root.activeWordIndex = -1
             root.activeWordProgress = 0
             return
@@ -112,7 +80,6 @@ Singleton {
             if (words[i].time <= pos) idx = i
             else break
         }
-        root.activeLineWords = words
         root.activeWordIndex = idx
         if (idx >= 0 && idx + 1 < words.length) {
             // Fill the word from its start toward the next word's start, but
@@ -127,7 +94,7 @@ Singleton {
             root.activeWordProgress = Math.min(1, Math.max(0, (pos - words[idx].time) / span))
         } else if (idx >= 0) {
             // Last word of the line: there is no next word, so it used to
-            // snap to 100% and only glow. Sweep it across the rest of the
+            // snap to 100% and only light up. Sweep it across the rest of the
             // line up to the next line's start instead, still capped so a
             // long pause before the next line can't make it crawl.
             const lineEnd = root.lyricsLines[root.activeIndex + 1]?.time
@@ -186,7 +153,7 @@ Singleton {
         id: syncTimer
         // 50ms so the word sweep tracks the audio smoothly even for fast
         // real word timings; at 200ms a newly active word jumps straight to
-        // a large progress and the glow looks choppy.
+        // a large progress and the sweep looks choppy.
         interval: 50
         repeat: true
         running: root.synced
@@ -196,10 +163,7 @@ Singleton {
             root.basePosition = root.activePlayer?.position ?? 0
             root.baseTime = Date.now()
             const idx = root.indexAt(root.shiftedPos())
-            if (idx !== root.activeIndex) {
-                root.activeIndex = idx
-                root.slots = root.buildSlots(idx)
-            }
+            root.activeIndex = idx
             root.updateActiveWords()
         }
     }
@@ -208,10 +172,7 @@ Singleton {
         boundaryTimer.stop()
         if (!root.synced) return
         const idx = root.indexAt(root.currentPosition() + root.leadSeconds)
-        if (idx !== root.activeIndex) {
-            root.activeIndex = idx
-            root.slots = root.buildSlots(idx)
-        }
+        root.activeIndex = idx
         const next = root.lyricsLines[idx + 1]
         if (!root.playing || !next) return
         const delay = (next.time - root.leadSeconds - root.currentPosition()) * 1000
@@ -285,7 +246,6 @@ Singleton {
 
                 root.lyricsLines = lines
                 root.activeIndex = -1
-                root.slots = root.buildSlots(-1)
                 root.status = "ok"
                 root.resync()
             }
@@ -358,9 +318,6 @@ Singleton {
         root.lyricsLines = []
         root.activeIndex = -1
         root.providedBy = ""
-        root.slots = root.buildSlots(-1)
-        root.noteSlot = -1
-        root.activeLineWords = []
         root.activeWordIndex = -1
         root.activeWordProgress = 0
         root.activeLineProgress = 0

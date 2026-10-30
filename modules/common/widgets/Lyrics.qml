@@ -5,16 +5,23 @@ import qs.modules.common.widgets
 import qs.services
 import Qt5Compat.GraphicalEffects
 import QtQuick
-import QtQuick.Layouts
-import Quickshell.Io
 
 Item {
     id: root
 
-    // Never paint beyond the widget: when the active line grows to many
-    // rows, the overflow is cut at the edge instead of overlapping the
-    // info column.
-    clip: true
+    // How much taller than the widget the list's clip box is, on each of the
+    // two ends. A line on its way in or out is sliced in half by the widget's
+    // edge, which reads as a broken glyph rather than as a fading line, so a
+    // host with spare room around the widget can move the cut down the list —
+    // where the opacity ladder has already taken the words to near-invisible.
+    // Zero by default: the dashboard and the sidebar give the lyrics every
+    // pixel they have, and for them the widget edge is the right bound.
+    // Negative takes the cut out altogether: the list keeps its size, its pan
+    // and which lines it decides to draw, but stops clipping, so nothing is
+    // ever sliced at the widget's edge even when it sits past the edge.
+    property real clipOverflowY: 0
+    // A negative value is a mode, not an amount of room, so it adds nothing.
+    readonly property real overflowY: Math.max(0, clipOverflowY)
 
     property color textColor: "white"
     property color activeColor: "white"
@@ -23,46 +30,47 @@ Item {
     property color indicatorShapeColor: Appearance.colors.colOnPrimaryContainer
     property int textAlignment: Text.AlignLeft
     property real fontScale: 1.0
-    property bool animateTransitions: false
-    // Default = jarak yang selama ini dipakai semua instance non-dashboard
-    // (dulu konstan slotSpacing 5); dashboard membukanya jadi 28.
-    property real lineSpacing: 5
-
-    // Jumlah baris sebelum/sesudah baris aktif untuk instance ini. Service
-    // membangun jendela terlebar (4/4); instance lebih sempit memotongnya,
-    // jadi sidebar/media tetap 2/2 seperti semula.
-    property int contextBefore: 2
-    property int contextAfter: 2
-
-    readonly property int slotCount: root.contextBefore + root.contextAfter + 1
-    readonly property int activeSlot: root.contextBefore
-    readonly property int sliceOffset: LyricsService.before - root.contextBefore
-    readonly property int localNoteSlot: LyricsService.noteSlot >= 0
-        ? LyricsService.noteSlot - root.sliceOffset
-        : -1
-
-    function slotText(i) {
-        const s = i + root.sliceOffset
-        return (s >= 0 && s < LyricsService.slots.length) ? LyricsService.slots[s] : ""
-    }
-
-    // When true, the past/future lines keep only their natural line height
-    // and cluster tightly around the active line (extra space becomes
-    // symmetric padding above/below the cluster) instead of spreading
-    // evenly across the whole widget.
-    property bool compactNeighbors: false
-
     property bool karaoke: true
+    // Air between the lines of the list. Hosts that show the lyrics big ask
+    // for more (the dashboard uses 28); the default is one Material spacing
+    // step, which reads tight enough for a sidebar or a media card.
+    property real lineSpacing: Appearance.spacing.space100
+
+    // How many lines the widget keeps on each side of the one being sung.
+    // Negative, the default: the whole list stays drawn and the opacity ladder
+    // carries the distance, which is what the dashboard and the sidebar want —
+    // the lyrics are the only thing in their space, so empty room around a
+    // short line would read as a hole. A host that asks for a window gets a
+    // fixed block of text instead: the same number of lines on each side of
+    // the sung one, and the leftover room left empty rather than filled with
+    // dead lines.
+    property int lineContext: -1
+
+    // Not a Config option: this exists for the offscreen render probe. A word
+    // behind a glow layer is a ShaderEffect, and those do not appear in a
+    // grabbed image at all, so with the glow on the sweep cannot be measured.
+    property bool glowEnabled: true
+
+    // Air kept between the text and the widget's own clip edge. The word being
+    // sung rises, grows and glows a few pixels past its ink, and the leftmost
+    // word of a row sits right on that edge, so its glow used to be sliced
+    // flat. Eight is a hair more than the glow's radius (7), which is how far
+    // the light reaches past the word. Insetting the text inside the widget
+    // moves the problem away without any host having to resize its cover canvas
+    // or re-anchor the widget.
+    property real contentInset: 8
+    // The width the text may actually use, once that air is kept on both sides
+    // so a centered line stays centered.
+    readonly property real textWidth: Math.max(1, width - 2 * contentInset)
 
     implicitWidth: 200
     implicitHeight: 200
 
     readonly property int activeFontSize: Appearance.font.pixelSize.normal
-    readonly property int adjFontSize: Appearance.font.pixelSize.smaller
     readonly property int farFontSize: Appearance.font.pixelSize.smallest
 
     function fontSizeFor(dist) {
-        // Big (active) to small (far) gradient, stepping every slot so the
+        // Big (active) to small (far) gradient, stepping every line so the
         // past/future lines visibly shrink away from the highlighted one;
         // the whole gradient scales with fontScale (dashboard asks 1.8).
         return Math.max(root.farFontSize, root.activeFontSize - dist * 2) * root.fontScale
@@ -74,132 +82,167 @@ Item {
         return 0.15
     }
 
-    // ── Vertical budgeting ────────────────────────────────────────────────
-    // The active line may wrap to two or three rows; if it claimed its full
-    // wrapped height the five other slots would be left a few pixels each and
-    // their single lines would overlap. So the non-active slots are given a
-    // hard minimum (their own line height) and the active slot is capped to
-    // the number of full rows that fit after those minimums are reserved.
-    // The result: past/future lines always keep a comfortable height and the
-    // active line shows as many complete rows as there is room for, clipping
-    // the overflow instead of squeezing the neighbors.
-
-    FontMetrics {
-        id: activeRowMetrics
-        font {
-            family: Appearance.font.family.main
-            pixelSize: root.fontSizeFor(0)
-            variableAxes: Appearance.font.variableAxes.main
-        }
-    }
-
-    // QFontMetrics understates the rendered karaoke line height slightly
-    // (variable fonts), which would clip the last wrapped row by a few
-    // pixels. Measure a real one-line Text at the active font instead.
-    Text {
-        id: rowMeter
-        opacity: 0
-        width: 200
-        height: implicitHeight
-        font {
-            family: Appearance.font.family.main
-            pixelSize: root.fontSizeFor(0)
-            variableAxes: Appearance.font.variableAxes.main
-        }
-        text: "Ag"
-    }
-    FontMetrics {
-        id: nearLineMetrics
-        font {
-            family: Appearance.font.family.main
-            pixelSize: root.fontSizeFor(1)
-            variableAxes: Appearance.font.variableAxes.main
-        }
-    }
-    FontMetrics {
-        id: midLineMetrics
-        font {
-            family: Appearance.font.family.main
-            pixelSize: root.fontSizeFor(2)
-            variableAxes: Appearance.font.variableAxes.main
-        }
-    }
-    FontMetrics {
-        id: farLineMetrics
-        font {
-            family: Appearance.font.family.main
-            pixelSize: root.fontSizeFor(3)
-            variableAxes: Appearance.font.variableAxes.main
-        }
-    }
-
-    readonly property real lineSlack: 4
-    readonly property real rowHeight:
-        rowMeter.implicitHeight > 0 ? rowMeter.implicitHeight : activeRowMetrics.height
+    readonly property int motionDuration: 320
     readonly property real rowSpacing: 4
-    readonly property real slotGap: root.lineSpacing + (root.compactNeighbors ? 6 : 0)
-    readonly property real uniformSlotHeight:
-        Math.max(0, (root.height - (root.slotCount - 1) * root.slotGap) / root.slotCount)
 
-    function comfortableHeightFor(dist) {
-        if (dist === 1) return Math.max(8, nearLineMetrics.height - root.lineSlack)
-        if (dist === 2) return Math.max(8, midLineMetrics.height - root.lineSlack)
-        return Math.max(8, farLineMetrics.height - root.lineSlack)
+    // The list is every lyric line plus the provider attribution trailing the
+    // last one, so the note scrolls up with the end of the song instead of
+    // being pinned inside the widget.
+    readonly property var lineRows: {
+        const lines = LyricsService.lyricsLines ?? []
+        const rows = []
+        for (let i = 0; i < lines.length; i++)
+            rows.push({ text: lines[i].text || "♪", note: false })
+        if (lines.length > 0 && LyricsService.providedBy.length > 0)
+            rows.push({ text: "Lyrics provided by " + LyricsService.providedBy, note: true })
+        return rows
     }
 
-    // Total height the non-active slots need to keep their lines readable.
-    // Computed over the actual slot distances so it tracks before/after.
-    readonly property real comfortableReserve: {
-        let sum = 0
-        for (let i = 0; i < root.slotCount; i++) {
-            if (i === root.activeSlot) continue
-            sum += root.comfortableHeightFor(Math.abs(i - root.activeSlot))
+    // ── Karaoke word layout for the active line ────────────────────────────
+    // Only the active line needs per-word items; the neighbours stay one plain
+    // text each, so a widget showing seven lines pays one wrapped word layout
+    // instead of seven.
+
+    FontMetrics {
+        id: hotMetrics
+        font {
+            family: Appearance.font.family.main
+            pixelSize: root.fontSizeFor(0)
+            variableAxes: Appearance.font.variableAxes.main
         }
-        return sum
     }
 
-    // Room the active slot may take once every other slot keeps its minimum:
-    // the widget height minus the layout gaps and the others' reserves.
-    readonly property real activeRoom:
-        Math.max(root.rowHeight, root.height
-            - (root.slotCount - 1) * root.slotGap - root.comfortableReserve)
+    readonly property var hotRows: root.buildHotRows()
 
-    // Largest whole number of active rows that fit in that room; the cap is
-    // that many rows (not the room itself), so the active slot never ends on
-    // a sliver of a cut row.
-    readonly property int fitRows:
-        Math.max(1, Math.floor((root.activeRoom + root.rowSpacing) / (root.rowHeight + root.rowSpacing)))
-    readonly property real activeCap:
-        root.fitRows * root.rowHeight + (root.fitRows - 1) * root.rowSpacing
+    // FontMetrics reports the ink advance, but a Text lays itself out on its
+    // bounding box, which is a couple of pixels wider (side bearings). Packing
+    // rows on the bare advance lets a long line outgrow the widget and get cut
+    // at the right edge, so every measurement here carries that slack.
+    function pieceWidth(text) {
+        return Math.ceil(hotMetrics.advanceWidth(text)) + 3
+    }
 
-    // ── Apple Music-style karaoke word sweep ───────────────────────────────
-    // One word: dim base text + active-color copy clipped to the sung
-    // fraction (clip-sweep). The currently-sung word additionally gets a glow.
+    function buildHotRows() {
+        const line = (LyricsService.lyricsLines ?? [])[LyricsService.activeIndex]
+        if (!line) return []
+        // The words come off the line itself, not off a service property: the
+        // service rewrites its word state every 50ms sync tick, and a row layout
+        // rebuilt on that would throw away every word item 20 times a second.
+        const words = line.words ?? []
+        // No word timings from the provider: lay the text out as pieces and let
+        // each own a slice of the line's own duration (index -1 marks that
+        // sentence sweep, so the light wipes left to right instead of every
+        // word filling at once).
+        const sentence = words.length === 0
+        const source = sentence ? [{ text: line.text || "" }] : words
+        const spacing = root.rowSpacing
+        const maxWidth = root.textWidth
+        // Some providers return the whole line as a single "word" (text with
+        // spaces). Split those into display words so the line can wrap instead
+        // of overflowing; every piece keeps the original word index.
+        const pieces = []
+        // Manual row packing never breaks a piece — a piece without spaces (a
+        // run of CJK characters, or a provider that sends the whole line as one
+        // "word") would widen past the row and get cut at the right edge. Break
+        // it into pieces that fit, per character if needed.
+        const fitChunks = (text, idx) => {
+            if (root.pieceWidth(text) <= maxWidth)
+                return [{ index: idx, text: text }]
+            const out = []
+            let cur = ""
+            for (const ch of String(text)) {
+                if (cur !== "" && root.pieceWidth(cur + ch) > maxWidth) {
+                    out.push({ index: idx, text: cur })
+                    cur = ch
+                } else {
+                    cur += ch
+                }
+            }
+            if (cur !== "") out.push({ index: idx, text: cur })
+            return out
+        }
+        for (let i = 0; i < source.length; i++) {
+            const parts = String(source[i].text ?? "").split(/\s+/).filter(s => s.length > 0)
+            for (const part of parts)
+                pieces.push(...fitChunks(part, sentence ? -1 : i))
+        }
+        if (pieces.length === 0) return []
+        let cum = 0
+        for (const p of pieces) {
+            p.w = root.pieceWidth(p.text)
+            p.start = cum
+            cum += p.w + spacing
+        }
+        for (let i = 0; i < pieces.length; i++) {
+            const p = pieces[i]
+            const s = p.start
+            p.order = i
+            p.start = cum > 0 ? s / cum : 0
+            p.end = cum > 0 ? (s + p.w) / cum : 1
+        }
+        // Rows are packed by hand instead of with a Flow, because a Flow fills
+        // the width and always left-aligns its rows — wrapping there looks
+        // off-center in a narrow widget. Each row below is a centered Row.
+        const rows = []
+        let cur = [], curWidth = 0
+        for (let i = 0; i < pieces.length; i++) {
+            const w = pieces[i].w
+            const need = cur.length === 0 ? w : curWidth + spacing + w
+            if (cur.length > 0 && need > maxWidth) {
+                rows.push(cur)
+                cur = []
+                curWidth = 0
+            }
+            cur.push(pieces[i])
+            curWidth = cur.length === 1 ? w : curWidth + spacing + w
+        }
+        if (cur.length > 0) rows.push(cur)
+        return rows
+    }
 
+    function entranceDelay(order) {
+        // A 12-word line at 30ms per word would take 330ms, and the last words
+        // would arrive after the line had already moved on in a fast song.
+        return Math.min(order * 30, 150)
+    }
+
+    // About how tall the sung line is, read from the data instead of from the
+    // item: asking `currentItem` for its height closes a binding loop, because
+    // the band this feeds is what lays the item out. The karaoke column is the
+    // only thing that wraps here, so its row count is the whole story.
+    readonly property real hotLineGuess: {
+        const rows = karaoke && hotRows.length > 0 ? hotRows.length : 1
+        return rows * hotMetrics.height + Math.max(0, rows - 1) * rowSpacing
+    }
+
+    // One karaoke word: the base look this widget already had — a dim copy with
+    // a pure white copy clipped to the fraction the karaoke has crossed, the
+    // pair behind a glow — plus the two motions taken from the reference: the
+    // word being sung rises a little and grows, and the words of a new line
+    // come in one after another.
     component KaraokeWord: Item {
         id: wordItem
+
         required property string word
         required property int wordIndex
         required property real progress
-        required property color dimColor
-        required property int fontSize
+        required property int order
 
         readonly property bool current: wordItem.progress > 0 && wordItem.progress < 1
 
         // Words that have been sung (or are being sung) are pure white, the
-        // maximum brightness. Future words stay dim so the karaoke progress
-        // is clearly visible.
+        // maximum brightness. Future words stay dim so the karaoke progress is
+        // clearly visible.
         readonly property color litColor: "#ffffff"
 
         // Glow fades in on the active word and stays on after the word is
         // passed (slightly dimmed) so sung words keep glowing. The value is
-        // driven from onProgressChanged instead of a binding so it can start
-        // at 0 and animate up: every new line recreates the word items, and
-        // a bound property would take its full value immediately, making the
-        // glow pop in bright on the first word of each line.
+        // driven from onProgressChanged instead of a binding so it can start at
+        // 0 and animate up: every new line recreates the word items, and a
+        // bound property would take its full value immediately, making the glow
+        // pop in bright on the first word of each line.
         property real glowStrength: 0
         property bool glowReady: false
-        Component.onCompleted: wordItem.glowReady = true
         onProgressChanged: {
             if (!wordItem.glowReady) return
             const target = wordItem.progress > 0
@@ -209,368 +252,293 @@ Item {
         }
         Behavior on glowStrength { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
 
+        // Entrance state; flipped true once the staggered pause for this word
+        // ends. A short host gets no entrance at all (an 8px rise inside a
+        // 40px-tall line just clips), so the words start already arrived.
+        readonly property bool entranceAllowed: root.height >= 90
+        property bool entered: !wordItem.entranceAllowed
+
+        // Explicitly sized, not merely implicit: a Row lays out a zero-width
+        // child by its implicit width and leaves the width itself at 0, and the
+        // fill below is a fraction of that width — so a word that never fills.
         implicitWidth: dimText.implicitWidth
         implicitHeight: dimText.implicitHeight
+        width: implicitWidth
+        height: implicitHeight
 
-        // Dim base: future words, not yet reached by the karaoke glow.
-        Text {
-            id: dimText
-            anchors.fill: parent
-            font {
-                family: Appearance.font.family.main
-                pixelSize: wordItem.fontSize
-                variableAxes: Appearance.font.variableAxes.main
-            }
-            color: wordItem.dimColor
-            text: wordItem.word
-            horizontalAlignment: Text.AlignLeft
-            verticalAlignment: Text.AlignVCenter
+        function replayEntrance() {
+            if (!wordItem.entranceAllowed) return
+            wordItem.entered = false
+            entrance.restart()
+        }
+        Component.onCompleted: {
+            wordItem.glowReady = true
+            wordItem.replayEntrance()
         }
 
-        // Pure-white copy, clipped to the sung fraction. Every part of a
-        // word the karaoke has passed turns white; the rest stays dim.
+        SequentialAnimation {
+            id: entrance
+            PauseAnimation { duration: root.entranceDelay(wordItem.order) }
+            PropertyAction { target: wordItem; property: "entered"; value: true }
+        }
+
+        StyledText {
+            id: dimText
+            anchors.fill: parent
+            font.pixelSize: root.fontSizeFor(0)
+            color: root.dimColor
+            text: wordItem.word
+        }
+
+        // The sung part: the same text in white, clipped to the fraction the
+        // sweep has crossed, so the light grows from the left of the word
+        // instead of the whole word lighting at once.
         Item {
-            id: fillClip
             anchors {
                 top: dimText.top
                 bottom: dimText.bottom
                 left: dimText.left
             }
             clip: true
+            visible: wordItem.progress > 0
             width: dimText.width * wordItem.progress
 
-            Text {
+            StyledText {
                 anchors.fill: parent
-                font {
-                    family: dimText.font.family
-                    pixelSize: dimText.font.pixelSize
-                    variableAxes: dimText.font.variableAxes
-                }
+                font: dimText.font
                 color: wordItem.litColor
                 text: wordItem.word
-                horizontalAlignment: Text.AlignLeft
-                verticalAlignment: Text.AlignVCenter
             }
-
-            visible: wordItem.progress > 0
         }
 
-        // Glow behind the words that have been sung. The layer turns on once
-        // a word starts being sung and stays on for the rest of the line
-        // (progress stays 1 after completion), so the fade-out never toggles
-        // the layer and blinks.
-        layer.enabled: wordItem.progress > 0
+        // The layer stays on from the moment any part of the word is lit until
+        // the line is replaced, so the fade never toggles it and blinks.
+        layer.enabled: root.glowEnabled && wordItem.progress > 0
         layer.effect: Glow {
             radius: 7
             samples: 15
             spread: 0.15
             color: wordItem.litColor
             opacity: wordItem.glowStrength
+            // Without this the layer is exactly the word's own rectangle, and
+            // the glow — which reaches about a radius past the ink — is cut
+            // flat at the left and right of every word.
+            transparentBorder: true
         }
+
+        // Two separate Translate objects on purpose: the entrance rise and the
+        // "sung word sits a little higher" lift have different triggers and
+        // different clocks, and one property driven by both would fight its own
+        // binding. Position (x/y) is never animated — that breaks layout.
+        transform: [
+            Translate {
+                y: wordItem.entered ? 0 : 8
+                Behavior on y { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+            },
+            Translate {
+                y: wordItem.current ? -2 : 0
+                Behavior on y { NumberAnimation {
+                    duration: Appearance.animation.elementMoveSmall.duration
+                    easing.type: Appearance.animation.elementMoveSmall.type
+                    easing.bezierCurve: Appearance.animation.elementMoveSmall.bezierCurve
+                } }
+            }
+        ]
+
+        opacity: wordItem.entered ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+
+        // The source grows the word with font.pixelSize; a scale does the same
+        // job without re-wrapping the row it sits in.
+        scale: wordItem.current ? 1.06 : 1.0
+        Behavior on scale { NumberAnimation {
+            duration: Appearance.animation.elementMoveSmall.duration
+            easing.type: Appearance.animation.elementMoveSmall.type
+            easing.bezierCurve: Appearance.animation.elementMoveSmall.bezierCurve
+        } }
     }
 
-    // The slots column always fills the widget and is always visible.
-    // The loading indicator overlays it instead of being a competing
-    // layout child, so toggling status can never squeeze the slots away
-    // (which piled all seven lines up at the top).
-    ColumnLayout {
-        anchors.fill: parent
-        // Compact mode keeps lines clustered, but with a bit more air
-        // between slots so it doesn't look cramped.
-        spacing: root.slotGap
+    // The line list itself. The loading indicator overlays it instead of being
+    // a competing child, so toggling status can never squeeze the lines away.
+    // Its box is of the widget's width and grown by `overflowY` at both ends, so
+    // the cut — when there is one — stays centred on the widget, and the
+    // highlight band, which is stated against the widget, does not drift with
+    // the extra room.
+    ListView {
+        id: lineList
+        x: 0
+        width: root.width
+        y: -root.overflowY
+        height: Math.max(0, root.height + 2 * root.overflowY)
+        clip: root.clipOverflowY >= 0
+        model: root.lineRows
+        spacing: root.lineSpacing
+        boundsBehavior: Flickable.StopAtBounds
+        interactive: false
 
-        // Compact mode: symmetric padding so the line cluster hugs the
-        // active line in the middle instead of stretching edge to edge.
-        Item { Layout.fillWidth: true; Layout.fillHeight: root.compactNeighbors }
+        currentIndex: LyricsService.activeIndex
+        // The glide to the next line comes from the highlight: the list pans so
+        // that the current item stays inside the band around the middle, and it
+        // pans over motionDuration instead of jumping. The band is stated
+        // against the widget rather than the grown viewport, so the first and
+        // last line of a song — where the list cannot pan far enough to centre
+        // — come to rest inside the widget instead of in the overflow.
+        //
+        // A windowed host gets the exact middle instead of the ±40 slack: its
+        // block of lines is a fixed size, so there is nothing for the line to
+        // drift toward, and the slack only ever pulled it to the bottom edge of
+        // it — a sung line with two dead lines under it, hanging in the lower
+        // half of a card that had nothing left to show. The band is a single
+        // point, which is the edge the list lays the incoming line on, and it
+        // sits half a sung line above the middle so that the line's *middle* is
+        // what lands there: stating the middle as the line's top left the whole
+        // block, and the two lines behind it, a line too low to fit.
+        readonly property real widgetMiddle: root.overflowY + root.height / 2
+        readonly property real sungPoint: Math.max(0, widgetMiddle - root.hotLineGuess / 2)
+        highlightFollowsCurrentItem: true
+        highlightRangeMode: ListView.StrictlyEnforceRange
+        preferredHighlightBegin: root.lineContext < 0
+            ? root.overflowY + Math.max(0, root.height / 2 - 40)
+            : sungPoint
+        preferredHighlightEnd: root.lineContext < 0
+            ? root.overflowY + Math.min(root.height, root.height / 2 + 40)
+            : sungPoint
+        highlightMoveDuration: root.motionDuration
+        highlightResizeDuration: root.motionDuration
+        // Only the anchor the glide works from; drawing a box behind the line
+        // would fight the karaoke colours.
+        highlight: Item {}
 
-        Repeater {
-            model: root.slotCount
-            delegate: Item {
-                id: slotItem
-                required property int index
-                // Capped active overflow is clipped so it never touches the
-                // lines above or below (the karaoke column already clips).
-                clip: true
-                Layout.fillWidth: true
-                // The active slot sizes to its wrapped line (karaoke rows,
-                // or the fallback text broken onto two rows) via preferred
-                // height instead of sharing the fill space, so over-long
-                // lyrics are not clipped at the widget edge; the others
-                // fill and share the remaining height equally. The active
-                // slot is capped to the rows that fit after the other slots
-                // keep their line-height minimums, and the others can never
-                // shrink below that minimum, so a long active line clips its
-                // overflow instead of cramming the lines around it.
-                Layout.fillHeight: !slotItem.isActiveSlot && !root.compactNeighbors
-                Layout.minimumHeight: slotItem.isActiveSlot
-                    ? 0
-                    : Math.ceil(slotItem.comfortableHeight)
-                readonly property real contentHeight: slotItem.useKaraoke
-                    ? slotItem.karaokeContentHeight
-                    : slotItem.fallbackContentHeight
-                // Active keeps its wrapped height only when it needs more than
-                // a normal slot; a one-row line takes the same height as the
-                // others so the gaps above and below stay equal.
-                Layout.preferredHeight: slotItem.isActiveSlot
-                    ? Math.min(Math.max(slotItem.contentHeight, root.uniformSlotHeight), root.activeCap)
-                    : (root.compactNeighbors ? 0 : root.uniformSlotHeight)
+        delegate: Item {
+            id: lineRow
+            required property int index
+            required property var modelData
 
-                readonly property int dist: Math.abs(index - root.activeSlot)
-                readonly property bool isActiveSlot: index === root.activeSlot
-                readonly property real comfortableHeight:
-                    slotItem.isActiveSlot ? 0 : root.comfortableHeightFor(slotItem.dist)
-                readonly property bool isNoteSlot: index === root.localNoteSlot
-                    && root.localNoteSlot >= 0
-                    && LyricsService.providedBy.length > 0
-                // Karaoke layout drives the active slot for every source: a
-                // per-word sweep when the provider has real word timings, one
-                // sentence sweep across the whole line when it only has line
-                // timing. Empty slot text (loading) keeps the plain fallback.
-                readonly property bool useKaraoke: root.karaoke
-                    && slotItem.isActiveSlot
-                    && root.slotText(slotItem.index).length > 0
+            readonly property bool isNote: modelData.note
+            readonly property bool isHot: index === LyricsService.activeIndex
+            readonly property int dist: Math.abs(index - LyricsService.activeIndex)
+            // The window: the same number of lines on each side, and nothing
+            // beyond it. A line three steps away says nothing about the moment
+            // the song is in, however much room the host has for it.
+            readonly property bool within: root.lineContext < 0
+                || lineRow.dist <= root.lineContext
+            readonly property bool useKaraoke: root.karaoke
+                && lineRow.isHot
+                && !lineRow.isNote
+                && root.hotRows.length > 0
 
-                // Per-word karaoke line. Rows are computed manually instead
-                // of using a Flow, because a Flow fills the width and always
-                // left-aligns its rows — wrapping there looks off-center in a
-                // narrow widget. Each row below is a centered Row instead.
-                readonly property var karaokeRows: slotItem.buildKaraokeRows()
+            opacity: lineRow.within ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
 
-                // Full height the wrapped karaoke line needs: every row plus
-                // the spacing between them, so the active slot can grow to
-                // fit instead of clipping the extra rows. The column's
-                // implicit height is the real rendered height (font metrics
-                // underestimate the line height slightly).
-                readonly property real karaokeContentHeight: karaokeColumn.implicitHeight
+            width: lineList.width
+            implicitHeight: lineRow.isNote ? noteRow.implicitHeight
+                : (lineRow.useKaraoke ? hotColumn.implicitHeight : plainRow.implicitHeight)
+            height: implicitHeight
 
-                // Wrapped height of the active fallback text (songs without
-                // per-word timestamps): one line if it fits the slot width,
-                // otherwise two (the Text caps at two lines and elides the
-                // rest). Measured with a real text instead of font metrics
-                // because the rendered line height differs slightly from
-                // QFontMetrics, which would clip the second line.
-                readonly property real fallbackContentHeight:
-                    fallbackMeter.height > 0 ? fallbackMeter.height : fallbackMetrics.height
+            // Provider attribution: small, dim, centered, never highlighted.
+            StyledText {
+                id: noteRow
+                width: lineRow.width
+                height: implicitHeight
+                horizontalAlignment: Text.AlignHCenter
+                font.pixelSize: Appearance.font.pixelSize.smallest
+                color: root.textColor
+                opacity: 0.4
+                text: lineRow.modelData.text
+                visible: lineRow.isNote
+            }
 
-                // Invisible meter: same width/font/wrapping as the active
-                // line, so its height is exactly what the slot must reserve.
-                // WrapAtWordBoundaryOrAnywhere (sama dengan lyricSlot): Wrap
-                // biasa kadang tak memecah lari tanpa spasi seperti CJK.
-                StyledText {
-                    id: fallbackMeter
-                    opacity: 0
-                    width: slotItem.width
-                    font.pixelSize: root.fontSizeFor(0)
-                    wrapMode: Text.WrapAtWordBoundaryOrAnywhere
-                    maximumLineCount: Math.max(2, root.fitRows)
-                    elide: Text.ElideRight
-                    text: root.slotText(slotItem.index)
-                }
+            Column {
+                id: hotColumn
+                x: root.contentInset
+                width: root.textWidth
+                spacing: root.rowSpacing
+                visible: lineRow.useKaraoke
+                anchors.verticalCenter: lineRow.verticalCenter
 
-                FontMetrics {
-                    id: fallbackMetrics
-                    font {
-                        family: Appearance.font.family.main
-                        pixelSize: root.fontSizeFor(0)
-                        variableAxes: Appearance.font.variableAxes.main
-                    }
-                }
+                Repeater {
+                    model: lineRow.useKaraoke ? root.hotRows : []
+                    delegate: Row {
+                        id: wordRow
+                        required property var modelData
+                        spacing: hotColumn.spacing
+                        // Centered when the widget asks for centered lyrics,
+                        // otherwise flush with the inset left edge. Centering on
+                        // the column rather than the row keeps the line in the
+                        // middle of the text area, not of the clipped widget.
+                        anchors.horizontalCenter: root.textAlignment === Text.AlignHCenter
+                            ? hotColumn.horizontalCenter : undefined
+                        anchors.left: root.textAlignment === Text.AlignHCenter
+                            ? undefined : hotColumn.left
 
-                function buildKaraokeRows() {
-                    const words = LyricsService.activeLineWords ?? []
-                    // No word timings from the source: build the rows from the
-                    // slot text and give every piece a slice of the line's own
-                    // duration instead (index -1 marks the sentence sweep).
-                    const sentence = words.length === 0
-                    const source = sentence
-                        ? [{ text: root.slotText(slotItem.index) }]
-                        : words
-                    const spacing = karaokeColumn.spacing
-                    const maxWidth = Math.max(1, slotItem.width)
-                    // Some providers return the whole line as a single "word"
-                    // (text with spaces). Split those into display words so the
-                    // line can wrap instead of overflowing the slot; every piece
-                    // keeps the original word index for the highlight sweep.
-                    const pieces = []
-                    // Pemecahan manual baris tidak pernah memecah sebuah
-                    // potongan — potongan tanpa spasi (lari aksara CJK, atau
-                    // provider yang mengirim satu baris sebagai satu "word")
-                    // melebar keluar slot dan terpotong di kanan. Pecah dulu
-                    // jadi potongan yang muat, per karakter bila perlu.
-                    const fitChunks = (text, idx) => {
-                        if (karaokeMetrics.advanceWidth(text) <= maxWidth)
-                            return [{ index: idx, text: text }]
-                        const out = []
-                        let cur = ""
-                        for (const ch of String(text)) {
-                            if (cur !== "" && karaokeMetrics.advanceWidth(cur + ch) > maxWidth) {
-                                out.push({ index: idx, text: cur })
-                                cur = ch
-                            } else {
-                                cur += ch
-                            }
-                        }
-                        if (cur !== "") out.push({ index: idx, text: cur })
-                        return out
-                    }
-                    for (let i = 0; i < source.length; i++) {
-                        const parts = String(source[i].text ?? "").split(/\s+/).filter(s => s.length > 0)
-                        for (const part of parts)
-                            pieces.push(...fitChunks(part, sentence ? -1 : i))
-                    }
-                    if (pieces.length === 0) return []
-                    // Share of the line each piece owns, accumulated in reading
-                    // order across wrapped rows, so the sentence sweep wipes
-                    // left to right instead of every word filling at once.
-                    let cum = 0
-                    for (const p of pieces) {
-                        p.w = karaokeMetrics.advanceWidth(p.text)
-                        p.start = cum
-                        cum += p.w + spacing
-                    }
-                    for (const p of pieces) {
-                        const s = p.start
-                        p.start = cum > 0 ? s / cum : 0
-                        p.end = cum > 0 ? (s + p.w) / cum : 1
-                    }
-                    const rows = []
-                    let cur = [], curWidth = 0
-                    for (let i = 0; i < pieces.length; i++) {
-                        const w = pieces[i].w
-                        const need = cur.length === 0 ? w : curWidth + spacing + w
-                        if (cur.length > 0 && need > maxWidth) {
-                            rows.push(cur)
-                            cur = []
-                            curWidth = 0
-                        }
-                        cur.push(pieces[i])
-                        curWidth = cur.length === 1 ? w : curWidth + spacing + w
-                    }
-                    if (cur.length > 0) rows.push(cur)
-                    return rows
-                }
-
-                FontMetrics {
-                    id: karaokeMetrics
-                    font {
-                        family: Appearance.font.family.main
-                        pixelSize: root.fontSizeFor(0)
-                        variableAxes: Appearance.font.variableAxes.main
-                    }
-                }
-
-                Column {
-                    id: karaokeColumn
-                    // The slot is usually taller than a one-row line, so the
-                    // rows are centered in it instead of hugging its top.
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    height: implicitHeight
-                    spacing: root.rowSpacing
-                    visible: slotItem.useKaraoke
-                    // Anything that overflows the slot is clipped so it never
-                    // touches the line above or below.
-                    clip: true
-
-                    Repeater {
-                        model: slotItem.useKaraoke ? slotItem.karaokeRows : []
-                        delegate: Row {
-                            required property var modelData
-                            spacing: karaokeColumn.spacing
-                            // Center every row when the widget asks for centered
-                            // lyrics; otherwise start at the left edge.
-                            anchors.horizontalCenter: root.textAlignment === Text.AlignHCenter
-                                ? parent.horizontalCenter : undefined
-                            anchors.left: root.textAlignment === Text.AlignHCenter
-                                ? undefined : parent.left
-
-                            Repeater {
-                                model: modelData
-                                delegate: KaraokeWord {
-                                    required property var modelData
-                                    word: modelData.text
-                                    wordIndex: modelData.index
-                                    fontSize: root.fontSizeFor(0)
-                                    dimColor: root.dimColor
-                                    progress: {
-                                        // Sentence-level source: one sweep
-                                        // across the whole line, each piece
-                                        // taking its own slice of it.
-                                        if (wordIndex < 0) {
-                                            const p = LyricsService.activeLineProgress
-                                            const span = Math.max(1e-4, modelData.end - modelData.start)
-                                            return Math.min(1, Math.max(0, (p - modelData.start) / span))
-                                        }
-                                        const cur = LyricsService.activeWordIndex
-                                        if (wordIndex < cur) return 1
-                                        if (wordIndex === cur)
-                                            return LyricsService.activeWordProgress
-                                        return 0
+                        Repeater {
+                            model: wordRow.modelData
+                            delegate: KaraokeWord {
+                                required property var modelData
+                                word: modelData.text
+                                wordIndex: modelData.index
+                                order: modelData.order
+                                progress: {
+                                    // Sentence-level source: one sweep across
+                                    // the whole line, each piece taking its own
+                                    // slice of it.
+                                    if (wordIndex < 0) {
+                                        const p = LyricsService.activeLineProgress
+                                        const span = Math.max(1e-4, modelData.end - modelData.start)
+                                        return Math.min(1, Math.max(0, (p - modelData.start) / span))
                                     }
-                                    // No Behavior on progress: delegates are
-                                    // recycled across line changes, and an
-                                    // animation would play the old word's
-                                    // bright fill down over the new word
-                                    // (a bright blink at every line change).
-                                    // The 50ms service timer is already smooth.
+                                    const cur = LyricsService.activeWordIndex
+                                    if (wordIndex < cur) return 1
+                                    if (wordIndex === cur) return LyricsService.activeWordProgress
+                                    return 0
                                 }
+                                // No Behavior on progress: the service pushes a
+                                // new value every 50ms and an animation would
+                                // only lag behind it, so the sweep would crawl
+                                // after the audio instead of tracking it.
                             }
                         }
                     }
-                }
-
-                // Fallback single-line (no karaoke, or non-active slots).
-                // The active line wraps onto a second row when too long;
-                // the others stay one row and are elided if needed.
-                StyledText {
-                    id: lyricSlot
-                    anchors.fill: parent
-                    horizontalAlignment: root.textAlignment
-                    verticalAlignment: Text.AlignVCenter
-                    wrapMode: slotItem.isActiveSlot ? Text.WrapAtWordBoundaryOrAnywhere : Text.NoWrap
-                    maximumLineCount: slotItem.isActiveSlot ? Math.max(2, root.fitRows) : 1
-                    elide: Text.ElideRight
-                    text: root.slotText(index)
-                    font.pixelSize: root.fontSizeFor(slotItem.dist)
-                    opacity: root.opacityFor(slotItem.dist)
-                    color: slotItem.dist === 0 ? root.activeColor : root.textColor
-                    visible: !slotItem.useKaraoke && !slotItem.isNoteSlot
-                    Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
-                }
-
-                // Provider attribution: scrolls in as its own slot right
-                // after the last lyric line, but stays small, dim and
-                // centered — never part of the highlight.
-                StyledText {
-                    id: noteSlot
-                    anchors.fill: parent
-                    visible: slotItem.isNoteSlot
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    font.pixelSize: Appearance.font.pixelSize.smallest
-                    color: root.textColor
-                    opacity: 0.4
-                    text: "Lyrics provided by " + LyricsService.providedBy
                 }
             }
-        }
 
-        Item { Layout.fillWidth: true; Layout.fillHeight: root.compactNeighbors }
+            // Everything that is not a karaoke line: the past/future lines and
+            // a widget with karaoke off. The active line wraps, the others stay
+            // one line and are elided. The font ladder already carries the
+            // distance, so no extra scale on the neighbours.
+            StyledText {
+                id: plainRow
+                x: root.contentInset
+                width: root.textWidth
+                height: implicitHeight
+                anchors.verticalCenter: lineRow.verticalCenter
+                horizontalAlignment: root.textAlignment
+                verticalAlignment: Text.AlignVCenter
+                wrapMode: lineRow.isHot ? Text.WrapAtWordBoundaryOrAnywhere : Text.NoWrap
+                maximumLineCount: lineRow.isHot ? 3 : 1
+                elide: Text.ElideRight
+                text: lineRow.modelData.text
+                font.pixelSize: root.fontSizeFor(lineRow.dist)
+                opacity: root.opacityFor(lineRow.dist)
+                color: lineRow.isHot ? root.activeColor : root.textColor
+                visible: !lineRow.isNote && !lineRow.useKaraoke
+                Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
+            }
+        }
     }
 
-    // Loading indicator overlay (stacked above the slots, not a layout child).
+    // Loading indicator overlay (stacked above the lines, not a list row).
     Item {
         anchors.fill: parent
         visible: LyricsService.status !== "ok"
         z: 2
 
-        ColumnLayout {
+        Column {
             anchors.centerIn: parent
             spacing: 12
 
             Item {
-                Layout.alignment: Qt.AlignHCenter
+                anchors.horizontalCenter: parent.horizontalCenter
                 implicitWidth: 48
                 implicitHeight: 48
 

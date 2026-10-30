@@ -47,10 +47,6 @@ Item {
         return a + (b - a) * root.t
     }
 
-    function restartLyrics() {
-        if (lyricsLoader.item) lyricsLoader.item.restartLyrics()
-    }
-
     component TrackChangeButton: RippleButton {
         implicitWidth: 24
         implicitHeight: 24
@@ -164,11 +160,20 @@ Item {
         x: root.pad + root.artSize + root.gap
         y: root.pad
         width: Math.max(0, root.width - x - root.pad)
-        height: 150
+        // Every pixel between the top of the card and the title block that comes
+        // up from its bottom in lyrics mode. The column is only as wide as what
+        // is left beside the cover, so a lyric line routinely wraps to three rows
+        // there, and a block of two lines, the sung one and two more needs that
+        // much height to stay whole rather than be cut at the strip's edges.
+        height: Math.max(150, root.lyricsTitleY - root.pad - 4)
         opacity: Math.max(0, Math.min(1, (root.t - 0.35) / 0.65))
         visible: opacity > 0.01
 
         sourceComponent: Lyrics {
+            // The block is kept small and centred: two lines on each side of the
+            // one being sung, instead of the whole list fading away into the top
+            // and bottom of the strip.
+            lineContext: 2
             textColor: root.blendedColors.colOnLayer0
             activeColor: root.blendedColors.colPrimary
             dimColor: root.blendedColors.colSubtext
@@ -260,7 +265,7 @@ Item {
                 value: root.player?.position / root.player?.length
                 onMoved: {
                     root.player.position = value * root.player.length
-                    root.restartLyrics()
+                    LyricsService.resync()
                 }
             }
         }
