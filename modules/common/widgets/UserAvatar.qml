@@ -9,11 +9,12 @@ Rectangle {
     property real iconSize: 32
     property color iconColor: Appearance.colors.colOnPrimaryContainer
     readonly property alias status: avatarImage.status
-    // Avatar singleton: explicitly picked picture -> first image in the avatar folder.
-    // Falls back to ~/.face so a plain ~/.face file still shows.
-    readonly property string picturePath: Avatar.effectiveAvatarSource !== ""
-        ? Avatar.effectiveAvatarSource
-        : `file://${FileUtils.trimFileProtocol(Directories.home)}/.face`
+    // Avatar singleton: explicitly picked picture -> first image in the avatar
+    // folder. Falls back to ~/.face so a plain ~/.face file still shows. The
+    // fragment is Avatar's reload marker, not part of the path.
+    readonly property string picturePath: Avatar.avatarUrl !== ""
+        ? Avatar.avatarUrl
+        : `file://${FileUtils.trimFileProtocol(Directories.home)}/.face#${Avatar.fileToken}`
 
     implicitWidth: 48
     implicitHeight: 48

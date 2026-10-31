@@ -393,6 +393,10 @@ Item {
                                 if (code === 0 && avatarCropProc.outputPath !== "") {
                                     Config.options.profile.avatarPath = ""
                                     Config.options.profile.avatarPicture = avatarCropProc.outputPath
+                                    // File-nya ditimpa di path yang sama, jadi
+                                    // URL avatar tidak berubah dan setiap Image
+                                    // tetap memegang wajah lama.
+                                    Avatar.markFileChanged()
                                 }
                             }
                         }

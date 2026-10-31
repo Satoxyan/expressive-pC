@@ -500,9 +500,10 @@ Item {
                     Image {
                         id: avatarImage
                         anchors.fill: parent
-                        source: Config.options.profile.avatarPath !== ""
-                            ? "file://" + Config.options.profile.avatarPicture
-                            : "file:///home/" + (Quickshell.env("USER") ?? "user") + "/.face"
+                        source: Avatar.avatarUrl
+                        // URL-nya baru tiap muat-ulang (lihat Avatar), jadi
+                        // cache-nya jangan dipakai.
+                        cache: false
                         sourceSize.width: avatarImage.width * 2
                         sourceSize.height: avatarImage.height * 2
                         fillMode: Image.PreserveAspectCrop

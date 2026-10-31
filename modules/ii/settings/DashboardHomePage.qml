@@ -18,9 +18,7 @@ Item {
     property date viewMonth: new Date(DateTime.clock.date.getFullYear(), DateTime.clock.date.getMonth(), 1)
     readonly property int firstDay: Qt.locale().firstDayOfWeek % 7
     readonly property string displayName: Config.options.profile.displayName || SystemInfo.username
-    readonly property string avatarPath: Config.options.profile.avatarPath !== "" && Config.options.profile.avatarPicture !== ""
-        ? Config.options.profile.avatarPicture
-        : `${FileUtils.trimFileProtocol(Directories.home)}/.face`
+    readonly property string avatarSource: Avatar.avatarUrl
     readonly property bool typing: flip.showBack || tasksCard.adding
     readonly property int pendingTasks: Todo.list.filter(t => !t.done).length
 
@@ -61,7 +59,10 @@ Item {
 
     FolderListModel {
         id: avatarFolderModel
-        folder: root.avatarFolder !== "" ? Qt.resolvedUrl(root.avatarFolder) : ""
+        // Folder kosong berarti ikut default singleton Avatar (~/.face), sama
+        // seperti halaman Profil; dulu halaman Home berhenti menampilkan
+        // ubinnya begitu gambar dipilih lewat sidebar.
+        folder: Qt.resolvedUrl(root.avatarFolder !== "" ? root.avatarFolder : Avatar.folder)
         showDirs: false
         nameFilters: ["*.png", "*.svg", "*.jpg", "*.jpeg", "*.webp", "*.PNG", "*.JPG", "*.JPEG", "*.WEBP"]
     }
@@ -253,7 +254,7 @@ Item {
                         Image {
                             id: avatarImage
                             anchors.fill: parent
-                            source: `file://${root.avatarPath}`
+                            source: root.avatarSource
                             fillMode: Image.PreserveAspectCrop
                             asynchronous: true
                             cache: false

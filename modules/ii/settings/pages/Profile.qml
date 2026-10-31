@@ -113,6 +113,9 @@ ContentPage {
                 Config.options.profile.avatarPath = ""
                 Config.options.profile.avatarPicture = avatarCropProc.outputPath
                 avatarFolderModel.folder = Qt.resolvedUrl(Avatar.folder)
+                // avatar.png ditimpa di path yang sama; tanpa ini wajahnya
+                // baru muncul setelah restart.
+                Avatar.markFileChanged()
             }
         }
     }

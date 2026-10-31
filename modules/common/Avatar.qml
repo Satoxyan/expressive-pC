@@ -42,4 +42,17 @@ Item {
         if (firstImage !== "") return "file://" + firstImage
         return ""
     }
+
+    // Image menyimpan pixmap menurut URL, jadi wajah yang ditimpa di path yang
+    // sama (avatar.png hasil crop) tetap tampil lama sampai shell restart.
+    // Fragmen tidak menentukan file mana yang dibuka, cukup untuk membuat URL
+    // berbeda sehingga setiap avatar membaca ulang file-nya.
+    property int fileToken: 0
+    function markFileChanged(): void {
+        root.fileToken++;
+    }
+
+    readonly property string avatarUrl: root.effectiveAvatarSource !== ""
+        ? `${root.effectiveAvatarSource}#${root.fileToken}`
+        : ""
 }

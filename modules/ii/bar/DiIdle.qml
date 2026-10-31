@@ -31,9 +31,11 @@ Item {
         Image {
             id: avatarImage
             anchors.fill: parent
-            source: Config.options.profile.avatarPath !== ""
-                ? "file://" + Config.options.profile.avatarPicture
-                : "file:///home/" + (Quickshell.env("USER") ?? "user") + "/.face"
+            source: Avatar.avatarUrl
+            // Avatar.avatarUrl membawa penanda muat-ulang, jadi URL-nya baru
+            // tiap kali file-nya ditimpa; tanpa ini pixmap lama menumpuk di
+            // cache.
+            cache: false
             sourceSize.width: avatarImage.width * 2
             sourceSize.height: avatarImage.height * 2
             fillMode: Image.PreserveAspectCrop
