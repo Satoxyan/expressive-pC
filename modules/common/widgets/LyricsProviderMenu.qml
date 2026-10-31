@@ -15,10 +15,24 @@ Popup {
     property real sizeScale: 1
     // true: tepi kiri menu sejajar tepi kiri anchor (default: kanan).
     property bool alignLeft: false
+    // Kapan popup terakhir tertutup; lihat toggle di show().
+    property real closedAt: 0
+    onVisibleChanged: if (!visible) root.closedAt = Date.now()
 
     // Tampil di atas `anchor`: kanan sejajar (di-clamp ke lebar wadah),
     // atau kiri sejajar bila alignLeft.
     function show(anchor) {
+        // Tombol pemilih ditekan lagi = tutup.
+        if (root.visible) { root.close(); return }
+        // CloseOnPressOutside sudah menutup popup tepat sebelum downAction
+        // tombol pemilih jalan, jadi `visible` pasti false di jalur itu:
+        // yang menandai toggle adalah penutupan yang baru terjadi. Jejaknya
+        // dihapus supaya klik berikutnya langsung membuka lagi.
+        if (root.closedAt > 0 && Date.now() - root.closedAt < 300) {
+            root.closedAt = 0
+            return
+        }
+
         LyricsService.probeProviders()
         // Posisi dihitung relatif parent popup, bukan koordinat window:
         // di layer surface (sidebar/lock) koordinat window bikin menu
@@ -72,6 +86,10 @@ Popup {
                         implicitWidth: 148 * root.sizeScale
                         implicitHeight: 24 * root.sizeScale
                         padding: 0
+                        // Highlight baris (hover dan saat ditekan) nyaris
+                        // kotak: tingginya 24px, radius 12 membuat pilnya
+                        // lepas dari bentuk baris.
+                        buttonRadius: 4 * root.sizeScale
                         // Ripple dimatikan: popup menutup tepat saat tekan,
                         // ripple tak sempat fade dan meninggalkan highlight
                         // basi saat daftar dibuka lagi.
@@ -95,6 +113,19 @@ Popup {
                             }
                             // Pengisi: mendorong badge & centang ke kanan.
                             Item { Layout.fillWidth: true }
+                            // Lencana duo: provider ini punya baris suara
+                            // kedua (align "end"). Duduk tepat di depan
+                            // lencana sinkronisasi, sehingga keduanya terbaca
+                            // satu keterangan: duo + per kata / per baris.
+                            MaterialSymbol {
+                                Layout.alignment: Qt.AlignVCenter
+                                iconSize: Appearance.font.pixelSize.smallest * root.sizeScale
+                                fill: 1
+                                visible: capInfo !== null && capInfo.ok === true
+                                    && capInfo.duet === true
+                                text: "music_note_2"
+                                color: ColorUtils.applyAlpha(root.blendedColors.colOnLayer0, 0.6)
+                            }
                             // Badge sinkronisasi: graphic_eq = word-by-word,
                             // notes = per baris. Tak tampil bila tak ada data.
                             MaterialSymbol {
@@ -119,6 +150,10 @@ Popup {
                             LyricsService.preferredProvider = modelData === "auto" ? "" : modelData
                             LyricsService.restartLyrics()
                             root.close()
+                            // Tutup karena memilih, bukan karena toggle:
+                            // jangan tinggalkan jejak penutupan, supaya klik
+                            // berikutnya langsung membuka daftar lagi.
+                            root.closedAt = 0
                         }
                     }
                 }
@@ -145,11 +180,22 @@ Popup {
             MaterialSymbol {
                 iconSize: Appearance.font.pixelSize.smallest * root.sizeScale
                 fill: 1
+                text: "music_note_2"
+                color: ColorUtils.applyAlpha(root.blendedColors.colOnLayer0, 0.6)
+            }
+            StyledText {
+                text: "duet"
+                font.pixelSize: Appearance.font.pixelSize.smallest * root.sizeScale
+                color: ColorUtils.applyAlpha(root.blendedColors.colOnLayer0, 0.6)
+            }
+            MaterialSymbol {
+                iconSize: Appearance.font.pixelSize.smallest * root.sizeScale
+                fill: 1
                 text: "graphic_eq"
                 color: ColorUtils.applyAlpha(root.blendedColors.colOnLayer0, 0.6)
             }
             StyledText {
-                text: "per word"
+                text: "word"
                 font.pixelSize: Appearance.font.pixelSize.smallest * root.sizeScale
                 color: ColorUtils.applyAlpha(root.blendedColors.colOnLayer0, 0.6)
             }
@@ -160,7 +206,7 @@ Popup {
                 color: ColorUtils.applyAlpha(root.blendedColors.colOnLayer0, 0.6)
             }
             StyledText {
-                text: "per line"
+                text: "line"
                 font.pixelSize: Appearance.font.pixelSize.smallest * root.sizeScale
                 color: ColorUtils.applyAlpha(root.blendedColors.colOnLayer0, 0.6)
             }

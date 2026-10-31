@@ -1434,21 +1434,24 @@ def _probe_cache_save(cache):
 
 
 def probe_all(title, artist, duration, providers=None):
-    """Query the enabled providers; report availability + word sync.
+    """Query the enabled providers; report availability + word sync + duet.
 
     Used by the provider dropdown to badge word-by-word vs line-by-line
     providers for the current track. Timeout providers get "unknown": true
     (no badge, but not dimmed — absence is not proof of no lyrics).
     Prints one JSON line:
     {"ok": true, "results": {"<provider>":
-        {"ok": bool, "wordByWord": bool, "unknown": bool}}}
+        {"ok": bool, "wordByWord": bool, "duet": bool, "unknown": bool}}}
     """
     key = f"{clean_text(title)}|{clean_text(artist)}|{int(duration)}"
     names = [n for n in (providers or DEFAULT_PROVIDERS).replace(" ", "").split(",")
              if n in PROVIDERS]
     cache = _probe_cache_load()
     entry = cache.get(key) or {}
-    results = dict(entry.get("results") or {})
+    # Cached results from before "duet" existed carry no verdict; drop them so
+    # the providers get re-queried once instead of showing a missing badge.
+    results = {n: v for n, v in (entry.get("results") or {}).items()
+               if isinstance(v, dict) and "duet" in v}
     missing = [n for n in names if n not in results]
 
     def probe_one(name):
@@ -1456,7 +1459,9 @@ def probe_all(title, artist, duration, providers=None):
         if lines is None:
             return  # unknown: leave it out so the next open retries
         wbw = any(any(l.get("words") or []) for l in lines)
-        results[name] = {"ok": bool(lines), "wordByWord": bool(lines and wbw), "unknown": False}
+        duet = any((l.get("align") or "start") == "end" for l in lines)
+        results[name] = {"ok": bool(lines), "wordByWord": bool(lines and wbw),
+                         "duet": bool(lines and duet), "unknown": False}
 
     if missing:
         threads = []

@@ -19,9 +19,13 @@ Singleton {
     // rantai Config.options.lyrics.providers; terisi = provider itu dicoba
     // dulu, baru jatuh ke rantai kalau gagal.
     property string preferredProvider: ""
-    // Hasil probe semua provider untuk track berjalan: {ok, wordByWord}
-    // per nama provider — dipakai badge dropdown (per kata / per baris).
+    // Hasil probe semua provider untuk track berjalan: {ok, wordByWord,
+    // duet} per nama provider — dipakai badge dropdown (per kata / per
+    // baris, plus penanda baris suara kedua).
     property var providerInfo: ({})
+    // The track those results belong to, so a provider change can keep them
+    // and a track change cannot.
+    property string providerInfoKey: ""
     property string probeKey: ""
     property real probeAt: 0
     property int activeIndex: -1
@@ -318,6 +322,7 @@ Singleton {
                 info[payload.provider] = {
                     ok: true,
                     wordByWord: lines.some(l => l.words.length > 0),
+                    duet: lines.some(l => l.align === "end"),
                     unknown: false
                 }
                 root.providerInfo = info
@@ -424,7 +429,16 @@ Singleton {
         }
 
         retryTimer.running = false
-        root.providerInfo = ({})
+        // The badges say what each provider has for *this* track, so they only
+        // go stale when the track does. Switching provider keeps them: the
+        // probe that produced them is still the answer for every provider in
+        // the list, and the payload that follows fills in the one line it can
+        // say for itself.
+        const infoKey = `${title}|${artist}|${Math.floor(duration)}`
+        if (infoKey !== root.providerInfoKey) {
+            root.providerInfoKey = infoKey
+            root.providerInfo = ({})
+        }
         lyricsProc.command = [
             "python3",
             `${Directories.scriptPath}/lyrics/lyrics.py`,
