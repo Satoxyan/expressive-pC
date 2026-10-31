@@ -22,6 +22,8 @@ Item {
             return isFullscreen ? Translation.tr("Search fullscreen with Lens") : Translation.tr("Search with Google Lens");
         case RegionSelection.SnipAction.CharRecognition:
             return isFullscreen ? Translation.tr("Recognize fullscreen text") : Translation.tr("Recognize text");
+        case RegionSelection.SnipAction.QrCode:
+            return Translation.tr("Scan QR code");
         case RegionSelection.SnipAction.Record:
         case RegionSelection.SnipAction.RecordWithSound:
             return isFullscreen ? Translation.tr("Record fullscreen") : Translation.tr("Record region");
@@ -42,6 +44,8 @@ Item {
             return "image_search";
         case RegionSelection.SnipAction.CharRecognition:
             return "document_scanner";
+        case RegionSelection.SnipAction.QrCode:
+            return "qr_code_scanner";
         case RegionSelection.SnipAction.Record:
         case RegionSelection.SnipAction.RecordWithSound:
             return "videocam";

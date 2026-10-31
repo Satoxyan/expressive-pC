@@ -32,6 +32,34 @@ QtObject {
         return Appearance.colors["col" + name.charAt(0).toUpperCase() + name.slice(1)] ?? Appearance.getColorFromName(name);
     }
 
+    readonly property var glassDefaults: ({
+        tintStrength: 0.3,
+        rimWidth: 16,
+        pull: 26,
+        split: 0.06,
+        haze: 3,
+        vividness: 1.3,
+        sheen: 0.55
+    })
+
+    function glassSlider(prop, scale, from, to) {
+        const glass = () => Config.options.background.widgets.glass;
+        const def = glassDefaults[prop];
+        return {
+            type: "slider",
+            get: () => glass()[prop] * scale,
+            set: v => { glass()[prop] = Math.round(v) / scale; },
+            from: from, to: to, stopIndicatorValues: [], usePercentTooltip: false,
+            defaultValue: def * scale,
+            reset: () => { glass()[prop] = def; }
+        };
+    }
+
+    function resetGlass() {
+        const glass = Config.options.background.widgets.glass;
+        for (const prop of Object.keys(glassDefaults)) glass[prop] = glassDefaults[prop];
+    }
+
     function controlFor(key) {
         return custom[key] ?? hyprControls[key] ?? null;
     }
@@ -83,6 +111,8 @@ QtObject {
     })
 
     readonly property var custom: ({
+        "bar:Claude Code": { type: "switch", get: () => Config.options.bar.aiUsage.claudeEnabled, set: v => { Config.options.bar.aiUsage.claudeEnabled = v; } },
+        "bar:Codex": { type: "switch", get: () => Config.options.bar.aiUsage.codexEnabled, set: v => { Config.options.bar.aiUsage.codexEnabled = v; } },
         "bar:Bar style": { type: "select", get: () => Config.options.bar.cornerStyle, set: v => { Config.options.bar.cornerStyle = v; }, options: [{ displayName: Translation.tr("Hug"), icon: "line_curve", value: 0 }, { displayName: Translation.tr("Split Hug"), icon: "splitscreen", value: 6 }, { displayName: Translation.tr("Float"), icon: "view_day", value: 1 }, { displayName: Translation.tr("Islands"), icon: "crop_3_2", value: 2 }, { displayName: Translation.tr("M3"), icon: "interests", value: 3 }, { displayName: Translation.tr("M3 Hug"), icon: "category", value: 4 }, { displayName: Translation.tr("Panel"), icon: "toolbar", value: 5 }] },
         "bar:Group color": { type: "select", get: () => Config.options.bar.groupColor, set: v => { Config.options.bar.groupColor = v; }, get options() { return ["primaryContainer", "secondaryContainer", "tertiaryContainer", "layer1", "layer0"].map(name => ({ value: name, color: roleColor(name) })); } },
         "interface:Football/Goal file": { type: "text", get: () => Config.options.sidebar.football.goalSoundPath, set: v => { Config.options.sidebar.football.goalSoundPath = v; } },
@@ -136,6 +166,15 @@ QtObject {
         "desktop:Visualizer sensitivity": { type: "slider", get: () => Config.options.background.widgets.visualizer.sensitivity * 100, set: v => { Config.options.background.widgets.visualizer.sensitivity = Math.round(v) / 100; }, from: 50, to: 300, stopIndicatorValues: [], usePercentTooltip: false },
         "desktop:Visualizer height": { type: "slider", get: () => Config.options.background.widgets.visualizer.height, set: v => { Config.options.background.widgets.visualizer.height = Math.round(v); }, from: 60, to: 1080, stopIndicatorValues: [], usePercentTooltip: false },
         "desktop:Visualizer size": { type: "slider", get: () => Config.options.background.widgets.visualizer.ringSize, set: v => { Config.options.background.widgets.visualizer.ringSize = Math.round(v); }, from: 200, to: 900, stopIndicatorValues: [], usePercentTooltip: false },
+        "interface:Glass tint": { type: "select", get: () => Config.options.background.widgets.glass.tint, set: v => { Config.options.background.widgets.glass.tint = v; }, options: [{ displayName: Translation.tr("Transparent"), icon: "opacity", value: "transparent" }, { displayName: Translation.tr("Primary"), icon: "palette", value: "primary" }, { displayName: Translation.tr("Black"), icon: "contrast", value: "black" }] },
+        "interface:Glass tint strength": glassSlider("tintStrength", 100, 0, 100),
+        "interface:Glass bezel": glassSlider("rimWidth", 1, 4, 40),
+        "interface:Glass refraction": glassSlider("pull", 1, 0, 80),
+        "interface:Glass dispersion": glassSlider("split", 100, 0, 30),
+        "interface:Glass blur": glassSlider("haze", 1, 1, 16),
+        "interface:Glass vividness": glassSlider("vividness", 100, 50, 200),
+        "interface:Glass shine": glassSlider("sheen", 100, 0, 150),
+        "interface:Glass reset": { type: "action", run: () => resetGlass() },
         "interface:Glassy UI": { type: "switch", get: () => Config.options.background.widgets.glass.enable, set: v => { Config.options.background.widgets.glass.enable = v; } },
         "desktop:Text enable": { type: "switch", get: () => Config.options.background.widgets.customText.enable, set: v => { Config.options.background.widgets.customText.enable = v; } },
         "desktop:Text shadow": { type: "switch", get: () => Config.options.background.widgets.customText.shadow, set: v => { Config.options.background.widgets.customText.shadow = v; } },
@@ -245,6 +284,12 @@ QtObject {
         {
             page: Translation.tr("Bar"), title: Translation.tr("Screens"), icon: "tv_displays", cards: [
                 { type: "barscreens", key: "bar:Screens", title: Translation.tr("Show bar on"), icon: "tv_displays" }
+            ]
+        },
+        {
+            page: Translation.tr("Bar"), title: Translation.tr("AI Usage"), icon: "neurology", cards: [
+                { type: "toggle", key: "bar:Claude Code", title: Translation.tr("Claude Code"), icon: "terminal", kw: "ai usage provider anthropic enable disable" },
+                { type: "toggle", key: "bar:Codex", title: Translation.tr("Codex"), icon: "code", kw: "ai usage provider openai enable disable" }
             ]
         },
         {
@@ -363,6 +408,19 @@ QtObject {
                 { type: "select", key: "interface:Dashboard animation speed", title: Translation.tr("Dashboard animation speed"), icon: "speed" },
                 { type: "spin", key: "interface:Border width", title: Translation.tr("Border width"), icon: "border_style" },
                 { type: "swatch", key: "interface:Border color", title: Translation.tr("Border color"), icon: "format_paint", w: 2 }
+            ]
+        },
+        {
+            page: Translation.tr("Interface"), title: Translation.tr("Glass"), icon: "water_drop", when: "glass", cards: [
+                { type: "select", w: 4, key: "interface:Glass tint", title: Translation.tr("Glass tint"), icon: "colorize", kw: "glass glassy tint color transparent primary black" },
+                { type: "slider", key: "interface:Glass tint strength", title: Translation.tr("Tint strength (%)"), icon: "colorize", percent: false },
+                { type: "slider", key: "interface:Glass bezel", title: Translation.tr("Edge width (px)"), icon: "crop_free", percent: false },
+                { type: "slider", key: "interface:Glass refraction", title: Translation.tr("Refraction"), icon: "lens_blur", percent: false },
+                { type: "slider", key: "interface:Glass dispersion", title: Translation.tr("Color split (%)"), icon: "gradient", percent: false },
+                { type: "slider", key: "interface:Glass blur", title: Translation.tr("Blur"), icon: "blur_on", percent: false },
+                { type: "slider", key: "interface:Glass vividness", title: Translation.tr("Vividness (%)"), icon: "palette", percent: false },
+                { type: "slider", key: "interface:Glass shine", title: Translation.tr("Edge shine (%)"), icon: "flare", percent: false },
+                { type: "reset", key: "interface:Glass reset", title: Translation.tr("Reset glass"), icon: "restart_alt" }
             ]
         },
         {

@@ -491,6 +491,14 @@ Singleton {
                     property real blurRadius: 32
                     property JsonObject glass: JsonObject {
                         property bool enable: false
+                        property string tint: "transparent"
+                        property real tintStrength: 0.3
+                        property real rimWidth: 16
+                        property real pull: 26
+                        property real split: 0.06
+                        property real haze: 3
+                        property real vividness: 1.3
+                        property real sheen: 0.55
                     }
                     property bool shadow: true
                     property list<string> menuHidden: []
@@ -814,6 +822,8 @@ Singleton {
                 }
 
                 property JsonObject aiUsage: JsonObject {
+                    property bool claudeEnabled: true
+                    property bool codexEnabled: true
                     property int tokenLimit: 1000000
                     property int updateInterval: 60
                 }
