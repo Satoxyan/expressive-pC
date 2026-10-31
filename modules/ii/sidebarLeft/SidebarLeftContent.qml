@@ -84,6 +84,23 @@ Item {
 
     onCurrentKeyChanged: headerAnim.restart()
 
+    // Halaman phone baru dibangun saat pertama dikunjungi, jadi buka pertama
+    // selalu menunggu: Loader async-nya baru lahir ketika halaman diminta dan
+    // kartu-kartunya menyusul beberapa frame kemudian — itu yang terlihat
+    // menetes satu per satu. Konten sidebar sendiri dibuat saat sidebar pertama
+    // dibuka dan sengaja tidak dibuang lagi (lihat SidebarLeft.unload), jadi
+    // hitungan ini sekali saja per sesi: bangun halaman phone di belakang
+    // halaman Home, sebelum siapa pun memintanya. Tersembunyi saat dibuat
+    // ada bonusnya: kartu notifikasi mendarat tanpa animasi masuk, karena
+    // NotificationListView hanya menganimasikan kartu yang lahir ketika
+    // view-nya sudah di layar.
+    Timer {
+        id: phonePrewarm
+        interval: 1200
+        running: root.phoneEnabled && !phoneSlot.visited && !phoneSlot.prewarm
+        onTriggered: phoneSlot.prewarm = true
+    }
+
     SequentialAnimation {
         id: headerAnim
         // Keluar: lembaran lama naik masuk ke celah.
@@ -208,6 +225,8 @@ Item {
                     property Component page: null
                     property bool lingering: false
                     property bool visited: false
+                    // Dibangun sebelum pernah dibuka; lihat phonePrewarm.
+                    property bool prewarm: false
                     readonly property bool current: root.currentKey === pageKey
                     readonly property bool isHome: pageKey === "home"
                     readonly property alias item: loader.item
@@ -253,7 +272,7 @@ Item {
                         id: loader
                         anchors.fill: parent
                         asynchronous: !slot.isHome
-                        active: slot.enabledPage && (slot.isHome || slot.visited)
+                        active: slot.enabledPage && (slot.isHome || slot.visited || slot.prewarm)
                         sourceComponent: slot.page
                         // Kartu home menunggu halaman benar-benar tampil, jadi
                         // animasinya tidak habis di balik `waiting`.
@@ -266,7 +285,7 @@ Item {
                 PageSlot { pageKey: "translator"; enabledPage: root.translatorEnabled; page: translator }
                 PageSlot { pageKey: "media"; enabledPage: root.mediaEnabled; page: media }
                 PageSlot { pageKey: "sports"; enabledPage: root.footballEnabled; page: football }
-                PageSlot { pageKey: "phone"; enabledPage: root.phoneEnabled; page: phone }
+                PageSlot { id: phoneSlot; pageKey: "phone"; enabledPage: root.phoneEnabled; page: phone }
                 PageSlot { pageKey: "anime"; enabledPage: root.animeEnabled && !root.animeCloset; page: anime }
             }
         }
