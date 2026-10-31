@@ -121,11 +121,111 @@ Item { // Window
         animation: Appearance.animation.elementMoveEnter.numberAnimation.createObject(this)
     }
 
+    // The grabbed frame, and the object it came from. The grab is served from
+    // a URL that only answers while that object is alive, so the result has to
+    // be held, not just its url.
+    property url snapshotUrl
+    property var snapshotResult
+
+    // Copies of every tile cannot be taken in the same frame, so each tile
+    // starts from a phase worked out from its own address.
+    readonly property int snapshotPhase: {
+        const addr = (root.windowData?.address ?? "").toString();
+        let h = 0;
+        for (let i = 0; i < addr.length; i++)
+            h = (h * 31 + addr.charCodeAt(i)) & 0xffff;
+        return h % 5;
+    }
+
+    function grabSnapshot() {
+        if (!windowPreview.hasContent) return
+        windowPreview.grabToImage(function(result) {
+            if (!result) return
+            root.snapshotResult = result
+            root.snapshotUrl = result.url
+        })
+    }
+
+    // Refreshed while the stream is healthy, so what covers a gap is the most
+    // recent picture rather than whatever the tile happened to show a minute ago.
+    Timer {
+        id: snapshotTick
+        interval: 1000 + root.snapshotPhase * 100
+        repeat: true
+        triggeredOnStart: true
+        running: GlobalStates.overviewOpen && windowPreview.hasContent
+        onTriggered: root.grabSnapshot()
+    }
+
     ScreencopyView {
         id: windowPreview
+
+        // Attaching the stream twice in a row is what brings the preview back:
+        // a frame Hyprland rejects while the window animates ends the recording
+        // and clears the picture, and the view only rebuilds it when the source
+        // is handed over again. So the source is detached for one tick and
+        // reattached, until a frame survives or the tries run out.
+        property bool detached: false
+        property int rearmTries: 0
         anchors.fill: parent
-        captureSource: GlobalStates.overviewOpen ? root.toplevel : null
+        captureSource: GlobalStates.overviewOpen && !windowPreview.detached
+            ? root.toplevel : null
         live: true
+
+        onHasContentChanged: {
+            if (windowPreview.hasContent) {
+                windowPreview.rearmTries = 0
+                rearmTick.stop()
+                return
+            }
+            if (!GlobalStates.overviewOpen || root.toplevel === null) return
+            windowPreview.rearmTries = 0
+            rearmTick.restart()
+        }
+
+        Timer {
+            id: rearmTick
+            interval: 16
+            repeat: true
+            onTriggered: {
+                if (windowPreview.hasContent || !GlobalStates.overviewOpen
+                        || root.toplevel === null) {
+                    windowPreview.rearmTries = 0
+                    windowPreview.detached = false
+                    rearmTick.stop()
+                    return
+                }
+                // Stop after about a second and a half. An animation is over
+                // long before that, and past it the source is not going to
+                // answer — while every reattach costs a round trip to the
+                // compositor.
+                if (windowPreview.rearmTries++ >= 90) {
+                    windowPreview.detached = false
+                    rearmTick.stop()
+                    return
+                }
+                // One detach-and-reattach per tick: the view only builds a fresh
+                // capture context when the source it is given changes, and the
+                // picture can stay empty without ever signalling again.
+                windowPreview.detached = true
+                windowPreview.detached = false
+            }
+        }
+
+        // The frame the view last had, painted over the tile while the stream is
+        // down. Reattaching takes as long as the compositor's own window
+        // animation — around a quarter of a second, no matter how often the
+        // retry runs — and a tile that goes empty for that long reads as broken
+        // even though nothing is wrong. A slightly stale picture does not.
+        Image {
+            id: windowSnapshot
+            anchors.fill: parent
+            anchors.margins: 1   // the tile's border stays on top of it
+            visible: !windowPreview.hasContent && windowSnapshot.status === Image.Ready
+            fillMode: Image.PreserveAspectFit
+            source: root.snapshotUrl
+            cache: false
+        }
 
         // Color overlay for interactions
         Rectangle {
