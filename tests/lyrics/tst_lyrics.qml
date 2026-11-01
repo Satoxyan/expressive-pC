@@ -88,6 +88,27 @@ TestCase {
         return lines
     }
 
+    // The call and response of Tarot – .feast: the lead stops at +2.0, the
+    // backstage answers five seconds later inside the same line, and nothing
+    // is sung again until +11. The silence before an answer is not an
+    // instrumental, so it may not open a break.
+    function callResponseSong(next) {
+        return [{
+            text: "Padamu ku percaya",
+            time: 0,
+            words: ["Padamu", "ku", "percaya"].map((w, i) => ({ text: w, time: i })),
+            bg: {
+                text: "(Padamu ku percaya)",
+                words: [{ text: "(Padamu", time: 5 }, { text: "ku", time: 5.5 },
+                        { text: "percaya)", time: 6 }]
+            }
+        }, {
+            text: "the line after it",
+            time: next ?? 11,
+            words: [{ text: "the", time: next ?? 11 }, { text: "line", time: (next ?? 11) + 1 }]
+        }]
+    }
+
     function init() {
         LyricsService.load([], "")
     }
@@ -684,6 +705,30 @@ TestCase {
         compare(Gaps.findInterludes(edge, 1.2).length, 1, "five seconds is a break")
         edge[1].time = 8.1
         compare(Gaps.findInterludes(edge, 1.2).length, 0, "and a hair less is a breath")
+    }
+
+    function test_an_answer_from_the_backstage_is_not_a_break() {
+        // The lead's own words end at +2.0, which five seconds before +11 would
+        // be a break, but the line is still being answered at +6.0.
+        const gaps = Gaps.findInterludes(callResponseSong(), 1.2)
+        compare(gaps.length, 0, "the pause before an answer is part of the line")
+    }
+
+    function test_the_break_after_an_answer_starts_when_the_answer_ends() {
+        const gaps = Gaps.findInterludes(callResponseSong(13), 1.2)
+        compare(gaps.length, 1, "the silence that follows an answer is a break")
+        compare(Math.round(gaps[0].time * 100) / 100, 7.2,
+            "counting starts after the last sound, not after the lead")
+        compare(gaps[0].end, 13)
+    }
+
+    function test_an_echo_without_word_timings_cannot_hold_the_break_back() {
+        // Nothing is known about when an echo ends if nothing timed it, so the
+        // lead's own sweep still stands, as it did before any of this.
+        const lines = callResponseSong(13)
+        lines[0].bg = { text: "(Padamu ku percaya)", words: [] }
+        compare(Math.round(Gaps.findInterludes(lines, 1.2)[0].time * 100) / 100, 3.2,
+            "the break opens where the lead's sweep ends")
     }
 
     function test_a_long_intro_is_a_break() {

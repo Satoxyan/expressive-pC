@@ -190,20 +190,30 @@ def _ttml_role(el):
     return _ttml_attr(el, "role") or ""
 
 
-def _ttml_primary_agent(root):
-    """xml:id of the first voice declared in the head, or None.
+def _ttml_agents(root):
+    """The ids of the document's declared voices, split into singers and groups.
 
-    Apple tags every line with the voice that sings it, and the first declared
-    agent is the lead: in its own client those lines stay on the near edge and
-    every other voice — the second singer, the group parts — goes to the far
-    one. A document without agents has one voice as far as we can tell.
+    Apple tags every line with the voice that sings it, and the first agent that
+    names a singer is the lead: in its own client those lines stay on the near
+    edge and every other voice — the second singer, the group parts — goes to
+    the far one. A document without agents has one voice as far as we can tell.
+    The ensemble behind a solo artist is declared among the same agents with
+    type="group", and counting it as a voice of its own badges a one-singer song
+    a duet, so it is neither a lead nor a second voice.
     """
+    singers = []
+    groups = set()
     for el in root.iter():
-        if el.tag.rsplit("}", 1)[-1] == "agent":
-            agent = _ttml_attr(el, "id")
-            if agent:
-                return agent
-    return None
+        if el.tag.rsplit("}", 1)[-1] != "agent":
+            continue
+        agent = _ttml_attr(el, "id")
+        if not agent:
+            continue
+        if (_ttml_attr(el, "type") or "") == "group":
+            groups.add(agent)
+        else:
+            singers.append(agent)
+    return (singers[0] if singers else None), groups
 
 
 def _ttml_parse_line(p):
@@ -306,7 +316,7 @@ def ttml_to_lrc(ttml):
     except Exception:
         return []
     lines = []
-    primary = _ttml_primary_agent(root)
+    primary, groups = _ttml_agents(root)
     for p in root.iter():
         if p.tag.rsplit("}", 1)[-1] != "p":
             continue
@@ -323,7 +333,8 @@ def ttml_to_lrc(ttml):
             "text": text,
             "words": _ttml_line_words(spans),
             "bg": _ttml_bg_text(bg_spans),
-            "align": "end" if primary and agent and agent != primary else "start",
+            "align": "end" if primary and agent and agent != primary
+                     and agent not in groups else "start",
         })
     return sorted(lines, key=lambda x: x["time"])
 
@@ -1481,12 +1492,55 @@ def probe_all(title, artist, duration, providers=None):
                      ensure_ascii=False, separators=(",", ":")), flush=True)
 
 
+# A line that is nothing but a parenthesis is the backstage answering the line
+# before it, not a line of its own.
+_ECHO_LINE = re.compile(r"^\s*[（(][^()（）]+[）)]\s*$")
+
+
+def _fold_echo_lines(lines):
+    """Move whole-parenthesis lines into the echo of the line they answer.
+
+    A provider writes a backing vocal either as an x-bg span inside a line or,
+    for the sources with no such marking, as its own line wrapped in
+    parentheses — and only the first is known to be an echo. The second reads
+    as fresh singing five seconds after the lead stopped, so the pause before
+    it gets counted as an instrumental stretch and the widget starts counting
+    dots through the part of the song that is still being answered.
+
+    Nothing folds when half the lines are wrapped: a source that parentheses
+    everything marks something else entirely, and swallowing the lyrics into
+    echoes is worse than the false break it removes.
+    """
+    if len(lines) < 2:
+        return lines
+    marks = [bool(_ECHO_LINE.match(line.get("text") or "")) for line in lines]
+    marks[0] = False      # a first line has nothing to answer
+    folded = sum(marks)
+    if folded == 0 or folded > len(lines) // 2:
+        return lines
+    kept = []
+    for line, is_echo in zip(lines, marks):
+        if not is_echo:
+            kept.append(line)
+            continue
+        prev = kept[-1]
+        bg = prev.get("bg") or {}
+        words = list(bg.get("words") or []) + list(line.get("words") or [])
+        words.sort(key=lambda w: w["t"])
+        prev["bg"] = {
+            "text": " ".join(t for t in (bg.get("text"), line["text"]) if t).strip(),
+            "words": words,
+        }
+    return kept
+
+
 def _payload_line(line):
     """One line as the widget reads it: t, x, w (words), a (voice edge).
 
     The background vocal of a line — the echo the source tags x-bg, like
-    "(can I?)" answering "can I get a kiss?" — goes in b/bw only when the
-    provider actually marked one, so an ordinary line costs nothing extra.
+    "(can I?)" answering "can I get a kiss?" — goes in b/bw only when the line
+    carries one, whether the provider marked it or _fold_echo_lines moved a
+    parenthesised line in, so an ordinary line costs nothing extra.
     """
     out = {
         "t": line["time"],
@@ -1530,6 +1584,7 @@ def main():
             continue
         lines = _run_timed(fn, title, artist, duration)
         if lines:
+            lines = _fold_echo_lines(lines)
             payload = {
                 "ok": True,
                 "provider": name,

@@ -7,14 +7,19 @@ var MIN_GAP_S = 5.0
 var DOTS = 3
 
 // When a line stops being sung. Providers give a word's start and never its
-// end, so the last word plus the longest span the sweep may run is as far as
-// anything can know; a line without word timings has no knowable end, and
-// marking a break after it would have the countdown and the sweep of the same
-// line running at once.
+// end, so the last word of either voice plus the longest span the sweep may run
+// is as far as anything can know; a line without word timings has no knowable
+// end, and marking a break after it would have the countdown and the sweep of
+// the same line running at once.
 function sweepEnd(line, maxWordSpan) {
     const words = line?.words ?? []
     if (words.length === 0) return null
-    const last = Number(words[words.length - 1]?.time)
+    let last = Number(words[words.length - 1]?.time)
+    // The backstage answers after the lead has stopped, so the line is not done
+    // being heard when its own last word is: silence starts at the last sound.
+    const echo = line?.bg?.words ?? []
+    if (echo.length > 0)
+        last = Math.max(last, Number(echo[echo.length - 1]?.time))
     if (isNaN(last)) return null
     return last + maxWordSpan
 }
@@ -26,7 +31,9 @@ function findInterludes(lines, maxWordSpan) {
     for (const line of lines ?? []) {
         const t = Number(line?.time)
         if (!isNaN(t) && String(line.text ?? "").trim() !== "")
-            sung.push({ time: t, words: line.words ?? [] })
+            // The echo travels with the line it answers: the sweep of this line
+            // ends on its last sound, and that sound can be backstage's.
+            sung.push({ time: t, words: line.words ?? [], bg: line.bg ?? null })
     }
     if (sung.length === 0) return out
     // A long lead-in before the first word is a break too, and the only one a
