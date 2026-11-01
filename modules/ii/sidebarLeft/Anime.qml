@@ -26,6 +26,64 @@ Item {
     property var suggestionQuery: ""
     property var suggestionList: []
 
+    // Halaman aktif. Angka di akhir tag masih diterima (/next, "+", pull-to-load
+    // dan tombol "Next page" menyusun string "tags N") tapi selalu ditulis kembali
+    // ke sini, jadi field tidak pernah meleset dari request sesungguhnya.
+    property int currentPage: 1
+    property int maxPage: 9999
+    property bool hasLastSearch: false
+    property string lastTagKey: ""
+    property var lastTagList: []
+
+    readonly property bool pagingVisible: Booru.providerSupportsPaging(Booru.currentProvider)
+
+    // Response terakhir yang bukan pesan system = pencarian yang sedang berlaku.
+    readonly property var currentResponse: {
+        for (let i = root.responses.length - 1; i >= 0; --i) {
+            const r = root.responses[i]
+            if (r.provider !== "system") return r
+        }
+        return null
+    }
+
+    readonly property int totalPages: root.currentResponse ? root.currentResponse.totalPages : -1
+
+    // Field BEDA dari halaman yang sedang tampil: submit boleh diminta lagi
+    // walaupun tag-nya tidak berubah, dan pencarian baru mulai dari halaman 1
+    // kalau angkanya memang tidak kamu sentuh.
+    readonly property bool pageEdited: root.currentPage !== (root.currentResponse ? root.currentResponse.page : 1)
+
+    // Satu-satunya jalur pengubah halaman: clamp dan sinkronkan field. Angka ini
+    // baru diambil oleh submit (tombol kirim/Enter), tidak oleh perubahan halaman.
+    function setPage(page) {
+        const clamped = Number.isFinite(page)
+            ? Math.min(root.maxPage, Math.max(1, Math.round(page)))
+            : 1
+        root.currentPage = clamped
+        pageField.text = clamped.toString()
+    }
+
+    function refetchCurrentPage() {
+        // Belum ada pencarian yang bisa diambil ulang.
+        if (!root.hasLastSearch) return
+        Booru.makeRequest(root.lastTagList, Persistent.states.booru.allowNsfw,
+            Config.options.sidebar.booru.limit, root.currentPage)
+    }
+
+    function clearSearch() {
+        Booru.clearResponses()
+        root.resetPaging()
+    }
+
+    // Riwayat gambar dibiarkan utuh; hanya halaman yang dipatahkan, karena
+    // ruang halaman sebuah endpoint tidak berlaku di endpoint lain.
+    function resetPaging() {
+        root.hasLastSearch = false
+        root.lastTagKey = ""
+        root.lastTagList = []
+        root.setPage(1)
+    }
+
     property bool pullLoading: false
     property int pullLoadingGap: 80
     property real normalizedPullDistance: Math.max(0, (1 - Math.exp(-booruResponseListView.verticalOvershoot / 50)) * booruResponseListView.dragging)
@@ -61,6 +119,18 @@ Item {
                 root.pullLoading = false;
             }
         }
+        function onCurrentProviderChanged() {
+            root.resetPaging();
+        }
+    }
+
+    Connections {
+        target: Persistent.states.booru
+        function onAllowNsfwChanged() {
+            // Filter ikut terbawa sebagai tag (rating:safe / -ai... di
+            // Booru.qml), jadi isi result set dan totalnya berubah.
+            root.refetchCurrentPage()
+        }
     }
 
     property var allCommands: [
@@ -75,15 +145,17 @@ Item {
             name: "clear",
             description: Translation.tr("Clear the current list of images"),
             execute: () => {
-                Booru.clearResponses();
+                root.clearSearch();
             }
         },
         {
             name: "next",
             description: Translation.tr("Get the next page of results"),
             execute: () => {
-                if (root.responses.length > 0) {
-                    const lastResponse = root.responses[root.responses.length - 1];
+                // currentResponse, bukan response terakhir: pesan system tidak
+                // punya tag maupun halaman, jadi tidak boleh memutus /next.
+                const lastResponse = root.currentResponse;
+                if (lastResponse) {
                     root.handleInput(`${lastResponse.tags.join(" ")} ${parseInt(lastResponse.page) + 1}`);
                 } else {
                     root.handleInput("");
@@ -123,16 +195,33 @@ Item {
         }
         else {
             // Create tag list
-            const tagList = inputText.split(/\s+/).filter(tag => tag.length > 0);
-            let pageIndex = 1;
-            for (let i = 0; i < tagList.length; ++i) { // Detect page number
+            let tagList = inputText.split(/\s+/).filter(tag => tag.length > 0);
+            // Semua pemanggil menempelkan halaman di belakang, jadi scan dari ujung:
+            // "1girl 2020 3" berarti tag 1girl+2020 di halaman 3, bukan halaman 2020.
+            let pageIndex = -1;
+            for (let i = tagList.length - 1; i >= 0; --i) { // Detect page number
                 if (/^\d+$/.test(tagList[i])) {
                     pageIndex = parseInt(tagList[i], 10);
                     tagList.splice(i, 1);
                     break;
                 }
             }
-            Booru.makeRequest(tagList, Persistent.states.booru.allowNsfw, Config.options.sidebar.booru.limit, pageIndex);
+            let tagKey = tagList.join(" ").toLowerCase();
+            // Field tag kosong = cari ulang pencarian terakhir; yang berubah cuma halaman.
+            if (tagList.length === 0 && root.hasLastSearch) {
+                tagList = root.lastTagList;
+                tagKey = root.lastTagKey;
+            }
+            // Angka field dipakai kalau kamu memang mengubahnya dari halaman yang
+            // sedang tampil; pencarian baru dengan field tak tersentuh mulai dari 1.
+            if (pageIndex < 0)
+                pageIndex = (tagKey === root.lastTagKey || root.pageEdited) ? root.currentPage : 1;
+            root.hasLastSearch = true;
+            root.lastTagKey = tagKey;
+            root.lastTagList = tagList;
+            // setPage satu-satunya yang meng-clamp, jadi request ikut nilainya.
+            root.setPage(pageIndex);
+            Booru.makeRequest(tagList, Persistent.states.booru.allowNsfw, Config.options.sidebar.booru.limit, root.currentPage);
         }
     }
 
@@ -157,7 +246,7 @@ Item {
             }
         }
         if ((event.modifiers & Qt.ControlModifier) && (event.modifiers & Qt.ShiftModifier) && event.key === Qt.Key_O) {
-            Booru.clearResponses()
+            root.clearSearch()
         }
     }
 
@@ -485,6 +574,61 @@ Item {
                     }
                 }
 
+                RowLayout { // Page stepper
+                    id: pageStepper
+                    visible: root.pagingVisible
+                    Layout.alignment: Qt.AlignTop
+                    Layout.topMargin: 4
+                    Layout.leftMargin: 5
+                    spacing: 0
+
+                    IconButton {
+                        buttonSize: 28
+                        buttonIcon: "chevron_left"
+                        enabled: root.currentPage > 1
+                        onClicked: root.setPage(root.currentPage - 1)
+                    }
+
+                    StyledTextInput {
+                        id: pageField
+                        Layout.alignment: Qt.AlignVCenter
+                        Layout.preferredWidth: Math.max(24, pageField.contentWidth + 6)
+                        horizontalAlignment: Text.AlignHCenter
+                        selectByMouse: true
+                        font.pixelSize: Appearance.font.pixelSize.small
+                        font.family: Appearance.font.family.numbers
+                        text: root.currentPage.toString()
+                        inputMethodHints: Qt.ImhDigitsOnly
+                        validator: IntValidator { bottom: 1; top: root.maxPage }
+                        onAccepted: {
+                            const p = parseInt(text)
+                            if (!Number.isFinite(p) || p < 1) {
+                                pageField.text = root.currentPage.toString()
+                                return
+                            }
+                            root.setPage(p)
+                            // Enter di sini = submit: tag yang sedang ditulis, atau
+                            // pencarian terakhir kalau field tag masih kosong.
+                            if (tagInputField.text.length > 0) tagInputField.accept()
+                            else if (root.hasLastSearch) root.handleInput("")
+                        }
+                    }
+
+                    StyledText {
+                        Layout.alignment: Qt.AlignVCenter
+                        text: "/ " + (root.totalPages > 0 ? root.totalPages : "?")
+                        font.pixelSize: Appearance.font.pixelSize.small
+                        color: Appearance.colors.colSubtext
+                    }
+
+                    IconButton {
+                        buttonSize: 28
+                        buttonIcon: "chevron_right"
+                        enabled: root.totalPages < 0 || root.currentPage < root.totalPages
+                        onClicked: root.setPage(root.currentPage + 1)
+                    }
+                }
+
                 RippleButton { // Send button
                     id: sendButton
                     Layout.alignment: Qt.AlignTop
@@ -492,7 +636,7 @@ Item {
                     implicitWidth: 40
                     implicitHeight: 40
                     buttonRadius: Appearance.rounding.small
-                    enabled: tagInputField.text.length > 0
+                    enabled: tagInputField.text.length > 0 || root.pageEdited
                     toggled: enabled
 
                     MouseArea {

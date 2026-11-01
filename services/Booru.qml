@@ -101,6 +101,7 @@ Singleton {
             "api": "https://www.zerochan.net/?json",
             "defaultLimit": 20,
             "description": Translation.tr("Clean stuff | Excellent quality, no NSFW"),
+            "totalCountFunc": (response) => response.pages?.count,
             "mapFunc": (response) => {
                 response = response.items
                 return response.map(item => {
@@ -203,6 +204,7 @@ Singleton {
             "api": "https://gelbooru.com/index.php?page=dapi&s=post&q=index&json=1",
             "defaultLimit": 42,
             "description": Translation.tr("The hentai one | Great quantity, a lot of NSFW, quality varies wildly"),
+            "totalCountFunc": (response) => response.image_count,
             "mapFunc": (response) => {
                 response = response.post
                 return response.map(item => {
@@ -239,6 +241,7 @@ Singleton {
             "api": "https://api.rule34.xxx/index.php?page=dapi&s=post&q=index&json=1",
             "defaultLimit": 42,
             "description": Translation.tr("The original | All the NSFW you could ever want"),
+            "totalCountFunc": (response) => response.image_count,
             "mapFunc": (response) => {
                 return response.map(item => {
                     return {
@@ -274,6 +277,7 @@ Singleton {
             "url": "https://waifu.im",
             "api": "https://api.waifu.im/images",
             "defaultLimit": 30,
+            "supportsPaging": false,
             "description": Translation.tr("Waifus only | Excellent quality, limited quantity"),
             "mapFunc": (response) => {
                 response = response.items
@@ -305,6 +309,7 @@ Singleton {
             "url": "https://t.alcy.cc",
             "api": "https://t.alcy.cc/",
             "defaultLimit": 20,
+            "supportsPaging": false,
             "description": Translation.tr("Large images | God tier quality, no NSFW."),
             "fixedTags": [
                 {
@@ -389,6 +394,12 @@ Singleton {
         responses = []
     }
 
+    // Endpoints that never receive a page parameter (waifu.im, t.alcy.cc) answer
+    // every page with the same first batch, so paging is hidden for them.
+    function providerSupportsPaging(provider = currentProvider) {
+        return providers[provider]?.supportsPaging !== false
+    }
+
     function addSystemMessage(message) {
         responses = [...responses, root.booruResponseDataComponent.createObject(null, {
             "provider": "system",
@@ -399,16 +410,24 @@ Singleton {
         })]
     }
 
+    // User override: if limit is explicitly set and differs from default (20), use it globally
+    // Otherwise: use per-provider defaultLimit
+    function effectiveLimitFor(provider, limit) {
+        return (limit !== undefined && limit !== 20) ? limit : (provider.defaultLimit ?? 20)
+    }
+
+    // Accurate when the endpoint reports a count; otherwise a batch that comes
+    // back short of the limit proves nothing follows it, so that page is last.
+    function totalPagesFrom(provider, raw, fetched, limit, page) {
+        const reported = raw === null || provider.totalCountFunc === undefined
+            ? NaN : Number(provider.totalCountFunc(raw))
+        if (Number.isFinite(reported) && reported >= 0) return Math.max(1, Math.ceil(reported / limit))
+        return fetched < limit ? page : -1
+    }
+
     function constructRequestUrl(tags, nsfw=true, limit, page=1) {
         var provider = providers[currentProvider]
-        // User override: if limit is explicitly set and differs from default (20), use it globally
-        // Otherwise: use per-provider defaultLimit
-        var effectiveLimit;
-        if (limit !== undefined && limit !== 20) {
-            effectiveLimit = limit;
-        } else {
-            effectiveLimit = provider.defaultLimit ?? 20;
-        }
+        var effectiveLimit = root.effectiveLimitFor(provider, limit)
         var baseUrl = provider.api
         var url = baseUrl
         var tagString = tags.join(" ")
@@ -508,14 +527,17 @@ Singleton {
                     // console.log("[Booru] Raw response: " + xhr.responseText)
                     const provider = providers[currentProvider]
                     let response;
+                    let raw = null;
                     if (provider.manualParseFunc) {
                         response = provider.manualParseFunc(xhr.responseText)
                     } else {
-                        response = JSON.parse(xhr.responseText)
-                        response = provider.mapFunc(response)
+                        raw = JSON.parse(xhr.responseText)
+                        response = provider.mapFunc(raw)
                     }
                     // console.log("[Booru] Mapped response: " + JSON.stringify(response))
                     newResponse.images = response
+                    newResponse.totalPages = root.totalPagesFrom(provider, raw, response.length,
+                        root.effectiveLimitFor(provider, limit), newResponse.page)
                     newResponse.message = response.length > 0 ? "" : root.failMessage
                     
                 } catch (e) {
