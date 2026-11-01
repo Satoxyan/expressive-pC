@@ -228,10 +228,14 @@ Item {
                     property bool workspaceAtTopRight: (workspaceAtRight && workspaceAtTop) 
                     property bool workspaceAtBottomLeft: (workspaceAtLeft && workspaceAtBottom) 
                     property bool workspaceAtBottomRight: (workspaceAtRight && workspaceAtBottom) 
-                    property real distanceFromLeftEdge: xWithinWorkspaceWidget
-                    property real distanceFromRightEdge: root.workspaceImplicitWidth - (xWithinWorkspaceWidget + targetWindowWidth)
-                    property real distanceFromTopEdge: yWithinWorkspaceWidget
-                    property real distanceFromBottomEdge: root.workspaceImplicitHeight - (yWithinWorkspaceWidget + targetWindowHeight)
+                    // A window dragged past the workspace edge reports a negative
+                    // gap. Clamped, because the radius below is subtracted from
+                    // this distance and an unclamped negative would inflate the
+                    // corner mask until it swallows the whole tile.
+                    property real distanceFromLeftEdge: Math.max(xWithinWorkspaceWidget, 0)
+                    property real distanceFromRightEdge: Math.max(root.workspaceImplicitWidth - (xWithinWorkspaceWidget + targetWindowWidth), 0)
+                    property real distanceFromTopEdge: Math.max(yWithinWorkspaceWidget, 0)
+                    property real distanceFromBottomEdge: Math.max(root.workspaceImplicitHeight - (yWithinWorkspaceWidget + targetWindowHeight), 0)
                     property real distanceFromTopLeftCorner: Math.max(distanceFromLeftEdge, distanceFromTopEdge)
                     property real distanceFromTopRightCorner: Math.max(distanceFromRightEdge, distanceFromTopEdge)
                     property real distanceFromBottomLeftCorner: Math.max(distanceFromLeftEdge, distanceFromBottomEdge)
