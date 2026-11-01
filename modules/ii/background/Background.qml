@@ -306,12 +306,13 @@ Variants {
 
             Loader {
                 id: blurLoader
-                // The blur is invisible while the centered wallpaper is active
-                // (opaque shape + solid background cover it), so skip it to
-                // save the expensive multi-sample blur pass on lock/unlock.
-                active: Config.options.lock.blur.enable && !centeredWallpaper.centeredWallpaperEnabled
-                    && (GlobalStates.screenLocked || scaleAnim.running)
-                    && !(bgRoot.userBlurActive || bgRoot.overviewBlurActive)
+                // The blur is invisible while the opaque centered background covers
+                // it, so it is skipped for that case only; a centered wallpaper that
+                // blurs its backdrop deliberately asks for this pass.
+                active: !(bgRoot.userBlurActive || bgRoot.overviewBlurActive)
+                    && (centeredWallpaper.centeredBlurActive
+                        || (Config.options.lock.blur.enable && !centeredWallpaper.centeredWallpaperEnabled
+                            && (GlobalStates.screenLocked || scaleAnim.running)))
                 anchors.fill: parent
                 scale: GlobalStates.screenLocked ? Config.options.lock.blur.extraZoom : 1
                 layer.enabled: active
@@ -326,7 +327,12 @@ Variants {
                 }
                 sourceComponent: GaussianBlur {
                     source: bgRoot.wallpaperAnimation === "" || bgRoot.transitionProgress >= 1.0 ? wallpaper : transitionEffect
-                    radius: GlobalStates.screenLocked ? Config.options.lock.blur.radius : 0
+                    // The centered blur can sit on the desktop all day, so it uses
+                    // the desktop blur size rather than the lock radius (100 = 201
+                    // samples), which would be far too expensive to keep running.
+                    radius: centeredWallpaper.centeredBlurActive
+                        ? Config.options.background.blurRadius
+                        : (GlobalStates.screenLocked ? Config.options.lock.blur.radius : 0)
                     samples: radius * 2 + 1
                     cached: true
                     Rectangle {

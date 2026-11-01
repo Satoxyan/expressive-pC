@@ -360,6 +360,16 @@ ContentPage {
                         }
                         enabled: Config.options.background.centeredWallpaper && WM.compositor !== "niri"
                     }
+                    ConfigSwitch {
+                        Layout.fillWidth: true
+                        buttonIcon: "blur_on"
+                        text: Translation.tr("Blur background")
+                        checked: Config.options.background.centeredWallpaperBlur
+                        onCheckedChanged: {
+                            Config.options.background.centeredWallpaperBlur = checked;
+                        }
+                        enabled: Config.options.background.centeredWallpaper && WM.compositor !== "niri"
+                    }
                 }
 
                 GroupedList {

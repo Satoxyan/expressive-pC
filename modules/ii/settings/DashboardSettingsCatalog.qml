@@ -596,6 +596,7 @@ QtObject {
             page: Translation.tr("Desktop"), title: Translation.tr("Centered wallpaper"), icon: "filter_center_focus", cards: [
                 { type: "toggle", key: "desktop:Wallpaper/Centered wallpaper/Enable", title: Translation.tr("Enable"), icon: "wallpaper" },
                 { type: "toggle", key: "desktop:Wallpaper/Centered wallpaper/Show only when locked", title: Translation.tr("Only when locked"), icon: "lock" },
+                { type: "toggle", key: "desktop:Wallpaper/Centered wallpaper/Blur background", title: Translation.tr("Blur background"), icon: "blur_on" },
                 { type: "toggle", key: "desktop:Scroll to cycle shape", title: Translation.tr("Scroll to cycle shape"), icon: "swipe_vertical" },
                 { type: "slider", key: "desktop:Wallpaper/Centered wallpaper/Size", title: Translation.tr("Size"), icon: "aspect_ratio", percent: false },
                 { type: "swatch", key: "desktop:Centered color", title: Translation.tr("Background color"), icon: "palette", w: 2 },

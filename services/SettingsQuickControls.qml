@@ -118,6 +118,7 @@ Singleton {
         ),
         "desktop:Wallpaper/Centered wallpaper/Enable": root.optionSwitch("background.centeredWallpaper"),
         "desktop:Wallpaper/Centered wallpaper/Show only when locked": root.optionSwitch("background.centeredWallpaperOnlyWhenLocked"),
+        "desktop:Wallpaper/Centered wallpaper/Blur background": root.optionSwitch("background.centeredWallpaperBlur"),
         "desktop:Wallpaper/Centered wallpaper/Size": root.optionSlider("background.centeredWallpaperSize", 400, 800, [400], false),
         "desktop:Clock/Enable": root.optionSwitch("background.widgets.clock.enable"),
         "desktop:Clock/Show only when locked": root.optionSwitch("background.widgets.clock.showOnlyWhenLocked"),

@@ -123,6 +123,15 @@ Item {
     readonly property bool centeredHidesFullWallpaper: root.centeredWallpaperEnabled
         && root.centeredFullWallpaperOpacity() <= 0
 
+    // "layer1" and "layer0" are the last two palette entries and already carry
+    // alpha from the Appearance transparency settings, so a blurred background
+    // shows through them without any extra help.
+    readonly property bool centeredColorHasAlpha:
+        ["layer1", "layer0"].includes(Config.options.background.centeredWallpaperColor)
+    readonly property bool centeredBlurActive: Config.options.background.centeredWallpaperBlur
+        && root.centeredShapeActive && !root.wallpaperIsVideo && !root.collageMode
+    readonly property real centeredBlurBgOpacity: 0.5
+
     property real centeredFade: 0.05
 
     // Size of the centered shape: grows from centeredWallpaperSize to
@@ -143,6 +152,9 @@ Item {
     }
     function centeredFullWallpaperOpacity() {
         if (!root.centeredWallpaperEnabled) return 1
+        // A blurred backdrop is the whole point of the toggle, so the wallpaper
+        // stays fully rendered (blurred by Background.qml) instead of fading out.
+        if (root.centeredBlurActive) return 1
         return Math.max(0, Math.min(1,
             (root.centeredProgress - (1 - root.centeredFade)) / root.centeredFade))
     }
@@ -150,7 +162,9 @@ Item {
         if (!root.centeredWallpaperEnabled) return 0
         if (root.collageMode) return 0
         if (root.wallpaperIsVideo && GlobalStates.screenLocked) return 1
-        return Math.max(0, Math.min(1, (1 - root.centeredProgress) / root.centeredFade))
+        const fade = Math.max(0, Math.min(1, (1 - root.centeredProgress) / root.centeredFade))
+        return root.centeredBlurActive && !root.centeredColorHasAlpha
+            ? Math.min(fade, root.centeredBlurBgOpacity) : fade
     }
 
     Component.onCompleted: {
@@ -192,8 +206,13 @@ Item {
         // Transparent while the shape is not the subject (desktop end): the layer
         // must keep rendering so its FBO stays allocated, but everything stacked
         // below in Background.qml (wallpaper, the transition shader) must show.
+        // The fill is thinned with the blurred background rather than by lowering
+        // the item's opacity, which would also fade the picture inside the shape.
         color: root.centeredShapeActive && !root.wallpaperIsVideo && !root.collageMode
-            ? root.centeredWallpaperColor : "transparent"
+            ? (root.centeredBlurActive && !root.centeredColorHasAlpha
+                ? CF.ColorUtils.transparentize(root.centeredWallpaperColor, 1 - root.centeredBlurBgOpacity)
+                : root.centeredWallpaperColor)
+            : "transparent"
         shape: root.centeredWallpaperShape
         transformOrigin: Item.Center
         property real shapeZoom: 1

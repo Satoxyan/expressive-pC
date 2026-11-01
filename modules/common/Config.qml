@@ -768,6 +768,7 @@ Singleton {
                 property string centeredWallpaperColor: "primaryContainer"
                 property bool centeredWallpaperOnlyWhenLocked: false
                 property bool centeredWallpaperShapeCycle: true // scroll on centered wallpaper cycles its shape
+                property bool centeredWallpaperBlur: false // blur the wallpaper behind the centered shape and let it show through
                 property string centeredWallpaperImage: ""
                 property string wallpaperAnimation: "magic"
                 property bool enableWallpaperPreview: false
