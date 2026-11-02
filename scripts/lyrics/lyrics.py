@@ -1199,8 +1199,11 @@ def fetch_lrclib(title, artist, duration):
 
         tracks.sort(key=keyfn)
         for track in tracks:
+            # lrclib also holds junk entries ("[00:00.00]probe"), even as the
+            # exact match: a song has more than a line or two, so try the next
+            # result instead of publishing that one.
             lines = _parse_lrc(track["syncedLyrics"])
-            if lines:
+            if sum(1 for line in lines if line["text"]) >= 3:
                 return lines
     return []
 
@@ -1578,11 +1581,17 @@ def main():
         probe_all(title, artist, duration, providers)
         return
 
+    # A provider that never answered says nothing about the track, so when the
+    # whole chain was like that the caller should try the same track again.
+    unanswered = False
     for name in _provider_names(providers):
         fn = PROVIDERS.get(name)
         if not fn:
             continue
         lines = _run_timed(fn, title, artist, duration)
+        if lines is None:
+            unanswered = True
+            continue
         if lines:
             lines = _fold_echo_lines(lines)
             payload = {
@@ -1593,7 +1602,7 @@ def main():
             print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), flush=True)
             return
 
-    print("not_found", flush=True)
+    print("error" if unanswered else "not_found", flush=True)
 
 
 if __name__ == "__main__":

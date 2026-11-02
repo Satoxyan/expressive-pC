@@ -32,6 +32,25 @@ Singleton {
     property string status: "loading"
     property string providedBy: ""
 
+    // Line window around the active line, for widgets that draw a fixed number
+    // of rows instead of the word-level timeline.
+    readonly property int before: 3
+    readonly property int after: 3
+    readonly property int total: 7
+    readonly property var slots: root.buildSlots(root.activeIndex)
+
+    function buildSlots(idx) {
+        const result = []
+        for (let i = 0; i < root.total; i++) {
+            const lineIdx = idx - root.before + i
+            if (lineIdx >= 0 && lineIdx < root.lyricsLines.length)
+                result.push(root.lyricsLines[lineIdx].text || "♪")
+            else
+                result.push("")
+        }
+        return result
+    }
+
     // Fixed lyric sync offset (ms). Negative = words/lines light up EARLIER,
     // positive = later. Hardcoded so it can't disturb the lyric logic.
     readonly property int lyricOffsetMs: -200
@@ -283,6 +302,7 @@ Singleton {
                 const trimmed = data.trim()
                 if (trimmed === "not_found") { root.status = "not_found"; return }
                 if (trimmed === "no_info")   { root.status = "no_info";   return }
+                if (trimmed === "error")     { root.status = "error"; root.scheduleRetry(); return }
 
                 let payload = null
                 try {
@@ -382,6 +402,18 @@ Singleton {
         probeProc.running = true
     }
 
+    // The search is worth repeating for the same track when a provider never
+    // answered: the scripts report "error" when every provider timed out.
+    readonly property list<int> retryDelays: [20000, 60000, 180000]
+    property int retryCount: 0
+
+    function scheduleRetry() {
+        if (root.retryCount >= root.retryDelays.length) return
+        lookupRetry.interval = root.retryDelays[root.retryCount]
+        root.retryCount++
+        lookupRetry.restart()
+    }
+
     Timer {
         id: retryTimer
         interval: 200
@@ -400,7 +432,16 @@ Singleton {
         }
     }
 
-    function restartLyrics() {
+    Timer {
+        id: lookupRetry
+        onTriggered: root.restartLyrics(true)
+    }
+
+    // A new track or a manual refresh starts a new round of retries
+    function restartLyrics(isRetry) {
+        if (!isRetry) root.retryCount = 0
+        retryTimer.stop()
+        lookupRetry.stop()
         lyricsProc.running = false
         boundaryTimer.stop()
         root.lyricsLines = []
