@@ -37,9 +37,23 @@ Singleton {
 
     onClockMinuteChanged: reEvaluate()
     onAutomaticChanged: {
+        // A state the user picked by hand is theirs to keep, so only what the schedule
+        // itself applied is handed back when the schedule is switched off. Before this,
+        // switching automatic off left a screen the schedule had warmed still warm for
+        // the rest of the day: nothing else was ever going to turn it off again, and
+        // the night light looked like it had come on by itself.
+        const manual = root.manualActive;
         root.manualActive = undefined;
         root.firstEvaluation = true;
-        reEvaluate();
+        root.reEvaluate();
+        if (root.automatic) {
+            // The first evaluation is swallowed to keep a starting shell from acting
+            // before it has read anything, so the schedule is applied by hand here
+            // instead of waiting for the minute to change.
+            root.ensureState();
+        } else if (manual === undefined && root.temperatureActive) {
+            root.disableTemperature();
+        }
     }
 
     function inBetween(t, from, to) {
@@ -85,7 +99,12 @@ Singleton {
 
     function startHyprsunset() {
         if (root.isNiri) return;
-        Quickshell.execDetached(["bash", "-c", `pidof hyprsunset || hyprsunset`]);
+        // A daemon without -i comes up with its own default of 6000K already on the
+        // displays, so the shell being merely *present* — started at boot, or woken up
+        // by the gamma slider — would warm the screen without anyone asking for the
+        // night light. Identity means it starts neutral and only enableTemperature,
+        // which sets a real temperature, is allowed to tint anything.
+        Quickshell.execDetached(["bash", "-c", `pidof hyprsunset || hyprsunset -i`]);
     }
 
     function load() {
@@ -93,8 +112,18 @@ Singleton {
             root.disableTemperature();
             return;
         }
-        Quickshell.execDetached(["bash", "-c", `pidof hyprsunset || hyprsunset & disown; sleep 0.3; hyprctl hyprsunset identity`]);
-        root.temperatureActive = false;
+        root.startHyprsunset();
+        // A daemon that outlived the previous session keeps whatever curve it was left
+        // with, and this shell knows nothing about it: with the schedule in charge it
+        // is put right by the answer below, without it the light begins off. The old
+        // `sleep 0.3; hyprctl hyprsunset identity` tried the same thing against a
+        // socket that might not exist yet, and left the 6000K default standing when it
+        // missed.
+        if (root.automatic)
+            root.ensureState();
+        else
+            root.disableTemperature();
+        root.fetchState();
     }
 
     function enableTemperature() {
@@ -149,15 +178,17 @@ Singleton {
     Process {
         id: fetchProc
         running: false
-        command: ["bash", "-c", "hyprctl hyprsunset temperature"]
+        // The reply to `temperature` is the number last stored, whatever the displays
+        // are actually doing — it kept answering 5000 long after the matrix was reset
+        // to identity. Only the identity flag says whether a curve is on the screens.
+        command: ["bash", "-c", "hyprctl hyprsunset identity get 2>/dev/null"]
         stdout: StdioCollector {
             id: stateCollector
             onStreamFinished: {
                 const output = stateCollector.text.trim();
-                if (output.length == 0 || output.startsWith("Couldn't"))
-                    root.temperatureActive = false;
-                else
-                    root.temperatureActive = (output != "6500");
+                // No daemon, no socket and an identity matrix all mean the same thing
+                // here: there is no night light to show as on.
+                root.temperatureActive = output === "false";
             }
         }
     }
