@@ -296,8 +296,8 @@ Item {
             // Neither of these is the lead: an echo and a reading are both a step
             // behind it in size, colour and lift.
             p.isSub = role !== "lead"
-            // ...and only one of them sweeps on the line's span rather than on
-            // the line's own progress.
+            // ...and the reading is the one that has no timings to be measured
+            // against at all, which is what makes it ride the line's own sweep.
             p.reading = role === "reading"
         }
         return rows
@@ -346,11 +346,10 @@ Item {
     function wordProgress(piece, sweepIndex, sweepProgress) {
         if (piece.index < 0) {
             // Sentence-level source: one sweep across the whole line, each
-            // piece taking its own slice of it. A reading has no timings at all
-            // and is not a sentence of this line either: it crosses the span the
-            // lead's light takes, so the two go out together.
-            const p = piece.reading === true
-                ? LyricsService.activeLineSweep : LyricsService.activeLineProgress
+            // piece taking its own slice of it. A reading of the line has no
+            // timings at all and joins that same sweep, which is what makes
+            // its light and the words above it go out together.
+            const p = LyricsService.activeLineProgress
             const span = Math.max(1e-4, piece.end - piece.start)
             return Math.min(1, Math.max(0, (p - piece.start) / span))
         }

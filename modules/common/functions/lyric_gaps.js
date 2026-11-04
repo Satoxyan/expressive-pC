@@ -43,6 +43,17 @@ function sweepEnd(line, maxWordSpan) {
     return last + maxWordSpan
 }
 
+// When a line's light goes out: the instant its singing is judged to end above,
+// and never later than the line after it starting. A break row takes the
+// foreground at that same instant, so a sweep that ran on to the next line's
+// start would be cut off with its last words still dark.
+function lineSpanEnd(line, nextTime, maxWordSpan) {
+    const sung = sweepEnd(line, maxWordSpan)
+    if (sung === null) return null
+    const next = Number(nextTime)
+    return isNaN(next) ? sung : Math.min(next, sung)
+}
+
 // The breaks of a song as [{time, end}], in the same seconds the lines use.
 function findInterludes(lines, maxWordSpan) {
     const out = []

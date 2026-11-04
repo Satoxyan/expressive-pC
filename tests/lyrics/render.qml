@@ -54,8 +54,7 @@ Window {
         // behind the lead's at this moment.
         LyricsService.activeBgWordIndex = 1
         LyricsService.activeBgWordProgress = 0.4
-        // The reading of the line crosses the span the line's own light takes.
-        LyricsService.activeLineSweep = 0.55
+        // The reading of the line crosses the same sweep the line itself is on.
         LyricsService.activeLineProgress = 0.55
         timer.restart()
     }

@@ -80,18 +80,13 @@ Singleton {
     property real activeWordProgress: 0
 
     // Sentence-level sweep (0..1) across the active line, used when the
-    // source only carries line timing: line start -> next line start, so
-    // the sweep tracks the real song instead of guessed per-word times.
+    // source only carries line timing: the line's own start to the instant it
+    // stops being heard, so the sweep tracks the real song instead of guessed
+    // per-word times — and finishes with its last character exactly where the
+    // gap rules say the silence after it opens, which is where a break row
+    // takes the foreground. The latin reading of a line has no timings of its
+    // own and rides this, so its light and the words above it go out together.
     property real activeLineProgress: 0
-
-    // How far through the active line the song stands, from its first sound to
-    // its last: the whole span its own light takes. A line with word timings
-    // ends with the fill of its last word, a cap's width before the next line
-    // starts; a line without them is heard right up to the next line, which is
-    // exactly how far its sentence sweep runs. The latin reading of a line has
-    // no timings of its own, so it sweeps on this and finishes with the words
-    // above it instead of drifting on after them.
-    property real activeLineSweep: 0
 
     // Word-level state of the background vocal of the active line: the echo
     // the source tags x-bg ("(can I?)" answering "can I get a kiss?"). It is
@@ -139,11 +134,11 @@ Singleton {
         root.activeBgWordProgress = Math.min(1, Math.max(0, (pos - words[idx].time) / span))
     }
 
-    // How far through the span from `start` to `end` the cursor stands. An
-    // unknown end — the last line of a song has none — reaches to the end of
-    // time, so the light is simply on once the start has come.
+    // How far through the span from `start` to `end` the cursor stands. An end
+    // that is not known reaches to the end of time, so the light is simply on
+    // once the start has come.
     function progressOver(start, end, pos) {
-        if (end !== undefined && end > start)
+        if (end != null && end > start)
             return Math.min(1, Math.max(0, (pos - start) / (end - start)))
         return pos >= start ? 1 : 0
     }
@@ -152,21 +147,14 @@ Singleton {
         const line = root.lyricsLines[root.activeIndex]
         const words = line?.words ?? []
         const pos = root.shiftedPos()
-        // The sentence sweep always follows the real line span, so a source
-        // with no word timings can still light the line over its own length.
+        // The sentence sweep runs over the line's own length, which is where the
+        // gap rules say it stops being heard: a break row must never arrive on a
+        // half-swept line, or the last characters lose their glow to the dots.
         const lineEnd = root.lyricsLines[root.activeIndex + 1]?.time
         root.activeLineProgress = line
-            ? root.progressOver(line.time, lineEnd, pos) : 0
-        // Where the lead's own light goes out. A word's fill is capped at
-        // maxWordSpan below, so the last word of the line ends the same way and
-        // the line's span is measured to that, not to the next line's start.
-        let spanEnd = lineEnd
-        if (words.length > 0) {
-            const lastWordEnd = words[words.length - 1].time + root.maxWordSpan
-            spanEnd = lineEnd === undefined ? lastWordEnd : Math.min(lineEnd, lastWordEnd)
-        }
-        root.activeLineSweep = line
-            ? root.progressOver(line.time, spanEnd, pos) : 0
+            ? root.progressOver(line.time,
+                Gaps.lineSpanEnd(line, lineEnd, root.maxWordSpan), pos)
+            : 0
         if (!words || words.length === 0) {
             root.activeWordIndex = -1
             root.activeWordProgress = 0
@@ -194,7 +182,6 @@ Singleton {
             // snap to 100% and only light up. Sweep it across the rest of the
             // line up to the next line's start instead, still capped so a
             // long pause before the next line can't make it crawl.
-            const lineEnd = root.lyricsLines[root.activeIndex + 1]?.time
             if (lineEnd !== undefined) {
                 const span = Math.min(
                     Math.max(0.001, lineEnd - words[idx].time),
@@ -483,7 +470,6 @@ Singleton {
         root.activeInterludeIndex = -1
         root.activeInterludeProgress = 0
         root.activeLineProgress = 0
-        root.activeLineSweep = 0
         root.status = "loading"
 
         const title    = root.activePlayer?.trackTitle  ?? ""

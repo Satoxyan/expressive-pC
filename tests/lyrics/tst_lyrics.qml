@@ -704,6 +704,21 @@ TestCase {
         }]
     }
 
+    // The same line as the providers hand it over for a CJK lyric: no word
+    // timings at all, timed to the second it starts, with the reading of it
+    // under it. The next line is twenty seconds off, so the silence in between
+    // is a break the moment the line is judged done being sung.
+    function cjkSong() {
+        return [{
+            text: "バカバカバカ バカバカバカ バカ",
+            time: 0,
+            reading: "se e no ba ka ba ka ba ka ba ka ba ka"
+        }, {
+            text: "the line after the pause",
+            time: 20
+        }]
+    }
+
     function test_the_reading_is_a_row_of_the_sung_line() {
         LyricsService.load(romajiSong(), "")
         LyricsService.activate(0)
@@ -728,38 +743,51 @@ TestCase {
             "the reading hangs under the line it reads")
     }
 
-    function test_the_reading_lights_on_the_line_span_not_on_the_gap() {
-        LyricsService.load(romajiSong(), "")
+    function test_the_line_and_its_reading_are_swept_by_one_clock() {
+        LyricsService.load(cjkSong(), "")
         LyricsService.activate(0)
         wait(300)
-        const reading = wordsOf(wordRows(list().currentItem)[1])
-        // The sentence sweep runs all the way to the next line's start, twenty
-        // seconds off; the line's own light goes out with its last word. The
-        // reading follows the light, so nothing of it burns while the gap runs.
-        LyricsService.activeLineProgress = 0.95
-        LyricsService.activeLineSweep = 0
-        wait(80)
-        for (const w of reading)
-            compare(fillOf(w).width, 0, "the reading waits for its line, not for the gap")
-        LyricsService.activeLineSweep = 1
-        wait(80)
-        for (const w of reading)
+        const rows = wordRows(list().currentItem)
+        compare(rows.length, 2, "the line and its reading under it")
+        const lead = wordsOf(rows[0]), reading = wordsOf(rows[1])
+        compare(lead.length, 3, "the line laid out in its own pieces")
+
+        // Both rows are sliced off the single line progress: whatever the light
+        // has crossed on one it has crossed on the other, and the two go out
+        // with the last character of each rather than with the gap after them.
+        LyricsService.activeLineProgress = 0
+        wait(120)
+        for (const w of lead.concat(reading))
+            compare(fillOf(w).width, 0, "nothing is crossed before the line begins")
+        LyricsService.activeLineProgress = 1
+        wait(120)
+        for (const w of lead.concat(reading))
             compare(fillOf(w).width.toFixed(1), w.width.toFixed(1),
-                "and is fully crossed the moment the line's own light is")
-        // Halfway through, one piece at a time is being swept: the light grows
-        // across the reading instead of the whole of it arriving at once.
-        LyricsService.activeLineSweep = 0.5
-        wait(80)
-        let mid = 0, whole = 0, dark = 0
-        for (const w of reading) {
-            const f = fillOf(w)
-            if (f.width <= 0) dark++
-            else if (f.width >= w.width - 0.5) whole++
-            else mid++
+                "and both end on their last character, not short of it")
+
+        const lit = (row) => {
+            let mid = 0, whole = 0, dark = 0
+            for (const w of row) {
+                const f = fillOf(w)
+                if (f.width <= 0) dark++
+                else if (f.width >= w.width - 0.5) whole++
+                else mid++
+            }
+            return { mid: mid, whole: whole, dark: dark }
         }
-        compare(mid, 1, "one piece of the reading is half-lit at a time")
-        verify(whole > 0 && dark > 0,
-            "with the pieces behind it lit and the ones ahead still waiting")
+        // Halfway through a piece of the lead: one piece at a time is being
+        // swept in either row, so the light grows across them instead of the
+        // whole line arriving at once.
+        const row = lyrics.hotRows[0]
+        const slice = row[Math.floor(row.length / 2)]
+        LyricsService.activeLineProgress = (slice.start + slice.end) / 2
+        wait(120)
+        compare(lit(lead).mid, 1, "one piece of the line is half-lit at a time")
+        verify(lit(lead).whole > 0 && lit(lead).dark > 0,
+            "with what is behind it crossed and what is ahead still waiting")
+        compare(lit(reading).mid, 1, "the same sweep is going on in the reading")
+        verify(lit(reading).whole > 0 && lit(reading).dark > 0,
+            "so it lights piece by piece with the line above it")
     }
 
     function test_the_band_leaves_room_for_every_row_of_the_reading() {
@@ -879,6 +907,34 @@ TestCase {
         compare(Gaps.findInterludes(near, 1.2).length, 0, "a long line is not a gap")
         compare(Gaps.sweepEnd(near[0], 1.2), 24 * Gaps.SYLLABLE_S,
             "twenty four mora, one syllable apiece")
+    }
+
+    function test_the_sweep_ends_where_the_break_opens() {
+        // The bug this pins: a line-timed lyric swept its light on to the next
+        // line's start while the break took the row away five seconds earlier,
+        // so the last characters of the line never got their glow before focus
+        // moved off. The sweep now stops on the tick the count down opens.
+        const lines = [
+            { text: "ひとつ ふたつ かぞえながら", time: 0 },
+            { text: "the next line, after the instrumental", time: 20 }
+        ]
+        const sung = Gaps.sweepEnd(lines[0], 1.2)
+        const gaps = Gaps.findInterludes(lines, 1.2)
+        compare(gaps.length, 1, "the silence is marked")
+        verify(sung > 0 && sung < 20 - Gaps.MIN_GAP_S,
+            "the line is judged done well before the next one arrives")
+        compare(Gaps.lineSpanEnd(lines[0], lines[1].time, 1.2), gaps[0].time,
+            "the line's own light goes out on the tick the count down opens")
+        // With no silence worth marking the next line still has the last word:
+        // a sweep may not run under the line that replaces it.
+        compare(Gaps.lineSpanEnd(lines[0], 3, 1.2), 3, "never later than the line after it")
+        // A line with word timings is untouched by the estimate.
+        const timed = { text: "one line", time: 0, words: [{ text: "one", time: 0 },
+                                                          { text: "line", time: 2 }] }
+        compare(Gaps.lineSpanEnd(timed, 20, 1.2), 3.2, "the words still decide their own end")
+        // And a line too short to say is heard for the least a line can be.
+        compare(Gaps.lineSpanEnd({ text: "solo", time: 0 }, undefined, 1.2),
+            Gaps.MIN_SUNG_S, "with a floor under it and nothing above")
     }
 
     function test_every_row_of_a_merged_list_knows_its_line() {
