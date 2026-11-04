@@ -84,6 +84,15 @@ Singleton {
     // the sweep tracks the real song instead of guessed per-word times.
     property real activeLineProgress: 0
 
+    // How far through the active line the song stands, from its first sound to
+    // its last: the whole span its own light takes. A line with word timings
+    // ends with the fill of its last word, a cap's width before the next line
+    // starts; a line without them is heard right up to the next line, which is
+    // exactly how far its sentence sweep runs. The latin reading of a line has
+    // no timings of its own, so it sweeps on this and finishes with the words
+    // above it instead of drifting on after them.
+    property real activeLineSweep: 0
+
     // Word-level state of the background vocal of the active line: the echo
     // the source tags x-bg ("(can I?)" answering "can I get a kiss?"). It is
     // sung on its own timings, so it cannot ride the lead's index.
@@ -130,6 +139,15 @@ Singleton {
         root.activeBgWordProgress = Math.min(1, Math.max(0, (pos - words[idx].time) / span))
     }
 
+    // How far through the span from `start` to `end` the cursor stands. An
+    // unknown end — the last line of a song has none — reaches to the end of
+    // time, so the light is simply on once the start has come.
+    function progressOver(start, end, pos) {
+        if (end !== undefined && end > start)
+            return Math.min(1, Math.max(0, (pos - start) / (end - start)))
+        return pos >= start ? 1 : 0
+    }
+
     function updateActiveWords() {
         const line = root.lyricsLines[root.activeIndex]
         const words = line?.words ?? []
@@ -137,9 +155,18 @@ Singleton {
         // The sentence sweep always follows the real line span, so a source
         // with no word timings can still light the line over its own length.
         const lineEnd = root.lyricsLines[root.activeIndex + 1]?.time
-        root.activeLineProgress = (line && lineEnd !== undefined && lineEnd > line.time)
-            ? Math.min(1, Math.max(0, (pos - line.time) / (lineEnd - line.time)))
-            : (line && pos >= line.time ? 1 : 0)
+        root.activeLineProgress = line
+            ? root.progressOver(line.time, lineEnd, pos) : 0
+        // Where the lead's own light goes out. A word's fill is capped at
+        // maxWordSpan below, so the last word of the line ends the same way and
+        // the line's span is measured to that, not to the next line's start.
+        let spanEnd = lineEnd
+        if (words.length > 0) {
+            const lastWordEnd = words[words.length - 1].time + root.maxWordSpan
+            spanEnd = lineEnd === undefined ? lastWordEnd : Math.min(lineEnd, lastWordEnd)
+        }
+        root.activeLineSweep = line
+            ? root.progressOver(line.time, spanEnd, pos) : 0
         if (!words || words.length === 0) {
             root.activeWordIndex = -1
             root.activeWordProgress = 0
@@ -456,6 +483,7 @@ Singleton {
         root.activeInterludeIndex = -1
         root.activeInterludeProgress = 0
         root.activeLineProgress = 0
+        root.activeLineSweep = 0
         root.status = "loading"
 
         const title    = root.activePlayer?.trackTitle  ?? ""

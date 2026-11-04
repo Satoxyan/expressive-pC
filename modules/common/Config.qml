@@ -1053,7 +1053,7 @@ Singleton {
             }
 
             property JsonObject lyrics: JsonObject {
-                property string providers: "musixmatch,paxsenix,unison,netease,youlyplus,betterlyric,binilyrics,simpmusic,lrclib,kugou" // Comma-separated priority order
+                property string providers: "binilyrics,musixmatch,netease,qqmusic,paxsenix,unison,youlyplus,betterlyric,simpmusic,lrclib,kugou" // Comma-separated priority order
                 property bool readings: true // Show the latin reading (romaji) a source supplies for CJK lines
             }
 

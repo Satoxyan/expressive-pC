@@ -20,6 +20,10 @@ QtObject {
     property int activeWordIndex: -1
     property real activeWordProgress: 0
     property real activeLineProgress: 0
+    // The span the sung line's own light takes, which the reading of the line
+    // sweeps on. The real service works it out of the word timings; a test that
+    // wants a particular value pushes it in directly.
+    property real activeLineSweep: 0
     // The line being sung can have an echo answering it, sung on its own
     // timings, so it sweeps on its own clock.
     property int activeBgWordIndex: -1
@@ -51,6 +55,7 @@ QtObject {
         root.activeWordIndex = words.length > 0 ? 0 : -1
         root.activeWordProgress = 0
         root.activeLineProgress = 0
+        root.activeLineSweep = 0
         const bgWords = root.lyricsLines[index]?.bg?.words ?? []
         root.activeBgWordIndex = bgWords.length > 0 ? 0 : -1
         root.activeBgWordProgress = 0

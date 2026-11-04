@@ -687,10 +687,108 @@ TestCase {
             + " -> " + list().currentItem.height.toFixed(1) + ")")
     }
 
+    // ── the latin reading ──────────────────────────────────────────────────
+    // A reading has no timings of its own: it is a transliteration of the line,
+    // said when the line is said, so its light has to cross the same span the
+    // words above it take and no longer.
+    function romajiSong() {
+        return [{
+            text: "せーの バカバカバカ",
+            time: 0,
+            words: [{ text: "せーの", time: 0 }, { text: "バカバカバカ", time: 1 }],
+            reading: "se e no ba ka ba ka ba ka ba ka ba ka"
+        }, {
+            text: "the line after the pause",
+            time: 20,
+            words: [{ text: "the", time: 20 }]
+        }]
+    }
+
+    function test_the_reading_is_a_row_of_the_sung_line() {
+        LyricsService.load(romajiSong(), "")
+        LyricsService.activate(0)
+        wait(300)
+        const rows = wordRows(list().currentItem)
+        compare(rows.length, 2, "the line and its reading under it")
+        const lead = wordsOf(rows[0])[0], reading = wordsOf(rows[1])
+        verify(reading.length > 4,
+            "the reading is laid out in its own pieces (" + reading.length + ")")
+        verify(reading[0].sub, "a reading comes in a step behind the line")
+        verify(reading[0].reading, "and says which of the two it is")
+        compare(lead.word, "せーの", "the lead keeps its own words")
+        verify(reading[0].height < lead.height,
+            "smaller (" + reading[0].height.toFixed(1) + " < " + lead.height.toFixed(1) + ")")
+        // Its pieces are swept on the line's own span, which is neither the
+        // echo's clock nor the lead's word list.
+        for (const row of lyrics.readingRows)
+            for (const piece of row)
+                verify(piece.reading === true && piece.index === -1,
+                    "every piece of the reading sweeps on the line's span: " + piece.text)
+        verify(rows[1].y > rows[0].y + rows[0].height - 1,
+            "the reading hangs under the line it reads")
+    }
+
+    function test_the_reading_lights_on_the_line_span_not_on_the_gap() {
+        LyricsService.load(romajiSong(), "")
+        LyricsService.activate(0)
+        wait(300)
+        const reading = wordsOf(wordRows(list().currentItem)[1])
+        // The sentence sweep runs all the way to the next line's start, twenty
+        // seconds off; the line's own light goes out with its last word. The
+        // reading follows the light, so nothing of it burns while the gap runs.
+        LyricsService.activeLineProgress = 0.95
+        LyricsService.activeLineSweep = 0
+        wait(80)
+        for (const w of reading)
+            compare(fillOf(w).width, 0, "the reading waits for its line, not for the gap")
+        LyricsService.activeLineSweep = 1
+        wait(80)
+        for (const w of reading)
+            compare(fillOf(w).width.toFixed(1), w.width.toFixed(1),
+                "and is fully crossed the moment the line's own light is")
+        // Halfway through, one piece at a time is being swept: the light grows
+        // across the reading instead of the whole of it arriving at once.
+        LyricsService.activeLineSweep = 0.5
+        wait(80)
+        let mid = 0, whole = 0, dark = 0
+        for (const w of reading) {
+            const f = fillOf(w)
+            if (f.width <= 0) dark++
+            else if (f.width >= w.width - 0.5) whole++
+            else mid++
+        }
+        compare(mid, 1, "one piece of the reading is half-lit at a time")
+        verify(whole > 0 && dark > 0,
+            "with the pieces behind it lit and the ones ahead still waiting")
+    }
+
+    function test_the_band_leaves_room_for_every_row_of_the_reading() {
+        const brief = romajiSong()
+        brief[0].reading = "se e no"
+        LyricsService.load(brief, "")
+        LyricsService.activate(0)
+        wait(300)
+        compare(lyrics.readingRows.length, 1, "a short reading is a single row")
+        const shortGuess = lyrics.hotLineGuess
+
+        const long = romajiSong()
+        long[0].reading = Array(40).fill("ba ka").join(" ")
+        LyricsService.load(long, "")
+        LyricsService.activate(0)
+        wait(300)
+        verify(lyrics.readingRows.length > 1,
+            "a long reading wraps to several rows (" + lyrics.readingRows.length + ")")
+        verify(lyrics.hotLineGuess > shortGuess,
+            "and the band grows row by row, not by one row however many there are ("
+            + shortGuess.toFixed(1) + " -> " + lyrics.hotLineGuess.toFixed(1) + ")")
+    }
+
     // ── the instrumental break ─────────────────────────────────────────────
-    // A gap is only knowable once the line before it has finished being sung,
-    // and a provider that times lines but not words never says when that is —
-    // so a break is marked from the last word, and an intro from the first.
+    // A gap is only knowable once the line before it has finished being sung. A
+    // provider that times every word says so; one that times only lines never
+    // does, and gets an estimate out of how much text there is to sing. Either
+    // way a break runs from the end of that sweep to the start of the line
+    // after it, and an intro from the top of the track to the first line.
     function test_a_break_needs_five_clear_seconds_after_the_sweep() {
         const lines = breakSong()
         const gaps = Gaps.findInterludes(lines, 1.2)
@@ -743,18 +841,44 @@ TestCase {
             "4s of intro is not worth marking")
     }
 
-    function test_line_synced_lyrics_get_no_mid_song_breaks() {
-        // No word timings: there is no knowing where the line stops, and the
-        // sentence sweep runs to the next line's start through the gap anyway.
+    function test_a_line_synced_gap_is_counted_from_the_text() {
+        // No word timings: the line is heard for about as long as it takes to
+        // say its syllables, and the countdown opens after that. A long enough
+        // silence between two lines is a break whichever way they were timed.
         const lines = [
-            { text: "one line", time: 0 },
-            { text: "the next, after a minute", time: 40 }
+            { text: "one line of the song", time: 0 },
+            { text: "the next, after a minute", time: 12 }
         ]
-        compare(Gaps.findInterludes(lines, 1.2).length, 0)
-        lines[0].words = [{ text: "one", time: 0 }, { text: "line", time: 1 }]
         const gaps = Gaps.findInterludes(lines, 1.2)
-        compare(gaps.length, 1, "with words the same gap is knowable")
-        compare(gaps[0].time, 2.2)
+        compare(gaps.length, 1, "the silence is marked")
+        // Sixteen letters, so eight syllables of them, at the rate this file
+        // sings an un-timed line at: the count down opens where the estimate
+        // says the line stops, not the next line and not the line's own start.
+        compare(gaps[0].time, 8 * Gaps.SYLLABLE_S, "from the end of the estimate")
+        compare(gaps[0].end, 12, "to the line that ends it")
+        // The same pair with words: the estimate goes, the real timings come,
+        // and the break opens on the last word plus one capped fill.
+        lines[0].words = [{ text: "one", time: 0 }, { text: "line", time: 1 }]
+        const timed = Gaps.findInterludes(lines, 1.2)
+        compare(timed.length, 1)
+        compare(timed[0].time, 2.2, "the sweep of the words still decides")
+    }
+
+    function test_a_breath_between_un_timed_lines_is_not_a_break() {
+        // A short line at a generous rate: two lines a breath apart stay one
+        // continuous thought, so nothing takes the row away from them.
+        const near = [
+            { text: "hai", time: 0 },
+            { text: "yeh", time: 3.5 }
+        ]
+        compare(Gaps.findInterludes(near, 1.2).length, 0, "3.5s is a breath")
+        // The same two lines, but the first says a whole verse worth of
+        // syllables: the estimate spends the span to the next line on saying
+        // them, so there is nothing left over to count down through.
+        near[0].text = "ひとつ ふたつ かぞえながら ねむれない よるを あるいた"
+        compare(Gaps.findInterludes(near, 1.2).length, 0, "a long line is not a gap")
+        compare(Gaps.sweepEnd(near[0], 1.2), 24 * Gaps.SYLLABLE_S,
+            "twenty four mora, one syllable apiece")
     }
 
     function test_every_row_of_a_merged_list_knows_its_line() {

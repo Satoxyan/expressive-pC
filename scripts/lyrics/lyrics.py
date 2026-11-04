@@ -13,8 +13,9 @@ import datetime
 import urllib.request
 import urllib.parse
 import uuid
+import zlib
 
-DEFAULT_PROVIDERS = "musixmatch,youlyplus,unison,netease,paxsenix,betterlyric,binilyrics,simpmusic,lrclib,kugou"
+DEFAULT_PROVIDERS = "musixmatch,youlyplus,unison,netease,qqmusic,paxsenix,betterlyric,binilyrics,simpmusic,lrclib,kugou"
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
@@ -25,28 +26,38 @@ PROVIDER_TIMEOUT = 12  # seconds per provider
 # HTTP helpers
 # ---------------------------------------------------------------------------
 
-_PROVIDER_DEADLINE = 0.0  # module-global; set by orchestrator before each provider
+# Per-thread, because the probe runs every provider at once and they must not
+# share one clock. 0 means no bound, which is how a direct call from the shell
+# or a test still works.
+_PROVIDER_DEADLINE = threading.local()
 
 
-def _http(url, headers=None, timeout=12):
+def _deadline():
+    return getattr(_PROVIDER_DEADLINE, "value", 0.0)
+
+
+def _http(url, headers=None, timeout=12, body=None):
     # Bound every request by the provider deadline so that a provider can
     # never exceed PROVIDER_TIMEOUT even when an internal handler swallows
-    # SIGALRM (which is one-shot and gets eaten by except blocks).
-    if _PROVIDER_DEADLINE > 0:
-        remaining = _PROVIDER_DEADLINE - time.time()
+    # SIGALRM (which is one-shot and gets eaten by except blocks), and even
+    # when it makes several requests of its own.
+    limit = _deadline()
+    if limit > 0:
+        remaining = limit - time.time()
         if remaining <= 0:
             raise TimeoutError("provider deadline exceeded")
         timeout = min(timeout, remaining)
     hdrs = {"User-Agent": USER_AGENT}
     if headers:
         hdrs.update(headers)
-    req = urllib.request.Request(url, headers=hdrs)
+    req = urllib.request.Request(url, headers=hdrs,
+                                 data=body.encode("utf-8") if body is not None else None)
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return r.read().decode("utf-8", "replace")
 
 
-def _http_json(url, headers=None, timeout=12):
-    return json.loads(_http(url, headers, timeout))
+def _http_json(url, headers=None, timeout=12, body=None):
+    return json.loads(_http(url, headers, timeout, body))
 
 
 def _q(s):
@@ -97,6 +108,77 @@ def clean_text(text):
     text = re.sub(r"[^a-z0-9 ]", "", text)
     text = re.sub(r"\s+", " ", text)
     return text.strip()
+
+
+# ---------------------------------------------------------------------------
+# Matching a search hit to the track (port of Mixtapes src/lyrics/matching.rs)
+# ---------------------------------------------------------------------------
+
+# A display credit can name several artists, joined any number of ways.
+_ARTIST_SPLIT = re.compile(r",|&|;|/|\bfeat\.?\b|\bft\.?\b|\bfeaturing\b|\bwith\b|\bx\b|\band\b|\bund\b", re.I)
+
+# A candidate that says it is some other take than the one being played.
+VERSION_MARKERS = ["live", "remix", "instrumental", "acoustic", "karaoke", "cover", "nightcore",
+                   "sped up", "spedup", "slowed", "reverb", "8d audio", "demo", "rehearsal",
+                   "unplugged", "orchestral", "piano version"]
+
+GENERIC_TITLE_WORDS = {"intro", "outro", "interlude", "skit", "prelude", "overture", "untitled",
+                       "bonus", "bonustrack", "instrumental", "reprise", "epilogue", "prologue"}
+
+
+def _norm_for_match(text):
+    """Casefolded letters and digits in any script.
+
+    An ASCII-only filter reduces every CJK name to nothing, which disqualifies
+    each result for the Japanese, Korean and Chinese tracks that a romanization
+    is exactly meant to serve.
+    """
+    return "".join(ch for ch in text.lower() if ch.isalnum())
+
+
+def _names_match(expected, found):
+    """Whether a credit says the same thing however each side wrote it.
+
+    Either may be the shorter form, so containment goes both ways: the player
+    says "Gurenge (紅蓮華)" where the catalog says "紅蓮華".
+    """
+    a, b = _norm_for_match(expected), _norm_for_match(found)
+    return bool(a) and bool(b) and (a in b or b in a)
+
+
+def _split_artists(artist):
+    """The names in a display credit, plus the whole string.
+
+    Providers credit `Hatsune Miku, WhiteFlame` or `CTS feat. Hatsune Miku`, and
+    matching only the first name loses the track whenever the catalog puts the
+    collaborator first, which is the normal case for Vocaloid. The whole string
+    counts too, since some artists have "and" in their name.
+    """
+    out = []
+    for part in _ARTIST_SPLIT.split(artist) + [artist]:
+        part = part.strip()
+        if part and part not in out:
+            out.append(part)
+    return out
+
+
+def _version_mismatch(query_title, candidate_name):
+    query = query_title.lower()
+    found = candidate_name.lower()
+    return any(mark in found and mark not in query for mark in VERSION_MARKERS)
+
+
+def _duration_ok(expected, found):
+    """Whether two lengths describe the same recording. Silence is not evidence."""
+    return not expected or not found or abs(int(expected) - int(found)) <= DURATION_TOLERANCE
+
+
+def _is_generic_title(title):
+    """Whether the title says nothing, so only the artist can identify the song."""
+    norm = re.sub(r"[^a-z0-9 ]", "", title.lower()).strip()
+    if not norm:
+        return True
+    return norm.replace(" ", "") in GENERIC_TITLE_WORDS or bool(re.match(r"^track\s*0*\d+$", norm))
 
 
 def _kugou_normalize_title(t):
@@ -154,6 +236,23 @@ def _parse_lrc(lrc_text):
             continue
         lines.append({"time": timestamp, "text": clean, "words": words})
     return sorted(lines, key=lambda x: x["time"])
+
+
+def _attach_readings(lines, readings):
+    """Stick a reading track onto the lines that it annotates.
+
+    The lyrics and the reading are cut by different hands, so they are matched
+    on time and never by index: a reading belongs to the line being sung near
+    it, and the padded credit lines at the top find no line to attach to.
+    """
+    marked = [r for r in readings if r["text"]]
+    if not marked:
+        return lines
+    for line in lines:
+        nearest = min(marked, key=lambda r: abs(r["time"] - line["time"]))
+        if abs(nearest["time"] - line["time"]) <= 1.5:
+            line["reading"] = nearest["text"]
+    return lines
 
 
 # ---------------------------------------------------------------------------
@@ -1303,23 +1402,6 @@ NETEASE_HEADERS = {
 }
 
 
-def _netease_attach_readings(lines, roma_text):
-    """Stick NetEase's romaji track onto the lines that it annotates.
-
-    The lyrics and the reading are cut by different hands, so they are matched
-    on time and never by index: a reading belongs to the line being sung near
-    it, and the padded credit lines at the top find no line to attach to.
-    """
-    roma = [line for line in _parse_lrc(roma_text) if line["text"]]
-    if not roma:
-        return lines
-    for line in lines:
-        nearest = min(roma, key=lambda r: abs(r["time"] - line["time"]))
-        if abs(nearest["time"] - line["time"]) <= 1.5:
-            line["reading"] = nearest["text"]
-    return lines
-
-
 def _netease_strip_credits(lines):
     """NetEase pads the start with credit lines (作词/作曲 : X) at 00:00."""
     credit = re.compile(r"^(作词|作曲|编曲|Written by|Produced by)\s*[:：]", re.I)
@@ -1392,8 +1474,433 @@ def fetch_netease(title, artist, duration):
             # (mostly Japanese). Everything else gets no reading at all.
             roma = ((data.get("romalrc") or {}).get("lyric") or "").strip()
             if roma:
-                _netease_attach_readings(lines, roma)
+                _attach_readings(lines, _parse_lrc(roma))
             return lines
+    return []
+
+
+# ---------------------------------------------------------------------------
+# Provider: qqmusic (y.qq.com)
+# Ported from m-obeid/Mixtapes src/lyrics/providers/qqmusic.rs (GPL-3.0): the
+# best source for Japanese anime and game songs and for Chinese releases the
+# other providers miss. Two account-free endpoints, the plain web search and
+# the nobase64 lyric one for LRC, plus the signed app API for word-level QRC
+# (src/lyrics/providers/qrc.rs, MIT), whose answer is DES over zlib.
+# ---------------------------------------------------------------------------
+
+QQ_SEARCH_URL = "https://c.y.qq.com/soso/fcgi-bin/client_search_cp"
+QQ_LYRIC_URL = "https://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg"
+QQ_API_URL = "https://u.y.qq.com/cgi-bin/musics.fcg"
+QQ_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Referer": "https://y.qq.com/",
+}
+QQ_CLIENT_VERSION = 13020508
+# Every QQ endpoint is in China, so one slow hop is normal rather than a failure,
+# and the whole provider only owns PROVIDER_TIMEOUT seconds of the chain.
+QQ_TIMEOUT = 5
+QQ_SIGN_SCRAMBLE = [89, 39, 179, 150, 218, 82, 58, 252, 177, 52,
+                    186, 123, 120, 64, 242, 133, 143, 161, 121, 179]
+# What the lyric endpoint answers for a song that has no words.
+QQ_INSTRUMENTAL = "纯音乐"
+
+_QQ_LINE = re.compile(r"^\[(\d+),(\d+)\](.*)$")
+_QQ_WORD = re.compile(r"(.*?)\((\d+),(\d+)\)")
+
+# --- QRC: DES with QQ Music's own bit layout, then zlib -------------------
+# The cipher is DES, but its permutations are not the standard ones, so no
+# crypto library fits and the tables are carried here as the reference has them.
+
+_QRC_MAGIC = bytes([0x98, 0x25, 0xb0, 0xac, 0xe3, 0x02, 0x83, 0x68, 0xe8, 0xfc, 0x6c])
+_QRC_KEYS = [(b"!@#)(NHL", False), (b"123ZXC!@", True), (b"!@#)(*$%", False)]
+_QRC_RND_SHIFTS = [1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1]
+_QRC_LARGE_SHIFTS = [0x1a, 0x14, 0x0e, 0x08, 0x3a, 0x34, 0x2e, 0x28]
+_QRC_P_BOX = [0x0f, 0x06, 0x13, 0x14, 0x1c, 0x0b, 0x1b, 0x10, 0x00, 0x0e, 0x16, 0x19, 0x04, 0x11, 0x1e, 0x09,
+              0x01, 0x07, 0x17, 0x0d, 0x1f, 0x1a, 0x02, 0x08, 0x12, 0x0c, 0x1d, 0x05, 0x15, 0x0a, 0x03, 0x18]
+_QRC_IP = [0x39, 0x31, 0x29, 0x21, 0x19, 0x11, 0x09, 0x01, 0x3b, 0x33, 0x2b, 0x23, 0x1b, 0x13, 0x0b, 0x03,
+           0x3d, 0x35, 0x2d, 0x25, 0x1d, 0x15, 0x0d, 0x05, 0x3f, 0x37, 0x2f, 0x27, 0x1f, 0x17, 0x0f, 0x07,
+           0x38, 0x30, 0x28, 0x20, 0x18, 0x10, 0x08, 0x00, 0x3a, 0x32, 0x2a, 0x22, 0x1a, 0x12, 0x0a, 0x02,
+           0x3c, 0x34, 0x2c, 0x24, 0x1c, 0x14, 0x0c, 0x04, 0x3e, 0x36, 0x2e, 0x26, 0x1e, 0x16, 0x0e, 0x06]
+_QRC_IP_INV = [0x27, 0x07, 0x2f, 0x0f, 0x37, 0x17, 0x3f, 0x1f, 0x26, 0x06, 0x2e, 0x0e, 0x36, 0x16, 0x3e, 0x1e,
+               0x25, 0x05, 0x2d, 0x0d, 0x35, 0x15, 0x3d, 0x1d, 0x24, 0x04, 0x2c, 0x0c, 0x34, 0x14, 0x3c, 0x1c,
+               0x23, 0x03, 0x2b, 0x0b, 0x33, 0x13, 0x3b, 0x1b, 0x22, 0x02, 0x2a, 0x0a, 0x32, 0x12, 0x3a, 0x1a,
+               0x21, 0x01, 0x29, 0x09, 0x31, 0x11, 0x39, 0x19, 0x20, 0x00, 0x28, 0x08, 0x30, 0x10, 0x38, 0x18]
+_QRC_KEY_PERM = [0x38, 0x30, 0x28, 0x20, 0x18, 0x10, 0x08, 0x00, 0x39, 0x31, 0x29, 0x21, 0x19, 0x11, 0x09, 0x01,
+                 0x3a, 0x32, 0x2a, 0x22, 0x1a, 0x12, 0x0a, 0x02, 0x3b, 0x33, 0x2b, 0x23, 0x3e, 0x36, 0x2e, 0x26,
+                 0x1e, 0x16, 0x0e, 0x06, 0x3d, 0x35, 0x2d, 0x25, 0x1d, 0x15, 0x0d, 0x05, 0x3c, 0x34, 0x2c, 0x24,
+                 0x1c, 0x14, 0x0c, 0x04, 0x1b, 0x13, 0x0b, 0x03]
+_QRC_KEY_COMP = [0x0d, 0x10, 0x0a, 0x17, 0x00, 0x04, 0x02, 0x1b, 0x0e, 0x05, 0x14, 0x09, 0x16, 0x12, 0x0b, 0x03,
+                 0x19, 0x07, 0x0f, 0x06, 0x1a, 0x13, 0x0c, 0x01, 0x2d, 0x38, 0x23, 0x29, 0x33, 0x3b, 0x22, 0x2c,
+                 0x37, 0x31, 0x25, 0x34, 0x30, 0x35, 0x2b, 0x3c, 0x26, 0x39, 0x32, 0x2e, 0x36, 0x28, 0x21, 0x24]
+_QRC_KEY_EXP = [0x1f, 0x00, 0x01, 0x02, 0x03, 0x04, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x07, 0x08, 0x09, 0x0a,
+                0x0b, 0x0c, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x13, 0x14,
+                0x15, 0x16, 0x17, 0x18, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x00]
+_QRC_QMC_KEY = [
+    0xc3, 0x4a, 0xd6, 0xca, 0x90, 0x67, 0xf7, 0x52, 0xd8, 0xa1, 0x66, 0x62, 0x9f, 0x5b, 0x09, 0x00,
+    0xc3, 0x5e, 0x95, 0x23, 0x9f, 0x13, 0x11, 0x7e, 0xd8, 0x92, 0x3f, 0xbc, 0x90, 0xbb, 0x74, 0x0e,
+    0xc3, 0x47, 0x74, 0x3d, 0x90, 0xaa, 0x3f, 0x51, 0xd8, 0xf4, 0x11, 0x84, 0x9f, 0xde, 0x95, 0x1d,
+    0xc3, 0xc6, 0x09, 0xd5, 0x9f, 0xfa, 0x66, 0xf9, 0xd8, 0xf0, 0xf7, 0xa0, 0x90, 0xa1, 0xd6, 0xf3,
+    0xc3, 0xf3, 0xd6, 0xa1, 0x90, 0xa0, 0xf7, 0xf0, 0xd8, 0xf9, 0x66, 0xfa, 0x9f, 0xd5, 0x09, 0xc6,
+    0xc3, 0x1d, 0x95, 0xde, 0x9f, 0x84, 0x11, 0xf4, 0xd8, 0x51, 0x3f, 0xaa, 0x90, 0x3d, 0x74, 0x47,
+    0xc3, 0x0e, 0x74, 0xbb, 0x90, 0xbc, 0x3f, 0x92, 0xd8, 0x7e, 0x11, 0x13, 0x9f, 0x23, 0x95, 0x5e,
+    0xc3, 0x00, 0x09, 0x5b, 0x9f, 0x62, 0x66, 0xa1, 0xd8, 0x52, 0xf7, 0x67, 0x90, 0xca, 0xd6, 0x4a,
+]
+_QRC_SBOXES = [
+    [14, 0, 4, 15, 13, 7, 1, 4, 2, 14, 15, 2, 11, 13, 8, 1, 3, 10, 10, 6, 6, 12, 12, 11, 5, 9, 9, 5, 0, 3, 7, 8, 4, 15, 1, 12, 14, 8, 8, 2, 13, 4, 6, 9, 2, 1, 11, 7, 15, 5, 12, 11, 9, 3, 7, 14, 3, 10, 10, 0, 5, 6, 0, 13],
+    [15, 3, 1, 13, 8, 4, 14, 7, 6, 15, 11, 2, 3, 8, 4, 15, 9, 12, 7, 0, 2, 1, 13, 10, 12, 6, 0, 9, 5, 11, 10, 5, 0, 13, 14, 8, 7, 10, 11, 1, 10, 3, 4, 15, 13, 4, 1, 2, 5, 11, 8, 6, 12, 7, 6, 12, 9, 0, 3, 5, 2, 14, 15, 9],
+    [10, 13, 0, 7, 9, 0, 14, 9, 6, 3, 3, 4, 15, 6, 5, 10, 1, 2, 13, 8, 12, 5, 7, 14, 11, 12, 4, 11, 2, 15, 8, 1, 13, 1, 6, 10, 4, 13, 9, 0, 8, 6, 15, 9, 3, 8, 0, 7, 11, 4, 1, 15, 2, 14, 12, 3, 5, 11, 10, 5, 14, 2, 7, 12],
+    [7, 13, 13, 8, 14, 11, 3, 5, 0, 6, 6, 15, 9, 0, 10, 3, 1, 4, 2, 7, 8, 2, 5, 12, 11, 1, 12, 10, 4, 14, 15, 9, 10, 3, 6, 15, 9, 0, 0, 6, 12, 10, 11, 10, 7, 13, 13, 8, 15, 9, 1, 4, 3, 5, 14, 11, 5, 12, 2, 7, 8, 2, 4, 14],
+    [2, 14, 12, 11, 4, 2, 1, 12, 7, 4, 10, 7, 11, 13, 6, 1, 8, 5, 5, 0, 3, 15, 15, 10, 13, 3, 0, 9, 14, 8, 9, 6, 4, 11, 2, 8, 1, 12, 11, 7, 10, 1, 13, 14, 7, 2, 8, 13, 15, 6, 9, 15, 12, 0, 5, 9, 6, 10, 3, 4, 0, 5, 14, 3],
+    [12, 10, 1, 15, 10, 4, 15, 2, 9, 7, 2, 12, 6, 9, 8, 5, 0, 6, 13, 1, 3, 13, 4, 14, 14, 0, 7, 11, 5, 3, 11, 8, 9, 4, 14, 3, 15, 2, 5, 12, 2, 9, 8, 5, 12, 15, 3, 10, 7, 11, 0, 14, 4, 1, 10, 7, 1, 6, 13, 0, 11, 8, 6, 13],
+    [4, 13, 11, 0, 2, 11, 14, 7, 15, 4, 0, 9, 8, 1, 13, 10, 3, 14, 12, 3, 9, 5, 7, 12, 5, 2, 10, 15, 6, 8, 1, 6, 1, 6, 4, 11, 11, 13, 13, 8, 12, 1, 3, 4, 7, 10, 14, 7, 10, 9, 15, 5, 6, 0, 8, 15, 0, 14, 5, 2, 9, 3, 2, 12],
+    [13, 1, 2, 15, 8, 13, 4, 8, 6, 10, 15, 3, 11, 7, 1, 4, 10, 12, 9, 5, 3, 6, 14, 11, 5, 0, 0, 14, 12, 9, 7, 2, 7, 2, 11, 1, 4, 14, 1, 7, 9, 4, 12, 10, 14, 8, 2, 13, 0, 15, 6, 12, 10, 9, 13, 0, 15, 3, 3, 5, 5, 6, 8, 11],
+]
+
+# A table entry names the bit it moves, counting down from the top of each
+# 32-bit half, low half first.
+_QRC_BITS = [1 << (31 - i) if i < 32 else 1 << (95 - i) for i in range(64)]
+
+
+def _qrc_mapper(table):
+    """The two half-tables of a permutation, as (test bit, set bit) pairs.
+
+    A permutation writes its low half from the table's first entries and its
+    high half from the rest, so splitting once here is all the bookkeeping a
+    block needs.
+    """
+    half = len(table) // 2
+    low = [(_QRC_BITS[t & 63], _QRC_BITS[i]) for i, t in enumerate(table[:half])]
+    high = [(_QRC_BITS[t & 63], _QRC_BITS[i]) for i, t in enumerate(table[half:])]
+
+    def permute(source):
+        out_low = out_high = 0
+        for test, set_ in low:
+            if source & test:
+                out_low |= set_
+        for test, set_ in high:
+            if source & test:
+                out_high |= set_
+        return (out_high << 32) | out_low
+    return permute
+
+
+def _qrc_map_bits(source, table):
+    """A permutation whose entries address the whole 64-bit word at once."""
+    out = 0
+    for i, t in enumerate(table):
+        if source & _QRC_BITS[t & 63]:
+            out |= _QRC_BITS[i]
+    return out
+
+
+_QRC_IP_MAP = _qrc_mapper(_QRC_IP)
+_QRC_IP_INV_MAP = _qrc_mapper(_QRC_IP_INV)
+_QRC_KEY_PERM_MAP = _qrc_mapper(_QRC_KEY_PERM)
+_QRC_KEY_COMP_MAP = _qrc_mapper(_QRC_KEY_COMP)
+_QRC_KEY_EXP_MAP = _qrc_mapper(_QRC_KEY_EXP)
+
+
+def _qrc_rotate(part, left):
+    return ((part << left) & 0xFFFFFFFF) | ((part >> (28 - left)) & 0xFFFFFFF0)
+
+
+def _qrc_subkeys(key, encrypt):
+    param = _QRC_KEY_PERM_MAP(int.from_bytes(key, "little"))
+    c, d = param & 0xFFFFFFFF, param >> 32
+    keys = [0] * 16
+    for rnd, shift in enumerate(_QRC_RND_SHIFTS):
+        c, d = _qrc_rotate(c, shift), _qrc_rotate(d, shift)
+        keys[15 - rnd if not encrypt else rnd] = _QRC_KEY_COMP_MAP((d << 32) | c)
+    return keys
+
+
+def _qrc_round(state, key):
+    high, low = state >> 32, state & 0xFFFFFFFF
+    mixed = _QRC_KEY_EXP_MAP((high << 32) | high) ^ key
+    substituted = 0
+    for shift, sbox in zip(_QRC_LARGE_SHIFTS, _QRC_SBOXES):
+        substituted = (substituted << 4) | sbox[(mixed >> shift) & 0x3f]
+    return (((_qrc_map_bits(substituted, _QRC_P_BOX) & 0xFFFFFFFF) ^ low) << 32) | high
+
+
+def _qrc_transform(data, keys):
+    out = bytearray(data)
+    for off in range(0, len(out) - 7, 8):
+        state = _QRC_IP_MAP(int.from_bytes(out[off:off + 8], "little"))
+        for key in keys:
+            state = _qrc_round(state, key)
+        state = ((state << 32) | (state >> 32)) & 0xFFFFFFFFFFFFFFFF
+        out[off:off + 8] = _QRC_IP_INV_MAP(state).to_bytes(8, "little")
+    return bytes(out)
+
+
+def _qrc_decode_hex(hex_text):
+    """The hex text the app API answers, as the QRC document inside it."""
+    if not hex_text or len(hex_text) % 2:
+        return None
+    try:
+        data = bytes.fromhex(hex_text)
+    except ValueError:
+        return None
+    if data.startswith(_QRC_MAGIC):
+        # A repeated mask over the whole blob, then the marker goes.
+        data = bytes(b ^ _QRC_QMC_KEY[(i if i <= 0x7FFF else i % 0x7FFF) & 0x7F]
+                     for i, b in enumerate(data))[len(_QRC_MAGIC):]
+    if len(data) % 8:
+        return None
+    for key, encrypt in _QRC_KEYS:
+        data = _qrc_transform(data, _qrc_subkeys(key, encrypt))
+    try:
+        return zlib.decompress(data).decode("utf-8", "replace")
+    except Exception:
+        return None
+
+
+# --- QQ's answers as lines --------------------------------------------------
+
+def _qq_sign(body):
+    """The signature the app API checks, computed from the request body."""
+    digest = hashlib.sha1(body.encode("utf-8")).hexdigest().upper()
+    pick = "".join(digest[i] for i in (23, 14, 6, 36, 16, 7, 19))
+    tail = "".join(digest[i] for i in (16, 1, 32, 12, 19, 27, 8, 5))
+    mixed = bytes(QQ_SIGN_SCRAMBLE[i] ^ int(digest[i * 2:i * 2 + 2], 16) for i in range(20))
+    encoded = base64.b64encode(mixed).decode().replace("/", "").replace("+", "").replace("=", "")
+    return ("zzc" + pick + encoded + tail).lower()
+
+
+_QQ_CREDIT_LABELS = {"written by", "lyrics", "lyrics by", "lyric", "words", "music",
+                     "music by", "composed by", "composed", "arranged by", "arranged",
+                     "produced by", "produced", "recorded by", "vocal", "chorus"}
+
+
+def _qq_strip_header(lines, timed=False):
+    """QQ opens with a line naming the song, then the writers as 詞∶Name.
+
+    They all sit before the first line that is actually sung, and a credit is a
+    short label before a colon — or one of the latin ones, which QQ also likes
+    to give a timing of its own.
+    """
+    def is_credit(line):
+        text = line["text"].strip()
+        head = re.split(r"[:：∶]", text)[0]
+        if head == text:
+            return False
+        return len(head) <= 4 or head.lower() in _QQ_CREDIT_LABELS
+
+    # An opener timed to nothing is the song named again for the credit roll. A
+    # word-timed line at zero is the song starting on the first beat, so it stays.
+    skip = 1 if lines and (" - " in lines[0]["text"]
+                           or (not timed and lines[0]["time"] == 0.0)) else 0
+    first = next((i for i in range(skip, len(lines)) if not is_credit(lines[i])), len(lines))
+    return lines[first:]
+
+
+def _qq_lyric_content(document):
+    """The QRC body, which sits in an XML attribute.
+
+    A line break inside an attribute is real text, which an XML parser would
+    flatten to a space, so this is sliced by hand; the attribute ends at its
+    closing tag because a quote sung in a line arrives unescaped.
+    """
+    marker = 'LyricContent="'
+    start = document.find(marker)
+    if start < 0:
+        return None
+    start += len(marker)
+    end = document.rfind('"/>', start)
+    if end < start:
+        return None
+    body = document[start:end]
+    for entity, char in (("&quot;", '"'), ("&apos;", "'"), ("&lt;", "<"),
+                         ("&gt;", ">"), ("&amp;", "&")):
+        body = body.replace(entity, char)
+    return body
+
+
+def _qq_parse_qrc(content):
+    """QRC lines as lyric lines with word timing. A plain LRC body has none."""
+    lines = []
+    for raw in content.splitlines():
+        timed = _QQ_LINE.match(raw.strip())
+        if not timed:
+            continue
+        parts = []
+        for token, at, _dur in _QQ_WORD.findall(timed.group(3)):
+            # Songs in Latin script time the gap as well: a token of bare space,
+            # or a space leading the next word. Either way the gap belongs to the
+            # word before it, so it is a flag rather than a token of its own.
+            if token[:1].isspace() and parts:
+                parts[-1][2] = True
+            trimmed = token.strip()
+            if trimmed:
+                parts.append([int(at) / 1000.0, trimmed, token[-1:].isspace()])
+        if not parts:
+            continue
+        # The timings are cut wherever they fall, so one word of the line can be
+        # several pieces (its ending comma is a piece of its own). A piece with no
+        # gap after it is the tail of the word before it, and the word is timed by
+        # the piece it starts with.
+        words = []
+        for at, piece, space in parts:
+            if words and not words[-1][2]:
+                words[-1][1] += piece
+                # The gap that follows a word is the one after its last piece.
+                words[-1][2] = space
+            else:
+                words.append([at, piece, space])
+        # Writing a language with no spaces between its words leaves one piece for
+        # the whole line, which says nothing the line timing does not already say,
+        # so those lines keep the wipe the widget does without word timings.
+        pairs = [{"t": at, "w": text} for at, text, _ in words] if len(words) > 1 else []
+        lines.append({"time": int(timed.group(1)) / 1000.0,
+                      "text": " ".join(text for _at, text, _s in words),
+                      "words": pairs})
+    return _qq_strip_header(lines, True)
+
+
+def _qq_search(query):
+    query = query.strip()
+    if not query:
+        return []
+    params = urllib.parse.urlencode({
+        "w": query, "format": "json", "p": "1", "n": "8", "cr": "1",
+        "new_json": "1", "inCharset": "utf8", "outCharset": "utf-8",
+    })
+    try:
+        data = _http_json(f"{QQ_SEARCH_URL}?{params}", headers=QQ_HEADERS, timeout=QQ_TIMEOUT)
+    except Exception:
+        return []
+    songs = []
+    for song in ((data.get("data") or {}).get("song") or {}).get("list") or []:
+        mid = song.get("mid")
+        if not mid:
+            continue
+        songs.append({
+            "mid": mid,
+            "name": song.get("name") or "",
+            "artists": " ".join((a.get("name") or "") for a in song.get("singer") or []),
+            "duration": int(song.get("interval") or 0),
+        })
+    return songs
+
+
+def _qq_rank(songs, title, artist, duration):
+    """The hits that could be this recording, nearest length first.
+
+    QQ's search answers a query it does not know with whatever is popular, so a
+    hit goes through the same gates Mixtapes puts it through: the length of this
+    recording, not a different take of it, and named or credited the same.
+    """
+    if songs and artist.strip():
+        # Keep the artist's own rows when the catalog has any, but a miss there
+        # is normal — romanizations differ — so it only disqualifies a song whose
+        # title says nothing either.
+        matched = [s for s in songs if _names_match(artist, s["artists"])]
+        if matched:
+            songs = matched
+        elif _is_generic_title(title):
+            return []
+
+    artists = _split_artists(artist)
+
+    def same_recording(song):
+        if not _duration_ok(duration, song["duration"]) or _version_mismatch(title, song["name"]):
+            return False
+        if any(_names_match(a, song["artists"]) for a in artists):
+            return True
+        # Catalogs romanize CJK titles (kanji to "Senbonzakura"), so a title miss
+        # is not disqualifying on its own: the artist above can carry it. Title
+        # agreement alone, from a different artist, is only trusted when the
+        # length corroborates it — "Popular" names a Weeknd track and an
+        # Ariana Grande one.
+        return _names_match(title, song["name"]) and (not artists or bool(duration and song["duration"]))
+
+    gated = [song for song in songs if same_recording(song)]
+    credited = [song for song in gated if any(_names_match(a, song["artists"]) for a in artists)]
+    pool = credited or gated
+    return sorted(pool, key=lambda s: abs(duration - s["duration"]) if duration and s["duration"] else 0)
+
+
+def _qq_pick(songs, title, artist, duration):
+    ranked = _qq_rank(songs, title, artist, duration)
+    return ranked[0] if ranked else None
+
+
+def _qq_word_level(mid):
+    """Word-level lyrics through the signed app API, or None.
+
+    The same answer carries the song read in latin letters, which QQ fills in
+    for tracks someone added one to (mostly Japanese), so it is asked for in the
+    same request and costs one more decryption.
+    """
+    device = hashlib.sha1(str(time.time_ns()).encode()).hexdigest().upper()
+    body = json.dumps({
+        "comm": {"wid": device[:32], "cv": QQ_CLIENT_VERSION, "v": QQ_CLIENT_VERSION,
+                "QIMEI36": "8888888888888888", "ct": "11", "tmeAppID": "qqmusic",
+                "format": "json", "inCharset": "utf-8", "outCharset": "utf-8",
+                "uid": "3931641530"},
+        "music.musichallSong.PlayLyricInfo.GetPlayLyricInfo": {
+            "module": "music.musichallSong.PlayLyricInfo",
+            "method": "GetPlayLyricInfo",
+            "param": {"crypt": 1, "ct": 11, "cv": QQ_CLIENT_VERSION, "lrc_t": 0,
+                      "qrc": 1, "qrc_t": 0, "roma": 1, "roma_t": 0, "trans": 0,
+                      "trans_t": 0, "type": 1, "songMid": mid},
+        },
+    }, separators=(",", ":"))
+    headers = dict(QQ_HEADERS)
+    headers.update({"Origin": "https://y.qq.com", "Content-Type": "application/json"})
+    try:
+        answer = _http_json(f"{QQ_API_URL}?sign={_qq_sign(body)}", headers=headers,
+                            timeout=QQ_TIMEOUT, body=body)
+    except Exception:
+        return None
+    payload = ((answer.get("music.musichallSong.PlayLyricInfo.GetPlayLyricInfo") or {})
+               .get("data") or {})
+    tracks = {}
+    for field, name in (("lyric", "lyric"), ("roma", "roma")):
+        blob = _qrc_decode_hex(payload.get(field) or "")
+        if blob:
+            tracks[name] = _qq_parse_qrc(_qq_lyric_content(blob) or blob)
+    lines = tracks.get("lyric")
+    if not lines:
+        return None
+    if tracks.get("roma"):
+        _attach_readings(lines, tracks["roma"])
+    return lines
+
+
+def _qq_lyric(mid):
+    """Word timing when QQ has it, line timing from the plain endpoint otherwise."""
+    lines = _qq_word_level(mid)
+    if lines:
+        return lines
+    params = urllib.parse.urlencode({"songmid": mid, "format": "json",
+                                     "nobase64": "1", "g_tk": "5381"})
+    try:
+        data = _http_json(f"{QQ_LYRIC_URL}?{params}", headers=QQ_HEADERS, timeout=QQ_TIMEOUT)
+    except Exception:
+        return []
+    lrc = ((data or {}).get("lyric") or "").strip()
+    if not lrc or QQ_INSTRUMENTAL in lrc:
+        return []
+    return _qq_strip_header(_parse_lrc(lrc))
+
+
+def fetch_qqmusic(title, artist, duration):
+    """The best QQ has for this recording, or nothing.
+
+    The player's own credit is searched first, as the catalog spells artists the
+    way the tags do; a query built from a trimmed-down name can miss the row
+    entirely, and an empty answer costs a second request rather than a wrong
+    lyric.
+    """
+    cleaned = clean_title(title)
+    queries = [f"{cleaned} {artist.strip()}".strip(), cleaned or title.strip()]
+    for query in dict.fromkeys(q for q in queries if q):
+        for best in _qq_rank(_qq_search(query), title, artist, duration)[:3]:
+            lines = _qq_lyric(best["mid"])
+            if lines:
+                return lines
     return []
 
 
@@ -1412,6 +1919,7 @@ PROVIDERS = {
     "simpmusic": fetch_simpmusic,
     "lrclib": fetch_lrclib,
     "kugou": fetch_kugou,
+    "qqmusic": fetch_qqmusic,
 }
 
 
@@ -1429,10 +1937,15 @@ def _run_timed(fn, title, artist, duration):
     urllib tries every resolved address (4+ IPs) at the socket timeout, so
     a single request can block for address_count * timeout seconds.
     A worker thread guarantees each provider gets at most PROVIDER_TIMEOUT
-    seconds regardless of what it swallows.
+    seconds regardless of what it swallows. The same budget is handed to the
+    thread as a deadline, so a request that never answers fails inside it
+    instead of leaving a provider that is already abandoned still holding a
+    socket for its own full timeout.
     """
     result = {}
+
     def worker():
+        _PROVIDER_DEADLINE.value = time.time() + PROVIDER_TIMEOUT
         try:
             result["lines"] = fn(title, artist, duration)
         except Exception:

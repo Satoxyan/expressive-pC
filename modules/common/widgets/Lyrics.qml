@@ -203,11 +203,13 @@ Item {
 
     readonly property var hotRows: root.buildHotRows()
     readonly property var subRows: root.buildSubRows()
-    // One list of rows for the sung line, lead first then its echo: the two
-    // share the column, the spacing and which edge they belong to, and packing
-    // them into a single Repeater is what keeps that true. Each row carries the
-    // flag its words are measured against.
-    readonly property var sungRows: root.hotRows.concat(root.subRows)
+    readonly property var readingRows: root.buildReadingRows()
+    // One list of rows for the sung line: its words, then the echo answering
+    // them, then the reading of them. The three share the column, the spacing
+    // and which edge they belong to, and packing them into a single Repeater is
+    // what keeps that true. Each row carries the flag and the clock its words
+    // are measured against.
+    readonly property var sungRows: root.hotRows.concat(root.subRows, root.readingRows)
 
     // FontMetrics reports the ink advance, but a Text lays itself out on its
     // bounding box, which is a couple of pixels wider (side bearings). Packing
@@ -221,7 +223,10 @@ Item {
     // sentence: the source has no word timings, so index -1 marks every piece
     // and each owns a slice of the line's own progress — the light then wipes
     // left to right instead of every word filling at once.
-    function buildRows(source, sentence, metrics, orderBase, isSub) {
+    // role: "lead", "sub" (the echo of the line) or "reading" (its latin
+    // transcription); a piece carries both what sits behind it and the clock it
+    // sweeps on, so a row of either kind can join the same list as the words.
+    function buildRows(source, sentence, metrics, orderBase, role) {
         const spacing = root.rowSpacing
         const maxWidth = root.textWidth
         // Some providers return the whole line as a single "word" (text with
@@ -287,8 +292,14 @@ Item {
         // The flag rides on the pieces, not on the row: a row is a list, and a
         // property added to a list does not survive the trip into a delegate's
         // modelData, while a property on an object does.
-        for (const p of pieces)
-            p.isSub = isSub
+        for (const p of pieces) {
+            // Neither of these is the lead: an echo and a reading are both a step
+            // behind it in size, colour and lift.
+            p.isSub = role !== "lead"
+            // ...and only one of them sweeps on the line's span rather than on
+            // the line's own progress.
+            p.reading = role === "reading"
+        }
         return rows
     }
 
@@ -300,7 +311,7 @@ Item {
         // rebuilt on that would throw away every word item 20 times a second.
         const words = line.words ?? []
         return root.buildRows(words.length > 0 ? words : [{ text: line.text || "" }],
-            words.length === 0, hotMetrics, 0, false)
+            words.length === 0, hotMetrics, 0, "lead")
     }
 
     // The echo of the line being sung. Its entrance waits out the lead's
@@ -309,11 +320,24 @@ Item {
         const bg = (LyricsService.lyricsLines ?? [])[LyricsService.activeIndex]?.bg
         if (!bg || !bg.text) return []
         const words = bg.words ?? []
-        let leadPieces = 0
-        for (const row of root.hotRows)
-            leadPieces += row.length
         return root.buildRows(words.length > 0 ? words : [{ text: bg.text }],
-            words.length === 0, subMetrics, leadPieces, true)
+            words.length === 0, subMetrics, root.pieceCount(root.hotRows), "sub")
+    }
+
+    // The latin reading, laid out and lit exactly like the line above it: it has
+    // no timings of its own, so its light crosses piece by piece over the span
+    // the words take, which is what makes the two finish together.
+    function buildReadingRows() {
+        if (root.activeReading.length === 0) return []
+        return root.buildRows([{ text: root.activeReading }], true, readingMetrics,
+            root.pieceCount(root.hotRows) + root.pieceCount(root.subRows), "reading")
+    }
+
+    function pieceCount(rows) {
+        let n = 0
+        for (const row of rows)
+            n += row.length
+        return n
     }
 
     // How far through its own sweep a piece of the sung line stands. The echo
@@ -322,8 +346,11 @@ Item {
     function wordProgress(piece, sweepIndex, sweepProgress) {
         if (piece.index < 0) {
             // Sentence-level source: one sweep across the whole line, each
-            // piece taking its own slice of it.
-            const p = LyricsService.activeLineProgress
+            // piece taking its own slice of it. A reading has no timings at all
+            // and is not a sentence of this line either: it crosses the span the
+            // lead's light takes, so the two go out together.
+            const p = piece.reading === true
+                ? LyricsService.activeLineSweep : LyricsService.activeLineProgress
             const span = Math.max(1e-4, piece.end - piece.start)
             return Math.min(1, Math.max(0, (p - piece.start) / span))
         }
@@ -338,6 +365,14 @@ Item {
         return Math.min(order * 30, 150)
     }
 
+    // A stack of `count` rows of `metrics`, hung under whatever sits above it:
+    // one spacing for the gap it arrives through, and one between each of its
+    // own rows.
+    function stackHeight(count, metrics) {
+        if (count <= 0) return 0
+        return rowSpacing + count * metrics.height + (count - 1) * rowSpacing
+    }
+
     // About how tall the sung line is, read from the data instead of from the
     // item: asking `currentItem` for its height closes a binding loop, because
     // the band this feeds is what lays the item out. The karaoke column is the
@@ -347,16 +382,16 @@ Item {
         if (!root.karaoke) height = hotMetrics.height
         else {
             const lead = root.hotRows.length > 0 ? root.hotRows.length : 1
-            const sub = root.subRows.length
-            const subH = sub > 0
-                ? rowSpacing + sub * subMetrics.height + (sub - 1) * rowSpacing
-                : 0
-            height = lead * hotMetrics.height + Math.max(0, lead - 1) * rowSpacing + subH
+            height = lead * hotMetrics.height + Math.max(0, lead - 1) * rowSpacing
+                + root.stackHeight(root.subRows.length, subMetrics)
+                + root.stackHeight(root.readingRows.length, readingMetrics)
         }
         // The reading hangs under the anchored line whichever way that line is
-        // drawn, so the band has to count it in both.
-        if (root.activeReading.length > 0)
-            height += rowSpacing + readingMetrics.height
+        // drawn, so the band has to count it in both. A host with the karaoke
+        // off never lays it out in rows, so one row of it is all there is to
+        // allow for.
+        if (!root.karaoke && root.activeReading.length > 0)
+            height += root.stackHeight(1, readingMetrics)
         return height
     }
 
@@ -383,6 +418,10 @@ Item {
         // does not rise or grow — the second voice answers from behind, and a
         // word of it jumping to the foreground would sing over the lead.
         property bool sub: false
+        // A word of the latin reading rather than of either voice: it comes in a
+        // step behind like the echo, but is there to be read ahead of, so what has
+        // not been reached stays as legible as the words above it.
+        property bool reading: false
 
         // The line this word belongs to is the one being sung. An instrumental
         // break takes the foreground from it: the words keep their layout and
@@ -398,14 +437,17 @@ Item {
         // clearly visible. The echo sits a step further back on both counts.
         readonly property color litColor:
             wordItem.sub ? Qt.rgba(1, 1, 1, 0.8) : "#ffffff"
-        readonly property color dimColor:
-            wordItem.sub ? Qt.rgba(1, 1, 1, 0.2) : root.dimColor
+        // The unsung part of a reading is not an echo waiting its turn but the
+        // shape of the words above, and it is only any use read ahead of the
+        // sweep, so it keeps the same resting ink those words have.
+        readonly property color dimColor: wordItem.reading ? root.dimColor
+            : wordItem.sub ? Qt.rgba(1, 1, 1, 0.2) : root.dimColor
 
         // What the word is drawn in once it is not being sung: the colour a
-        // plain line of this widget uses, echo included.
+        // plain line of this widget uses, echo and reading included.
         readonly property color restingColor: wordItem.sub
             ? Qt.rgba(root.textColor.r, root.textColor.g, root.textColor.b,
-                      root.textColor.a * 0.75)
+                      root.textColor.a * (wordItem.reading ? 0.6 : 0.75))
             : root.textColor
 
         // Glow fades in on the active word and stays on after the word is
@@ -693,10 +735,11 @@ Item {
                     delegate: Row {
                         id: wordRow
                         required property var modelData
-                        // Lead row or echo row, read off the pieces it holds: a
-                        // flag put on the row itself would not survive the trip
-                        // into modelData, one put on an object does.
+                        // Lead row, echo row or reading row, read off the pieces it
+                        // holds: a flag put on the row itself would not survive the
+                        // trip into modelData, one put on an object does.
                         readonly property bool isSub: wordRow.modelData[0]?.isSub === true
+                        readonly property bool isReading: wordRow.modelData[0]?.reading === true
                         spacing: hotColumn.spacing
                         // Centered when the widget asks for centered lyrics,
                         // otherwise flush with the inset left edge. Centering on
@@ -717,6 +760,7 @@ Item {
                             delegate: KaraokeWord {
                                 required property var modelData
                                 sub: wordRow.isSub
+                                reading: wordRow.isReading
                                 word: modelData.text
                                 wordIndex: modelData.index
                                 order: modelData.order
@@ -734,23 +778,6 @@ Item {
                             }
                         }
                     }
-                }
-
-                // The reading of the line being sung. It has no timings of its
-                // own, so it never sweeps: it sits under the words and goes to
-                // the same edge as they do.
-                StyledText {
-                    width: hotColumn.width
-                    height: implicitHeight
-                    visible: root.activeReading.length > 0
-                    horizontalAlignment: hotColumn.far ? Text.AlignRight : root.textAlignment
-                    wrapMode: Text.WrapAtWordBoundaryOrAnywhere
-                    maximumLineCount: 2
-                    elide: Text.ElideRight
-                    text: root.activeReading
-                    font.pixelSize: root.fontSizeFor(root.subLineOffset)
-                    opacity: 0.6
-                    color: root.textColor
                 }
             }
 

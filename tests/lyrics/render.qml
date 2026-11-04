@@ -39,6 +39,7 @@ Window {
             { text: "the line being sung beautifully right now with words in it", time: 2,
               words: "the line being sung beautifully right now with words in it".split(" ")
                   .map((w, i) => ({ text: w, time: 2 + i * 0.3 })),
+              reading: "teh laayn biing sung byootifooree rayt now with werds in it",
               bg: { text: "(ooh, singing along)",
                     words: [{ text: "(ooh,", time: 3 }, { text: "singing", time: 3.4 },
                             { text: "along)", time: 3.8 }] } },
@@ -53,6 +54,9 @@ Window {
         // behind the lead's at this moment.
         LyricsService.activeBgWordIndex = 1
         LyricsService.activeBgWordProgress = 0.4
+        // The reading of the line crosses the span the line's own light takes.
+        LyricsService.activeLineSweep = 0.55
+        LyricsService.activeLineProgress = 0.55
         timer.restart()
     }
 
