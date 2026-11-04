@@ -252,8 +252,7 @@ Scope {
                         // This card's own lyric flag: two players, two cards, and
                         // opening one lyric leaves the other at its title line.
                         readonly property var lyricsTrack: LyricsService.trackFor(modelData)
-                        readonly property real targetHeight: (lyricsTrack
-                            ? lyricsTrack.lyricsOpen : Config.options.bar.media.showLyrics)
+                        readonly property real targetHeight: (lyricsTrack?.lyricsOpen ?? false)
                             ? 290 : Appearance.sizes.mediaControlsHeight
                         implicitWidth: root.widgetWidth
                         // tinggi slot = tinggi kartu (beranimasi) → tinggi kolom dan

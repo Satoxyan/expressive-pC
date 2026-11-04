@@ -83,10 +83,10 @@ Singleton {
             // The song the shell draws is the one looked up without being asked.
             foreground: root.active === track
             preferredProvider: root.preferredProvider
-            // The configured value is where a player's card starts; from the
-            // first toggle on, this track's own flag is the answer, which is
-            // how two cards can be open and closed independently.
-            lyricsOpen: Config.options.bar.media.showLyrics
+            // A card starts on its title line and keeps its own flag from
+            // there. Nothing reads or writes Config for it: what a card was
+            // doing before a restart is not worth restoring, and a stored
+            // answer used to reopen every card on every start.
         }
     }
 

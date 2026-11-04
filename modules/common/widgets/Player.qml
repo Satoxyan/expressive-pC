@@ -35,8 +35,7 @@ Item {
     // fact about this card: the popup shows one card per player, and they all
     // used to read one setting, so opening one opened them all.
     readonly property var lyricsTrack: LyricsService.trackFor(root.player)
-    property bool showLyrics: allowLyrics && (root.lyricsTrack
-        ? root.lyricsTrack.lyricsOpen : Config.options.bar.media.showLyrics)
+    property bool showLyrics: allowLyrics && (root.lyricsTrack?.lyricsOpen ?? false)
 
     // Somebody is looking at this player's song, so it is worth searching for
     // even while the player sits paused. A bus no card was ever made for costs
