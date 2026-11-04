@@ -36,7 +36,7 @@ Singleton {
         const rh = Math.round(height);
         const cropBase = `magick ${StringUtils.shellSingleQuoteEscape(screenshotPath)} `
             + `-crop ${rw}x${rh}+${rx}+${ry} +repage`
-        const cropToStdout = `${cropBase} -`
+        const cropToStdout = `${cropBase} PNG:-`
         const cropInPlace = `${cropBase} '${StringUtils.shellSingleQuoteEscape(screenshotPath)}'`
         const cleanup = `rm '${StringUtils.shellSingleQuoteEscape(screenshotPath)}'`
         const slurpRegion = `${rx + Math.round(originX)},${ry + Math.round(originY)} ${rw}x${rh}`
@@ -49,7 +49,7 @@ Singleton {
             case ScreenshotAction.Action.Copy:
                 if (saveDir === "") {
                     // not saving the screenshot, just copy to clipboard
-                    return ["bash", "-c", `${cropToStdout} | wl-copy && ${cleanup}`]
+                    return ["bash", "-c", `${cropToStdout} | wl-copy --type image/png && ${cleanup}`]
                     break;
                 }
                 return [
@@ -57,7 +57,7 @@ Singleton {
                     `mkdir -p '${StringUtils.shellSingleQuoteEscape(saveDir)}' && \
                     saveFileName="screenshot-$(date '+%Y-%m-%d_%H.%M.%S').png" && \
                     savePath="${saveDir}/$saveFileName" && \
-                    ${cropToStdout} | tee >(wl-copy) > "$savePath" && \
+                    ${cropToStdout} | tee >(wl-copy --type image/png) > "$savePath" && \
                     ${cleanup}`
                 ]
 

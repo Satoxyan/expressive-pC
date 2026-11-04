@@ -987,17 +987,24 @@ def fetch_paxsenix(title, artist, duration):
 # Provider: better lyric (lyrics-api.boidu.dev)
 # ---------------------------------------------------------------------------
 
+BETTERLYRIC_BASES = ["https://lyrics-api.boidu.dev", "https://api.betterlyrics.org"]
+
+
 def fetch_betterlyric(title, artist, duration):
-    url = (f"https://lyrics-api.boidu.dev/getLyrics?s={_q(title)}"
-           f"&a={_q(artist)}&d={int(duration)}")
-    try:
-        data = _http_json(url)
-    except Exception:
-        return []
-    ttml = data.get("ttml") or ""
-    if not ttml.strip():
-        return []
-    return ttml_to_lrc(ttml)
+    query = f"getLyrics?s={_q(title)}&a={_q(artist)}"
+    if duration > 0:
+        # The length only narrows a fuzzy lookup, so leave it off when the
+        # player never reported one instead of matching against zero seconds.
+        query += f"&d={int(duration)}"
+    for base in BETTERLYRIC_BASES:
+        try:
+            data = _http_json(f"{base}/{query}")
+        except Exception:
+            continue
+        ttml = (data or {}).get("ttml") or ""
+        if ttml.strip():
+            return ttml_to_lrc(ttml)
+    return []
 
 
 # ---------------------------------------------------------------------------

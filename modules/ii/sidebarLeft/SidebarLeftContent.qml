@@ -35,6 +35,8 @@ Item {
     readonly property int currentIndex: Math.max(0, root.pageKeys.indexOf(root.currentKey))
     readonly property var currentPage: root.featurePages.find(page => page.key === root.currentKey) ?? null
     property bool restored: false
+    property int direction: 1
+    readonly property bool glassPage: ["media", "sports", "ai", "anime", "translator"].includes(root.currentKey)
 
     // Header "kertas dari printer": isinya memakai headerKey yang tertinggal
     // sebentar dari currentKey, supaya header lama sempat slide keluar dulu
@@ -53,6 +55,7 @@ Item {
 
     function goTo(key) {
         if (root.pageKeys.indexOf(key) < 0) key = "home"
+        root.direction = root.pageKeys.indexOf(key) >= root.currentIndex ? 1 : -1
         if (key !== root.currentKey) {
             // Dihitung sekarang, saat nilainya masih segar (contentExitMs home
             // bergantung pada jumlah kartu yang bisa berubah).
@@ -209,10 +212,17 @@ Item {
         }
 
         ClippingRectangle {
+            id: pagesBox
             Layout.fillWidth: true
             Layout.fillHeight: true
             radius: Appearance.rounding.normal
-            color: Appearance.colors.colLayer1
+            color: root.glassPage && Config.options.background.widgets.glass.enable ? "transparent" : Appearance.colors.colLayer1
+
+            WindowGlass {
+                anchors.fill: parent
+                glassEnabled: root.currentKey === "sports" || root.currentKey === "ai" || root.currentKey === "anime" || root.currentKey === "translator"
+                cardRadius: pagesBox.radius
+            }
 
             Item { // Content pages
                 id: pageStack
@@ -244,8 +254,9 @@ Item {
                     visible: (current && !waiting) || lingering
                     enterDelay: root.nextDelay
                     minScale: isHome ? 1 : 0.97
-                    travelX: 0
-                    travelY: isHome ? 0 : 20
+                    travelX: isHome ? 0 : root.direction * slot.width * 0.35
+                    exitX: -travelX
+                    travelY: 0
                     fade: !isHome
                     // Tanpa stagger: keluarnya halaman lama dan masuknya yang
                     // baru sudah diurutkan lewat enterDelay.
