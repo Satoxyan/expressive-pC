@@ -51,6 +51,11 @@ Item {
     // dead lines.
     property int lineContext: -1
 
+    // Draw the latin reading a source supplies under each line (NetEase calls
+    // it romaji, and only fills it for the tracks someone annotated — mostly
+    // Japanese). Off simply leaves the layout exactly as it was.
+    property bool readings: true
+
     // Not a Config option: this exists for the offscreen render probe. A word
     // behind a glow layer is a ShaderEffect, and those do not appear in a
     // grabbed image at all, so with the glow on the sweep cannot be measured.
@@ -174,6 +179,26 @@ Item {
             pixelSize: root.fontSizeFor(root.subLineOffset)
             variableAxes: Appearance.font.variableAxes.main
         }
+    }
+
+    // A reading is laid out on the same step of the ladder as the echo.
+    FontMetrics {
+        id: readingMetrics
+        font {
+            family: Appearance.font.family.main
+            pixelSize: root.fontSizeFor(root.subLineOffset)
+            variableAxes: Appearance.font.variableAxes.main
+        }
+    }
+
+    // The reading of the line the song is standing on. The row heights this
+    // widget aims its scroll band at are worked out from the data instead of
+    // from the items, so the data is also where the extra line has to show up.
+    readonly property string activeReading: {
+        const lines = LyricsService.lyricsLines
+        const i = LyricsService.activeIndex
+        if (!root.readings || i < 0 || i >= lines.length) return ""
+        return lines[i].reading ?? ""
     }
 
     readonly property var hotRows: root.buildHotRows()
@@ -318,13 +343,21 @@ Item {
     // the band this feeds is what lays the item out. The karaoke column is the
     // only thing that wraps here, so its row count is the whole story.
     readonly property real hotLineGuess: {
-        if (!root.karaoke) return hotMetrics.height
-        const lead = root.hotRows.length > 0 ? root.hotRows.length : 1
-        const sub = root.subRows.length
-        const subH = sub > 0
-            ? rowSpacing + sub * subMetrics.height + (sub - 1) * rowSpacing
-            : 0
-        return lead * hotMetrics.height + Math.max(0, lead - 1) * rowSpacing + subH
+        let height
+        if (!root.karaoke) height = hotMetrics.height
+        else {
+            const lead = root.hotRows.length > 0 ? root.hotRows.length : 1
+            const sub = root.subRows.length
+            const subH = sub > 0
+                ? rowSpacing + sub * subMetrics.height + (sub - 1) * rowSpacing
+                : 0
+            height = lead * hotMetrics.height + Math.max(0, lead - 1) * rowSpacing + subH
+        }
+        // The reading hangs under the anchored line whichever way that line is
+        // drawn, so the band has to count it in both.
+        if (root.activeReading.length > 0)
+            height += rowSpacing + readingMetrics.height
+        return height
     }
 
     // A break claims a line's height even though its dots are small: the row
@@ -603,6 +636,8 @@ Item {
             readonly property bool otherVoice: modelData.otherVoice === true
             // The note row carries no echo, so the field is not always there.
             readonly property string bgText: modelData.bgText ?? ""
+            readonly property string readingText: root.readings
+                ? (modelData.reading ?? "") : ""
             // The window: the same number of lines on each side, and nothing
             // beyond it. A line three steps away says nothing about the moment
             // the song is in, however much room the host has for it.
@@ -700,6 +735,23 @@ Item {
                         }
                     }
                 }
+
+                // The reading of the line being sung. It has no timings of its
+                // own, so it never sweeps: it sits under the words and goes to
+                // the same edge as they do.
+                StyledText {
+                    width: hotColumn.width
+                    height: implicitHeight
+                    visible: root.activeReading.length > 0
+                    horizontalAlignment: hotColumn.far ? Text.AlignRight : root.textAlignment
+                    wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                    text: root.activeReading
+                    font.pixelSize: root.fontSizeFor(root.subLineOffset)
+                    opacity: 0.6
+                    color: root.textColor
+                }
             }
 
             // Which edge this line's text belongs to, shared by the line and by
@@ -755,6 +807,26 @@ Item {
                     text: lineRow.bgText
                     font.pixelSize: root.fontSizeFor(lineRow.dist + root.subLineOffset)
                     opacity: root.opacityFor(lineRow.dist) * 0.75
+                    color: lineRow.isHot ? root.activeColor : root.textColor
+                    Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
+                }
+
+                // The latin reading, one step of the ladder behind its line and
+                // quieter than the echo: it is a hint for the shape of the words,
+                // not something to sing from.
+                StyledText {
+                    id: plainReading
+                    width: plainColumn.width
+                    height: implicitHeight
+                    horizontalAlignment: lineRow.textHAlign
+                    verticalAlignment: Text.AlignVCenter
+                    wrapMode: plainRow.wrapMode
+                    maximumLineCount: plainRow.maximumLineCount
+                    elide: Text.ElideRight
+                    visible: lineRow.readingText.length > 0
+                    text: lineRow.readingText
+                    font.pixelSize: root.fontSizeFor(lineRow.dist + root.subLineOffset)
+                    opacity: root.opacityFor(lineRow.dist) * 0.6
                     color: lineRow.isHot ? root.activeColor : root.textColor
                     Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
                 }

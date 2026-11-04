@@ -1303,6 +1303,23 @@ NETEASE_HEADERS = {
 }
 
 
+def _netease_attach_readings(lines, roma_text):
+    """Stick NetEase's romaji track onto the lines that it annotates.
+
+    The lyrics and the reading are cut by different hands, so they are matched
+    on time and never by index: a reading belongs to the line being sung near
+    it, and the padded credit lines at the top find no line to attach to.
+    """
+    roma = [line for line in _parse_lrc(roma_text) if line["text"]]
+    if not roma:
+        return lines
+    for line in lines:
+        nearest = min(roma, key=lambda r: abs(r["time"] - line["time"]))
+        if abs(nearest["time"] - line["time"]) <= 1.5:
+            line["reading"] = nearest["text"]
+    return lines
+
+
 def _netease_strip_credits(lines):
     """NetEase pads the start with credit lines (作词/作曲 : X) at 00:00."""
     credit = re.compile(r"^(作词|作曲|编曲|Written by|Produced by)\s*[:：]", re.I)
@@ -1370,6 +1387,12 @@ def fetch_netease(title, artist, duration):
             continue
         lines = _netease_strip_credits(_parse_lrc(lrc))
         if lines:
+            # The same answer carries the song read in latin letters, which
+            # NetEase only fills in for the tracks someone added one to
+            # (mostly Japanese). Everything else gets no reading at all.
+            roma = ((data.get("romalrc") or {}).get("lyric") or "").strip()
+            if roma:
+                _netease_attach_readings(lines, roma)
             return lines
     return []
 
@@ -1550,7 +1573,8 @@ def _payload_line(line):
     The background vocal of a line — the echo the source tags x-bg, like
     "(can I?)" answering "can I get a kiss?" — goes in b/bw only when the line
     carries one, whether the provider marked it or _fold_echo_lines moved a
-    parenthesised line in, so an ordinary line costs nothing extra.
+    parenthesised line in, so an ordinary line costs nothing extra. r is the
+    reading (romaji) of a line the source provided one for.
     """
     out = {
         "t": line["time"],
@@ -1558,6 +1582,9 @@ def _payload_line(line):
         "w": [[w["t"], w["w"]] for w in line.get("words") or []],
         "a": line.get("align") or "start",
     }
+    reading = (line.get("reading") or "").replace("§", "")
+    if reading:
+        out["r"] = reading
     bg = line.get("bg") or {}
     if bg.get("text"):
         out["b"] = bg["text"].replace("§", "")

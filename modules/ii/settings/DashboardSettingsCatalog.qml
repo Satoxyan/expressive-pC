@@ -188,6 +188,9 @@ QtObject {
         "desktop:Lyrics enable": { type: "switch", get: () => Config.options.background.widgets.lyrics.enable, set: v => { Config.options.background.widgets.lyrics.enable = v; } },
         "desktop:Lyrics hide when paused": { type: "switch", get: () => Config.options.background.widgets.lyrics.hideWhenPaused, set: v => { Config.options.background.widgets.lyrics.hideWhenPaused = v; } },
         "desktop:Lyrics shadow": { type: "switch", get: () => Config.options.background.widgets.lyrics.shadow, set: v => { Config.options.background.widgets.lyrics.shadow = v; } },
+        // Not a widget setting: the reading is drawn by every lyrics widget, so
+        // it keeps one switch for all of them.
+        "desktop:Lyrics readings": { type: "switch", get: () => Config.options.lyrics.readings, set: v => { Config.options.lyrics.readings = v; } },
         "desktop:Lyrics style": { type: "select", get: () => Config.options.background.widgets.lyrics.style, set: v => { Config.options.background.widgets.lyrics.style = v; }, options: [{ displayName: Translation.tr("Current line"), icon: "short_text", value: "line" }, { displayName: Translation.tr("Karaoke"), icon: "lyrics", value: "karaoke" }] },
         "desktop:Lyrics font family": { type: "text", get: () => Config.options.background.widgets.lyrics.fontFamily, set: v => { Config.options.background.widgets.lyrics.fontFamily = v.trim(); } },
         "desktop:Lyrics size": { type: "slider", get: () => Config.options.background.widgets.lyrics.fontSize, set: v => { Config.options.background.widgets.lyrics.fontSize = Math.round(v); }, from: 16, to: 200, stopIndicatorValues: [48], usePercentTooltip: false },
@@ -744,6 +747,7 @@ QtObject {
                 { type: "toggle", key: "desktop:Lyrics enable", title: Translation.tr("Enable"), icon: "lyrics" },
                 { type: "toggle", key: "desktop:Lyrics hide when paused", title: Translation.tr("Hide when paused"), icon: "pause_circle" },
                 { type: "toggle", key: "desktop:Lyrics shadow", title: Translation.tr("Shadow"), icon: "shadow" },
+                { type: "toggle", key: "desktop:Lyrics readings", title: Translation.tr("Latin reading"), icon: "language", kw: "romaji pronunciation cjk japanese" },
                 { type: "toggle", key: "desktop:Lyrics auto colors", title: Translation.tr("Automatic colors"), icon: "auto_awesome" },
                 { type: "select", key: "desktop:Lyrics style", title: Translation.tr("Style"), icon: "format_line_spacing" },
                 { type: "text", key: "desktop:Lyrics font family", title: Translation.tr("Font family"), icon: "custom_typography" },

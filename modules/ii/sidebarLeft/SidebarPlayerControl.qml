@@ -285,6 +285,7 @@ Item {
 
                 Lyrics {
                     id: lyricsComp
+                    readings: Config.options.lyrics.readings
                     anchors.fill: parent
                     // A fixed block of seven lines: three behind the one being
                     // sung, three ahead of it, and the opacity ladder carries the

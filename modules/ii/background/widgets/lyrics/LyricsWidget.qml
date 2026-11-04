@@ -26,6 +26,7 @@ AbstractBackgroundWidget {
     property real fontSize: root.configEntry.fontSize
     readonly property bool karaoke: root.configEntry.style === "karaoke"
     readonly property real sideFontSize: root.fontSize * 0.55
+    readonly property real readingFontSize: root.fontSize * 0.45
     readonly property color textColor: root.configEntry.color === "" ? root.colText : Appearance.getColorFromName(root.configEntry.color)
     readonly property string fontFamily: root.configEntry.fontFamily || Appearance.font.family.title
     readonly property int textAlignment: ({ left: Text.AlignLeft, right: Text.AlignRight })[root.configEntry.alignment] ?? Text.AlignHCenter
@@ -34,17 +35,25 @@ AbstractBackgroundWidget {
     readonly property string currentLine: LyricsService.slots[LyricsService.before] ?? ""
     readonly property string previousLine: LyricsService.slots[LyricsService.before - 1] ?? ""
     readonly property string nextLine: LyricsService.slots[LyricsService.before + 1] ?? ""
+    // The latin reading of the line being sung, for the sources that supply
+    // one (NetEase calls it romaji). It is not word-timed, so it arrives as
+    // plain text under the line rather than sweeping with it.
+    readonly property string currentReading: Config.options.lyrics.readings
+        ? (LyricsService.lyricsLines[LyricsService.activeIndex]?.reading ?? "") : ""
 
     // Lines actually drawn, swapped while faded out so a new line reads as a transition
     property string shownCurrent: root.currentLine
     property string shownPrevious: root.previousLine
     property string shownNext: root.nextLine
+    property string shownReading: root.currentReading
+    readonly property bool readingShown: root.shownReading.length > 0
     property real lineFade: 1
 
     // A fixed box: the widget does not jump around as line lengths change
     implicitWidth: Math.min(root.fontSize * 14, root.scaledScreenWidth * 0.9)
     implicitHeight: root.fontSize * root.lineHeight * 2
         + (root.karaoke ? (root.sideFontSize * root.lineHeight + content.spacing) * 2 : 0)
+        + (root.readingShown ? root.readingFontSize * root.lineHeight + content.spacing : 0)
     draggable: placementStrategy === "free" && !Config.options.background.widgetsLocked
 
     onCurrentLineChanged: lineChange.restart()
@@ -57,6 +66,7 @@ AbstractBackgroundWidget {
                 root.shownCurrent = root.currentLine;
                 root.shownPrevious = root.previousLine;
                 root.shownNext = root.nextLine;
+                root.shownReading = root.currentReading;
                 slide.y = root.fontSize * 0.25;
             }
         }
@@ -129,6 +139,13 @@ AbstractBackgroundWidget {
             text: root.shownCurrent
             font.pixelSize: root.fontSize
             font.weight: Font.DemiBold
+        }
+        LyricLine {
+            visible: root.readingShown
+            text: root.shownReading
+            font.pixelSize: root.readingFontSize
+            maximumLineCount: 2
+            opacity: 0.55
         }
         LyricLine {
             visible: root.karaoke

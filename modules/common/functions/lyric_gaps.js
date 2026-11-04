@@ -81,7 +81,8 @@ function mergeRows(lines, interludes, noteText) {
             interlude: false,
             text: lines[i].text || "♪",
             otherVoice: lines[i].align === "end",
-            bgText: lines[i].bg?.text ?? ""
+            bgText: lines[i].bg?.text ?? "",
+            reading: lines[i].reading ?? ""
         })
     }
     while (next < gaps.length)

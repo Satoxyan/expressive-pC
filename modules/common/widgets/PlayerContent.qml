@@ -170,6 +170,7 @@ Item {
         visible: opacity > 0.01
 
         sourceComponent: Lyrics {
+            readings: Config.options.lyrics.readings
             // The block is kept small and centred: two lines on each side of the
             // one being sung, instead of the whole list fading away into the top
             // and bottom of the strip.

@@ -331,6 +331,7 @@ Singleton {
                         })).filter(w => !isNaN(w.time))
                     } : null
                     lines.push({ time: t, text: txt, words, bg,
+                                 reading: String(line.r || ""),
                                  align: line.a === "end" ? "end" : "start" })
                 }
 

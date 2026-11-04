@@ -746,6 +746,7 @@ AbstractBackgroundWidget {
                         anchors.fill: parent
                         anchors.leftMargin: 16
                         anchors.rightMargin: 16
+                        readings: Config.options.lyrics.readings
                         // Never cut a line in half: the strip is 250px of a card
                         // that has room around it, so the lines on their way in
                         // and out are allowed to paint past its edges. The card
@@ -902,6 +903,7 @@ AbstractBackgroundWidget {
                     Lyrics {
                         anchors.fill: parent
                         anchors.margins: 10
+                        readings: Config.options.lyrics.readings
                         clipOverflowY: -1
                         lineContext: 2
                         textAlignment: Text.AlignHCenter

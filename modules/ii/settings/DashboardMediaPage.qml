@@ -384,6 +384,7 @@ Item {
 
             Lyrics {
                 id: lyricsView
+                readings: Config.options.lyrics.readings
                 anchors.fill: parent
                 // A fixed block of nine lines: four behind the one being sung and
                 // four ahead of it, held centred in the card. The lines this high
