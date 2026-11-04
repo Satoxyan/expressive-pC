@@ -12,6 +12,7 @@ import threading
 import datetime
 import urllib.request
 import urllib.parse
+import unicodedata
 import uuid
 import zlib
 
@@ -1929,7 +1930,7 @@ def _provider_names(arg):
     return [p.strip() for p in arg.split(",") if p.strip()]
 
 
-def _run_timed(fn, title, artist, duration):
+def _run_timed(fn, title, artist, duration, budget=PROVIDER_TIMEOUT):
     """Run a provider function on a daemon thread with a hard timeout.
 
     SIGALRM is unreliable here because one-shot alarm fires once and gets
@@ -1945,19 +1946,143 @@ def _run_timed(fn, title, artist, duration):
     result = {}
 
     def worker():
-        _PROVIDER_DEADLINE.value = time.time() + PROVIDER_TIMEOUT
+        _PROVIDER_DEADLINE.value = time.time() + budget
         try:
             result["lines"] = fn(title, artist, duration)
         except Exception:
             result["lines"] = []
     t = threading.Thread(target=worker, daemon=True)
     t.start()
-    t.join(PROVIDER_TIMEOUT)
+    t.join(budget)
     if t.is_alive():
         # None = timeout: caller must distinguish "provider has no lyrics"
         # from "provider never answered in time".
         return None
     return result.get("lines") or []
+
+
+# ---------------------------------------------------------------------------
+# Readings borrowed from the providers that carry them
+# ---------------------------------------------------------------------------
+
+# NetEase and QQ Music are the two that ship a transliteration of their own, in
+# the `romalrc` track and the `roma` track. Neither of them times anything word
+# by word, which is the other half of what the widget wants.
+READING_SOURCES = ("netease", "qqmusic")
+
+# A borrowed reading is worth waiting for but not worth holding the popup for,
+# so the borrowing as a whole gets one short clock, shared by both sources,
+# instead of the full PROVIDER_TIMEOUT a provider answering with the lyric gets.
+READING_BUDGET = 8
+
+# A line in these scripts is not spelled the way it is read, so they are the
+# only ones a reading is asked for. Korean and Cyrillic spell themselves
+# phonetically and neither source above marks them anyway.
+READING_WANTED = re.compile(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
+
+# How many consecutive source lines one of ours may be a run of.
+MAX_JOIN = 4
+
+_BRACKETED = re.compile(r"[（(\[][^）)\]]*[）)\]]")
+
+
+def _norm_lyric_text(text):
+    """The shape two sources agree on when they hold the same lyric.
+
+    Full-width and half-width letters fold together, the parenthetical credits
+    and echo marks one of them carries and the other drops go, and only letters
+    and digits are left: spacing is exactly what the two cut differently.
+    """
+    folded = unicodedata.normalize("NFKC", text)
+    folded = _BRACKETED.sub("", folded)
+    return "".join(c for c in folded.lower() if c.isalnum())
+
+
+def _reading_gaps(lines):
+    """Lines whose reading is missing rather than not wanted."""
+    return [l for l in lines
+            if not (l.get("reading") or "").strip()
+            and READING_WANTED.search(l.get("text") or "")]
+
+
+def _joined_reading(key, pairs):
+    """The readings of the consecutive source lines that spell `key` run together."""
+    for start in range(len(pairs)):
+        if not key.startswith(pairs[start][0]):
+            continue
+        acc = ""
+        parts = []
+        for text, reading in pairs[start:start + MAX_JOIN]:
+            acc += text
+            parts.append(reading)
+            if acc == key:
+                return " ".join(parts)
+            if not key.startswith(acc):
+                break
+    return None
+
+
+def _merge_readings_by_text(lines, source):
+    """Copy readings from another provider's lines onto ours, matched on the text.
+
+    Timestamps are no good across providers: two sources for one song are
+    routinely different masters, a second or two apart, and they split their
+    lines differently, while agreeing on the text is proof that the two lines
+    are the same lyric. Answers how many lines gained one.
+    """
+    pairs = []
+    for line in source:
+        key = _norm_lyric_text(line.get("text") or "")
+        reading = (line.get("reading") or "").strip()
+        if key and reading:
+            pairs.append((key, reading))
+    if not pairs:
+        return 0
+
+    matched = 0
+    for line in lines:
+        if line.get("reading") or not READING_WANTED.search(line.get("text") or ""):
+            continue
+        key = _norm_lyric_text(line["text"])
+        if not key:
+            continue
+        # The first source line with this text wins: a chorus repeats a line and
+        # repeats its reading with it.
+        hit = next((r for k, r in pairs if k == key), None) or _joined_reading(key, pairs)
+        if hit:
+            line["reading"] = hit
+            matched += 1
+    return matched
+
+
+def _borrow_readings(lines, winner, title, artist, duration):
+    """Fill the readings the chosen provider did not have from the ones that do.
+
+    The provider that times every word usually has no transliteration and the
+    ones that have it usually time nothing, so a Japanese song from Unison gains
+    its romaji here while keeping its word timings. A provider that already
+    answered cannot add anything to itself. The whole borrowing shares one clock
+    and is a bonus on top of the lyric, never a reason to keep the widget
+    waiting: when the first source covered all but a line or two, the holes left
+    are lines it does not have either and the second is not asked.
+    """
+    want = _reading_gaps(lines)
+    if not want:
+        return
+    deadline = time.time() + READING_BUDGET
+    for name in READING_SOURCES:
+        if name == winner:
+            continue
+        left = deadline - time.time()
+        if left < 1:
+            return
+        source = _run_timed(PROVIDERS[name], title, artist, duration, left)
+        if not source:
+            continue
+        if _merge_readings_by_text(lines, source):
+            gaps = _reading_gaps(lines)
+            if len(gaps) * 4 <= len(want):
+                return
 
 
 # Capability probes fetch full lyrics from every provider just to learn whether
@@ -2141,6 +2266,7 @@ def main():
             continue
         if lines:
             lines = _fold_echo_lines(lines)
+            _borrow_readings(lines, name, title, artist, duration)
             payload = {
                 "ok": True,
                 "provider": name,

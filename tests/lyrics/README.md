@@ -7,7 +7,13 @@ QT_ASSUME_STDERR_HAS_CONSOLE=1 QT_QPA_PLATFORM=offscreen \
   /usr/lib/qt6/bin/qmltestrunner -import tests/lyrics -input tests/lyrics
 QT_ASSUME_STDERR_HAS_CONSOLE=1 QT_QPA_PLATFORM=offscreen \
   /usr/lib/qt6/bin/qml -I tests/lyrics tests/lyrics/render.qml
+python3 -m unittest discover -s tests/lyrics -p 'test_*.py'
 ```
+
+`test_romanization.py` covers the script side — the reading an answer borrows
+from another provider is matched on the lyric text, and that matching is
+reachable without any network. The QML harness cannot see it: it drives a
+payload double rather than the providers that make the payload.
 
 `render.qml` grabs the karaoke widget mid-line to `/tmp/lyrics-render.png`
 (the path is hardcoded — `QImageWriter` takes the file suffix as the image
