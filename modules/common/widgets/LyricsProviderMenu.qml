@@ -15,6 +15,10 @@ Popup {
     property real sizeScale: 1
     // true: tepi kiri menu sejajar tepi kiri anchor (default: kanan).
     property bool alignLeft: false
+    // Lagu yang daftar provider-nya dibuka di menu ini. Yang ditanya adalah
+    // provider untuk lagu itu, dan yang dipilih tetap satu pilihan user untuk
+    // semua player (LyricsService.preferredProvider).
+    property var track: LyricsService.active
     // Kapan popup terakhir tertutup; lihat toggle di show().
     property real closedAt: 0
     onVisibleChanged: if (!visible) root.closedAt = Date.now()
@@ -33,7 +37,7 @@ Popup {
             return
         }
 
-        LyricsService.probeProviders()
+        root.track?.probeProviders()
         // Posisi dihitung relatif parent popup, bukan koordinat window:
         // di layer surface (sidebar/lock) koordinat window bikin menu
         // terlempar jauh dari tombolnya.
@@ -95,7 +99,7 @@ Popup {
                         // basi saat daftar dibuka lagi.
                         rippleEnabled: false
                         // Hasil probe track berjalan; null = belum ada data.
-                        readonly property var capInfo: LyricsService.providerInfo[modelData] ?? null
+                        readonly property var capInfo: root.track?.providerInfo?.[modelData] ?? null
                         // Provider tak punya lyric utk track ini: redupkan.
                         // Timeout ("unknown") dibiarkan normal — ketiadaan
                         // jawaban bukan bukti tak ada lyric.
@@ -148,7 +152,7 @@ Popup {
                         }
                         downAction: () => {
                             LyricsService.preferredProvider = modelData === "auto" ? "" : modelData
-                            LyricsService.restartLyrics()
+                            root.track?.restartLyrics()
                             root.close()
                             // Tutup karena memilih, bukan karena toggle:
                             // jangan tinggalkan jejak penutupan, supaya klik

@@ -249,7 +249,12 @@ Scope {
                     delegate: Item {
                         id: playerSlot
                         required property MprisPlayer modelData
-                        readonly property real targetHeight: Config.options.bar.media.showLyrics ? 290 : Appearance.sizes.mediaControlsHeight
+                        // This card's own lyric flag: two players, two cards, and
+                        // opening one lyric leaves the other at its title line.
+                        readonly property var lyricsTrack: LyricsService.trackFor(modelData)
+                        readonly property real targetHeight: (lyricsTrack
+                            ? lyricsTrack.lyricsOpen : Config.options.bar.media.showLyrics)
+                            ? 290 : Appearance.sizes.mediaControlsHeight
                         implicitWidth: root.widgetWidth
                         // tinggi slot = tinggi kartu (beranimasi) → tinggi kolom dan
                         // mask input ikut, sementara tinggi window tetap konstan

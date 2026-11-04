@@ -17,12 +17,16 @@ Item {
     required property var blendedColors
     // Pengali ukuran untuk wadah besar (mis. dashboard tab Media).
     property real sizeScale: 1
+    // Lagu yang provider-nya ditulis di pill ini. Tiap player punya kartu dan
+    // lagunya sendiri, jadi labelnya tidak boleh ikut player yang terakhir
+    // dilihat shell.
+    property var track: LyricsService.active
 
     implicitWidth: pillRow.implicitWidth + 16 * sizeScale
     implicitHeight: 20 * sizeScale
 
-    readonly property string providerLabel: LyricsService.providedBy.length > 0
-        ? LyricsService.providedBy
+    readonly property string providerLabel: root.track?.providedBy?.length > 0
+        ? root.track.providedBy
         : (LyricsService.preferredProvider.length > 0 ? LyricsService.preferredProvider : "auto")
 
     RippleButton {
@@ -62,5 +66,6 @@ Item {
         id: providerMenu
         blendedColors: root.blendedColors
         sizeScale: root.sizeScale
+        track: root.track
     }
 }

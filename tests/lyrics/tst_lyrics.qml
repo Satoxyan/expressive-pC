@@ -41,6 +41,20 @@ TestCase {
 
     // The ListView lives inside the widget; reach it the way the widget's own
     // layout does, without exporting it as a public property.
+    // A second card of the same kind, drawing a song of its own: the media
+    // popup shows one of these per player, and each has to stay on its own
+    // player's lyric rather than on whichever one the shell last looked at.
+    LyricsTrack {
+        id: secondSong
+    }
+
+    Lyrics {
+        id: secondWidget
+        width: 400
+        height: 150
+        track: secondSong
+    }
+
     function list(widget) {
         const target = widget ?? lyrics
         for (let i = 0; i < target.children.length; i++) {
@@ -809,6 +823,36 @@ TestCase {
         verify(lyrics.hotLineGuess > shortGuess,
             "and the band grows row by row, not by one row however many there are ("
             + shortGuess.toFixed(1) + " -> " + lyrics.hotLineGuess.toFixed(1) + ")")
+    }
+
+    // ── one song per player ────────────────────────────────────────────────
+    // Every card used to read the one song the singleton held, so a second
+    // player's lyrics were the first player's lyrics, and a card's words went
+    // out from under it whenever the shell looked at another app. A card now
+    // draws the song it is given.
+    function test_two_cards_do_not_share_one_song() {
+        LyricsService.load(romajiSong(), "qqmusic")
+        LyricsService.activate(0)
+        secondSong.load([{ text: "das zweite lied", time: 0 },
+                         { text: "und seine zeile hier", time: 3 }], "netease")
+        secondSong.activate(1)
+        wait(300)
+
+        const first = wordsOf(wordRows(list().currentItem)[0])
+        const second = wordsOf(wordRows(list(secondWidget).currentItem)[0])
+        compare(first[0].word, "せーの", "the first card still draws its own line")
+        compare(second.length, 4, "the second draws a line of its own length")
+        for (const w of second)
+            verify(!String(w.word).includes("せ"),
+                "and nothing of the first song is on it: " + w.word)
+        verify(lyrics.hotLineGuess > secondWidget.hotLineGuess,
+            "each band is sized on the song that card draws, not on one for both")
+
+        // The same separation for the state that is not the words: opening one
+        // card's lyrics says nothing about the other's.
+        secondSong.lyricsOpen = true
+        verify(secondSong.lyricsOpen, "the second card is open")
+        compare(LyricsService.lyricsOpen, false, "and the first is still closed")
     }
 
     // ── the instrumental break ─────────────────────────────────────────────

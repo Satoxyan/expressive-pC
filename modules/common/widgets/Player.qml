@@ -31,7 +31,17 @@ Item {
     property bool allowLyrics: true
     property bool animateResize: false
     property string growFrom: "top"
-    property bool showLyrics: allowLyrics && Config.options.bar.media.showLyrics
+    // The song of the player this card shows. Whether its lyrics are open is a
+    // fact about this card: the popup shows one card per player, and they all
+    // used to read one setting, so opening one opened them all.
+    readonly property var lyricsTrack: LyricsService.trackFor(root.player)
+    property bool showLyrics: allowLyrics && (root.lyricsTrack
+        ? root.lyricsTrack.lyricsOpen : Config.options.bar.media.showLyrics)
+
+    // Somebody is looking at this player's song, so it is worth searching for
+    // even while the player sits paused. A bus no card was ever made for costs
+    // no search at all.
+    Component.onCompleted: LyricsService.ensureFor(root.player)
 
     // Ukuran decode dibekukan. Kalau ikut ukuran kartu, `cache: false` membuat Image
     // reload tiap frame selama animasi resize → blank frame → flicker.
@@ -209,8 +219,10 @@ Item {
             artDominantColor: root.artDominantColor
             lyricsMode: root.showLyrics
             lyricsAllowed: root.allowLyrics
-            // write config only: assigning to root.showLyrics would break the binding above
-            onToggleLyrics: Config.options.bar.media.showLyrics = !Config.options.bar.media.showLyrics
+            // The card's own song holds the flag, so this card opens and closes
+            // on its own. No write to root.showLyrics: it is bound above.
+            onToggleLyrics: if (root.lyricsTrack)
+                root.lyricsTrack.lyricsOpen = !root.lyricsTrack.lyricsOpen
         }
     }
 }

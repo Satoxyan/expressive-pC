@@ -1,69 +1,21 @@
 pragma Singleton
+
 import QtQuick
-import "../../../../modules/common/functions/lyric_gaps.js" as Gaps
 
-// Test double for qs.services.LyricsService. The real service is a timer and
-// Mpris machine around the same members; Lyrics only reads them, so the test
-// pushes values in directly.
-QtObject {
-    id: root
+// Test double for qs.services.LyricsService, the registry: the songs the widget
+// draws are handed out per player, and every test that existed before this was
+// one player's song, so the registry is a single track that answers for them
+// all. `active` is what a widget with no player of its own binds to.
+LyricsTrack {
+    id: registry
 
-    // The partner of the real service's maxWordSpan. Duplicated rather than
-    // shared, like the real one's word rules are: if the two drift apart the
-    // gap tests fail loudly instead of quietly finding no gaps at all.
-    readonly property real maxWordSpan: 1.2
+    readonly property var active: registry
 
-    property var lyricsLines: []
-    property int activeIndex: -1
-    property string status: "ok"
-    property string providedBy: ""
-    property int activeWordIndex: -1
-    property real activeWordProgress: 0
-    property real activeLineProgress: 0
-    // The line being sung can have an echo answering it, sung on its own
-    // timings, so it sweeps on its own clock.
-    property int activeBgWordIndex: -1
-    property real activeBgWordProgress: 0
-    // The instrumental breaks, worked out by the same rules the real service
-    // runs over its payload.
-    property var interludes: []
-    property int activeInterludeIndex: -1
-    property real activeInterludeProgress: 0
+    // The registry looks a song up by the player it belongs to. The tests only
+    // ever have one, and the widget under test is told which song to draw.
+    function trackFor(player) { return registry }
 
-    // The loading overlay's tap target calls this; no test clicks it, so it
-    // only has to exist.
-    function restartLyrics() {}
-
-    // Load a song: lines = [{text, time, words?, bg?}], and make one of them active.
-    function load(lines, provided) {
-        root.lyricsLines = lines
-        root.providedBy = provided ?? ""
-        root.status = "ok"
-        root.activeIndex = -1
-        root.interludes = Gaps.findInterludes(lines, root.maxWordSpan)
-        root.activeInterludeIndex = -1
-        root.activeInterludeProgress = 0
-    }
-
-    function activate(index) {
-        root.activeIndex = index
-        const words = root.lyricsLines[index]?.words ?? []
-        root.activeWordIndex = words.length > 0 ? 0 : -1
-        root.activeWordProgress = 0
-        root.activeLineProgress = 0
-        const bgWords = root.lyricsLines[index]?.bg?.words ?? []
-        root.activeBgWordIndex = bgWords.length > 0 ? 0 : -1
-        root.activeBgWordProgress = 0
-        // The real service never has a line and a break lit at the same time.
-        root.activeInterludeIndex = -1
-        root.activeInterludeProgress = 0
-    }
-
-    // Stand in an instrumental break: the line before it stays the active line
-    // — that is where the cursor still is — while the dots take over the row
-    // the list is centred on.
-    function activateGap(index, progress) {
-        root.activeInterludeIndex = index
-        root.activeInterludeProgress = progress
-    }
+    // What the hosts call when they show a player's card, so a paused player
+    // still gets its lyric looked up. Nothing here looks anything up.
+    function ensureFor(player) {}
 }

@@ -573,7 +573,13 @@ Item {
             // section sliders/bottom.
             active: root.sectionActive("media")
             sourceComponent: Item {
-                implicitHeight: (Config.options.bar.media.showLyrics ? 290 : (160 - Appearance.sizes.elevationMargin * 2))
+                // Tinggi ikut flag kartu ini, yang sekarang hidup di lagu
+                // player yang sedang ditampilkan — bukan di satu setting yang
+                // dibaca semua kartu.
+                readonly property var lyricsTrack: LyricsService.trackFor(root.activePlayer)
+                implicitHeight: (lyricsTrack ? lyricsTrack.lyricsOpen
+                    : Config.options.bar.media.showLyrics)
+                    ? 290 : (160 - Appearance.sizes.elevationMargin * 2)
                 Behavior on implicitHeight {
                     NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
                 }

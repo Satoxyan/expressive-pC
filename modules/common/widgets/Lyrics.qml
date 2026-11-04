@@ -95,31 +95,56 @@ Item {
     readonly property int motionDuration: 320
     readonly property real rowSpacing: 4
 
+    // Whose lyric this widget draws. The media popup shows one card per player,
+    // and each of them is now sung by its own state, so a host that displays a
+    // particular player names it here. A host that only ever shows the active
+    // player leaves this at its default and sees exactly what it always saw.
+    property var track: LyricsService.active
+
+    // Everything the widget knows about the song comes through these, never
+    // through the service directly: a binding that reads the service would keep
+    // drawing the previous track's words when the host swaps to another player.
+    // The defaults are for the frame in which a card exists before the registry
+    // has handed it a track of its own.
+    readonly property var lines: root.track?.lyricsLines ?? []
+    readonly property var gaps: root.track?.interludes ?? []
+    readonly property int activeIdx: root.track?.activeIndex ?? -1
+    readonly property int gapIdx: root.track?.activeInterludeIndex ?? -1
+    readonly property real gapProgress: root.track?.activeInterludeProgress ?? 0
+    readonly property int wordIdx: root.track?.activeWordIndex ?? -1
+    readonly property real wordProgressOf: root.track?.activeWordProgress ?? 0
+    readonly property int bgWordIdx: root.track?.activeBgWordIndex ?? -1
+    readonly property real bgWordProgressOf: root.track?.activeBgWordProgress ?? 0
+    readonly property real lineProgress: root.track?.activeLineProgress ?? 0
+    readonly property string providedBy: root.track?.providedBy ?? ""
+    // No track at all is the service's own answer: it knows whether anything is
+    // playing and what it looked like when nothing was found.
+    readonly property string trackStatus: root.track?.status ?? LyricsService.status
+
     // The provider attribution trailing the last line, so the note scrolls up
     // with the end of the song instead of being pinned inside the widget.
-    readonly property string noteText: LyricsService.providedBy.length > 0
-        ? "Lyrics provided by " + LyricsService.providedBy : ""
+    readonly property string noteText: root.providedBy.length > 0
+        ? "Lyrics provided by " + root.providedBy : ""
 
     // The list is every lyric line, an extra row wherever an instrumental
     // break is long enough to count down through, and the note at the end.
     // The break rows are why nothing in here may read a row position as a line
     // index any more; the layout comes back with the maps that do that.
     readonly property var rowLayout: Gaps.mergeRows(
-        LyricsService.lyricsLines ?? [], LyricsService.interludes ?? [], root.noteText)
+        root.lines, root.gaps, root.noteText)
     readonly property var lineRows: root.rowLayout.rows
 
     // Whether the song is standing in a break right now. The bounds test is
-    // the guard: the service can still be pointing at a break of the song that
-    // just ended, and reading past the end of a QML list hands back something
+    // the guard: a track can still be pointing at a break of the song that just
+    // ended, and reading past the end of a QML list hands back something
     // that "?? -1" does not catch.
     //
     // Neither of these reads the other: a binding can be handed a stale
     // sibling while its own layout is already new, and that is how an
     // out-of-range row sneaks into an int property.
     readonly property bool inBreak: {
-        const gaps = root.rowLayout.gapAt
-        const gi = LyricsService.activeInterludeIndex
-        return gi >= 0 && gi < gaps.length
+        const laid = root.rowLayout
+        return root.gapIdx >= 0 && root.gapIdx < laid.gapAt.length
     }
 
     // The row the song is on: the break's dots while an instrumental runs, the
@@ -127,10 +152,9 @@ Item {
     // opacity step is measured from it.
     readonly property int anchorRow: {
         const laid = root.rowLayout
-        const gi = LyricsService.activeInterludeIndex
-        if (gi >= 0 && gi < laid.gapAt.length)
-            return laid.gapAt[gi]
-        const line = LyricsService.activeIndex
+        if (root.gapIdx >= 0 && root.gapIdx < laid.gapAt.length)
+            return laid.gapAt[root.gapIdx]
+        const line = root.activeIdx
         if (line < 0 || line >= laid.lineAt.length)
             return -1
         return laid.lineAt[line]
@@ -151,8 +175,7 @@ Item {
     // is the whole point of the marking, so it overrides whatever alignment the
     // host asked for. With one voice there is nothing to tell apart and the
     // host's own alignment stands.
-    readonly property bool duet: (LyricsService.lyricsLines ?? [])
-        .some(l => l.align === "end")
+    readonly property bool duet: root.lines.some(l => l.align === "end")
 
     // ── Karaoke word layout for the active line ────────────────────────────
     // Only the active line needs per-word items; the neighbours stay one plain
@@ -195,10 +218,9 @@ Item {
     // widget aims its scroll band at are worked out from the data instead of
     // from the items, so the data is also where the extra line has to show up.
     readonly property string activeReading: {
-        const lines = LyricsService.lyricsLines
-        const i = LyricsService.activeIndex
-        if (!root.readings || i < 0 || i >= lines.length) return ""
-        return lines[i].reading ?? ""
+        const i = root.activeIdx
+        if (!root.readings || i < 0 || i >= root.lines.length) return ""
+        return root.lines[i].reading ?? ""
     }
 
     readonly property var hotRows: root.buildHotRows()
@@ -304,7 +326,7 @@ Item {
     }
 
     function buildHotRows() {
-        const line = (LyricsService.lyricsLines ?? [])[LyricsService.activeIndex]
+        const line = root.lines[root.activeIdx]
         if (!line) return []
         // The words come off the line itself, not off a service property: the
         // service rewrites its word state every 50ms sync tick, and a row layout
@@ -317,7 +339,7 @@ Item {
     // The echo of the line being sung. Its entrance waits out the lead's
     // stagger, so the two never arrive in the same breath.
     function buildSubRows() {
-        const bg = (LyricsService.lyricsLines ?? [])[LyricsService.activeIndex]?.bg
+        const bg = root.lines[root.activeIdx]?.bg
         if (!bg || !bg.text) return []
         const words = bg.words ?? []
         return root.buildRows(words.length > 0 ? words : [{ text: bg.text }],
@@ -349,7 +371,7 @@ Item {
             // piece taking its own slice of it. A reading of the line has no
             // timings at all and joins that same sweep, which is what makes
             // its light and the words above it go out together.
-            const p = LyricsService.activeLineProgress
+            const p = root.lineProgress
             const span = Math.max(1e-4, piece.end - piece.start)
             return Math.min(1, Math.max(0, (p - piece.start) / span))
         }
@@ -660,7 +682,7 @@ Item {
             // the line being sung when the service has not picked one yet.
             readonly property bool isInterlude: modelData.interlude === true
             readonly property bool isHot: modelData.lineIndex >= 0
-                && modelData.lineIndex === LyricsService.activeIndex
+                && modelData.lineIndex === root.activeIdx
             // Measured in rows, not lines: what the eye judges is how far a
             // line sits from whatever the song is standing on, and a break row
             // takes up room like any other.
@@ -671,7 +693,7 @@ Item {
             // with the rest of the list instead of keeping a white hole in it.
             readonly property real rowProgress: lineRow.isInterlude
                 && lineRow.index === root.anchorRow
-                ? LyricsService.activeInterludeProgress : 0
+                ? root.gapProgress : 0
             // Sung by a voice other than the lead: this line goes to the far
             // edge of the text area instead of the near one.
             readonly property bool otherVoice: modelData.otherVoice === true
@@ -764,12 +786,9 @@ Item {
                                 wordIndex: modelData.index
                                 order: modelData.order
                                 progress: root.wordProgress(modelData,
-                                    wordRow.isSub
-                                        ? LyricsService.activeBgWordIndex
-                                        : LyricsService.activeWordIndex,
-                                    wordRow.isSub
-                                        ? LyricsService.activeBgWordProgress
-                                        : LyricsService.activeWordProgress)
+                                    wordRow.isSub ? root.bgWordIdx : root.wordIdx,
+                                    wordRow.isSub ? root.bgWordProgressOf
+                                        : root.wordProgressOf)
                                 // No Behavior on progress: the service pushes a
                                 // new value every 50ms and an animation would
                                 // only lag behind it, so the sweep would crawl
@@ -951,7 +970,7 @@ Item {
     // Loading indicator overlay (stacked above the lines, not a list row).
     Item {
         anchors.fill: parent
-        visible: LyricsService.status !== "ok"
+        visible: root.trackStatus !== "ok"
         z: 2
 
         Column {
@@ -965,7 +984,7 @@ Item {
 
                 MaterialLoadingIndicator {
                     anchors.fill: parent
-                    loading: LyricsService.status === "loading"
+                    loading: root.trackStatus === "loading"
                     colBg: root.indicatorColor
                     colShape: root.indicatorShapeColor
                     implicitSize: 48
@@ -974,7 +993,7 @@ Item {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: LyricsService.restartLyrics()
+                    onClicked: root.track?.restartLyrics()
                 }
             }
         }

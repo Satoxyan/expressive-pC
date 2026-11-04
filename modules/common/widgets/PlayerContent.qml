@@ -21,6 +21,10 @@ Item {
     property bool lyricsAllowed: true
     signal toggleLyrics()
 
+    // The song of this card's player, and the only lyric anything in here reads.
+    // Two cards can therefore be on two different songs at the same time.
+    readonly property var track: LyricsService.trackFor(root.player)
+
     readonly property real pad: 13
     readonly property real gap: 15
     property real t: root.lyricsMode ? 1 : 0
@@ -170,6 +174,7 @@ Item {
         visible: opacity > 0.01
 
         sourceComponent: Lyrics {
+            track: root.track
             readings: Config.options.lyrics.readings
             // The block is kept small and centred: two lines on each side of the
             // one being sung, instead of the whole list fading away into the top
@@ -236,6 +241,7 @@ Item {
     // saat mode lyric terbuka, di kiri tombol play/pause.
     LyricsProviderSelector {
         blendedColors: root.blendedColors
+        track: root.track
         x: playPauseButton.x - 8 - width
         y: trackTime.y + (trackTime.implicitHeight - height) / 2 - 1
         visible: root.lyricsMode && root.lyricsAllowed
@@ -269,7 +275,7 @@ Item {
                 value: root.player?.position / root.player?.length
                 onMoved: {
                     root.player.position = value * root.player.length
-                    LyricsService.resync()
+                    root.track?.resync()
                 }
             }
         }

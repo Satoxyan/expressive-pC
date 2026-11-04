@@ -1,2 +1,3 @@
 module qs.services
 singleton LyricsService 1.0 LyricsService.qml
+LyricsTrack 1.0 LyricsTrack.qml
