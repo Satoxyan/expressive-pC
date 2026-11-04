@@ -53,7 +53,7 @@ Item {
         let c = 1
         const sl = Config.options.sidebar.quickSliders
         if (sl && sl.enable && (sl.showMic || sl.showVolume || sl.showBrightness)) c++
-        if (Config.options.sidebar.mediaPlayer && (root.hasMedia || root.editMode)) c++
+        if (Config.options.sidebar.mediaPlayer && root.mediaSectionVisible) c++
         return c
     }
     readonly property bool threePanelsActive: root.activePanelCount >= 3
@@ -82,10 +82,18 @@ Item {
             let p1 = players[i];
             let group = [i];
 
-            // Find duplicates by trackTitle prefix
             for (let j = i + 1; j < players.length; ++j) {
                 let p2 = players[j];
-                if (p1.trackTitle && p2.trackTitle && (p1.trackTitle.includes(p2.trackTitle) || p2.trackTitle.includes(p1.trackTitle)) || (Math.abs(p1.position - p2.position) <= 2 && Math.abs(p1.length - p2.length) <= 2)) {
+                // Two buses carrying the same line, or the same song at the same
+                // moment. The progress test used to stand on its own, so any two
+                // players stopped at 0 of a 0-length track were merged and the
+                // pager below was left with a single page to show.
+                const titled = !!(p1.trackTitle || p2.trackTitle);
+                const sameTitle = !!(p1.trackTitle && p2.trackTitle &&
+                    (p1.trackTitle.includes(p2.trackTitle) || p2.trackTitle.includes(p1.trackTitle)));
+                const sameProgress = titled && (p1.length ?? 0) > 0 &&
+                    Math.abs(p1.position - p2.position) <= 2 && Math.abs(p1.length - p2.length) <= 2;
+                if (sameTitle || sameProgress) {
                     group.push(j);
                 }
             }
@@ -100,6 +108,18 @@ Item {
         }
         return filtered;
     }
+
+    // The buses worth a page: deduplicated, and without the phantom ones
+    // (kdeconnect/playerctld registering a bus that carries nothing).
+    readonly property var mediaPlayers: {
+        // Array.from because meaningfulPlayers can hand back a list property
+        // rather than an array, and a pager that cannot count its pages is stuck
+        // on the first one.
+        const list = Array.from(root.meaningfulPlayers ?? [])
+        return list.filter(p => p && (((p.trackTitle ?? "") !== "") || p.isPlaying))
+    }
+    readonly property bool mediaSectionVisible: Config.options.sidebar.mediaPlayer
+        && (root.hasMedia || root.mediaPlayers.length > 0 || root.editMode)
 
     Connections {
         target: Vpn
@@ -203,7 +223,7 @@ Item {
         case "media":
             // Saat edit layout, panel media tetap tampil walau tidak ada
             // pemutar — supaya urutannya bisa diubah tanpa memutar musik.
-            return sidebar.mediaPlayer && (root.hasMedia || root.editMode)
+            return root.mediaSectionVisible
         case "bottom":
             return sidebar.bottomGroup
         default:
@@ -572,24 +592,13 @@ Item {
             // = storm buat/hancur. Buat sekali saat media ada, seperti
             // section sliders/bottom.
             active: root.sectionActive("media")
-            sourceComponent: Item {
-                // Tinggi ikut flag kartu ini, yang sekarang hidup di lagu
-                // player yang sedang ditampilkan — bukan di satu setting yang
-                // dibaca semua kartu.
-                readonly property var lyricsTrack: LyricsService.trackFor(root.activePlayer)
-                implicitHeight: (lyricsTrack?.lyricsOpen ?? false)
-                    ? 290 : (160 - Appearance.sizes.elevationMargin * 2)
-                Behavior on implicitHeight {
-                    NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
-                }
-
-                Player {
-                    anchors.fill: parent
-                    anchors.margins: -Appearance.sizes.elevationMargin
-                    player: root.activePlayer
-                    visualizerPoints: GlobalStates.visualizerPoints
-                    radius: Appearance.rounding.normal
-                }
+            sourceComponent: MediaPager {
+                // Satu kartu, beberapa pemutar. Yang menggeser halaman adalah
+                // pager-nya, bukan daftar: kartu lain tidak pernah dibangun
+                // sebelum ditunjuk.
+                players: root.mediaPlayers
+                editMode: root.editMode && root.editTab === "layout"
+                sidebarOpen: GlobalStates.sidebarRightOpen
             }
         }
     }
