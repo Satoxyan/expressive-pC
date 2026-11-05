@@ -86,6 +86,26 @@ Scope {
                 } else {
                     mediaHoldTimer.restart()
                 }
+                // While the media controls this dock opened are showing, a click on the dock
+                // is not a click somewhere else. So the dock joins the focus grab as a window
+                // that must not dismiss anything, and tapping an icon, grabbing the dock or
+                // using its context menu leaves the popup standing. A popup the bar opened is
+                // not covered here and still closes on a dock click, as it always did.
+                if (mediaControlsHeld)
+                    GlobalFocusGrab.addPersistent(dockRoot)
+                else
+                    GlobalFocusGrab.removePersistent(dockRoot)
+            }
+
+            // The dock is rebuilt when its position or style changes, and a window born into
+            // the middle of an open popup gets no change signal to register from.
+            Component.onCompleted: {
+                if (mediaControlsHeld)
+                    GlobalFocusGrab.addPersistent(dockRoot)
+            }
+
+            Component.onDestruction: {
+                GlobalFocusGrab.removePersistent(dockRoot)
             }
             Timer {
                 id: mediaHoldTimer
