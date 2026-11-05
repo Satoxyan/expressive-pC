@@ -124,6 +124,177 @@ Item {
         }
     }
 
+    // ── paging the players the bar can show ────────────────────────────────
+    // The bar draws one player at a time, so a swipe here moves no row: it chooses
+    // which bus the bar stands on, and everything that follows the bar's player —
+    // the popup's order, the lyrics, the buttons above — comes along with it. The
+    // list is the one worth paging over, every real bus carrying something, kept
+    // narrow when the preferred-player setting names more than one of them.
+    readonly property var pagePlayers: {
+        const list = MprisController.pagedPlayers
+        const preferred = MprisController.preferredPlayerName
+        if (preferred.length === 0) return list
+        const hit = list.filter(p => (p.identity ?? "").toLowerCase().includes(preferred)
+            || (p.desktopEntry ?? "").toLowerCase().includes(preferred))
+        return hit.length > 0 ? hit : list
+    }
+    readonly property string shownKey: LyricsService.playerKey(root.activePlayer)
+    readonly property int pageIndex: {
+        const list = root.pagePlayers
+        for (let i = 0; i < list.length; i++) {
+            if (LyricsService.playerKey(list[i]) === root.shownKey) return i
+        }
+        return 0
+    }
+    readonly property bool pagingEnabled: root.pagePlayers.length > 1
+
+    // Which side the new words arrive from: the direction of the page that was last
+    // turned, and forward for a change nobody turned (a track ending on its own).
+    readonly property int enterDir: slideDir === 0 ? 1 : slideDir
+    property int slideDir: 0
+
+    function turnPage(dir) {
+        const n = root.pagePlayers.length
+        if (n < 2) return
+        // Round the end rather than stop at it: nothing in a bar shows where the
+        // list begins, so a page that runs off one side comes back on the other
+        // instead of leaving a swipe with nothing to answer it.
+        const to = (root.pageIndex + dir + n) % n
+        if (to === root.pageIndex) return
+        root.slideDir = dir
+        MprisController.manualPlayer = root.pagePlayers[to]
+    }
+
+    // A wheel notch and a finger are told apart the way the dock does it: Qt turns a
+    // notch into pixels itself, at eight angle units to the pixel, so a movement that
+    // asks for no more screen than that conversion is a wheel.
+    function isWheel(angle, pixel) {
+        return angle !== 0 && Math.abs(pixel) * 8 <= Math.abs(angle)
+    }
+
+    property real accum: 0
+
+    // A wheel's travel, told in whole pages: one notch is one page, and a wheel that
+    // reports its clicks in fractions of one (a smooth-scrolling mouse, or Hyprland's
+    // scroll multiplier) has to add up to a page before anything is turned.
+    property real wheelTravel: 0
+
+    // Whether the travel last arriving came from a wheel. It decides how long a pause
+    // still counts as the same movement, which a wheel needs far more of than a finger
+    // does.
+    property bool wheelLast: false
+
+    // Travel in the units the scroll settings work in; at the default touchpad
+    // sensitivity a little under a centimetre of finger, which no palm graze reaches
+    // and no flick on its way to something else carries.
+    readonly property real trigger: 180
+
+    // Whether this touchpad movement has already been given a page. A swipe reaches Qt
+    // as a long stream of small deltas rather than as one movement, so travel past the
+    // demand would keep turning: the bar, which rounds at its ends, would read as a
+    // loop instead of as the one page the swipe asked for.
+    property bool swipeSpent: false
+
+    function handleWheel(event, horizontal) {
+        const angle = horizontal ? event.angleDelta.x : event.angleDelta.y
+        const pixel = horizontal ? event.pixelDelta.x : event.pixelDelta.y
+        if (angle === 0 && pixel === 0) return
+        const wheel = root.isWheel(angle, pixel)
+
+        // Two fingers travelling across the bar's thickness are the thing under the
+        // pointer moving, not a page asked for. A wheel is not bound by this: it has
+        // no other direction to be asked in, and over a bar lying flat it is the only
+        // way anyone will turn a page.
+        if (!wheel && horizontal === root.vertical) return
+
+        root.wheelLast = wheel
+
+        // A wheel is counted in its own units: on Wayland the pixels attached to a notch
+        // are Qt's conversion of the angle it carried, so counting them as travel would
+        // make a click worth an eighth of a page. A positive angle asks for the earlier
+        // page, so it is turned around here.
+        if (wheel) {
+            root.wheelTravel += (angle * -1) / 120
+            accumResetTimer.restart()
+            // Travel left over after a page is turned is kept rather than dropped, so
+            // a fast wheel is pages in order and not clicks thrown away.
+            while (Math.abs(root.wheelTravel) >= 1) {
+                const dir = root.wheelTravel > 0 ? 1 : -1
+                root.wheelTravel -= dir
+                root.turnPage(dir)
+            }
+            event.accepted = true
+            return
+        }
+
+        // A finger is asked the same way round: a positive delta means the earlier page,
+        // so both are turned into travel towards the next one.
+        const step = pixel * -1
+        root.accum += step * Config.options.interactions.scrolling.touchpadSensitivity
+        accumResetTimer.restart()
+        // Travel still arriving after the page was given is the rest of the same swipe,
+        // and the swipe that follows will have stopped long enough here for this to be
+        // let go.
+        if (root.swipeSpent) {
+            event.accepted = true
+            return
+        }
+        if (Math.abs(root.accum) < root.trigger) {
+            event.accepted = true
+            return
+        }
+        const dir = root.accum > 0 ? 1 : -1
+        root.accum = 0
+        root.swipeSpent = true
+        root.turnPage(dir)
+        event.accepted = true
+    }
+
+    // Travel that stops arriving was a finished gesture, not the first third of the
+    // next one: a slow drag that only adds up to a page across two touches was never
+    // a page asked for, and a wheel that was paused between two clicks was asked for
+    // twice.
+    Timer {
+        id: accumResetTimer
+        // Two clicks half a second apart are still one wheel being turned, so a fuse
+        // short enough to call them two gestures would throw the first one away.
+        interval: root.wheelLast ? 600 : 150
+        onTriggered: {
+            root.accum = 0
+            root.wheelTravel = 0
+            root.swipeSpent = false
+        }
+    }
+
+    // Qt 6 gives a WheelHandler one orientation, not a mask, so a vertical mouse
+    // wheel and a horizontal swipe need one handler each.
+    WheelHandler {
+        orientation: Qt.Horizontal
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        enabled: root.pagingEnabled
+        onWheel: event => root.handleWheel(event, true)
+    }
+
+    WheelHandler {
+        orientation: Qt.Vertical
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        enabled: root.pagingEnabled
+        onWheel: event => root.handleWheel(event, false)
+    }
+
+    // A choice is only worth keeping while the bus it names is still there: a player
+    // that has gone would otherwise leave the bar showing nothing and refusing to
+    // follow whoever starts playing, because the chosen player outranks the tracked
+    // one. Handing the choice back is what the automatic tracking expects.
+    Connections {
+        target: MprisController
+        function onPlayersChanged() {
+            const p = MprisController.manualPlayer
+            if (p && !MprisController.players.includes(p))
+                MprisController.manualPlayer = null
+        }
+    }
+
     // Vertical default
     Loader {
         id: mediaCircProg
@@ -199,6 +370,7 @@ Item {
                 }
             }
             StyledText {
+                id: flatWords
                 visible: Config.options.bar.verbose
                 Layout.alignment: Qt.AlignVCenter
                 Layout.fillWidth: true
@@ -207,6 +379,21 @@ Item {
                 elide: Text.ElideRight
                 color: root.contentColorOverridden ? root.contentColor : Appearance.colors.colOnLayer1
                 text: Config.options.bar.media.onlyTitle ? root.cleanedTitle : `${root.cleanedTitle}${root.activePlayer?.trackArtist ? ' • ' + root.activePlayer.trackArtist : ''}`
+                Behavior on text {
+                    // The same turn the material style shows, told in the one line this
+                    // style writes the two of them into.
+                    SequentialAnimation {
+                        ParallelAnimation {
+                            NumberAnimation { target: flatWords; property: "x"; to: -flatWords.width * root.enterDir; duration: 150; easing.type: Easing.InQuad }
+                            NumberAnimation { target: flatWords; property: "opacity"; to: 0; duration: 150; easing.type: Easing.InQuad }
+                        }
+                        PropertyAction { target: flatWords; property: "text" }
+                        ParallelAnimation {
+                            NumberAnimation { target: flatWords; property: "x"; from: flatWords.width * root.enterDir; to: 0; duration: 150; easing.type: Easing.OutQuad }
+                            NumberAnimation { target: flatWords; property: "opacity"; from: 0; to: 1; duration: 150; easing.type: Easing.OutQuad }
+                        }
+                    }
+                }
             }
         }
     }
@@ -317,9 +504,28 @@ Item {
 
                     // Title + Artist
                     ColumnLayout {
+                        id: shownLines
                         spacing: -4
                         Layout.alignment: Qt.AlignVCenter
                         Layout.topMargin: 2
+
+                        // The two lines fade together while each slides on its own. The
+                        // fade has to be asked of the pair rather than of a line, because
+                        // one of them keeps its dimming as a binding and an animation
+                        // would take it over when it finished.
+                        property string shownWords: `${root.trackTitle} ${root.trackArtist}`
+                        Behavior on shownWords {
+                            SequentialAnimation {
+                                NumberAnimation {
+                                    target: shownLines; property: "opacity"; to: 0
+                                    duration: 150; easing.type: Easing.InQuad
+                                }
+                                NumberAnimation {
+                                    target: shownLines; property: "opacity"; from: 0; to: 1
+                                    duration: 150; easing.type: Easing.OutQuad
+                                }
+                            }
+                        }
 
                         StyledText {
                             id: artistText
@@ -329,10 +535,13 @@ Item {
                             elide: Text.ElideRight
                             Layout.maximumWidth: 120
                             Behavior on text {
+                                // Out to the side the page was turned from and back in, so
+                                // a swipe reads as the next player arriving, not as new
+                                // words appearing in the same place.
                                 SequentialAnimation {
-                                    NumberAnimation { target: artistText; property: "x"; to: -artistText.width; duration: 150; easing.type: Easing.InQuad }
+                                    NumberAnimation { target: artistText; property: "x"; to: -artistText.width * root.enterDir; duration: 150; easing.type: Easing.InQuad }
                                     PropertyAction { target: artistText; property: "text" }
-                                    NumberAnimation { target: artistText; property: "x"; from: artistText.width; to: 0; duration: 150; easing.type: Easing.OutQuad }
+                                    NumberAnimation { target: artistText; property: "x"; from: artistText.width * root.enterDir; to: 0; duration: 150; easing.type: Easing.OutQuad }
                                 }
                             }
                         }
@@ -347,9 +556,9 @@ Item {
                             Layout.maximumWidth: 120
                             Behavior on text {
                                 SequentialAnimation {
-                                    NumberAnimation { target: titleText; property: "x"; to: -artistText.width; duration: 150; easing.type: Easing.InQuad }
+                                    NumberAnimation { target: titleText; property: "x"; to: -titleText.width * root.enterDir; duration: 150; easing.type: Easing.InQuad }
                                     PropertyAction { target: titleText; property: "text" }
-                                    NumberAnimation { target: titleText; property: "x"; from: artistText.width; to: 0; duration: 150; easing.type: Easing.OutQuad }
+                                    NumberAnimation { target: titleText; property: "x"; from: titleText.width * root.enterDir; to: 0; duration: 150; easing.type: Easing.OutQuad }
                                 }
                             }
                         }
