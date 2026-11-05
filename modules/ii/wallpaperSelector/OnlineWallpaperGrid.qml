@@ -33,9 +33,20 @@ Item {
         
     readonly property bool missingKey: root.unsplashMissingKey || root.pexelsMissingKey
 
-    onProviderChanged:   { root.hoveredItem = null; _syncAndFetch() }
-    onResolutionChanged: _syncAndFetch()
-    onColorGroupChanged: { if (root.provider === "naive" || root.provider === "blapples") _syncAndFetch() }
+    // Whether this grid has been told what to stand on. The three properties it is built
+    // with arrive one after another, and each of them would otherwise ask the provider
+    // again before the grid has had its say about what it wants shown.
+    property bool standing: false
+
+    onProviderChanged: {
+        root.hoveredItem = null
+        if (root.standing) _syncAndFetch()
+    }
+    onResolutionChanged: if (root.standing) _syncAndFetch()
+    onColorGroupChanged: {
+        if (!root.standing) return
+        if (root.provider === "naive" || root.provider === "blapples") _syncAndFetch()
+    }
 
     function _syncAndFetch() {
         if (root.missingKey) return
@@ -76,7 +87,24 @@ Item {
         root.downloadItem(item, true)
     }
 
-    Component.onCompleted: _syncAndFetch()
+    // The service keeps what it fetched, so a grid rebuilt over the same provider and the
+    // same settings is filled from what is already there rather than asked again: a new
+    // fetch starts over at page one, and which page was reached is part of the search.
+    function _restoreFromService() {
+        for (const item of OnlineWallpapers.results)
+            wallpaperModel.append(item)
+    }
+
+    Component.onCompleted: {
+        if (OnlineWallpapers.provider === root.provider
+            && OnlineWallpapers.resolution === root.resolution
+            && OnlineWallpapers.colorGroup === root.colorGroup
+            && OnlineWallpapers.results.length > 0)
+            _restoreFromService()
+        else
+            _syncAndFetch()
+        root.standing = true
+    }
 
     ListModel { id: wallpaperModel }
 

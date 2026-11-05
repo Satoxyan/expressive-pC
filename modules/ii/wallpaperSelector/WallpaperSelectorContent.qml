@@ -17,8 +17,12 @@ MouseArea {
     property bool useDarkMode: Appearance.m3colors.darkmode
     property bool showControls: false
     property string source: "local"
-    property string selectedResolution: "1080p"
-    property string selectedColorGroup: ""
+    // What each provider was last asked for is kept by the services that do the asking,
+    // not here: this component is taken apart whenever the selector closes, so anything
+    // stored in it is gone by the next opening. These two are read back from the online
+    // service, which holds them for as long as the shell runs.
+    property string selectedResolution: OnlineWallpapers.resolution
+    property string selectedColorGroup: OnlineWallpapers.colorGroup
     property bool toolbarVisible: showControls || Config.options.wallpaperSelector.showSearchbar
     property bool filterFieldFocused: false
     property Item activeFilterField: null
@@ -669,7 +673,10 @@ MouseArea {
                                     id: filterField
                                     Component.onCompleted: {
                                         root.activeFilterField = filterField
-                                        Wallpapers.searchQuery = text
+                                        // The service remembers what was being filtered, so
+                                        // the rebuilt field starts from it rather than
+                                        // handing its own emptiness over to the service.
+                                        text = Wallpapers.searchQuery
                                     }
                                     Component.onDestruction: if (root.activeFilterField === filterField) root.activeFilterField = null
                                     placeholderText: focus
@@ -708,7 +715,10 @@ MouseArea {
                                     id: onlineSearchField
                                     Component.onCompleted: {
                                         root.activeFilterField = onlineSearchField
-                                        OnlineWallpapers.query = text
+                                        // Same as the local field: the query is read back
+                                        // from the service instead of being erased by the
+                                        // field's own starting value.
+                                        text = OnlineWallpapers.query
                                     }
                                     Component.onDestruction: if (root.activeFilterField === onlineSearchField) root.activeFilterField = null
                                     placeholderText: Translation.tr("Search online wallpapers")
@@ -717,12 +727,6 @@ MouseArea {
                                     onTextChanged: OnlineWallpapers.query = text
                                     onAccepted: OnlineWallpapers.fetch()
                                     onActiveFocusChanged: root.filterFieldFocused = activeFocus
-                                    Connections {
-                                        target: GlobalStates
-                                        function onWallpaperSelectorOpenChanged() {
-                                            if (!GlobalStates.wallpaperSelectorOpen) onlineSearchField.text = ""
-                                        }
-                                    }
                                     Keys.onPressed: event => {
                                         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                                             event.accepted = true;
@@ -884,9 +888,11 @@ MouseArea {
                 else
                     root.forceActiveFocus()
             } else if (!GlobalStates.wallpaperSelectorOpen) {
+                // Only the things that would keep acting while nobody is looking at the
+                // page are stopped. The searches are left where they are, in the services
+                // that made them, so the next opening can pick them up again.
                 sortMenuPopup.open = false;
                 Wallpapers.stopPreview();
-                WallhavenSearch.clearQuery();
             }
         }
     }
