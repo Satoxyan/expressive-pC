@@ -172,6 +172,9 @@ Item {
                 const globalPos = root.mapToItem(null, root.width / 2, 0)
                 GlobalStates.mediaControlsAnchorX = globalPos.x
                 GlobalStates.mediaControlsAboveDock = true
+                // The popup sorts itself by this, so it opens with this card's player in the
+                // slot nearest the dock instead of sliding a frame after it appeared.
+                GlobalStates.dockMediaKey = LyricsService.playerKey(root.player)
                 GlobalStates.mediaControlsOpen = !GlobalStates.mediaControlsOpen
             }
         }

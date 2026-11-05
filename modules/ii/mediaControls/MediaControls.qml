@@ -27,6 +27,13 @@ Scope {
         if (filtered.length === 0) return filterDuplicatePlayers(realPlayers)
         return filterDuplicatePlayers(filtered)
     }
+
+    readonly property real lyricsCardHeight: 290
+    readonly property real colSpacing: -Appearance.sizes.elevationMargin
+    // Only the popup standing above the dock reorders its cards. That one has an edge the
+    // dock is against, and the card resting on that edge is the media the dock is looking at;
+    // a popup the bar opened keeps the order its players came in.
+    readonly property bool followsDock: GlobalStates.mediaControlsAboveDock && !root.barVertical
     readonly property real osdWidth: Appearance.sizes.osdWidth
     readonly property real widgetWidth: Appearance.sizes.mediaControlsWidth
     readonly property real widgetHeight: Appearance.sizes.mediaControlsHeight
@@ -94,6 +101,47 @@ Scope {
         return filtered;
     }
 
+    // How tall a player's card wants to be, which is the whole of what stacking needs to
+    // know: a card is one height or the other, and the card itself asks for them in exactly
+    // this way.
+    function heightFor(player) {
+        return (LyricsService.trackFor(player)?.lyricsOpen ?? false)
+            ? root.lyricsCardHeight : root.widgetHeight
+    }
+
+    readonly property var orderedPlayers: {
+        const list = root.meaningfulPlayers
+        const key = GlobalStates.dockMediaKey
+        if (!root.followsDock || list.length < 2 || key.length === 0) return list
+        let hit = null
+        for (const p of list) {
+            if (LyricsService.playerKey(p) === key) hit = p
+        }
+        // A bus the duplicate filter folded away, or the preferred-player setting hid, has no
+        // card here at all: then nothing may move.
+        if (!hit) return list
+        // Last of the list is the bottom of the stack, which is the end the dock stands at.
+        return list.filter(p => LyricsService.playerKey(p) !== key).concat([hit])
+    }
+
+    function rankOf(player, naturalIndex) {
+        const key = LyricsService.playerKey(player)
+        const list = root.orderedPlayers
+        for (let i = 0; i < list.length; i++) {
+            if (LyricsService.playerKey(list[i]) === key) return i
+        }
+        return naturalIndex
+    }
+
+    // Where a card would rest if the stack were laid out in `list`.
+    function yAt(list, index) {
+        let y = 0
+        for (let i = 0; i < index; i++) {
+            y += root.heightFor(list[i]) + root.colSpacing
+        }
+        return y
+    }
+
      Process {
         id: cavaProc
         // Pemicu: overlay/panel yang butuh visualizer.
@@ -154,7 +202,7 @@ Scope {
             // tidak pernah di-resize, jadi tak ada set_size+set_margin yang datang
             // terpisah (itu penyebab popup "fling" lalu balik lagi).
             implicitHeight: root.meaningfulPlayers.length > 0
-                ? root.meaningfulPlayers.length * 290
+                ? root.meaningfulPlayers.length * root.lyricsCardHeight
                 : playerColumnLayout.implicitHeight
             color: "transparent"
             WlrLayershell.namespace: "quickshell:mediaControls"
@@ -237,7 +285,7 @@ Scope {
                 anchors.top: root.vAnchor === "top" ? parent.top : undefined
                 anchors.bottom: root.vAnchor === "bottom" ? parent.bottom : undefined
                 anchors.verticalCenter: root.vAnchor === "center" ? parent.verticalCenter : undefined
-                spacing: -Appearance.sizes.elevationMargin // Shadow overlap okay
+                spacing: root.colSpacing // Shadow overlap okay
 
                 Repeater {
                     id: playersRepeater
@@ -249,15 +297,34 @@ Scope {
                     delegate: Item {
                         id: playerSlot
                         required property MprisPlayer modelData
-                        // This card's own lyric flag: two players, two cards, and
-                        // opening one lyric leaves the other at its title line.
-                        readonly property var lyricsTrack: LyricsService.trackFor(modelData)
-                        readonly property real targetHeight: (lyricsTrack?.lyricsOpen ?? false)
-                            ? 290 : Appearance.sizes.mediaControlsHeight
+                        required property int index
+                        // This card's own lyric flag: two players, two cards, and opening one
+                        // lyric leaves the other at its title line.
+                        readonly property real targetHeight: root.heightFor(modelData)
+                        // The slot the dock wants this card in, told as the distance from the
+                        // place the layout already gave it. The layout goes on stacking by
+                        // itself and only the shuffle is animated here, so a card opening its
+                        // lyrics never fights with a card moving down to the dock.
+                        readonly property int rank: root.rankOf(modelData, playerSlot.index)
+                        property real reorderOffset: root.yAt(root.orderedPlayers, playerSlot.rank)
+                            - root.yAt(root.meaningfulPlayers, playerSlot.index)
                         implicitWidth: root.widgetWidth
                         // tinggi slot = tinggi kartu (beranimasi) → tinggi kolom dan
                         // mask input ikut, sementara tinggi window tetap konstan
                         implicitHeight: card.height
+                        // The order cards are drawn in follows the order they end up standing
+                        // in, so a card crossing the stack passes over the ones it is not
+                        // landing behind.
+                        z: playerSlot.rank
+
+                        transform: Translate { y: playerSlot.reorderOffset }
+
+                        Behavior on reorderOffset {
+                            // The dock's own crossing: the two cards are on their way at the
+                            // same time and arrive on the same frame.
+                            NumberAnimation { duration: 420; easing.type: Easing.BezierSpline
+                                easing.bezierCurve: Appearance.animationCurves.standard }
+                        }
 
                         Item {
                             id: card

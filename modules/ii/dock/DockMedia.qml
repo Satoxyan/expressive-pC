@@ -53,6 +53,20 @@ Item {
     }
     readonly property var currentPlayer: players[root.currentIndex] ?? null
 
+    // The page the row stands on, or the one it is on its way to. The popup above the dock
+    // turns its cards over on this the moment a swipe asks for a page, rather than after the
+    // dock's card has landed, so the two frames move as one movement. A lean that stops short
+    // never names a page — `pendingDir` is only written once a crossing really started.
+    readonly property string pagedKey: root.settling && root.pendingDir !== 0
+        ? root.keyAt(root.currentIndex + root.pendingDir)
+        : LyricsService.playerKey(root.currentPlayer)
+
+    // Whether the popup this dock opened is showing. Only that popup is being fed, so a dock
+    // on another screen cannot steer the one this dock is not holding.
+    readonly property bool holdsPopup: GlobalStates.mediaControlsOpen
+        && GlobalStates.mediaControlsAboveDock
+    onPagedKeyChanged: if (root.holdsPopup) GlobalStates.dockMediaKey = root.pagedKey
+
     // What Dock.qml and DockActiveApps.qml ask the card: whether there is a page worth
     // showing. A bus that carries nothing is never in the list, so this is the old
     // `trackTitle.length > 0` test read off the page in hand.

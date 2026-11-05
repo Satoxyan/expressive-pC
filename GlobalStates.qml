@@ -20,6 +20,10 @@ Singleton {
     // When true, media controls are positioned right above the dock's media item
     property bool mediaControlsAboveDock: false
     property real mediaControlsAnchorX: 0
+    // Which media the dock is looking at, so the popup standing above it can put that
+    // player's card in the slot nearest the dock. Written by the card whose click opened the
+    // popup, and kept up by the pager holding that popup.
+    property string dockMediaKey: ""
     property bool lockMediaOpen: false
     property bool osdBrightnessOpen: false
     property bool settingsOpen: false
