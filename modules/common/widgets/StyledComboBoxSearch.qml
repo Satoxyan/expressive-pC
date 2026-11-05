@@ -32,7 +32,13 @@ ComboBox {
     property bool popupAbove: false
     property string searchText: ""
     property bool splitIndicator: false
+    // Baris penjelasan di paling bawah popup: pasangan ikon dan kata, dibaca
+    // sebagai keterangan ikon `trailing` milik tiap baris. Kosong = tidak ada.
+    property var popupLegend: []
 
+    // A row may carry two extras besides its label: `trailing`, the symbols to
+    // read at the right end, and `dim`, which says the entry is there but is not
+    // offering anything. Both ride along the filter so a searched list keeps them.
     readonly property var filteredItems: {
         const query = root.searchText.toLowerCase()
         const source = root.model ?? []
@@ -42,7 +48,13 @@ ComboBox {
             const isObject = typeof item === "object"
             const label = isObject ? (item[root.textRole] ?? "") : String(item)
             if (query.length === 0 || label.toLowerCase().includes(query))
-                result.push({ realIndex: i, label: label, icon: isObject ? (item.icon ?? "") : "" })
+                result.push({
+                    realIndex: i,
+                    label: label,
+                    icon: isObject ? (item.icon ?? "") : "",
+                    trailing: isObject ? (item.trailing ?? []) : [],
+                    dim: isObject ? (item.dim === true) : false
+                })
         }
         return result
     }
@@ -118,7 +130,12 @@ ComboBox {
             anchors.fill: parent
             spacing: 8
             anchors.leftMargin: 16
-            anchors.rightMargin: root.splitIndicator ? root.indicator.width + 12 : 16
+            // The style already takes the indicator out of the content item's
+            // width (`rightPadding: padding + indicator.width + spacing`, Basic
+            // ComboBox.qml:22), so this row sits right against the badge and only
+            // owes it a gap. Naming the indicator's width here again would spend
+            // the same 48px twice and leave a dead strip at the label's right.
+            anchors.rightMargin: root.splitIndicator ? 12 : 16
 
             Loader {
                 Layout.alignment: Qt.AlignVCenter
@@ -173,6 +190,11 @@ ComboBox {
             }
             property color colText: itemDelegate.selected ? root.colOnSelected : root.colOnItem
 
+            // An entry that has nothing to give is kept in the list and pushed
+            // back, the way the lyric provider menu did it: the row is still
+            // there to be read, it just does not look like a choice.
+            opacity: itemDelegate.modelData.dim ? 0.4 : 1
+
             background: Rectangle {
                 anchors.fill: parent
                 anchors.bottomMargin: 2
@@ -219,6 +241,24 @@ ComboBox {
                     elide: Text.ElideRight
                     verticalAlignment: Text.AlignVCenter
                 }
+
+                // What the entry offers, read as symbols at the right end. They
+                // sit next to a label of pixelSize.small, so they are drawn a
+                // step larger: symbols read lighter than glyphs of the same size.
+                RowLayout {
+                    spacing: 6
+                    Repeater {
+                        model: itemDelegate.modelData.trailing
+                        delegate: MaterialSymbol {
+                            required property var modelData
+                            Layout.alignment: Qt.AlignVCenter
+                            text: modelData
+                            iconSize: Appearance.font.pixelSize.normal
+                            fill: 1
+                            color: ColorUtils.applyAlpha(itemDelegate.colText, 0.6)
+                        }
+                    }
+                }
             }
         }
     }
@@ -227,8 +267,11 @@ ComboBox {
         y: root.popupAbove ? -height - 4 : root.height + 4
         width: root.width
         clip: true
+        // Tinggi legenda dihitung sebagai konstanta, bukan dari id child, supaya
+        // pengukuran Popup sudah benar sejak pertama kali dibuka.
+        readonly property real legendHeight: root.popupLegend.length > 0 ? 24 : 0
         height: Math.min(
-            searchField.implicitHeight + 12 + (root.visibleCount * 42) + topPadding + bottomPadding,
+            searchField.implicitHeight + 12 + (root.visibleCount * 42) + legendHeight + topPadding + bottomPadding,
             320
         )
         padding: 8
@@ -334,13 +377,44 @@ ComboBox {
             StyledListView {
                 id: listView
                 Layout.fillWidth: true
-                Layout.preferredHeight: Math.min(contentHeight, 320 - root.popup.topPadding - root.popup.bottomPadding - searchField.implicitHeight - 12)
+                Layout.preferredHeight: Math.min(contentHeight, 320 - root.popup.topPadding - root.popup.bottomPadding - searchField.implicitHeight - 12 - root.popup.legendHeight)
                 clip: true
                 spacing: 0
                 popin: false
                 animateAppearance: false
                 model: root.popup.visible ? root.filteredItems : null
                 delegate: entryDelegate
+            }
+
+            // Keterangan ikon di paling bawah popup: tiap pasangan dibaca
+            // "ikon ini artinya kata ini". Sedikit di bawah teks baris supaya
+            // tetap terbaca sebagai keterangan, bukan sebagai pilihan, dan
+            // ditempatkan di tengah agar tidak menempel ke salah satu tepi.
+            RowLayout {
+                visible: root.popupLegend.length > 0
+                Layout.alignment: Qt.AlignHCenter
+                Layout.preferredHeight: visible ? root.popup.legendHeight : 0
+                spacing: 10
+                Repeater {
+                    model: root.popupLegend
+                    delegate: RowLayout {
+                        required property var modelData
+                        spacing: 4
+                        MaterialSymbol {
+                            Layout.alignment: Qt.AlignVCenter
+                            text: modelData.icon
+                            iconSize: Appearance.font.pixelSize.small
+                            fill: 1
+                            color: ColorUtils.applyAlpha(root.colOnItem, 0.6)
+                        }
+                        StyledText {
+                            Layout.alignment: Qt.AlignVCenter
+                            text: modelData.label
+                            font.pixelSize: Appearance.font.pixelSize.smallie
+                            color: ColorUtils.applyAlpha(root.colOnItem, 0.6)
+                        }
+                    }
+                }
             }
         }
     }

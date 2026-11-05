@@ -446,19 +446,95 @@ Item {
                 colOnSearch: root.colors.colOnLayer1
                 colSearchHint: root.colors.colSubtext
             }
-        }
-    }
 
-    // Overlay pemilih provider lyric — di luar RowLayout sehingga tidak
-    // mengubah posisi lirik/kartu apa pun; menu terbuka ke atas menutupi
-    // kartu lirik (tidak masalah — konsisten dengan permukaan lain).
-    LyricsProviderSelector {
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        anchors.rightMargin: 8
-        anchors.bottomMargin: 4
-        z: 10
-        sizeScale: 1.5
-        blendedColors: root.colors
+            // Pemilih provider lyric — kotak yang sama dan sekolom yang sama
+            // dengan pemilih player di atasnya, jadi keduanya terbaca sebagai
+            // satu tumpukan dan tidak pernah saling menutupi.
+            StyledComboBoxSearch {
+                id: providerSelector
+
+                readonly property var providerNames: ["auto"].concat(
+                    Config.options.lyrics.providers.split(",")
+                        .map(s => s.trim())
+                        .filter(s => s.length > 0))
+                readonly property int activeIndex: {
+                    const wanted = LyricsService.preferredProvider.length > 0
+                        ? LyricsService.preferredProvider
+                        : "auto";
+                    const at = providerNames.findIndex(name => name === wanted);
+                    return at >= 0 ? at : 0;
+                }
+
+                anchors.right: parent.right
+                anchors.rightMargin: 14
+                anchors.bottom: playerSelector.visible ? playerSelector.top : parent.bottom
+                anchors.bottomMargin: playerSelector.visible ? 10 : 14
+                width: Math.min(190, parent.width - 28)
+                popupAbove: true
+                splitIndicator: true
+                textRole: "displayName"
+                // Penanda yang dulu ditunjukkan menu provider: bentuk lirik yang
+                // diberikan provider ini untuk lagu ini (per kata / per baris),
+                // apakah ia punya baris suara kedua, dan redup bagi yang tahu
+                // dirinya tidak punya apa-apa. Hasil probe disimpan per lagu, dan
+                // diminta lagi tiap daftar dibuka (sudah di-cache 2 menit).
+                readonly property var caps: LyricsService.providerInfo ?? ({})
+                model: providerNames.map(name => {
+                    const cap = providerSelector.caps[name] ?? null;
+                    const trailing = [];
+                    if (cap?.ok === true) {
+                        if (cap.duet === true) trailing.push("music_note_2");
+                        trailing.push(cap.wordByWord ? "graphic_eq" : "notes");
+                    }
+                    return {
+                        displayName: name === "auto" ? Translation.tr("Auto") : name,
+                        icon: name === "auto" ? "auto_awesome" : "lyrics",
+                        trailing: trailing,
+                        dim: cap !== null && cap.ok === false && cap.unknown !== true
+                    };
+                })
+                popupLegend: [
+                    { icon: "music_note_2", label: "duet" },
+                    { icon: "graphic_eq", label: "word" },
+                    { icon: "notes", label: "line" }
+                ]
+                Connections {
+                    target: providerSelector.popup
+                    function onOpened() { LyricsService.probeProviders() }
+                }
+                onActivated: index => {
+                    const name = providerSelector.providerNames[index];
+                    LyricsService.preferredProvider = name === "auto" ? "" : name;
+                    LyricsService.probeProviders();
+                    LyricsService.restartLyrics();
+                }
+
+                function syncIndex() {
+                    providerSelector.currentIndex = providerSelector.activeIndex;
+                }
+                onActiveIndexChanged: Qt.callLater(syncIndex)
+                onModelChanged: Qt.callLater(syncIndex)
+                onCountChanged: Qt.callLater(syncIndex)
+                Component.onCompleted: syncIndex()
+
+                colBackground: root.colors.colSecondaryContainer
+                colBackgroundHover: root.colors.colSecondaryContainerHover
+                colBackgroundActive: root.colors.colSecondaryContainerActive
+                colText: root.colors.colOnSecondaryContainer
+                colAccent: root.colors.colPrimary
+                colOnAccent: root.colors.colOnPrimary
+                colPopup: playerSelector.solid
+                colSelected: root.colors.colSecondaryContainer
+                colSelectedHover: root.colors.colSecondaryContainerHover
+                colSelectedActive: root.colors.colSecondaryContainerActive
+                colOnSelected: root.colors.colOnSecondaryContainer
+                colItemHover: root.colors.colSecondaryContainerHover
+                colItemActive: root.colors.colSecondaryContainerActive
+                colOnItem: root.colors.colOnLayer1
+                colSearch: root.colors.colLayer0
+                colOnSearch: root.colors.colOnLayer1
+                colSearchHint: root.colors.colSubtext
+            }
+        }
     }
 }
