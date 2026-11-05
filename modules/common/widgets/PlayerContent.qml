@@ -237,11 +237,17 @@ Item {
         text: `${StringUtils.friendlyTimeForSeconds(root.player?.position)} / ${StringUtils.friendlyTimeForSeconds(root.player?.length)}`
     }
 
-    // Pemilih provider lyric — komponen bersama (pill + dropdown), hanya
-    // saat mode lyric terbuka, di kiri tombol play/pause.
-    LyricsProviderSelector {
-        blendedColors: root.blendedColors
+    // Pemilih provider lyric — kotak yang sama seperti di kartu Media
+    // dashboard, diperkecil agar muat di baris waktu kartu player. Hanya saat
+    // mode lyric terbuka, di kiri tombol play/pause.
+    LyricsProviderComboBox {
+        colors: root.blendedColors
         track: root.track
+        sizeScale: 0.6
+        // Kotaknya mengikuti panjang teks di dalamnya — "Auto" lebih pendek dari
+        // "Auto · betterlyric" — jadi tidak ada ruang kosong sebesar nama
+        // provider terpanjang. Tepi kanannya tetap di tempat yang sama.
+        width: Math.min(implicitWidth, Math.max(0, playPauseButton.x - 8 - root.textX - root.pad))
         x: playPauseButton.x - 8 - width
         y: trackTime.y + (trackTime.implicitHeight - height) / 2 - 1
         visible: root.lyricsMode && root.lyricsAllowed

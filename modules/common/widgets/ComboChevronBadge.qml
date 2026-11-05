@@ -10,6 +10,8 @@ Rectangle {
     property color colOpen: Appearance.colors.colPrimary
     property color colIconClosed: Appearance.colors.colOnSecondaryContainer
     property color colIconOpen: Appearance.colors.colOnPrimary
+    // Pangkal yang memanggil bisa mengecilkan glyph bersama sisa kontrolnya.
+    property real iconSize: Appearance.font.pixelSize.larger
 
     width: open ? height : height * 1.2
     color: open ? colOpen : colClosed
@@ -31,7 +33,7 @@ Rectangle {
     MaterialSymbol {
         anchors.centerIn: parent
         text: "keyboard_arrow_down"
-        iconSize: Appearance.font.pixelSize.larger
+        iconSize: root.iconSize
         color: root.open ? root.colIconOpen : root.colIconClosed
         rotation: root.open ? 180 : 0
         Behavior on rotation {

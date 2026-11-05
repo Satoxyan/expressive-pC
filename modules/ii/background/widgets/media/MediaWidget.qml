@@ -764,6 +764,20 @@ AbstractBackgroundWidget {
                         indicatorColor: Appearance.colors.colPrimary
                         indicatorShapeColor: Appearance.colors.colOnPrimary
                     }
+
+                    // Pemilih provider lyric — kotak yang sama seperti di kartu
+                    // Media dashboard, di sudut kanan bawah strip lyric.
+                    LyricsProviderComboBox {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 12
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 8
+                        width: Math.min(170, parent.width - 24)
+                        colors: Appearance.colors
+                        fg: Appearance.colors.colOnPrimaryContainer
+                        track: LyricsService.trackFor(root.currentPlayer)
+                        sizeScale: 0.7
+                    }
                 }
             }
         }
@@ -912,6 +926,19 @@ AbstractBackgroundWidget {
                         dimColor: Appearance.colors.colSubtext
                         indicatorColor: Appearance.colors.colPrimary
                         indicatorShapeColor: Appearance.colors.colOnPrimary
+                    }
+
+                    // Pemilih provider lyric, sama seperti di strip 1x3.
+                    LyricsProviderComboBox {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 16
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 12
+                        width: Math.min(170, parent.width - 32)
+                        colors: Appearance.colors
+                        fg: Appearance.colors.colOnPrimaryContainer
+                        track: LyricsService.trackFor(root.currentPlayer)
+                        sizeScale: 0.7
                     }
                 }
             }

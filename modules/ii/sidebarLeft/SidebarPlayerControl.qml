@@ -492,8 +492,6 @@ Item {
                     downAction: () => {
                         Config.options.sidebar.media.showLyrics = !Config.options.sidebar.media.showLyrics
                     }
-                    // Klik kanan: pilih provider lirik (dulu pill di atas play).
-                    altAction: () => providerMenu.show(lyricsToggle)
                     contentItem: MaterialSymbol {
                         iconSize: 18
                         fill: Config.options.sidebar.media.showLyrics ? 1 : 0
@@ -691,12 +689,18 @@ Item {
                 model: Mpris.players.values.map(p => p.identity ?? p.desktopEntry ?? "Unknown")
                 currentIndex: 0
             }
-        }
-    }
 
-    LyricsProviderMenu {
-        id: providerMenu
-        blendedColors: root.blendedColors
-        alignLeft: true
+            // ── Provider lirik ──
+            // Kotak yang sama seperti di kartu Media dashboard, persis di bawah
+            // pemilih player. Dulu lewat klik-kanan tombol lyric; sekarang
+            // tempatnya terlihat, jadi klik-kanan itu tidak diperlukan lagi.
+            LyricsProviderComboBox {
+                visible: Config.options.sidebar.media.showLyrics
+                colors: root.blendedColors
+                track: LyricsService.trackFor(root.player)
+                // Skala penuh: pemilih player di atasnya juga setinggi 40, jadi
+                // keduanya terbaca sebagai satu tumpukan kontrol yang sama.
+            }
+        }
     }
 }

@@ -36,6 +36,23 @@ ComboBox {
     // sebagai keterangan ikon `trailing` milik tiap baris. Kosong = tidak ada.
     property var popupLegend: []
 
+    // Pengali seluruh metrik, untuk tempat yang lebih sempit dari halaman
+    // setting (kartu lyric di sidebar/lock/widget: 0.6 bikin kotaknya setinggi
+    // kontrol di sekitarnya). Setiap angka dikalikan per-metrik, bukan lewat
+    // `transform: Scale`, supaya teks tetap tajam dan area klik tetap benar.
+    // Default 1 = persis seperti dulu, jadi call site settings tidak berubah.
+    property real sizeScale: 1
+    readonly property real rowHeight: 42 * root.sizeScale
+    // Satu batas untuk dua pemakai (tinggi popup dan tinggi list): kalau keduanya
+    // boleh berbeda, list terpotong atau popup kebablasan.
+    readonly property real maxPopupHeight: Math.max(150, 320 * root.sizeScale)
+    // Teks dan glyph tidak dikurangi sekasar kotaknya: di skala 0.6 angka mentah
+    // 15px jadi 9px dan tidak lagi terbaca. Skala huruf diredam setengah, jadi
+    // kotak 24px masih memuat label 12px seperti pill lyric yang dulu.
+    readonly property real fontScale: 0.5 + 0.5 * root.sizeScale
+
+    onSizeScaleChanged: if (popup.visible) popup.close()
+
     // A row may carry two extras besides its label: `trailing`, the symbols to
     // read at the right end, and `dim`, which says the entry is there but is not
     // offering anything. Both ride along the filter so a searched list keeps them.
@@ -60,17 +77,46 @@ ComboBox {
     }
     readonly property int visibleCount: root.filteredItems.length
 
+    // Popup dulu meniru lebar tombolnya persis. Begitu tombol boleh memeluk
+    // teksnya sendiri (kartu player), tiruan itu jadi terlalu sempit untuk baris
+    // terpanjang, jadi daftar diukur lebih dulu dan popup tidak boleh kurang
+    // selebar itu.
+    TextMetrics {
+        id: labelMetrics
+        font.family: Appearance.font.family.main
+        font.pixelSize: Appearance.font.pixelSize.small * root.fontScale
+    }
+    readonly property real popupNeededWidth: {
+        const iconW = Appearance.font.pixelSize.larger * root.fontScale
+        const trailW = Appearance.font.pixelSize.normal * root.fontScale
+        const items = root.filteredItems
+        let best = 0
+        for (let i = 0; i < items.length; i++) {
+            labelMetrics.text = items[i].label
+            let w = labelMetrics.advanceWidth + 24 * root.sizeScale
+            if (items[i].icon.length > 0) w += iconW + 8 * root.sizeScale
+            const n = items[i].trailing.length
+            if (n > 0) w += 8 * root.sizeScale + n * trailW + (n - 1) * 6 * root.sizeScale
+            if (w > best) best = w
+        }
+        return Math.round(best + 16 * root.sizeScale)
+    }
+
     function pick(realIndex) {
         root.activated(realIndex)
         root.popup.close()
     }
 
-    implicitHeight: 40
+    implicitHeight: 40 * root.sizeScale
+    // ComboBox mengurut implicitWidth dari popup juga, padahal popup meniru lebar
+    // tombol: tanpa baris ini, tombol yang sedang memeluk teksnya akan melebar
+    // begitu popup pertama kali terbuka lalu terkunci selebar baris terpanjang.
+    implicitWidth: buttonContent.implicitWidth + leftPadding + rightPadding
     Layout.fillWidth: true
 
     background: Rectangle {
         anchors.fill: parent
-        anchors.rightMargin: root.splitIndicator ? root.indicator.width + 2 : 0
+        anchors.rightMargin: root.splitIndicator ? root.indicator.width + 2 * root.sizeScale : 0
         topLeftRadius: root.buttonRadius
         bottomLeftRadius: root.buttonRadius
         topRightRadius: root.splitIndicator ? Appearance.rounding.unsharpenmore : root.buttonRadius
@@ -90,12 +136,13 @@ ComboBox {
 
     indicator: Item {
         x: root.width - width
-        width: root.splitIndicator ? badge.width : chevron.width + 32
+        width: root.splitIndicator ? badge.width : chevron.width + 32 * root.sizeScale
         height: root.height
 
         ComboChevronBadge {
             id: badge
             visible: root.splitIndicator
+            iconSize: Appearance.font.pixelSize.larger * root.fontScale
             anchors.right: parent.right
             height: parent.height
             open: root.popup.visible
@@ -108,10 +155,10 @@ ComboBox {
         MaterialSymbol {
             id: chevron
             visible: !root.splitIndicator
-            x: parent.width - width - 16
+            x: parent.width - width - 16 * root.sizeScale
             y: parent.height / 2 - height / 2
             text: "keyboard_arrow_down"
-            iconSize: Appearance.font.pixelSize.larger
+            iconSize: Appearance.font.pixelSize.larger * root.fontScale
             color: root.colText
 
             rotation: root.popup.visible ? 180 : 0
@@ -122,20 +169,24 @@ ComboBox {
     }
 
     contentItem: Item {
-        implicitWidth: buttonLayout.implicitWidth
+        id: buttonContent
+        // Implicit size RowLayout tidak menghitung margin anchors-nya sendiri,
+        // jadi margin kiri-kanan baris ditambahkan manual; kalau tidak, teks
+        // kepotong persis sebesar margin itu.
+        implicitWidth: buttonLayout.implicitWidth + buttonLayout.anchors.leftMargin + buttonLayout.anchors.rightMargin
         implicitHeight: buttonLayout.implicitHeight
 
         RowLayout {
             id: buttonLayout
             anchors.fill: parent
-            spacing: 8
-            anchors.leftMargin: 16
+            spacing: 8 * root.sizeScale
+            anchors.leftMargin: 16 * root.sizeScale
             // The style already takes the indicator out of the content item's
             // width (`rightPadding: padding + indicator.width + spacing`, Basic
             // ComboBox.qml:22), so this row sits right against the badge and only
             // owes it a gap. Naming the indicator's width here again would spend
             // the same 48px twice and leave a dead strip at the label's right.
-            anchors.rightMargin: root.splitIndicator ? 12 : 16
+            anchors.rightMargin: (root.splitIndicator ? 12 : 16) * root.sizeScale
 
             Loader {
                 Layout.alignment: Qt.AlignVCenter
@@ -148,7 +199,7 @@ ComboBox {
                         }
                         return root.buttonIcon;
                     }
-                    iconSize: Appearance.font.pixelSize.larger
+                    iconSize: Appearance.font.pixelSize.larger * root.fontScale
                     color: root.colText
                 }
             }
@@ -157,6 +208,7 @@ ComboBox {
                 Layout.fillWidth: true
                 Layout.alignment: Qt.AlignVCenter
                 color: root.colText
+                font.pixelSize: Appearance.font.pixelSize.small * root.fontScale
                 text: root.displayText
                 elide: Text.ElideRight
                 verticalAlignment: Text.AlignVCenter
@@ -174,7 +226,7 @@ ComboBox {
             readonly property bool selected: root.currentIndex === itemDelegate.modelData.realIndex
 
             width: ListView.view ? ListView.view.width : root.width
-            implicitHeight: 42
+            implicitHeight: root.rowHeight
             onClicked: root.pick(itemDelegate.modelData.realIndex)
 
             property color color: {
@@ -197,8 +249,12 @@ ComboBox {
 
             background: Rectangle {
                 anchors.fill: parent
-                anchors.bottomMargin: 2
-                radius: Appearance.rounding.small
+                anchors.bottomMargin: 2 * root.sizeScale
+                // Highlight baris dibaca sebagai blok, bukan pil: radius 12 pada
+                // kotak setinggi 40 membuat tiap baris terlihat seperti tombol
+                // terpisah, bukan sebagai salah satu baris daftar. 8 masih
+                // melunakkan sudutnya tanpa mem bulat-bulatkan barisnya.
+                radius: Appearance.rounding.verysmall * root.sizeScale
                 color: itemDelegate.color
                 Behavior on color {
                     animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
@@ -210,32 +266,40 @@ ComboBox {
                 }
             }
 
+            // Kotak highlight menggantung 2px di atas baris berikutnya, jadi
+            // tengahnya bukan tengah slot baris. Isi digeser ke atas dengan
+            // padding atas lebih kecil daripada bawah, supaya teks duduk di
+            // tengah kotaknya sendiri, bukan setengah baris ke bawah.
+            topPadding: 4 * root.sizeScale
+            bottomPadding: 6 * root.sizeScale
+
             contentItem: RowLayout {
-                spacing: 8
-                anchors.leftMargin: 12
-                anchors.rightMargin: 12
+                spacing: 8 * root.sizeScale
+                anchors.leftMargin: 12 * root.sizeScale
+                anchors.rightMargin: 12 * root.sizeScale
 
                 Loader {
                     Layout.alignment: Qt.AlignVCenter
-                    Layout.preferredHeight: Appearance.font.pixelSize.larger
+                    Layout.preferredHeight: Appearance.font.pixelSize.larger * root.fontScale
                     active: itemDelegate.modelData.icon.length > 0
                     visible: active
                     sourceComponent: Item {
                         implicitWidth: icon.implicitWidth
-                        implicitHeight: Appearance.font.pixelSize.larger
+                        implicitHeight: Appearance.font.pixelSize.larger * root.fontScale
                         MaterialSymbol {
                             id: icon
                             anchors.centerIn: parent
                             text: itemDelegate.modelData.icon
-                            iconSize: Appearance.font.pixelSize.larger
+                            iconSize: Appearance.font.pixelSize.larger * root.fontScale
                             color: itemDelegate.colText
                         }
                     }
                 }
 
                 StyledText {
+                    font.pixelSize: Appearance.font.pixelSize.small * root.fontScale
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Appearance.font.pixelSize.larger
+                    Layout.preferredHeight: Appearance.font.pixelSize.larger * root.fontScale
                     color: itemDelegate.colText
                     text: itemDelegate.modelData.label
                     elide: Text.ElideRight
@@ -246,14 +310,14 @@ ComboBox {
                 // sit next to a label of pixelSize.small, so they are drawn a
                 // step larger: symbols read lighter than glyphs of the same size.
                 RowLayout {
-                    spacing: 6
+                    spacing: 6 * root.sizeScale
                     Repeater {
                         model: itemDelegate.modelData.trailing
                         delegate: MaterialSymbol {
                             required property var modelData
                             Layout.alignment: Qt.AlignVCenter
                             text: modelData
-                            iconSize: Appearance.font.pixelSize.normal
+                            iconSize: Appearance.font.pixelSize.normal * root.fontScale
                             fill: 1
                             color: ColorUtils.applyAlpha(itemDelegate.colText, 0.6)
                         }
@@ -264,17 +328,21 @@ ComboBox {
     }
 
     popup: Popup {
-        y: root.popupAbove ? -height - 4 : root.height + 4
-        width: root.width
+        y: root.popupAbove ? -height - 4 * root.sizeScale : root.height + 4 * root.sizeScale
+        width: Math.max(root.width, root.popupNeededWidth)
+        // Combo yang memeluk teks duduk di sisi kanan, jadi popup yang lebih
+        // lebar darinya tumbuh ke kiri, bukan keluar layar. Saat lebarnya sama,
+        // hasil rumus ini 0 — persis seperti dulu.
+        x: root.popupAbove ? root.width - width : 0
         clip: true
         // Tinggi legenda dihitung sebagai konstanta, bukan dari id child, supaya
         // pengukuran Popup sudah benar sejak pertama kali dibuka.
-        readonly property real legendHeight: root.popupLegend.length > 0 ? 24 : 0
-        height: Math.min(
-            searchField.implicitHeight + 12 + (root.visibleCount * 42) + legendHeight + topPadding + bottomPadding,
-            320
-        )
-        padding: 8
+        readonly property real legendHeight: root.popupLegend.length > 0 ? 24 * root.sizeScale : 0
+        height: Math.round(Math.min(
+            searchField.implicitHeight + 12 * root.sizeScale + (root.visibleCount * root.rowHeight) + legendHeight + topPadding + bottomPadding,
+            root.maxPopupHeight
+        ))
+        padding: 8 * root.sizeScale
 
         onVisibleChanged: {
             if (visible) {
@@ -325,23 +393,23 @@ ComboBox {
         }
 
         contentItem: ColumnLayout {
-            spacing: 4
+            spacing: 4 * root.sizeScale
 
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: searchField.implicitHeight + 8
+                implicitHeight: searchField.implicitHeight + 8 * root.sizeScale
                 radius: Appearance.rounding.small
                 color: root.colSearch
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.margins: 4
-                    spacing: 6
+                    anchors.margins: 4 * root.sizeScale
+                    spacing: 6 * root.sizeScale
 
                     MaterialSymbol {
-                        Layout.leftMargin: 6
+                        Layout.leftMargin: 6 * root.sizeScale
                         text: "search"
-                        iconSize: Appearance.font.pixelSize.larger
+                        iconSize: Appearance.font.pixelSize.larger * root.fontScale
                         color: root.colSearchHint
                     }
 
@@ -354,7 +422,7 @@ ComboBox {
                         color: root.colOnSearch
                         background: null
                         font.family: Appearance.font.family.main
-                        font.pixelSize: Appearance.font.pixelSize.normal
+                        font.pixelSize: Appearance.font.pixelSize.normal * root.fontScale
                         onTextChanged: root.searchText = text
                         Keys.onDownPressed: listView.incrementCurrentIndex()
                         Keys.onUpPressed: listView.decrementCurrentIndex()
@@ -367,9 +435,9 @@ ComboBox {
                     MaterialSymbol {
                         visible: searchField.text.length > 0
                         text: "close"
-                        iconSize: Appearance.font.pixelSize.normal
+                        iconSize: Appearance.font.pixelSize.normal * root.fontScale
                         color: root.colSearchHint
-                        Layout.rightMargin: 6
+                        Layout.rightMargin: 6 * root.sizeScale
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
@@ -385,7 +453,7 @@ ComboBox {
             StyledListView {
                 id: listView
                 Layout.fillWidth: true
-                Layout.preferredHeight: Math.min(contentHeight, 320 - root.popup.topPadding - root.popup.bottomPadding - searchField.implicitHeight - 12 - root.popup.legendHeight)
+                Layout.preferredHeight: Math.min(contentHeight, root.maxPopupHeight - root.popup.topPadding - root.popup.bottomPadding - searchField.implicitHeight - 12 * root.sizeScale - root.popup.legendHeight)
                 clip: true
                 spacing: 0
                 popin: false
@@ -402,23 +470,23 @@ ComboBox {
                 visible: root.popupLegend.length > 0
                 Layout.alignment: Qt.AlignHCenter
                 Layout.preferredHeight: visible ? root.popup.legendHeight : 0
-                spacing: 10
+                spacing: 10 * root.sizeScale
                 Repeater {
                     model: root.popupLegend
                     delegate: RowLayout {
                         required property var modelData
-                        spacing: 4
+                        spacing: 4 * root.sizeScale
                         MaterialSymbol {
                             Layout.alignment: Qt.AlignVCenter
                             text: modelData.icon
-                            iconSize: Appearance.font.pixelSize.small
+                            iconSize: Appearance.font.pixelSize.small * root.fontScale
                             fill: 1
                             color: ColorUtils.applyAlpha(root.colOnItem, 0.6)
                         }
                         StyledText {
                             Layout.alignment: Qt.AlignVCenter
                             text: modelData.label
-                            font.pixelSize: Appearance.font.pixelSize.smallie
+                            font.pixelSize: Appearance.font.pixelSize.smallie * root.fontScale
                             color: ColorUtils.applyAlpha(root.colOnItem, 0.6)
                         }
                     }
