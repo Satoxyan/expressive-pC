@@ -428,10 +428,18 @@ Item {
                 onCountChanged: Qt.callLater(syncIndex)
                 Component.onCompleted: syncIndex()
 
-                colBackground: root.colors.colSecondaryContainer
+                // Kotaknya baru ada saat disentuh atau saat daftarnya terbuka.
+                // Di luar itu yang tersisa hanya teks dan ikonnya, jadi pemilih
+                // ini terbaca sebagai bagian dari kartu, bukan sebagai tombol.
+                colBackground: playerSelector.popup.visible
+                    ? root.colors.colSecondaryContainer
+                    : "transparent"
                 colBackgroundHover: root.colors.colSecondaryContainerHover
                 colBackgroundActive: root.colors.colSecondaryContainerActive
-                colText: root.colors.colOnSecondaryContainer
+                // Teksnya tinggal di kartu yang tembus pandang, di atas art yang
+                // sama dengan lirik, jadi ia ikut warna foreground kartu — bukan
+                // warna teks container yang cuma benar saat kotaknya ikut tampil.
+                colText: root.fg
                 colAccent: root.colors.colPrimary
                 colOnAccent: root.colors.colOnPrimary
                 colPopup: playerSelector.solid
@@ -517,10 +525,18 @@ Item {
                 onCountChanged: Qt.callLater(syncIndex)
                 Component.onCompleted: syncIndex()
 
-                colBackground: root.colors.colSecondaryContainer
+                // Kotaknya baru ada saat disentuh atau saat daftarnya terbuka.
+                // Di luar itu yang tersisa hanya teks dan ikonnya, jadi pemilih
+                // ini terbaca sebagai bagian dari kartu, bukan sebagai tombol.
+                colBackground: providerSelector.popup.visible
+                    ? root.colors.colSecondaryContainer
+                    : "transparent"
                 colBackgroundHover: root.colors.colSecondaryContainerHover
                 colBackgroundActive: root.colors.colSecondaryContainerActive
-                colText: root.colors.colOnSecondaryContainer
+                // Teksnya tinggal di kartu yang tembus pandang, di atas art yang
+                // sama dengan lirik, jadi ia ikut warna foreground kartu — bukan
+                // warna teks container yang cuma benar saat kotaknya ikut tampil.
+                colText: root.fg
                 colAccent: root.colors.colPrimary
                 colOnAccent: root.colors.colOnPrimary
                 colPopup: playerSelector.solid

@@ -281,7 +281,15 @@ ComboBox {
                 searchField.forceActiveFocus()
                 Qt.callLater(() => {
                     const position = root.filteredItems.findIndex(entry => entry.realIndex === root.currentIndex)
-                    if (position >= 0) listView.positionViewAtIndex(position, ListView.Center)
+                    if (position < 0) return
+                    // Yang di paling atas atau paling bawah tidak perlu
+                    // disengah: ListView.Center untuk item pertama malah
+                    // meninggalkan offset setengah baris begitu tinggi list
+                    // berubah (mis. saat baris legenda ikut tampil), jadi baris
+                    // pertama terpotong.
+                    if (position === 0) listView.positionViewAtBeginning()
+                    else if (position === root.filteredItems.length - 1) listView.positionViewAtEnd()
+                    else listView.positionViewAtIndex(position, ListView.Center)
                 })
             } else {
                 root.searchText = ""
