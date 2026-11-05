@@ -35,6 +35,15 @@ Singleton {
 	property MprisPlayer activePlayer: manualPlayer ?? preferredPlayer ?? trackedPlayer ?? Mpris.players.values[0] ?? null;
 	signal trackChanged(reverse: bool);
 
+	// The buses worth a page: every real one that is carrying something. A pager over
+	// these reaches each bus on its own, so unlike `preferredPlayer` and the duplicate
+	// filtering used by the sidebar and the popup, nothing here is folded away or hidden —
+	// the whole point of a page is to be able to get at the other one.
+	readonly property var pagedPlayers: {
+		const list = root.players;
+		return list.filter(p => p && (((p.trackTitle ?? "") !== "") || p.isPlaying));
+	}
+
 	property bool __reverse: false;
 
 	property var activeTrack;

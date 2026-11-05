@@ -46,7 +46,6 @@ Item {
             Layout.bottomMargin: DockStyle.mBottom(DockStyle.mediaInnerMargin, DockStyle.mediaOuterMargin)
             Layout.leftMargin: DockStyle.mLeft(DockStyle.mediaInnerMargin, DockStyle.mediaOuterMargin)
             Layout.rightMargin: DockStyle.mRight(DockStyle.mediaInnerMargin, DockStyle.mediaOuterMargin)
-            buttonPadding: DockStyle.padding
         }
 
         Repeater {
