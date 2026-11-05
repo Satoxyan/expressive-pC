@@ -100,7 +100,21 @@ Item {
             if (event.button === Qt.MiddleButton)      activePlayer?.togglePlaying()
             else if (event.button === Qt.BackButton)   activePlayer?.previous()
             else if (event.button === Qt.ForwardButton) activePlayer?.next()
-            else if (event.button === Qt.LeftButton)   GlobalStates.mediaControlsOpen = !GlobalStates.mediaControlsOpen
+            else if (event.button === Qt.LeftButton) {
+                // The popup stands where the thing that asked for it stands. The dock's card
+                // says so when it is clicked, and nothing ever says it on the way out, so a
+                // click from the bar has to ask for the bar's own place rather than inherit
+                // wherever the last popup happened to be standing.
+                GlobalStates.mediaControlsAboveDock = false
+                // Where along the bar this widget is, so the card column runs to it. The bar
+                // window spans the whole screen along its own edge, so the coordinate in that
+                // edge's direction is already a screen one, and a bar that lies flat leaves
+                // that direction free for the popup to stand in.
+                const here = root.mapToItem(null, root.width / 2, root.height / 2)
+                GlobalStates.mediaControlsAnchorX = here.x
+                GlobalStates.mediaControlsAnchorY = here.y
+                GlobalStates.mediaControlsOpen = !GlobalStates.mediaControlsOpen
+            }
         }
         onClicked: (event) => {
             if (event.button === Qt.RightButton) activePlayer?.next()

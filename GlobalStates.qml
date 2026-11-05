@@ -19,7 +19,14 @@ Singleton {
     property bool mediaControlsOpen: false
     // When true, media controls are positioned right above the dock's media item
     property bool mediaControlsAboveDock: false
+    // Where the widget that was clicked to open the popup stands, in screen coordinates. The
+    // popup runs along the bar to it instead of to the middle of the screen, so a media widget
+    // parked at the end of a bar gets its card column at that end. Y is -1 until something has
+    // been clicked: a popup opened by a shortcut has no widget to lean against and falls back
+    // to the end of the bar its layout lists media at.
     property real mediaControlsAnchorX: 0
+    property real mediaControlsAnchorY: -1
+    readonly property bool mediaControlsAnchored: mediaControlsAnchorY >= 0
     // Which media the dock is looking at, so the popup standing above it can put that
     // player's card in the slot nearest the dock. Written by the card whose click opened the
     // popup, and kept up by the pager holding that popup.

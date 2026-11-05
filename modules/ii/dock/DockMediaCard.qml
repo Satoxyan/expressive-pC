@@ -169,8 +169,9 @@ Item {
             z: 2
             enabled: root.interactive
             onClicked: {
-                const globalPos = root.mapToItem(null, root.width / 2, 0)
+                const globalPos = root.mapToItem(null, root.width / 2, root.height / 2)
                 GlobalStates.mediaControlsAnchorX = globalPos.x
+                GlobalStates.mediaControlsAnchorY = globalPos.y
                 GlobalStates.mediaControlsAboveDock = true
                 // The popup sorts itself by this, so it opens with this card's player in the
                 // slot nearest the dock instead of sliding a frame after it appeared.

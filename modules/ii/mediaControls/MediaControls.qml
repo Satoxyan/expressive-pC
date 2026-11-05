@@ -30,10 +30,21 @@ Scope {
 
     readonly property real lyricsCardHeight: 290
     readonly property real colSpacing: -Appearance.sizes.elevationMargin
-    // Only the popup standing above the dock reorders its cards. That one has an edge the
-    // dock is against, and the card resting on that edge is the media the dock is looking at;
-    // a popup the bar opened keeps the order its players came in.
-    readonly property bool followsDock: GlobalStates.mediaControlsAboveDock && !root.barVertical
+    // Whether this popup is the one standing above the dock. Only that one is steered by the
+    // dock's paging; a popup the bar opened is steered by the media the bar itself shows.
+    readonly property bool followsDock: GlobalStates.mediaControlsAboveDock
+
+    // Which player the surface that asked for this popup stands on. The dock keeps its own key,
+    // fed page by page while it holds the popup; the bar has no key of its own and follows
+    // whoever its widget is drawing, so the two surfaces order their cards separately.
+    readonly property string focusKey: root.followsDock
+        ? GlobalStates.dockMediaKey
+        : LyricsService.playerKey(root.activePlayer)
+
+    // Which end of the stack that surface stands at: the last of the list is the bottom of the
+    // column. The dock always sits under its popup, a bar lying flat is at the edge it is
+    // configured for, and a bar running up the side has no end nearer than the top.
+    readonly property bool focusNearBottom: root.followsDock || barEdge === "bottom"
     readonly property real osdWidth: Appearance.sizes.osdWidth
     readonly property real widgetWidth: Appearance.sizes.mediaControlsWidth
     readonly property real widgetHeight: Appearance.sizes.mediaControlsHeight
@@ -62,9 +73,13 @@ Scope {
     // posisi kartu tetap sama walau tinggi kartu beranimasi. Cabangnya harus
     // sama persis dengan urutan perhitungan margins.top di PanelWindow.
     readonly property string vAnchor: {
-        if (GlobalStates.mediaControlsAboveDock && !barVertical) return "bottom"
+        if (GlobalStates.mediaControlsAboveDock) return "bottom"
         if (barEdge === "top") return "top"
         if (barEdge === "bottom") return "bottom"
+        // Along a bar that runs up the side the column stands level with the widget that was
+        // clicked, and holding it centred in the window is what keeps it level while a card
+        // opens its lyrics and the column grows around that same middle.
+        if (GlobalStates.mediaControlsAnchored) return "center"
         if (mediaPosition === "left") return "top"
         if (mediaPosition === "right") return "bottom"
         return "center"
@@ -111,8 +126,8 @@ Scope {
 
     readonly property var orderedPlayers: {
         const list = root.meaningfulPlayers
-        const key = GlobalStates.dockMediaKey
-        if (!root.followsDock || list.length < 2 || key.length === 0) return list
+        const key = root.focusKey
+        if (list.length < 2 || key.length === 0) return list
         let hit = null
         for (const p of list) {
             if (LyricsService.playerKey(p) === key) hit = p
@@ -120,8 +135,8 @@ Scope {
         // A bus the duplicate filter folded away, or the preferred-player setting hid, has no
         // card here at all: then nothing may move.
         if (!hit) return list
-        // Last of the list is the bottom of the stack, which is the end the dock stands at.
-        return list.filter(p => LyricsService.playerKey(p) !== key).concat([hit])
+        const rest = list.filter(p => LyricsService.playerKey(p) !== key)
+        return root.focusNearBottom ? rest.concat([hit]) : [hit].concat(rest)
     }
 
     function rankOf(player, naturalIndex) {
@@ -222,31 +237,57 @@ Scope {
             readonly property real minX: reserved[0] + inset - cardMargin
             readonly property real maxX: panelWindow.screen.width - reserved[2] - inset - root.widgetWidth + cardMargin
             readonly property real minY: reserved[1] + inset - cardMargin
+            // Tepi band tempat kolom kartu boleh berdiri sepanjang bar yang berdiri tegak:
+            // tepi yang sama dengan minY/maxY, cuma tidak dipotong tinggi window. Kolom yang
+            // dihitung, bukan window, karena window selalu N×290 dan bisa lebih tinggi
+            // daripada layar.
+            readonly property real alongFrom: reserved[1] + inset - cardMargin
+            readonly property real alongTo: panelWindow.screen.height - reserved[3] - inset + cardMargin
             // maxY pakai tinggi window (bukan playerColumnLayout): tinggi window
             // kita dipegang konstan N×290, margins harus menempel ke tepi window.
             readonly property real maxY: panelWindow.screen.height - reserved[3] - inset - panelWindow.implicitHeight + cardMargin
 
             margins {
                 top: {
-                    if (GlobalStates.mediaControlsAboveDock && !root.barVertical) {
+                    if (GlobalStates.mediaControlsAboveDock) {
                         const dockHeight = (Config.options?.dock.height ?? 70)
                             + Appearance.sizes.elevationMargin + Appearance.sizes.hyprlandGapsOut
                         return panelWindow.screen.height - dockHeight - panelWindow.implicitHeight
                     }
                     if (root.barEdge === "top") return panelWindow.minY
                     if (root.barEdge === "bottom") return panelWindow.maxY
+                    // Along a bar that runs up the side: the column stands level with the
+                    // widget that was clicked. The window is the fixed N×290 band and the
+                    // column is what has to stay on screen, so the ends of the band are
+                    // counted for the column's middle and the window is put half its own
+                    // height behind that middle.
+                    if (GlobalStates.mediaControlsAnchored) {
+                        const colH = playerColumnLayout.implicitHeight
+                        const half = Math.min(colH / 2,
+                            (panelWindow.alongTo - panelWindow.alongFrom) / 2)
+                        const middle = Math.max(panelWindow.alongFrom + half, Math.min(
+                            GlobalStates.mediaControlsAnchorY, panelWindow.alongTo - half))
+                        return middle - panelWindow.implicitHeight / 2
+                    }
                     if (root.mediaPosition === "left") return panelWindow.minY
                     if (root.mediaPosition === "right") return panelWindow.maxY
                     return (panelWindow.minY + panelWindow.maxY) / 2
                 }
                 left: {
-                    if (GlobalStates.mediaControlsAboveDock && !root.barVertical) {
+                    if (GlobalStates.mediaControlsAboveDock) {
                         return Math.max(root.gap, Math.min(
                             GlobalStates.mediaControlsAnchorX - root.widgetWidth / 2,
                             panelWindow.screen.width - root.widgetWidth - root.gap))
                     }
                     if (root.barEdge === "left") return panelWindow.minX
                     if (root.barEdge === "right") return panelWindow.maxX
+                    // And along a bar that lies flat: the same run to the clicked widget the
+                    // dock already gets, kept inside the band the bar reserves.
+                    if (GlobalStates.mediaControlsAnchored) {
+                        return Math.max(panelWindow.minX, Math.min(
+                            GlobalStates.mediaControlsAnchorX - root.widgetWidth / 2,
+                            panelWindow.maxX))
+                    }
                     if (root.mediaPosition === "left") return panelWindow.minX
                     if (root.mediaPosition === "right") return panelWindow.maxX
                     return (panelWindow.minX + panelWindow.maxX) / 2
@@ -418,7 +459,10 @@ Scope {
         description: "Toggles media controls on press"
 
         onPressed: {
+            // Nothing was clicked, so nothing asked to be stood next to a widget: drop the
+            // anchor a previous click left behind and let the bar layout place it.
             GlobalStates.mediaControlsAboveDock = false;
+            GlobalStates.mediaControlsAnchorY = -1;
             GlobalStates.mediaControlsOpen = !GlobalStates.mediaControlsOpen;
         }
     }
@@ -428,6 +472,7 @@ Scope {
 
         onPressed: {
             GlobalStates.mediaControlsAboveDock = false;
+            GlobalStates.mediaControlsAnchorY = -1;
             GlobalStates.mediaControlsOpen = true;
         }
     }
