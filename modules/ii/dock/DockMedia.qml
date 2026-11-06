@@ -4,6 +4,7 @@ import qs.modules.common
 import qs.modules.common.functions
 import qs.services
 import QtQuick
+import QtQuick.Effects
 
 // Several players, side by side in the dock.
 //
@@ -295,14 +296,61 @@ Item {
     }
 
     // ── the two cards ──────────────────────────────────────────────────────
-    // The stage is the slot grown by the shadow band around it, and it is clipped: a card
-    // cannot get out of it, and growing it by exactly the shadow's reach is what keeps a
-    // resting card from losing its drop shadow to the cut.
+    // The stage is clipped to the slot along the axis the pages are crossed on, so
+    // a card that is on its way in or out is cut off at this component's own edge
+    // instead of being painted over the dock icon standing next to it. A plate still
+    // rests one bleed outside that clip: the card is inset by the shadow band inside
+    // the plate, and that is what lands it centred in the slot.
+    //
+    // The cut is not a straight edge but the card's own box — `slideWindow` — so the
+    // side a card disappears behind is rounded exactly like the corner it shows at
+    // rest. It is only in charge while the row travels, since a window that hugs the
+    // card has no room left for the card's drop shadow.
+    // The box has to be moved into the stage's own coordinates, and the plate is not
+    // at the stage's origin: it rests one bleed off it on each axis, inwards along the
+    // axis pages are crossed on and outwards along the other. So one axis gains a bleed
+    // and the other loses one.
+    readonly property rect slideWindow: {
+        const box = plateA.paintedBox;
+        return DockStyle.vertical
+            ? Qt.rect(box.x + root.bleed, box.y - root.bleed, box.width, box.height)
+            : Qt.rect(box.x - root.bleed, box.y + root.bleed, box.width, box.height);
+    }
+
+    // The mask is drawn at the stage's own size and the window is placed inside it,
+    // because an effect mask is stretched over whatever it is applied to.
+    Item {
+        id: slideMask
+        width: stage.width
+        height: stage.height
+        visible: false
+        layer.enabled: true
+
+        Rectangle {
+            x: root.slideWindow.x
+            y: root.slideWindow.y
+            width: root.slideWindow.width
+            height: root.slideWindow.height
+            radius: plateA.paintedRadius
+            color: "white"
+        }
+    }
+
     Item {
         id: stage
-        anchors.fill: parent
-        anchors.margins: -root.bleed
+        x: DockStyle.vertical ? -root.bleed : 0
+        y: DockStyle.vertical ? 0 : -root.bleed
+        width: DockStyle.vertical ? root.width + 2 * root.bleed : root.width
+        height: DockStyle.vertical ? root.height : root.height + 2 * root.bleed
         clip: true
+        // The window that hugs the card cannot carry the card's shadow, so it is only
+        // laid over the stage while the row actually travels; a resting card gets the
+        // band of shadow above and below it back.
+        layer.enabled: Math.abs(root.pageShift) > 0.5
+        layer.effect: MultiEffect {
+            maskEnabled: true
+            maskSource: slideMask
+        }
 
         DockMediaCard {
             id: plateA
@@ -313,10 +361,9 @@ Item {
             interactive: home === 0 && !root.settling
             // Only the axis the pages are crossed on is grown by the shadow band, because
             // that band is part of the pitch. The other one stays exactly the size of the
-            // dock's slot, so the card is as tall as it was before there were two of them —
-            // the row's own edge, not this clip, is what ends its shadow.
-            x: DockStyle.vertical ? root.bleed : home * root.pitch + root.pageShift
-            y: DockStyle.vertical ? home * root.pitch + root.pageShift : root.bleed
+            // dock's slot, so the card is as tall as it was before there were two of them.
+            x: DockStyle.vertical ? root.bleed : home * root.pitch + root.pageShift - root.bleed
+            y: DockStyle.vertical ? home * root.pitch + root.pageShift - root.bleed : root.bleed
             width: DockStyle.vertical ? root.width : root.pitch
             height: DockStyle.vertical ? root.pitch : root.height
             // An invisible card draws nothing, so the one waiting off the side costs no artwork
@@ -331,8 +378,8 @@ Item {
 
             player: root.platePlayer(key)
             interactive: home === 0 && !root.settling
-            x: DockStyle.vertical ? root.bleed : home * root.pitch + root.pageShift
-            y: DockStyle.vertical ? home * root.pitch + root.pageShift : root.bleed
+            x: DockStyle.vertical ? root.bleed : home * root.pitch + root.pageShift - root.bleed
+            y: DockStyle.vertical ? home * root.pitch + root.pageShift - root.bleed : root.bleed
             width: DockStyle.vertical ? root.width : root.pitch
             height: DockStyle.vertical ? root.pitch : root.height
             visible: key.length > 0 && (home === 0 || Math.abs(root.pageShift) > 0.5)
@@ -476,8 +523,9 @@ Item {
     implicitHeight: DockStyle.vertical ? (root.hasTrack ? root.slotLength : 0)
         : (parent?.height ?? 46)
 
-    // The row has to draw over the icons next to it while it is moving, or a card on its way to
-    // the far side would disappear behind its own neighbour.
+    // The row is clipped to its own slot now, so it can no longer reach the icons beside
+    // it; it is still raised while it travels so that the band of shadow those icons cast
+    // does not fall across the card that is passing the edge of the slot.
     z: (root.settling || Math.abs(root.pageShift) > 0.5) ? 1 : 0
 
     Behavior on implicitWidth {
@@ -579,9 +627,8 @@ Item {
         orientation: Qt.Horizontal
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         enabled: root.pagingEnabled
-        // The band of shadow around the card is part of the plate and answers a click, so it
-        // answers a wheel too.
-        margin: root.bleed
+        // The answer area is the slot and nothing more: what is clipped away from the
+        // eye is not allowed to steal the wheel from the icon it was covering.
         onWheel: event => root.handleWheel(event, true)
     }
 
@@ -589,7 +636,6 @@ Item {
         orientation: Qt.Vertical
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         enabled: root.pagingEnabled
-        margin: root.bleed
         onWheel: event => root.handleWheel(event, false)
     }
 

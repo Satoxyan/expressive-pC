@@ -3,6 +3,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import QtQuick
+import QtQuick.Effects
 
 // Several players, side by side. The sidebar used to show `activePlayer` only, so
 // a second bus — a browser video next to a song — could not be reached at all.
@@ -266,11 +267,43 @@ Item {
     // card cannot get out of it, and it sits inside the sidebar, so nothing ever
     // crosses the panel's border. Growing it by exactly the shadow's reach is what
     // keeps a resting card from losing its drop shadow to the cut.
+    //
+    // While the row is moving a second, tighter cut is laid over that: `slideWindow`
+    // is the card's own box, so the side a card disappears behind is rounded exactly
+    // like the corner it shows at rest instead of being sliced by a flat edge. It is
+    // only there while the row travels, because a window that hugs the card cannot
+    // carry the card's shadow, and a resting card should keep it.
+    readonly property rect slideWindow: plateA.paintedBox
+
+    // The mask is drawn at the stage's own size and the window is placed inside it,
+    // because an effect mask is stretched over whatever it is applied to.
+    Item {
+        id: slideMask
+        width: stage.width
+        height: stage.height
+        visible: false
+        layer.enabled: true
+
+        Rectangle {
+            x: root.slideWindow.x
+            y: root.slideWindow.y
+            width: root.slideWindow.width
+            height: root.slideWindow.height
+            radius: plateA.paintedRadius
+            color: "white"
+        }
+    }
+
     Item {
         id: stage
         anchors.fill: parent
         anchors.margins: -root.bleed
         clip: true
+        layer.enabled: Math.abs(root.pageX) > 0.5
+        layer.effect: MultiEffect {
+            maskEnabled: true
+            maskSource: slideMask
+        }
 
         Player {
             id: plateA

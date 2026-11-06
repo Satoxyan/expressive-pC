@@ -41,6 +41,12 @@ Item {
     // dock runs along the side of the screen.
     readonly property real contentLength: mediaGrid.implicitHeight
 
+    // Where the card's own silhouette is inside this item, and how round it is. The
+    // pager cuts its slide window along this box, so a card on its way out is sliced by
+    // the corners it already carries rather than by a flat edge.
+    readonly property rect paintedBox: Qt.rect(card.x, card.y, card.width, card.height)
+    readonly property real paintedRadius: card.radius
+
     readonly property real bleed: Appearance.sizes.elevationMargin
     readonly property real gap: Appearance.sizes.hyprlandGapsOut
     // The paging axis carries the shadow band as well as the gap; the other one does not.

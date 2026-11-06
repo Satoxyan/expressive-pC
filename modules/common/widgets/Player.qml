@@ -28,6 +28,12 @@ Item {
     property real maxVisualizerValue: 1000
     property int visualizerSmoothing: 2
     property real radius
+    // Where the card's own silhouette is inside this item. The pager cuts its slide
+    // window along this box, so a card on its way out is sliced by the corners it
+    // already carries rather than by a flat edge.
+    readonly property rect paintedBox: Qt.rect(background.x, background.y,
+        background.width, background.height)
+    readonly property real paintedRadius: background.radius
     property bool allowLyrics: true
     property bool animateResize: false
     property string growFrom: "top"
