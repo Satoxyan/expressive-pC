@@ -70,6 +70,23 @@ Item {
         }
     }
 
+    // Closing a window only asks the app to put it away, so one that hides itself to
+    // the tray keeps running with nothing left to click. This ends the process behind
+    // the windows instead: the app's own windows are gone, and so is the app. The
+    // address is looked up in the client list because a toplevel carries no pid.
+    function killProcesses() {
+        const pids = [];
+        for (const toplevel of root.toplevels) {
+            const pid = HyprlandData.clientForToplevel(toplevel)?.pid;
+            // One app usually has several windows on one pid, and killing it twice is
+            // a second chance to hit somebody else's process number.
+            if (pid && !pids.includes(pid))
+                pids.push(pid);
+        }
+        if (pids.length > 0)
+            Quickshell.execDetached(["kill", "-9", ...pids]);
+    }
+
     Loader {
         id: menuLoader
         active: false
@@ -278,6 +295,16 @@ Item {
                             for (const toplevel of root.toplevels) {
                                 toplevel.close();
                             }
+                            root.close();
+                        }
+                    }
+
+                    ContextMenuItem {
+                        visible: root.hasWindows
+                        iconName: "stop_circle"
+                        label: Translation.tr("Kill process")
+                        onClicked: {
+                            root.killProcesses();
                             root.close();
                         }
                     }
