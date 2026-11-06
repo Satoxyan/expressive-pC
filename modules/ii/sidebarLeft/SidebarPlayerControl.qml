@@ -15,7 +15,10 @@ import Quickshell.Services.Mpris
 
 Item {
     id: root
-    property var player: Mpris.players.values[root.currentPlayerIndex] ?? Mpris.players.values[0]
+    // Player yang sidebar baca = player yang shell baca. Dulu ini indeks mentah
+    // ke Mpris.players.values[0] yang tidak pernah ditulis siapa pun, jadi
+    // pemilih sumber di bawahnya cuma hiasan.
+    property var player: MprisController.activePlayer
     property var artUrl: player?.trackArtUrl ?? ""
     property string artDownloadLocation: Directories.coverArt
     property bool showLyrics: Config.options.sidebar.media.showLyrics ?? true
@@ -33,7 +36,6 @@ Item {
     property real maxVisualizerValue: 1000
     property int visualizerSmoothing: 2
     property real radius
-    property int currentPlayerIndex: 0
     property bool blurredBackground: Config.options.sidebar.media.blurredBackground ?? false
     property bool shapeArt: Config.options.sidebar.media.shapeArt ?? false
     readonly property var artShapeOptions: ["Circle", "Square", "Pill", "Bun", "Cookie12Sided", "Clover4Leaf", "Heart", "Slanted", "Arch", "Arrow", "SemiCircle", "Oval", "Triangle", "Diamond", "ClamShell", "Pentagon", "Gem", "Sunny", "VerySunny", "Cookie4Sided", "Cookie6Sided", "Cookie7Sided", "Cookie9Sided", "Ghostish", "Clover8Leaf", "Burst", "SoftBurst", "Boom", "SoftBoom", "Flower", "Puffy", "PuffyDiamond"]
@@ -677,29 +679,46 @@ Item {
                 }
             }
 
-            // ── Player selector ──
-            StyledComboBox {
-                id: playerSelector
-                visible: Mpris.players.values.length > 1
+            // ── Sumber media & provider lirik, sebaris ──
+            // Dua kotak penuh yang ditumpuk memakan tempat lebih besar dari
+            // isinya, jadi keduanya berbagi satu baris dan barisnya dibagi rata.
+            // Membagi rata juga yang membuat baris ini tidak bisa didorong keluar:
+            // sebuah layout menganggap implicitWidth anak sebagai lebar MINIMUMnya,
+            // jadi dua label sepanjang "Mozilla firefox-developer-edition" dan
+            // "Auto · plasma-browser-integration" saja sudah cukup untuk membuatnya
+            // lebih lebar dari panel. Dengan hint yang dinolkan (preferredWidth 0)
+            // dan minimumWidth 0, layout yang membagi ruang — teks yang tidak muat
+            // dipotong dengan titik-titik di dalam kotaknya sendiri. Kotaknya ikut
+            // warna tombol volume di atasnya, tidak bening lagi.
+            RowLayout {
+                id: sourceRow
                 Layout.fillWidth: true
+                Layout.minimumWidth: 0
                 Layout.topMargin: 12
-                colBackground: blendedColors.colSecondaryContainer
-                colBackgroundHover: blendedColors.colSecondaryContainerHover
-                colBackgroundActive: blendedColors.colSecondaryContainerActive
-                model: Mpris.players.values.map(p => p.identity ?? p.desktopEntry ?? "Unknown")
-                currentIndex: 0
-            }
+                spacing: 8
 
-            // ── Provider lirik ──
-            // Kotak yang sama seperti di kartu Media dashboard, persis di bawah
-            // pemilih player. Dulu lewat klik-kanan tombol lyric; sekarang
-            // tempatnya terlihat, jadi klik-kanan itu tidak diperlukan lagi.
-            LyricsProviderComboBox {
-                visible: Config.options.sidebar.media.showLyrics
-                colors: root.blendedColors
-                track: LyricsService.trackFor(root.player)
-                // Skala penuh: pemilih player di atasnya juga setinggi 40, jadi
-                // keduanya terbaca sebagai satu tumpukan kontrol yang sama.
+                PlayerSourceComboBox {
+                    id: playerSelector
+                    Layout.preferredWidth: 0
+                    colors: root.blendedColors
+                    // Kotak yang selalu ada, sewarna tombol volume di atasnya.
+                    solidBox: true
+                    // Judul lagu sudah terbaca besar di atas, jadi di baris ini
+                    // cukup nama player saja.
+                    showTrackTitle: false
+                    onActivated: index => MprisController.manualPlayer = playerSelector.players[index]
+                }
+
+                // Dulu lewat klik-kanan tombol lyric; sekarang tempatnya terlihat,
+                // jadi klik-kanan itu tidak diperlukan lagi.
+                LyricsProviderComboBox {
+                    id: lyricsSelector
+                    Layout.preferredWidth: 0
+                    visible: Config.options.sidebar.media.showLyrics
+                    colors: root.blendedColors
+                    solidBox: true
+                    track: LyricsService.trackFor(root.player)
+                }
             }
         }
     }

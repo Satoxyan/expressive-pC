@@ -27,6 +27,12 @@ StyledComboBoxSearch {
     // "auto · <provider>" dan penanda tiap baris tidak boleh ikut track yang
     // kebetulan sedang dilihat shell.
     property var track: LyricsService.active
+    // Defaultnya kotak ini bening sampai disentuh: ia biasanya duduk di atas art
+    // yang sama dengan liriknya, dan di sana ia harus terbaca sebagai bagian dari
+    // kartu, bukan sebagai tombol. Baris kontrol sidebarLeft bukan tempat itu —
+    // di sana pemilih ini berdiri di samping tombol volume dan harus terlihat
+    // sebagai kotak yang sama, jadi call site boleh memintanya selalu ada.
+    property bool solidBox: false
 
     readonly property var providerNames: ["auto"].concat(
         Config.options.lyrics.providers.split(",")
@@ -46,7 +52,11 @@ StyledComboBoxSearch {
 
     textRole: "displayName"
     popupAbove: true
-    splitIndicator: true
+    // Badge chevron yang terpisah cuma masuk selama kotaknya bening: ia satu-
+    // satunya bagian yang boleh berubah warna saat ditekan. Begitu solidBox
+    // mewarnai chip-nya, badge dengan warna yang sama cuma memecah tombol jadi
+    // dua segmen, jadi kotak ini kembali jadi satu pill seperti tombol volume.
+    splitIndicator: !root.solidBox
     // Provider yang tahu dirinya tidak punya apa-apa untuk lagu ini diredupkan,
     // tapi tetap ada di daftar — persis seperti menu provider yang lama. Timeout
     // ("unknown") dibiarkan normal: tidak menjawab bukan bukti tidak ada lyric.
@@ -104,13 +114,13 @@ StyledComboBoxSearch {
 
     // Kotaknya baru ada saat disentuh atau saat daftarnya terbuka. Di luar itu
     // yang tersisa hanya teks dan ikonnya, jadi pemilih ini terbaca sebagai
-    // bagian dari kartu, bukan sebagai tombol.
-    colBackground: root.popup.visible
-        ? root.colors.colSecondaryContainer
-        : "transparent"
+    // bagian dari kartu, bukan sebagai tombol. Kecuali kalau solidBox diminta.
+    colBackground: root.solidBox
+        ? ColorUtils.transparentize(root.colors.colSecondaryContainer, 0.7)
+        : (root.popup.visible ? root.colors.colSecondaryContainer : "transparent")
     colBackgroundHover: root.colors.colSecondaryContainerHover
     colBackgroundActive: root.colors.colSecondaryContainerActive
-    colText: root.fg
+    colText: root.solidBox ? root.colors.colOnSecondaryContainer : root.fg
     colAccent: root.colors.colPrimary
     colOnAccent: root.colors.colOnPrimary
     colPopup: root.solid

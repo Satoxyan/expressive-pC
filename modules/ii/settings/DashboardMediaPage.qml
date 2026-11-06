@@ -402,57 +402,19 @@ Item {
                 indicatorShapeColor: root.colors.colOnSecondaryContainer
             }
 
-            StyledComboBoxSearch {
+            PlayerSourceComboBox {
                 id: playerSelector
 
-                readonly property var players: Array.from(MprisController.players)
-                readonly property int activeIndex: players.findIndex(p => p === MprisController.activePlayer)
-                readonly property color solid: Qt.rgba(root.colors.colLayer1.r, root.colors.colLayer1.g, root.colors.colLayer1.b, 1)
-
-                visible: players.length > 1
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 anchors.margins: 14
+                // Kotaknya boleh memeluk teksnya, tapi kartu ini tempat judul lagu
+                // panjang hidup, jadi lebarnya dibatasi dulu supaya tidak pernah
+                // keluar kartu.
                 width: Math.min(300, parent.width - 28)
-                popupAbove: true
-                splitIndicator: true
-                textRole: "displayName"
-                model: players.map(p => ({ displayName: `${p.identity ?? p.desktopEntry ?? Translation.tr("Unknown")} · ${p.trackTitle || "—"}`, icon: "music_note" }))
-                onActivated: index => MprisController.manualPlayer = players[index]
-
-                function syncIndex() {
-                    playerSelector.currentIndex = playerSelector.activeIndex;
-                }
-                onActiveIndexChanged: Qt.callLater(syncIndex)
-                onModelChanged: Qt.callLater(syncIndex)
-                onCountChanged: Qt.callLater(syncIndex)
-                Component.onCompleted: syncIndex()
-
-                // Kotaknya baru ada saat disentuh atau saat daftarnya terbuka.
-                // Di luar itu yang tersisa hanya teks dan ikonnya, jadi pemilih
-                // ini terbaca sebagai bagian dari kartu, bukan sebagai tombol.
-                colBackground: playerSelector.popup.visible
-                    ? root.colors.colSecondaryContainer
-                    : "transparent"
-                colBackgroundHover: root.colors.colSecondaryContainerHover
-                colBackgroundActive: root.colors.colSecondaryContainerActive
-                // Teksnya tinggal di kartu yang tembus pandang, di atas art yang
-                // sama dengan lirik, jadi ia ikut warna foreground kartu — bukan
-                // warna teks container yang cuma benar saat kotaknya ikut tampil.
-                colText: root.fg
-                colAccent: root.colors.colPrimary
-                colOnAccent: root.colors.colOnPrimary
-                colPopup: playerSelector.solid
-                colSelected: root.colors.colSecondaryContainer
-                colSelectedHover: root.colors.colSecondaryContainerHover
-                colSelectedActive: root.colors.colSecondaryContainerActive
-                colOnSelected: root.colors.colOnSecondaryContainer
-                colItemHover: root.colors.colSecondaryContainerHover
-                colItemActive: root.colors.colSecondaryContainerActive
-                colOnItem: root.colors.colOnLayer1
-                colSearch: root.colors.colLayer0
-                colOnSearch: root.colors.colOnLayer1
-                colSearchHint: root.colors.colSubtext
+                colors: root.colors
+                fg: root.fg
+                onActivated: index => MprisController.manualPlayer = playerSelector.players[index]
             }
 
             // Pemilih provider lyric — komponen bersama yang sama dengan yang

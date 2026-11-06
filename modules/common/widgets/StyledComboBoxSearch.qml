@@ -77,30 +77,15 @@ ComboBox {
     }
     readonly property int visibleCount: root.filteredItems.length
 
-    // Popup dulu meniru lebar tombolnya persis. Begitu tombol boleh memeluk
-    // teksnya sendiri (kartu player), tiruan itu jadi terlalu sempit untuk baris
-    // terpanjang, jadi daftar diukur lebih dulu dan popup tidak boleh kurang
-    // selebar itu.
-    TextMetrics {
-        id: labelMetrics
-        font.family: Appearance.font.family.main
-        font.pixelSize: Appearance.font.pixelSize.small * root.fontScale
-    }
-    readonly property real popupNeededWidth: {
-        const iconW = Appearance.font.pixelSize.larger * root.fontScale
-        const trailW = Appearance.font.pixelSize.normal * root.fontScale
-        const items = root.filteredItems
-        let best = 0
-        for (let i = 0; i < items.length; i++) {
-            labelMetrics.text = items[i].label
-            let w = labelMetrics.advanceWidth + 24 * root.sizeScale
-            if (items[i].icon.length > 0) w += iconW + 8 * root.sizeScale
-            const n = items[i].trailing.length
-            if (n > 0) w += 8 * root.sizeScale + n * trailW + (n - 1) * 6 * root.sizeScale
-            if (w > best) best = w
-        }
-        return Math.round(best + 16 * root.sizeScale)
-    }
+    // Popup dulu meniru lebar tombolnya persis. Di tempat yang kotaknya memeluk
+    // teks (kartu player: "Auto" = 75px) itu membuat nama provider terpotong dan
+    // legendanya tidak muat, jadi popup punya batas bawah sendiri — kira-kira
+    // selebar label terpanjang plus penanda trailing dan legenda, ikut skala.
+    // Angka tetap, bukan hasil mengukur isinya: satu bus YouTube bisa membawa
+    // judul halaman sepanjang 700px dan popup yang ikut mengukur isinya lalu
+    // melebar sendiri sampai keluar layar. Baris sepanjang itu sekarang dipotong
+    // di dalam popup yang tetap muat.
+    readonly property real popupMinWidth: 180 * root.sizeScale
 
     function pick(realIndex) {
         root.activated(realIndex)
@@ -113,6 +98,12 @@ ComboBox {
     // begitu popup pertama kali terbuka lalu terkunci selebar baris terpanjang.
     implicitWidth: buttonContent.implicitWidth + leftPadding + rightPadding
     Layout.fillWidth: true
+    // Layout memakai implicitWidth sebagai lebar MINIMUM kalau tidak dikatakan
+    // lain, jadi kotak yang memeluk teksnya sendiri tidak pernah boleh dipotong
+    // oleh layoutnya: label panjang (nama player, "Auto · provider") mendorong
+    // baris dan kartunya keluar panel. Teks di dalam kotak ini bisa dipotong
+    // dengan titik-titik, jadi tidak ada yang perlu ditolak.
+    Layout.minimumWidth: 0
 
     background: Rectangle {
         anchors.fill: parent
@@ -329,7 +320,7 @@ ComboBox {
 
     popup: Popup {
         y: root.popupAbove ? -height - 4 * root.sizeScale : root.height + 4 * root.sizeScale
-        width: Math.max(root.width, root.popupNeededWidth)
+        width: Math.max(root.width, root.popupMinWidth)
         // Combo yang memeluk teks duduk di sisi kanan, jadi popup yang lebih
         // lebar darinya tumbuh ke kiri, bukan keluar layar. Saat lebarnya sama,
         // hasil rumus ini 0 — persis seperti dulu.
