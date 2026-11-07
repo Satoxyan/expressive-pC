@@ -295,6 +295,7 @@ DelegateChooser {
         buttonData: modelData
         editMode: root.editMode
         gridRef: root.gridRef
+        panelRef: root.panelRef
         expandedSize: modelData.size > 1
         baseCellWidth: root.baseCellWidth
         baseCellHeight: root.baseCellHeight

@@ -71,6 +71,16 @@ AbstractQuickPanel {
         for (let i = 0; i < usedRowCount; i++) out = out.concat(toggleRows[i]);
         return out;
     }
+    // The configured order, without nulls. This is what the delegates are made from, so
+    // it has to stay put for the whole drag: see the note on the Repeater below.
+    readonly property list<var> stableToggles: toggles.filter(t => !!t)
+    // The order the buttons are actually shown in, as types, which is what a slot is
+    // placed by while a drag is moving something around it.
+    readonly property list<string> displayOrder: {
+        let out = [];
+        for (const t of usedToggles) if (t) out.push(t.type);
+        return out;
+    }
     readonly property var usedLayout: {
         const out = [];
         let row = 0, col = 0;
@@ -119,14 +129,24 @@ AbstractQuickPanel {
             implicitHeight: root.usedGridHeight
 
             Repeater {
+                // Keyed on the configured order, not the displayed one. Reordering the
+                // model instead rebuilds delegates whenever the packing changes, and the
+                // button being dragged is one of them: its DragHandler dies with the
+                // delegate, so the release never runs, the ghost keeps the last point it
+                // was handed and hangs in mid-air, and the new order is never written.
                 model: ScriptModel {
-                    values: root.usedToggles
+                    values: root.stableToggles
                     objectProp: "type"
                 }
                 delegate: Item {
                     id: slot
-                    x: root.usedLayout[index].x
-                    y: root.usedLayout[index].y
+                    required property var modelData
+                    readonly property int orderIndex: root.displayOrder.indexOf(modelData.type)
+                    readonly property bool placed: orderIndex >= 0 && orderIndex < root.usedLayout.length
+                    readonly property var cell: placed ? root.usedLayout[orderIndex] : null
+                    visible: placed
+                    x: placed ? cell.x : 0
+                    y: placed ? cell.y : 0
                     width: root.baseCellWidth * modelData.size + root.spacing * (modelData.size - 1)
                     height: root.baseCellHeight
                     // slot ditinggal kosong — tombolnya sendiri ada di dragGhost, nempel di kursor
