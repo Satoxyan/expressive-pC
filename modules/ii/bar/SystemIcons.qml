@@ -36,6 +36,32 @@ Item {
         flow: root.vertical ? Flow.TopToBottom : Flow.LeftToRight
         spacing: isMaterial ? 2 : root.vertical ? 6 : 10
 
+        // First of the group, so a VPN is the first thing you read on the way in.
+        Revealer {
+            reveal: Vpn.running
+            MaterialSymbol {
+                id: vpnIcon
+                property bool hovered: vpnHover.containsMouse
+                text: "vpn_key"
+                iconSize: Appearance.font.pixelSize.larger
+                color: root.iconColor
+
+                // Only for the tooltip: no button is taken, so the click still reaches
+                // the area underneath and opens the sidebar like the rest of the group.
+                MouseArea {
+                    id: vpnHover
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    acceptedButtons: Qt.NoButton
+                }
+
+                StyledToolTip {
+                    text: Vpn.tunnelDevice.length > 0
+                        ? Vpn.tunnelDevice
+                        : Translation.tr("VPN")
+                }
+            }
+        }
         Revealer {
             reveal: true
             Item {

@@ -26,6 +26,18 @@ Singleton {
     readonly property bool available: profiles.length > 0
     readonly property bool connected: activeProfile !== null
 
+    // Whether the traffic leaving this machine is carried by a tunnel rather than by
+    // the network card itself. Read off the default route and the type of whatever
+    // interface it lands on, so a VPN that runs its own daemon — Cloudflare WARP,
+    // Mullvad, Proton, openvpn — counts just as much as one NetworkManager knows
+    // about, which is all `connected` can see.
+    //
+    // The answer is watched, not asked: whoever brings a VPN up gets the bar key
+    // within a second, without the sidebar being opened to poke the listing.
+    property string tunnelDevice: ""
+    readonly property bool tunnelActive: tunnelDevice.length > 0
+    readonly property bool running: connected || tunnelActive
+
     function splitFields(line) {
         const fields = [];
         let current = "";
@@ -46,6 +58,14 @@ Singleton {
 
     function refresh() {
         if (!listProc.running) listProc.running = true;
+    }
+
+    // The watcher never stops writing into the same buffer, so the current verdict
+    // is simply the last line it has produced.
+    function readTunnelLine() {
+        const lines = tunnelOut.text.split("\n").filter(s => s.length > 0);
+        const last = lines[lines.length - 1] ?? "";
+        root.tunnelDevice = last === "-" ? "" : last;
     }
 
     function toggle() {
@@ -118,6 +138,26 @@ Singleton {
                 root.activeUuids = (parts[1] ?? "").split("\n").map(s => s.trim()).filter(s => s.length > 0);
             }
         }
+    }
+
+    Process {
+        id: tunnelWatch
+        running: true
+        // The interface the default route lands on, printed only when its type says
+        // tunnel: 1 is a network card and 772 is the loopback, while 65534 covers
+        // tun/tap/wireguard — WARP, Mullvad, Proton, openvpn alike — and 512 is ppp.
+        // A line is written only when the verdict differs from the last one, so the
+        // shell hears about a change and nothing else. `ip route get` rather than the
+        // routing table because a VPN usually sits in its own table behind a rule.
+        command: ["bash", "-c", "p=init; while :; do out=$(ip -4 route get 1.1.1.1 2>/dev/null); rest=\"${out#* dev }\"; d=\"${rest%% *}\"; t=\"\"; read -r t < \"/sys/class/net/$d/type\" 2>/dev/null; case \"$t\" in 1|772|\"\") c=\"\" ;; *) c=\"$d\" ;; esac; [ \"$c\" != \"$p\" ] && { echo \"${c:--}\"; p=\"$c\"; }; sleep 1; done"]
+        stdout: StdioCollector {
+            id: tunnelOut
+            waitForEnd: false
+            onStreamFinished: root.readTunnelLine()
+            onDataChanged: root.readTunnelLine()
+        }
+        // Should it ever be killed, the bar key must not go deaf for good.
+        onExited: tunnelWatch.running = true
     }
 
     Process {
