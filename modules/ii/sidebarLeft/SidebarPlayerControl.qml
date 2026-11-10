@@ -337,7 +337,27 @@ Item {
 
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 24
+                    spacing: 12
+                    RippleButton {
+                        property real baseSize: Math.max(60, parent.parent.height * 0.06)
+                        implicitWidth: baseSize
+                        implicitHeight: baseSize 
+                        buttonRadius: Appearance.rounding.verylarge
+                        colBackground: "transparent"
+                        colBackgroundHover: "transparent"
+                        colRipple: "transparent"
+                        padding: -10
+                        downAction: () => root.player?.previous()
+                        contentItem: MaterialShapeWrappedMaterialSymbol {
+                            wrappedShape: MaterialShape.Shape.Cookie12Sided
+                            padding: 0
+                            iconSize: 32
+                            fill: 1
+                            text: "skip_previous"
+                            color: ColorUtils.transparentize(blendedColors.colSecondaryContainer, 0.7)
+                            colSymbol: blendedColors.colOnSecondaryContainer
+                        }
+                    }
 
                     RippleButton {
                         property real baseSize: Math.max(70, parent.parent.height * 0.1)
@@ -385,27 +405,6 @@ Item {
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 24
-
-                    RippleButton {
-                        property real baseSize: Math.max(60, parent.parent.height * 0.06)
-                        implicitWidth: baseSize
-                        implicitHeight: baseSize 
-                        buttonRadius: Appearance.rounding.verylarge
-                        colBackground: "transparent"
-                        colBackgroundHover: "transparent"
-                        colRipple: "transparent"
-                        padding: -10
-                        downAction: () => root.player?.previous()
-                        contentItem: MaterialShapeWrappedMaterialSymbol {
-                            wrappedShape: MaterialShape.Shape.Cookie12Sided
-                            padding: 0
-                            iconSize: 32
-                            fill: 1
-                            text: "skip_previous"
-                            color: ColorUtils.transparentize(blendedColors.colSecondaryContainer, 0.7)
-                            colSymbol: blendedColors.colOnSecondaryContainer
-                        }
-                    }
 
                     ColumnLayout {
                         Layout.fillWidth: true
@@ -525,47 +524,26 @@ Item {
                     }
                 }
 
-                RippleButton {
-                    property real baseSize: Math.max(36, parent.parent.height * 0.05)
-                    Layout.fillWidth: true
-                    implicitHeight: baseSize
-                    buttonRadius: Appearance.rounding.large
-                    colBackground: ColorUtils.transparentize(blendedColors.colSecondaryContainer, 0.7)
-                    colBackgroundHover: blendedColors.colSecondaryContainerHover
-                    colRipple: blendedColors.colSecondaryContainerActive
-                    downAction: () => {
-                        if (root.player) root.player.volume = Math.max(0, (root.player.volume ?? 1) - 0.1)  
-                    }
-                    contentItem: MaterialSymbol {
-                        iconSize: 18
-                        fill: 1
-                        horizontalAlignment: Text.AlignHCenter
-                        color: blendedColors.colOnSecondaryContainer
-                        text: "volume_down"
-                    }
-                }
+                   // Volume slider
+                   StyledSlider {
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignVCenter
 
-                RippleButton {
-                    property real baseSize: Math.max(36, parent.parent.height * 0.05)
-                    Layout.fillWidth: true
-                    implicitHeight: baseSize
-                    buttonRadius: Appearance.rounding.large
-                    colBackground: ColorUtils.transparentize(blendedColors.colSecondaryContainer, 0.7)
-                    colBackgroundHover: blendedColors.colSecondaryContainerHover
-                    colRipple: blendedColors.colSecondaryContainerActive
-                    downAction: () => {
-                        if (root.player) root.player.volume = Math.min(1.5, (root.player.volume ?? 1) + 0.1)  
-                    }
-                    contentItem: MaterialSymbol {
-                        iconSize: 18
-                        fill: 1
-                        horizontalAlignment: Text.AlignHCenter
-                        color: blendedColors.colOnSecondaryContainer
-                        text: "volume_up"
-                    }
-                }
+                        configuration: StyledSlider.Configuration.Wavy
 
-                RippleButton {
+                        highlightColor: blendedColors.colPrimary
+                        trackColor: blendedColors.colSecondaryContainer
+                        handleColor: blendedColors.colPrimary
+
+                        value: root.player?.volume ?? 1
+
+                        onMoved: {
+                            if (root.player)
+                            root.player.volume = value
+                        }
+                    }
+
+               RippleButton {
                     id: moreButton
                     property real baseSize: Math.max(36, parent.parent.height * 0.05)
                     implicitWidth: baseSize
