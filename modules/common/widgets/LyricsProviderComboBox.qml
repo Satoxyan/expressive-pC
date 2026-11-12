@@ -52,6 +52,11 @@ StyledComboBoxSearch {
 
     textRole: "displayName"
     popupAbove: true
+    // Daftar ini punya lebar sendiri, tidak ikut lebar tombolnya: label tombol
+    // berubah panjang ("Auto" vs "Auto · provider") dan tombolnya mengecil di
+    // widget, jadi popup yang meniru tombol ikut melompat dan memotong legenda.
+    // Lebarnya tetap, cukup untuk nama provider + penanda + legenda.
+    popupWidth: 240 * root.sizeScale
     // Badge chevron yang terpisah cuma masuk selama kotaknya bening: ia satu-
     // satunya bagian yang boleh berubah warna saat ditekan. Begitu solidBox
     // mewarnai chip-nya, badge dengan warna yang sama cuma memecah tombol jadi

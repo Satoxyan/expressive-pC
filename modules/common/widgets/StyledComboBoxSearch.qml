@@ -86,6 +86,9 @@ ComboBox {
     // melebar sendiri sampai keluar layar. Baris sepanjang itu sekarang dipotong
     // di dalam popup yang tetap muat.
     readonly property real popupMinWidth: 180 * root.sizeScale
+    // Lebar tetap untuk daftar, kalau pemanggil mau daftarnya punya ukuran
+    // sendiri alih-alih ikut melebar bersama tombolnya. 0 = perilaku lama.
+    property real popupWidth: 0
 
     function pick(realIndex) {
         root.activated(realIndex)
@@ -320,7 +323,7 @@ ComboBox {
 
     popup: Popup {
         y: root.popupAbove ? -height - 4 * root.sizeScale : root.height + 4 * root.sizeScale
-        width: Math.max(root.width, root.popupMinWidth)
+        width: root.popupWidth > 0 ? root.popupWidth : Math.max(root.width, root.popupMinWidth)
         // Combo yang memeluk teks duduk di sisi kanan, jadi popup yang lebih
         // lebar darinya tumbuh ke kiri, bukan keluar layar. Saat lebarnya sama,
         // hasil rumus ini 0 — persis seperti dulu.
