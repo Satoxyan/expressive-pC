@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import qs
 import qs.services
 import qs.modules.common
+import qs.modules.common.widgets
 import qs.modules.common.functions
 import Qt5Compat.GraphicalEffects
 import QtQuick
@@ -157,7 +158,7 @@ Item { // Window
         onTriggered: root.grabSnapshot()
     }
 
-    ScreencopyView {
+    SmoothScreencopyView {
         id: windowPreview
 
         // Attaching the stream twice in a row is what brings the preview back:
