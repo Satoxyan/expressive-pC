@@ -79,10 +79,13 @@ startup() {
   local t0 t1 pid
   t0=$(date +%s%N)
   nohup qs -c "$CONFIG" >/tmp/opencode/qs-startup.log 2>&1 &
+  # Siap = QML sudah hidup, bukan sekadar proses terdaftar: target IPC `search`
+  # baru ada setelah Overview.qml ter-load. `search close` aman (menutup yang sudah tertutup).
   for _ in $(seq 1 $((STARTUP_SECS*10))); do
-    pid=$(qs list --all 2>/dev/null | awk -v cfg="/$CONFIG/shell.qml" '
-      /Process ID:/{p=$3} /Config path:/{if (index($0,cfg)) {print p; exit}}')
-    [ -n "$pid" ] && break
+    if ! qs -c "$CONFIG" ipc call search close 2>&1 | grep -q 'Target not found'; then
+      pid=$(qs list --all 2>/dev/null | awk '/Process ID:/{p=$3} END{print p}')
+      [ -n "$pid" ] && break
+    fi
     sleep 0.1
   done
   [ -n "${pid:-}" ] || { echo "startup: qs never registered" >&2; return 1; }
