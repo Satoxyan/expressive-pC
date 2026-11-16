@@ -16,7 +16,7 @@ import unicodedata
 import uuid
 import zlib
 
-DEFAULT_PROVIDERS = "musixmatch,youlyplus,unison,netease,qqmusic,paxsenix,betterlyric,binilyrics,simpmusic,lrclib,kugou"
+DEFAULT_PROVIDERS = "lrcred,musixmatch,youlyplus,unison,netease,qqmusic,paxsenix,betterlyric,binilyrics,simpmusic,lrclib,kugou"
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
@@ -1203,6 +1203,118 @@ def fetch_binilyrics(title, artist, duration):
 
 
 # ---------------------------------------------------------------------------
+# Provider: lrc.red (Apple Music TTML, filed by ISRC)
+# Ported from kushagrasinghx/BitChord shared/src/jvmSharedMain/kotlin/
+# com/music/bitchord/data/lyrics/LrcRed.kt (GPL-3.0). Every document lives at
+# https://lrc.red/s/{ISRC}.ttml, so a search hit costs one more request and
+# cannot come back as a different edit of the song. The player gives no ISRC,
+# so the search is asked by title + artist and the hits are matched here rather
+# than trusted in order: lrc.red ranks a free-text search, and the first row is
+# routinely another take.
+# ---------------------------------------------------------------------------
+
+LRCRED_BASE = "https://lrc.red/"
+# `CC-XXX-YY-NNNNN` without the dashes — and nothing else goes into a path.
+LRCRED_ISRC = re.compile(r"[A-Z]{2}[A-Z0-9]{3}\d{7}")
+# Players report whole seconds and lrc.red fractional ones; a live cut and the
+# studio take of one song can also sit a few seconds apart.
+LRCRED_DURATION_TOLERANCE = 3.0
+LRCRED_BRACKETED = re.compile(r"[(\[][^)\]]*[)\]]")
+LRCRED_ARTIST_SPLIT = re.compile(
+    r"\s*(?:,|&|;|/|\band\b|\bx\b|\bwith\b|\bfeat\.?\b|\bft\.?\b)\s*", re.I)
+# Bracket words that make it a different recording, not a different label.
+LRCRED_VERSION_WORDS = {
+    "live", "remix", "remixed", "mix", "acoustic", "unplugged", "instrumental",
+    "karaoke", "cappella", "acapella", "demo", "edit", "version", "cover",
+    "sped", "slowed", "reverb", "nightcore", "lofi", "orchestral", "extended",
+}
+
+
+def _lrcred_normalized(value):
+    """Lower case, accents off ("ROSÉ" is "rose"), and only letters and digits."""
+    value = unicodedata.normalize("NFD", value)
+    value = "".join(ch for ch in value if not unicodedata.combining(ch))
+    value = "".join(ch if ch.isalnum() else " " for ch in value.lower())
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def _lrcred_core(title):
+    """The title without its brackets or its " - " suffix."""
+    core = _lrcred_normalized(LRCRED_BRACKETED.sub(" ", title).split(" - ")[0])
+    return core or _lrcred_normalized(title)
+
+
+def _lrcred_version(title):
+    """The version words in the parts _lrcred_core throws away."""
+    extras = " ".join(m.group(0) for m in LRCRED_BRACKETED.finditer(title))
+    if " - " in title:
+        extras += " " + title.split(" - ", 1)[1]
+    return {word for word in _lrcred_normalized(extras).split()
+            if word in LRCRED_VERSION_WORDS}
+
+
+def _lrcred_artists(artist):
+    return {name for name in (_lrcred_normalized(part)
+                              for part in LRCRED_ARTIST_SPLIT.split(artist)) if name}
+
+
+def _lrcred_document_url(isrc):
+    isrc = (isrc or "").strip().upper()
+    return f"{LRCRED_BASE}s/{isrc}.ttml" if LRCRED_ISRC.fullmatch(isrc) else None
+
+
+def _lrcred_best(hits, title, artist, duration):
+    """The hit that is this recording, or None if none of them is sure to be.
+
+    A miss is recoverable (the next provider gets its turn) and the wrong words
+    scrolling in time with the right song is not, so every test is a
+    requirement: same core title, same version words, a shared artist, and a
+    length within tolerance. Of the hits that pass, the closest in length wins.
+    """
+    wanted_title = _lrcred_core(title)
+    wanted_version = _lrcred_version(title)
+    wanted_artists = _lrcred_artists(artist)
+
+    def distance(hit):
+        length = hit.get("duration")
+        return abs(float(length) - duration) if duration > 0 and length is not None else 0.0
+
+    candidates = []
+    for hit in hits:
+        name = hit.get("title")
+        if not name or not _lrcred_document_url(hit.get("isrc")):
+            continue
+        if _lrcred_core(name) != wanted_title:
+            continue
+        if _lrcred_version(name) != wanted_version:
+            continue
+        hit_artists = _lrcred_artists(hit.get("artist") or "")
+        if wanted_artists and not (hit_artists & wanted_artists):
+            continue
+        if distance(hit) > LRCRED_DURATION_TOLERANCE:
+            continue
+        candidates.append(hit)
+    return min(candidates, key=distance) if candidates else None
+
+
+def fetch_lrcred(title, artist, duration):
+    query = f"{title} {artist}".strip()
+    try:
+        data = _http_json(LRCRED_BASE + "search.json?" + urllib.parse.urlencode({"q": query}))
+    except Exception:
+        return []
+    hit = _lrcred_best((data or {}).get("hits") or [], title, artist, duration)
+    url = _lrcred_document_url((hit or {}).get("isrc"))
+    if not url:
+        return []
+    try:
+        ttml = _http(url)
+    except Exception:
+        return []
+    return ttml_to_lrc(ttml)
+
+
+# ---------------------------------------------------------------------------
 # Provider: simpmusic (YouTube videoId based)
 # ---------------------------------------------------------------------------
 
@@ -1910,6 +2022,7 @@ def fetch_qqmusic(title, artist, duration):
 # ---------------------------------------------------------------------------
 
 PROVIDERS = {
+    "lrcred": fetch_lrcred,
     "musixmatch": fetch_musixmatch,
     "youlyplus": fetch_youlyplus,
     "unison": fetch_unison,
