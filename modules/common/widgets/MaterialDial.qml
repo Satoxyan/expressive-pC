@@ -33,7 +33,11 @@ Dial {
         to: 360
         duration: 2000
         loops: Animation.Infinite
-        running: true
+        // The dial is drawn only while its host fades it in (PlayerContent
+        // sets opacity to 0 unless the artwork is hovered). Animating a phase
+        // nobody can see costs a full path rebuild per frame; the wave still
+        // runs whenever the dial is actually visible.
+        running: control.visible && control.opacity > 0
     }
 
     MouseArea {
