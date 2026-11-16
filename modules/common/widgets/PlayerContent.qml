@@ -19,6 +19,9 @@ Item {
     required property color artDominantColor
     property bool lyricsMode: false
     property bool lyricsAllowed: true
+    // True while the volume dial is being scrolled: the player's reported
+    // volume is allowed to drive the dial only when this is false.
+    property bool volumeDialBusy: false
     signal toggleLyrics()
 
     // The song of this card's player, and the only lyric anything in here reads.
@@ -49,6 +52,12 @@ Item {
 
     function lerp(a, b) {
         return a + (b - a) * root.t
+    }
+
+    Timer {
+        id: volumeDialSettleTimer
+        interval: 300
+        onTriggered: root.volumeDialBusy = false
     }
 
     component TrackChangeButton: RippleButton {
@@ -134,14 +143,27 @@ Item {
         }
 
         MaterialDial {
+            id: volumeDial
             anchors.fill: parent
             anchors.margins: 14
             enabled: root.t < 0.5
             colPrimary: root.blendedColors.colPrimary
             colSecondary: root.blendedColors.colSecondaryContainer
-            value: root.player?.volume ?? 0
             waveAmplitude: 3.2 * (root.player?.volume ?? 0)
             opacity: artHover.hovered && root.t < 0.5 ? 1.0 : 0.0
+
+            // A touchpad emits wheel events faster than MPRIS reports the new
+            // volume back: every stale report used to yank the dial backwards
+            // mid-gesture (measured: 200 of 619 events started from a higher
+            // value than the previous event ended at). While the dial is being
+            // scrolled, its own value is the truth; the player takes over again
+            // once the gesture goes quiet.
+            Binding {
+                target: volumeDial
+                property: "value"
+                value: root.player?.volume ?? 0
+                when: !root.volumeDialBusy
+            }
 
             Behavior on opacity {
                 NumberAnimation {
@@ -154,6 +176,8 @@ Item {
             onMoved: {
                 if (root.player)
                     root.player.volume = value;
+                root.volumeDialBusy = true;
+                volumeDialSettleTimer.restart();
             }
         }
     }

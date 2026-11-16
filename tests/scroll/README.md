@@ -14,4 +14,4 @@ Use `/usr/lib/qt6/bin/qmltestrunner`; `/usr/bin/qmltestrunner` is a different bu
 `qs/modules/common` is a test-only module: the real `InertialScrollEngine.qml`
 and `ContentPage.qml`, plus a stub `Config.qml` with only the scrolling knobs
 the engine reads and a stub `Appearance.qml` with only the properties the
-widgets read.
+widgets read. `tst_dial.qml` reuses it for MaterialDial's wheel parsing.

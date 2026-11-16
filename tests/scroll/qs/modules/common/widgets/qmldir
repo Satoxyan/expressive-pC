@@ -1,2 +1,4 @@
 module qs.modules.common.widgets
 ContentPage 1.0 ContentPage.qml
+Circle 1.0 Circle.qml
+MaterialDial 1.0 MaterialDial.qml
