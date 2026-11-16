@@ -269,6 +269,6 @@ git add docs/superpowers/perf && git commit -m "perf: baseline S0-S5 measurement
 **Files:**
 - Create: `docs/superpowers/perf/<tanggal>-final-report.md`
 
-- [ ] **Step 1:** Tabel sebelum/sesudah per skenario per metrik (median), daftar perubahan default (nilai lama → baru), perubahan sistem (`setcap`), dan daftar yang ditolak.
-- [ ] **Step 2:** Bagian keputusan C: apakah biaya yang tersisa tersebar struktural (timer per-file, capture per-monitor terduplikasi, 114 singleton) atau ada hotspot tunggal. Sertakan angka yang mendukung, bukan opini.
-- [ ] **Step 3:** Serahkan ke user untuk memutuskan lanjut C atau berhenti.
+- [x] **Step 1:** Tabel sebelum/sesudah per skenario per metrik (median), daftar perubahan default (nilai lama → baru), perubahan sistem (`setcap`), dan daftar yang ditolak.
+- [x] **Step 2:** Bagian keputusan C: apakah biaya yang tersisa tersebar struktural (timer per-file, capture per-monitor terduplikasi, 114 singleton) atau ada hotspot tunggal. Sertakan angka yang mendukung, bukan opini.
+- [x] **Step 3:** Serahkan ke user untuk memutuskan lanjut C atau berhenti. **Keputusan user 2026-11-16: berhenti di sini**, tidak lanjut kerja struktural.

@@ -150,3 +150,10 @@ Kalau dilanjutkan, ada dua tingkat pekerjaan:
   satu ticker global, dan memindahkan watcher VPN 1 detik ke event
   `ip monitor`/`nmcli monitor`. Keduanya menyentuh banyak pemanggil dan butuh
   rencana sendiri.
+
+
+## Keputusan
+
+User memutuskan **berhenti di sini** (2026-11-16): tidak dilanjutkan ke kerja
+struktural (ticker global, watcher VPN berbasis event). Semua perbaikan ada di
+branch `audit/perf`, belum di-push.
