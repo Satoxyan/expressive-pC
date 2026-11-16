@@ -1,0 +1,42 @@
+Trace QML lewat TCP (qs --debug + qmlprofiler). Atribusi memakai JUMLAH
+event per detik, bukan jumlah durasi (durasi/rentang bisa negatif di Qt 6.12).
+File .qtd mentah tidak disimpan (44-90 MB); ringkasan ini yang jadi bukti.
+
+=== trace3.qtd  sebelum fix #4, musik Paused (HEAD 93bd921)
+    span=13.1s  total=72082 event/detik
+       9316.5/dtk  Javascript       morph.js:23
+       9316.5/dtk  Javascript       utils.js:24
+       4964.2/dtk  Javascript       point.js:17
+       3377.5/dtk  Javascript       cubic.js:28
+       3335.2/dtk  Javascript       cubic.js:24
+       3335.2/dtk  Javascript       cubic.js:26
+       3335.2/dtk  Javascript       cubic.js:25
+       3335.2/dtk  Javascript       cubic.js:27
+       3303.7/dtk  Javascript       cubic.js:29
+       3143.0/dtk  Javascript       cubic.js:22
+
+=== trace-post.qtd  sesudah fix #4, musik Playing (HEAD audit/perf)
+    span=19.0s  total=37577 event/detik
+       4002.6/dtk  Javascript       point.js:17
+       3061.4/dtk  Javascript       MediaControls.qml:190
+       3061.4/dtk  Javascript       MediaControls.qml:190
+       2518.2/dtk  Javascript       cubic.js:22
+       2462.2/dtk  Javascript       cubic.js:23
+       1845.1/dtk  Javascript       cubic.js:28
+       1789.2/dtk  Javascript       cubic.js:29
+       1788.5/dtk  Javascript       cubic.js:24
+       1788.5/dtk  Javascript       cubic.js:26
+       1788.5/dtk  Javascript       cubic.js:25
+
+=== trace-paused.qtd  sesudah fix #4, musik Paused (HEAD audit/perf)
+    span=12.9s  total=1013 event/detik
+        166.7/dtk  HandlingSignal   StyledSlider.qml:161
+        166.7/dtk  Javascript       StyledSlider.qml:161
+        119.8/dtk  Javascript       PhoneNotifications.qml:89
+         89.7/dtk  Javascript       StyledProgressBar.qml:83
+         89.7/dtk  Javascript       StyledProgressBar.qml:74
+         24.1/dtk  Javascript       PhoneNotifications.qml:356
+         12.6/dtk  Javascript       PhoneConnect.qml:434
+         12.6/dtk  Javascript       PhoneConnect.qml:125
+         12.2/dtk  Javascript       PhoneConnect.qml:140
+         12.1/dtk  Javascript       PhoneNotifications.qml:351
