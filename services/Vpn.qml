@@ -149,7 +149,10 @@ Singleton {
         // A line is written only when the verdict differs from the last one, so the
         // shell hears about a change and nothing else. `ip route get` rather than the
         // routing table because a VPN usually sits in its own table behind a rule.
-        command: ["bash", "-c", "p=init; while :; do out=$(ip -4 route get 1.1.1.1 2>/dev/null); rest=\"${out#* dev }\"; d=\"${rest%% *}\"; t=\"\"; read -r t < \"/sys/class/net/$d/type\" 2>/dev/null; case \"$t\" in 1|772|\"\") c=\"\" ;; *) c=\"$d\" ;; esac; [ \"$c\" != \"$p\" ] && { echo \"${c:--}\"; p=\"$c\"; }; sleep 1; done"]
+        // `pp=$PPID` + `kill -0 $pp` adalah penjaganya: kalau qs mati, loop ini
+        // jadi yatim (ppid 1) dan dulu hidup terus, satu proses bocor per
+        // restart. Sekarang loop ikut mati begitu induknya hilang.
+        command: ["bash", "-c", "pp=$PPID; while kill -0 $pp 2>/dev/null; do out=$(ip -4 route get 1.1.1.1 2>/dev/null); rest=\"${out#* dev }\"; d=\"${rest%% *}\"; t=\"\"; read -r t < \"/sys/class/net/$d/type\" 2>/dev/null; case \"$t\" in 1|772|\"\") c=\"\" ;; *) c=\"$d\" ;; esac; [ \"$c\" != \"$p\" ] && { echo \"${c:--}\"; p=\"$c\"; }; sleep 1; done"]
         stdout: StdioCollector {
             id: tunnelOut
             waitForEnd: false
