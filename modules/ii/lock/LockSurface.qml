@@ -44,6 +44,72 @@ MouseArea {
     readonly property bool mediaPlayerAvailable: MprisController.activePlayer !== null && MprisController.activePlayer.trackTitle
     property bool mediaLoaderActive: false
 
+    // The compact media row beside the password field pages the same list as the card
+    // above it. Both end up setting `MprisController.manualPlayer`, so whichever one is
+    // on screen follows the other.
+    property real mediaWheelAccum: 0
+    property real mediaWheelTravel: 0
+    property bool mediaWheelLast: false
+    readonly property real mediaWheelTrigger: 180
+
+    function mediaIsWheel(angle) {
+        return angle !== 0 && Math.abs(angle) % 120 === 0
+    }
+
+    function turnMediaPage(dir) {
+        const list = MprisController.pagedPlayers
+        if (list.length < 2) return
+        const key = LyricsService.playerKey(MprisController.activePlayer)
+        let index = 0
+        for (let i = 0; i < list.length; i++) {
+            if (LyricsService.playerKey(list[i]) === key) {
+                index = i
+                break
+            }
+        }
+        const next = Math.max(0, Math.min(list.length - 1, index + dir))
+        if (next === index) return
+        MprisController.manualPlayer = list[next]
+    }
+
+    function handleMediaWheel(event) {
+        const angle = event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x
+        const pixel = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.pixelDelta.x
+        if (angle === 0 && pixel === 0) return
+        const wheel = root.mediaIsWheel(angle)
+        root.mediaWheelLast = wheel
+        mediaWheelTimer.restart()
+        if (wheel) {
+            root.mediaWheelTravel += (angle * -1) / 120
+            while (Math.abs(root.mediaWheelTravel) >= 1) {
+                const dir = root.mediaWheelTravel > 0 ? 1 : -1
+                root.mediaWheelTravel -= dir
+                root.turnMediaPage(dir)
+            }
+            event.accepted = true
+            return
+        }
+        root.mediaWheelAccum += (pixel !== 0 ? pixel : angle) * -1
+            * Config.options.interactions.scrolling.touchpadSensitivity
+        if (Math.abs(root.mediaWheelAccum) < root.mediaWheelTrigger) {
+            event.accepted = true
+            return
+        }
+        const dir = root.mediaWheelAccum > 0 ? 1 : -1
+        root.mediaWheelAccum = 0
+        root.turnMediaPage(dir)
+        event.accepted = true
+    }
+
+    Timer {
+        id: mediaWheelTimer
+        interval: root.mediaWheelLast ? 600 : 150
+        onTriggered: {
+            root.mediaWheelAccum = 0
+            root.mediaWheelTravel = 0
+        }
+    }
+
     Connections {
         target: GlobalStates
         function onLockMediaOpenChanged() {
@@ -304,6 +370,7 @@ MouseArea {
 
         sourceComponent: LockMediaWidget {
             player: MprisController.activePlayer
+            players: MprisController.pagedPlayers
             visualizerPoints: GlobalStates.visualizerPoints
             radius: Appearance.rounding.screenRounding - Appearance.sizes.hyprlandGapsOut + 1
         }
@@ -590,6 +657,7 @@ MouseArea {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
+                    onWheel: wheel => root.handleMediaWheel(wheel)
                     onClicked: {
                         root.forceFieldFocus()
                         GlobalStates.lockMediaOpen = !GlobalStates.lockMediaOpen
