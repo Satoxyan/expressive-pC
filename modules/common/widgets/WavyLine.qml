@@ -9,6 +9,10 @@ Canvas {
     property real lineWidth: 4
     property real fullLength: width
 
+    // The amplitude is animated (a wave settling into a line when the player
+    // pauses), and a Canvas does not repaint on property changes by itself.
+    onAmplitudeMultiplierChanged: requestPaint()
+
     onPaint: {
         var ctx = getContext("2d");
         ctx.clearRect(0, 0, width, height);

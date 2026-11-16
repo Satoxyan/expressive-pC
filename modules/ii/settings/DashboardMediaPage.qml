@@ -238,6 +238,7 @@ Item {
                         StyledSlider {
                             Layout.fillWidth: true
                             configuration: StyledSlider.Configuration.Wavy
+                            waveActive: root.player?.isPlaying ?? false
                             enabled: root.player?.canSeek ?? false
                             highlightColor: root.colors.colPrimary
                             trackColor: root.colors.colSecondaryContainer

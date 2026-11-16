@@ -52,7 +52,14 @@ Slider {
     property string tooltipContent: usePercentTooltip ? `${Math.round(((value - from) / (to - from)) * 100)}%` : `${Math.round(value)}`
     property bool wavy: configuration === StyledSlider.Configuration.Wavy // If true, the progress bar will have a wavy fill effect
     property bool animateWave: true
-    property real waveAmplitudeMultiplier: wavy ? 0.5 : 0
+    // Whether the wave should be there at all. A paused player sets this false:
+    // the fill settles into a straight line (and stops repainting) instead of
+    // waving under a position that is not moving.
+    property bool waveActive: true
+    // How long the settle takes, in ms. Its own knob so tuning the morph does
+    // not slow every elementMoveFast animation in the shell.
+    property int waveMorphDuration: 750
+    property real waveAmplitudeMultiplier: (wavy && waveActive) ? 0.5 : 0
     property real waveFrequency: 6
     property real waveFps: 60
 
@@ -72,6 +79,15 @@ Slider {
 
     Behavior on handleMargins {
         animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+    }
+
+    // Morph the wave into a straight line (and back) instead of snapping.
+    Behavior on waveAmplitudeMultiplier {
+        NumberAnimation {
+            duration: root.waveMorphDuration
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve
+        }
     }
 
     component TrackDot: Rectangle {
@@ -148,7 +164,7 @@ Slider {
                     frequency: root.waveFrequency
                     fullLength: root.width
                     color: root.highlightColor
-                    amplitudeMultiplier: root.wavy ? 0.5 : 0
+                    amplitudeMultiplier: root.waveAmplitudeMultiplier
                     width: parent.width
                     height: root.trackWidth
                     Connections {
@@ -157,7 +173,7 @@ Slider {
                         function onHighlightColorChanged() { wavyFill.requestPaint(); }
                     }
                     FrameAnimation {
-                        running: root.animateWave
+                        running: root.animateWave && root.waveActive
                         onTriggered: {
                             wavyFill.requestPaint()
                         }

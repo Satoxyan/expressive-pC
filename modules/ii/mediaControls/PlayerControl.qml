@@ -270,6 +270,7 @@ Item { // Player instance
                                 active: root.player?.canSeek ?? false
                                 sourceComponent: StyledSlider { 
                                     configuration: StyledSlider.Configuration.Wavy
+                                    waveActive: root.player?.isPlaying ?? false
                                     highlightColor: blendedColors.colPrimary
                                     trackColor: blendedColors.colSecondaryContainer
                                     handleColor: blendedColors.colPrimary

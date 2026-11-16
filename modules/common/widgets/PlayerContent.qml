@@ -299,6 +299,7 @@ Item {
             active: root.player?.canSeek ?? false
             sourceComponent: StyledSlider {
                 configuration: StyledSlider.Configuration.Wavy
+                waveActive: root.player?.isPlaying ?? false
                 highlightColor: root.blendedColors.colPrimary
                 trackColor: root.blendedColors.colSecondaryContainer
                 handleColor: root.blendedColors.colPrimary
