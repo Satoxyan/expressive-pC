@@ -53,6 +53,14 @@ ComboBox {
 
     onSizeScaleChanged: if (popup.visible) popup.close()
 
+    // Kotak transparan yang idle masih membawa hitam di alpha 0, jadi animasi
+    // ke warna hover melewati versi gelap setengah transparan — kotaknya
+    // menghitam dulu sebelum mantap. Mulai dari warna hover ber-alpha 0:
+    // pudarnya sama, tanpa kedipan hitam. Kotak yang memang solid tidak diubah.
+    readonly property color idleBackground: root.colBackground.a > 0
+        ? root.colBackground
+        : ColorUtils.applyAlpha(root.colBackgroundHover, 0)
+
     // A row may carry two extras besides its label: `trailing`, the symbols to
     // read at the right end, and `dim`, which says the entry is there but is not
     // offering anything. Both ride along the filter so a searched list keeps them.
@@ -115,7 +123,7 @@ ComboBox {
         bottomLeftRadius: root.buttonRadius
         topRightRadius: root.splitIndicator ? Appearance.rounding.unsharpenmore : root.buttonRadius
         bottomRightRadius: topRightRadius
-        color: (root.down && !root.popup.visible) ? root.colBackgroundActive : root.hovered ? root.colBackgroundHover : root.colBackground
+        color: (root.down && !root.popup.visible) ? root.colBackgroundActive : root.hovered ? root.colBackgroundHover : root.idleBackground
 
         Behavior on color {
             animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
@@ -140,7 +148,7 @@ ComboBox {
             anchors.right: parent.right
             height: parent.height
             open: root.popup.visible
-            colClosed: (root.down && !root.popup.visible) ? root.colBackgroundActive : root.hovered ? root.colBackgroundHover : root.colBackground
+            colClosed: (root.down && !root.popup.visible) ? root.colBackgroundActive : root.hovered ? root.colBackgroundHover : root.idleBackground
             colOpen: root.colAccent
             colIconClosed: root.colText
             colIconOpen: root.colOnAccent
