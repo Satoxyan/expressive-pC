@@ -80,9 +80,13 @@ startup() {
   t0=$(date +%s%N)
   nohup qs -c "$CONFIG" >/tmp/opencode/qs-startup.log 2>&1 &
   # Siap = QML sudah hidup, bukan sekadar proses terdaftar: target IPC `search`
-  # baru ada setelah Overview.qml ter-load. `search close` aman (menutup yang sudah tertutup).
+  # baru ada setelah Overview.qml ter-load. `search close` aman (menutup yang
+  # sudah tertutup) dan mencetak apa pun hanya kalau gagal - termasuk
+  # "No running instances" yang tetap exit 0 saat instance belum/tidak hidup.
   for _ in $(seq 1 $((STARTUP_SECS*10))); do
-    if ! qs -c "$CONFIG" ipc call search close 2>&1 | grep -q 'Target not found'; then
+    local out
+    out=$(qs -c "$CONFIG" ipc call search close 2>&1)
+    if [ $? -eq 0 ] && [ -z "$out" ]; then
       pid=$(qs list --all 2>/dev/null | awk '/Process ID:/{p=$3} END{print p}')
       [ -n "$pid" ] && break
     fi
