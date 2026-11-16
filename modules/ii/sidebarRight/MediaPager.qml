@@ -174,6 +174,7 @@ Item {
         backAnim.stop()
         accumResetTimer.stop()
         root.accum = 0
+        root.wheelTravel = 0
         root.pendingDir = 0
         root.tailDir = 0
         root.pageX = 0
@@ -366,9 +367,9 @@ Item {
 
     // ── wheel & touchpad ───────────────────────────────────────────────────
     // Qt 6 gives a WheelHandler one orientation, not a mask, so a vertical mouse
-    // wheel and a horizontal swipe need one handler each. Both turn their event into
-    // pixels of travel before anything else, so a diagonal swipe adds up instead of
-    // cancelling out.
+    // wheel and a horizontal swipe need one handler each. A click of the wheel turns a
+    // whole page through the same eased crossing the dock uses; a finger leans the row
+    // before it commits.
     //
     // The row is never parked halfway between two pages: a request crosses a whole
     // page or nothing. A touchpad still has to be asked for, because the pad sends
@@ -377,10 +378,27 @@ Item {
     // media player is not something to have happen by accident.
     property real accum: 0
 
-    // Travel in the units the scroll settings work in: at the default touchpad
-    // sensitivity this is a little under a centimetre of finger, which no graze
-    // reaches and no deliberate swipe fails to pass.
-    readonly property real trigger: 80
+    // Whether the travel last arriving came from a wheel. It decides how long a pause
+    // still counts as the same movement, which a wheel needs far more of than a finger
+    // does.
+    property bool wheelLast: false
+
+    // Travel in the units the scroll settings work in. Same threshold as the dock, so
+    // both pagers ask for the same deliberate push; the wheel does not go through this
+    // at all.
+    readonly property real trigger: 180
+
+    // A wheel's travel, told in whole pages: one notch is one page, and a wheel that
+    // reports its clicks in fractions of one has to add up to a page before anything is
+    // turned.
+    property real wheelTravel: 0
+
+    // A mouse notch arrives as an exact multiple of 120 on the angle axis; a finger
+    // arrives as a stream of small, non-multiple deltas (or pixels only). The rest of
+    // the shell's scrolling reads the same needle, so the pager does too.
+    function isWheel(angle) {
+        return angle !== 0 && Math.abs(angle) % 120 === 0
+    }
 
     function handleWheel(event, horizontal) {
         const angle = horizontal ? event.angleDelta.x : event.angleDelta.y
@@ -390,22 +408,30 @@ Item {
             // page or already on its way to the next one.
             return
         }
+        const wheel = root.isWheel(angle)
+        root.wheelLast = wheel
+        accumResetTimer.restart()
+
+        // A click of the wheel is a whole page asked for, not a finger being read: it
+        // crosses through the eased animation rather than leaning first. Travel left
+        // over after a page is kept, so a fast wheel is pages in order.
+        if (wheel) {
+            root.wheelTravel += (angle * -1) / 120
+            while (Math.abs(root.wheelTravel) >= 1) {
+                const dir = root.wheelTravel > 0 ? 1 : -1
+                root.wheelTravel -= dir
+                root.cross(dir)
+            }
+            event.accepted = true
+            return
+        }
 
         // A positive delta means the scroll engine is asking for earlier content on
         // either axis — the finger went right, or the wheel went up — so both axes
         // turn into the same number here: pixels of travel towards the next page.
         const step = (pixel !== 0 ? pixel : angle) * -1
 
-        // A wheel notch arrives as an exact multiple of 120 with no pixels attached;
-        // a touchpad does not. Same test the scroll engines use.
-        if (angle !== 0 && pixel === 0 && Math.abs(angle) % 120 === 0) {
-            root.cross(step > 0 ? 1 : -1)
-            event.accepted = true
-            return
-        }
-
         root.accum += step * Config.options.interactions.scrolling.touchpadSensitivity
-        accumResetTimer.restart()
         if (Math.abs(root.accum) < root.trigger) {
             root.leanRow()
             event.accepted = true
@@ -424,9 +450,13 @@ Item {
     // page asked for, and a row left leaning is given back.
     Timer {
         id: accumResetTimer
-        interval: 150
+        // Two clicks half a second apart are still one wheel being turned, and a fuse
+        // short enough to call them two gestures would lean the row and give it back on
+        // every click that was taken deliberately.
+        interval: root.wheelLast ? 600 : 150
         onTriggered: {
             root.accum = 0
+            root.wheelTravel = 0
             if (root.settling) return
             if (Math.abs(root.pageX) > 0.5) backAnim.restart()
         }

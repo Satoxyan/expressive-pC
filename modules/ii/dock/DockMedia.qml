@@ -208,6 +208,7 @@ Item {
         backAnim.stop()
         accumResetTimer.stop()
         root.accum = 0
+        root.wheelTravel = 0
         root.pendingDir = 0
         root.tailDir = 0
         root.pageShift = 0
@@ -538,42 +539,39 @@ Item {
 
     // ── wheel & touchpad ───────────────────────────────────────────────────
     // Qt 6 gives a WheelHandler one orientation, not a mask, so a vertical mouse wheel and a
-    // horizontal swipe need one handler each. Both are read out of the same travel: a wheel
-    // and a finger lean the row and are answered together when the travel has asked for a
-    // page. A touchpad still has to be asked for, because the pad sends pixels for things that
-    // are not gestures at all — a palm grazing it, a jolt of the desk — and switching the media
-    // player is not something to have happen by accident.
+    // horizontal swipe need one handler each. A click of the wheel turns a whole page through
+    // the same eased crossing the sidebar uses; a finger leans the row before it commits. A
+    // touchpad still has to be asked for, because the pad sends pixels for things that are not
+    // gestures at all — a palm grazing it, a jolt of the desk — and switching the media player
+    // is not something to have happen by accident.
     property real accum: 0
 
     // Whether the travel last arriving came from a wheel. It decides how long a pause still
     // counts as the same movement, which a wheel needs far more of than a finger does.
     property bool wheelLast: false
 
-    // Travel in the units the scroll settings work in: at the default touchpad sensitivity this
-    // is a little under a centimetre of finger, which no graze reaches and no deliberate swipe
-    // fails to pass.
-    readonly property real trigger: 80
+    // Travel in the units the scroll settings work in. The dock is a smaller, easier-to-graze
+    // strip than the sidebar, so a finger has to travel further here before a page is turned;
+    // the wheel does not go through this at all.
+    readonly property real trigger: 180
 
-    // One click of a wheel, told in those units: a quarter under the trigger, so the first
-    // click rolls the row onto the edge of the next page and the next one sends it over. A
-    // wheel that answered here like a switch would never lean at all, and the row would look
-    // like it was being teleported rather than being turned through.
-    readonly property real notch: 60
+    // A wheel's travel, told in whole pages: one notch is one page, and a wheel that reports
+    // its clicks in fractions of one has to add up to a page before anything is turned.
+    property real wheelTravel: 0
 
-    // Two readings of the same needle. Qt converts a wheel itself, at eight angle units to the
-    // pixel, so a wheel is a turn whose pixels are no more than that conversion; a finger
-    // pushes more screen than that for the angle it reports. High-resolution wheels arrive as
-    // fractions of a hundred and twenty and are counted as fractions of a click, which is why
-    // nothing here asks for an exact notch.
-    function isWheel(angle, pixel) {
-        return angle !== 0 && Math.abs(pixel) * 8 <= Math.abs(angle)
+    // A mouse notch arrives as an exact multiple of 120 on the angle axis; a finger arrives as
+    // a stream of small, non-multiple deltas (or pixels only). The rest of the shell's scrolling
+    // reads the same needle, so the dock does too. The old angle/pixel ratio called a touchpad a
+    // wheel, and then every small sample turned a page no matter what `trigger` said.
+    function isWheel(angle) {
+        return angle !== 0 && Math.abs(angle) % 120 === 0
     }
 
     function handleWheel(event, horizontal) {
         const angle = horizontal ? event.angleDelta.x : event.angleDelta.y
         const pixel = horizontal ? event.pixelDelta.x : event.pixelDelta.y
         if (angle === 0 && pixel === 0) return
-        const wheel = root.isWheel(angle, pixel)
+        const wheel = root.isWheel(angle)
 
         // Two fingers travelling across the screen are left alone on purpose: the dock is a thin
         // strip at the edge of the screen, and a scroll that happens to end over it was never a
@@ -581,17 +579,29 @@ Item {
         // on a dock along the bottom it is the only way anyone will ask.
         if (!wheel && horizontal === DockStyle.vertical) return
 
-        // Travel towards the next page, in trigger units. A positive delta means the scroll
-        // engine is asking for earlier content on either axis, so both of them turn around here.
-        // The touchpad sensitivity belongs to the finger, and a wheel is left in its own units:
-        // the clicks of a wheel are counted by the wheel, not by how far a finger happens to
-        // throw a swipe, and one setting is not allowed to make the other unreadable.
-        const travel = wheel ? root.notch * (Math.abs(angle) / 120)
-            : Math.abs(pixel) * Config.options.interactions.scrolling.touchpadSensitivity
-        const dir = (pixel !== 0 ? pixel : angle) > 0 ? -1 : 1
         root.wheelLast = wheel
-        root.accum += dir * travel
         accumResetTimer.restart()
+
+        // A click of the wheel is a whole page asked for, not a finger being read: it crosses
+        // through the same eased animation the sidebar uses. Leaning the row on the first
+        // notch would jump it under a single click and then cross on the next one, which is
+        // exactly the twitchy feel the dock is not supposed to have. Travel left over after a
+        // page is kept, so a fast wheel is pages in order rather than clicks thrown away.
+        if (wheel) {
+            root.wheelTravel += (angle * -1) / 120
+            while (Math.abs(root.wheelTravel) >= 1) {
+                const dir = root.wheelTravel > 0 ? 1 : -1
+                root.wheelTravel -= dir
+                root.cross(dir)
+            }
+            event.accepted = true
+            return
+        }
+
+        // A finger is read as travel towards the next page, in trigger units. A positive delta
+        // means the scroll engine is asking for earlier content, so it is turned around here.
+        root.accum += (pixel !== 0 ? pixel : angle) * -1
+            * Config.options.interactions.scrolling.touchpadSensitivity
         if (Math.abs(root.accum) < root.trigger) {
             root.leanRow()
             event.accepted = true
@@ -600,10 +610,8 @@ Item {
         const flip = root.accum > 0 ? 1 : -1
         root.accum = 0
         // The travel that keeps arriving after the flip was decided belongs to the same swipe,
-        // and one swipe is one page asked for. A click of the wheel is its own ask, so it is
-        // not made to wait for the row to land: `cross` settles the crossing in flight and
-        // starts this one from rest.
-        if (wheel || !root.settling) root.cross(flip)
+        // and one swipe is one page asked for.
+        if (!root.settling) root.cross(flip)
         event.accepted = true
     }
 
@@ -618,6 +626,7 @@ Item {
         interval: root.wheelLast ? 600 : 150
         onTriggered: {
             root.accum = 0
+            root.wheelTravel = 0
             if (root.settling) return
             if (Math.abs(root.pageShift) > 0.5) backAnim.restart()
         }
