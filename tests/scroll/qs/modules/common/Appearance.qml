@@ -1,7 +1,7 @@
 pragma Singleton
 import QtQuick
 
-// Test stub: only the members ContentPage/StyledScrollBar read.
+// Test stub: only the members ContentPage/StyledScrollBar/MaterialDial read.
 QtObject {
     property QtObject rounding: QtObject {
         property real small: 4
@@ -10,11 +10,20 @@ QtObject {
     property QtObject colors: QtObject {
         property color colPrimary: "#ff0000"
         property color colOnSurfaceVariant: "#888888"
+        property color colSecondaryContainer: "#cccccc"
+    }
+    property QtObject m3colors: QtObject {
+        property color m3onSecondaryContainer: "#000000"
     }
     property QtObject animation: QtObject {
         property QtObject elementMoveFast: QtObject {
             property int type: Easing.OutCubic
             property var bezierCurve: [0.2, 0, 0, 1]
         }
+    }
+    property QtObject animationCurves: QtObject {
+        property int expressiveFastSpatialDuration: 200
+        property var expressiveFastSpatial: [0.2, 0, 0, 1]
+        property var standard: [0.2, 0, 0, 1]
     }
 }

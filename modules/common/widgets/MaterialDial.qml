@@ -28,6 +28,24 @@ Dial {
 
     inputMode: Dial.Horizontal
 
+    // A touchpad announces the start and end of a scroll gesture with events
+    // that carry no delta at all. Only a non-zero delta is a scroll.
+    function wheelDelta(angleY, pixelY) {
+        return angleY !== 0 ? angleY : pixelY;
+    }
+
+    // One mouse-wheel notch is 120 units; a touchpad sends the same travel as
+    // many small events. Scale by the delta so a gesture moves the volume by
+    // the distance scrolled, not by the number of events it arrived in.
+    function scrollBy(delta) {
+        if (delta === 0)
+            return;
+        const step = control.stepSize * Math.abs(delta) / 120;
+        const next = control.value + (delta > 0 ? step : -step);
+        control.value = Math.max(control.from, Math.min(control.to, next));
+        control.moved();
+    }
+
     NumberAnimation on wavePhase {
         from: 0
         to: 360
@@ -42,13 +60,7 @@ Dial {
         acceptedButtons: Qt.NoButton
 
         onWheel: wheel => {
-            if (wheel.angleDelta.y > 0) {
-                control.increase();
-            } else {
-                control.decrease();
-            }
-            control.moved();
-
+            control.scrollBy(control.wheelDelta(wheel.angleDelta.y, wheel.pixelDelta.y));
             wheel.accepted = true;
         }
     }
