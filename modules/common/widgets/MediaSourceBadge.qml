@@ -1,5 +1,6 @@
 import qs.modules.common
 import qs.modules.common.functions
+import "../functions/MediaSource.js" as MediaSource
 import qs.services
 import Qt5Compat.GraphicalEffects
 import QtQuick
@@ -16,11 +17,19 @@ RippleButton {
     required property MprisPlayer player
     required property QtObject blendedColors
 
-    readonly property var desktopEntry: DesktopEntries.heuristicLookup(root.player?.desktopEntry ?? "")
-        ?? DesktopEntries.heuristicLookup(root.player?.identity ?? "")
+    // Resolved the same way as DockAppButton: the player's entry, and a refresh
+    // when either the player or the desktop-entry list changes.
+    property var desktopEntry: null
     readonly property string iconSource: root.desktopEntry?.icon
         ? SystemAppearance.iconPath(root.desktopEntry.icon, "") : ""
     readonly property bool known: root.iconSource !== ""
+
+    function resolveEntry() {
+        const id = MediaSource.normalize(root.player?.desktopEntry ?? "")
+        root.desktopEntry = (id ? DesktopEntries.byId(id) : null)
+            ?? (id ? DesktopEntries.heuristicLookup(id) : null)
+            ?? DesktopEntries.heuristicLookup(root.player?.identity ?? "")
+    }
 
     // MPRIS identifies the app, not the tab or playlist inside it.
     function activateSource() {
@@ -28,8 +37,19 @@ RippleButton {
             MediaSource.matches(root.player?.desktopEntry ?? "", t.appId,
                 DesktopEntries.heuristicLookup(t.appId)?.id))
         if (wins.find(w => w.activated)) return
+
         if (wins.length > 0) wins[wins.length - 1].activate()
         else root.desktopEntry?.execute()
+    }
+
+    onPlayerChanged: root.resolveEntry()
+    Component.onCompleted: root.resolveEntry()
+
+    Connections {
+        target: DesktopEntries
+        function onApplicationsChanged() {
+            root.resolveEntry()
+        }
     }
 
     visible: root.known
