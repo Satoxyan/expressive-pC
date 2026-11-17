@@ -19,6 +19,9 @@ Item {
     required property color artDominantColor
     property bool lyricsMode: false
     property bool lyricsAllowed: true
+    // Room kept free at the right edge for an overlay that must not cover the
+    // lyric column (the media source badge). Normal mode ignores it.
+    property real rightInset: 0
     // True while the volume dial is being scrolled: the player's reported
     // volume is allowed to drive the dial only when this is false.
     property bool volumeDialBusy: false
@@ -187,7 +190,7 @@ Item {
         active: root.lyricsAllowed
         x: root.pad + root.artSize + root.gap
         y: root.pad
-        width: Math.max(0, root.width - x - root.pad)
+        width: Math.max(0, root.width - x - root.pad - root.rightInset)
         // Every pixel between the top of the card and the title block that comes
         // up from its bottom in lyrics mode. The column is only as wide as what
         // is left beside the cover, so a lyric line routinely wraps to three rows
