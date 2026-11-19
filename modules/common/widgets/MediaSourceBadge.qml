@@ -60,10 +60,13 @@ RippleButton {
     visible: root.known
     implicitWidth: 28
     implicitHeight: 28
-    // Only the glyph: no circle behind it when idle, hovered or pressed.
+    // Flat at rest; on hover it takes the same surface as the lyric button
+    // beside it, and the glyph uses the same on-secondary-container colour.
     colBackground: "transparent"
-    colBackgroundHover: "transparent"
-    colRipple: "transparent"
+    colBackgroundHover: root.blendedColors.colSecondaryContainerHover
+    colBackgroundToggled: "transparent"
+    colRipple: root.blendedColors.colSecondaryContainerActive
+    colRippleToggled: root.blendedColors.colSecondaryContainerActive
     onClicked: root.activateSource()
 
     contentItem: Item {
@@ -76,7 +79,7 @@ RippleButton {
         ColorOverlay {
             anchors.fill: iconImage
             source: iconImage
-            color: root.blendedColors.colOnLayer0
+            color: root.blendedColors.colOnSecondaryContainer
         }
     }
 }
