@@ -62,7 +62,9 @@ RippleButton {
     implicitHeight: 28
     // Flat at rest; on hover it takes the same surface as the lyric button
     // beside it, and the glyph uses the same on-secondary-container colour.
-    colBackground: "transparent"
+    // Transparent *of the hover colour*, not plain transparent: animating from
+    // #00000000 makes Qt interpolate through black and flash dark on hover.
+    colBackground: ColorUtils.transparentize(root.blendedColors.colSecondaryContainer, 1)
     colBackgroundHover: root.blendedColors.colSecondaryContainerHover
     colBackgroundToggled: "transparent"
     colRipple: root.blendedColors.colSecondaryContainerActive
