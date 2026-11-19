@@ -21,6 +21,12 @@ TestCase {
         verify(MediaSource.matches("firefox.desktop", "Navigator", "firefox.desktop"))
     }
 
+    function test_matchesEditionSuffix() {
+        verify(MediaSource.matches("firefox", "firefox-developer-edition", undefined))
+        verify(MediaSource.matches("firefox", "Firefox-Developer-Edition", undefined))
+        verify(!MediaSource.matches("fire", "firefox-developer-edition", undefined))
+    }
+
     function test_noMatch() {
         verify(!MediaSource.matches("firefox.desktop", "spotify", "spotify.desktop"))
         verify(!MediaSource.matches("", "firefox", "firefox.desktop"))

@@ -20,8 +20,13 @@ RippleButton {
     // Resolved the same way as DockAppButton: the player's entry, and a refresh
     // when either the player or the desktop-entry list changes.
     property var desktopEntry: null
-    readonly property string iconSource: root.desktopEntry?.icon
-        ? SystemAppearance.iconPath(root.desktopEntry.icon, "") : ""
+    // Usually the entry names the icon. A browser integration can report an id
+    // with no installed .desktop file ("firefox" on an edition-only install),
+    // and the icon theme still carries that name, so try it directly.
+    readonly property string iconName: root.desktopEntry?.icon
+        || MediaSource.normalize(root.player?.desktopEntry ?? "")
+    readonly property string iconSource: root.iconName
+        ? SystemAppearance.iconPath(root.iconName, "") : ""
     readonly property bool known: root.iconSource !== ""
 
     function resolveEntry() {

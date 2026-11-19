@@ -10,5 +10,15 @@ function normalize(id) {
 function matches(desktopEntry, appId, resolvedEntryId) {
     const target = normalize(desktopEntry)
     if (!target) return false
-    return normalize(appId) === target || normalize(resolvedEntryId) === target
+    return matchesId(target, appId) || matchesId(target, resolvedEntryId)
+}
+
+// A browser integration can report the generic browser id ("firefox") while
+// the window carries the edition id ("firefox-developer-edition"), and no
+// "firefox.desktop" is installed on such a machine. A "-suffix" relation is
+// the same application, so accept it.
+function matchesId(target, candidate) {
+    const id = normalize(candidate)
+    if (!id) return false
+    return id === target || id.startsWith(target + "-")
 }
