@@ -6,3 +6,5 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .qoder
+/AGENTS.md
+/docs/
