@@ -224,23 +224,10 @@ Item {
             artDominantColor: root.artDominantColor
             lyricsMode: root.showLyrics
             lyricsAllowed: root.allowLyrics
-            rightInset: badge.known && root.showLyrics ? badge.width + 8 : 0
             // The card's own song holds the flag, so this card opens and closes
             // on its own. No write to root.showLyrics: it is bound above.
             onToggleLyrics: if (root.lyricsTrack)
                 root.lyricsTrack.lyricsOpen = !root.lyricsTrack.lyricsOpen
-        }
-    }
-
-    MediaSourceBadge {
-        id: badge
-        player: root.player
-        blendedColors: root.blendedColors
-        anchors {
-            top: parent.top
-            right: parent.right
-            topMargin: root.cardMargin + 4
-            rightMargin: root.cardMargin + 4
         }
     }
 }

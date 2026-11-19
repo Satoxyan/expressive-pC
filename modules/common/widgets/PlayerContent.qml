@@ -19,9 +19,6 @@ Item {
     required property color artDominantColor
     property bool lyricsMode: false
     property bool lyricsAllowed: true
-    // Room kept free at the right edge for an overlay that must not cover the
-    // lyric column (the media source badge). Normal mode ignores it.
-    property real rightInset: 0
     // True while the volume dial is being scrolled: the player's reported
     // volume is allowed to drive the dial only when this is false.
     property bool volumeDialBusy: false
@@ -37,7 +34,11 @@ Item {
 
     readonly property real artSize: lerp(114, 150)
     readonly property real textX: lerp(pad + 114 + gap, pad)
-    readonly property real textWidth: Math.max(0, width - textX - pad)
+    // The source badge is part of the card, not an overlay: both the title
+    // block and the lyric column end before it, so their ellipsis lands short
+    // of the icon instead of running under it.
+    readonly property real badgeInset: sourceBadge.known ? sourceBadge.width + 6 : 0
+    readonly property real textWidth: Math.max(0, width - textX - pad - badgeInset * (1 - t))
     readonly property real bottomPad: lerp(13, 12)
     readonly property real rowSpacing: 5
     readonly property real rowHeight: Math.max(24, progressBarContainer.implicitHeight)
@@ -190,7 +191,7 @@ Item {
         active: root.lyricsAllowed
         x: root.pad + root.artSize + root.gap
         y: root.pad
-        width: Math.max(0, root.width - x - root.pad - root.rightInset)
+        width: Math.max(0, root.width - x - root.pad - root.badgeInset)
         // Every pixel between the top of the card and the title block that comes
         // up from its bottom in lyrics mode. The column is only as wide as what
         // is left beside the cover, so a lyric line routinely wraps to three rows
@@ -377,6 +378,18 @@ Item {
             Behavior on color {
                 animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
             }
+        }
+    }
+
+    MediaSourceBadge {
+        id: sourceBadge
+        player: root.player
+        blendedColors: root.blendedColors
+        anchors {
+            top: parent.top
+            right: parent.right
+            topMargin: 8
+            rightMargin: 8
         }
     }
 }
