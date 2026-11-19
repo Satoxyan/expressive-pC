@@ -11,7 +11,7 @@ import Quickshell.Widgets
 
 // The application a media card belongs to: a monochrome source icon in the
 // card's own colors, click to bring that application forward. Mounted once in
-// Player.qml, so every host (sidebar, mediaControls, lock screen) gets it.
+// PlayerContent.qml, so every host (sidebar, mediaControls, lock screen) gets it.
 RippleButton {
     id: root
     required property MprisPlayer player
