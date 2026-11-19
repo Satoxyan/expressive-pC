@@ -60,10 +60,10 @@ RippleButton {
     visible: root.known
     implicitWidth: 28
     implicitHeight: 28
-    buttonRadius: Appearance.rounding.full
-    colBackground: ColorUtils.transparentize(root.blendedColors.colLayer0, 0.3)
-    colBackgroundHover: ColorUtils.transparentize(root.blendedColors.colLayer0, 0.15)
-    colRipple: ColorUtils.transparentize(root.blendedColors.colPrimary, 0.5)
+    // Only the glyph: no circle behind it when idle, hovered or pressed.
+    colBackground: "transparent"
+    colBackgroundHover: "transparent"
+    colRipple: "transparent"
     onClicked: root.activateSource()
 
     contentItem: Item {

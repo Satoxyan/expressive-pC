@@ -34,11 +34,16 @@ Item {
 
     readonly property real artSize: lerp(114, 150)
     readonly property real textX: lerp(pad + 114 + gap, pad)
-    // The source badge is part of the card, not an overlay: both the title
-    // block and the lyric column end before it, so their ellipsis lands short
-    // of the icon instead of running under it.
-    readonly property real badgeInset: sourceBadge.known ? sourceBadge.width + 6 : 0
-    readonly property real textWidth: Math.max(0, width - textX - pad - badgeInset * (1 - t))
+    // The source badge is part of the card, not an overlay: text that runs into
+    // its band ends before it. Only that band is reserved, so a line below the
+    // icon still gets the full width instead of losing it to the whole column.
+    readonly property real textWidth: Math.max(0, width - textX - pad)
+    readonly property real badgeClearLeft: sourceBadge.known ? sourceBadge.x - 6 : width
+    readonly property real badgeBottom: sourceBadge.known ? sourceBadge.y + sourceBadge.height + 6 : 0
+    function textWidthFor(itemY) {
+        return Math.max(0, Math.min(root.textWidth,
+            itemY < root.badgeBottom ? root.badgeClearLeft - root.textX : root.textWidth))
+    }
     readonly property real bottomPad: lerp(13, 12)
     readonly property real rowSpacing: 5
     readonly property real rowHeight: Math.max(24, progressBarContainer.implicitHeight)
@@ -191,7 +196,7 @@ Item {
         active: root.lyricsAllowed
         x: root.pad + root.artSize + root.gap
         y: root.pad
-        width: Math.max(0, root.width - x - root.pad - root.badgeInset)
+        width: Math.max(0, root.width - x - root.pad)
         // Every pixel between the top of the card and the title block that comes
         // up from its bottom in lyrics mode. The column is only as wide as what
         // is left beside the cover, so a lyric line routinely wraps to three rows
@@ -208,6 +213,11 @@ Item {
             // one being sung, instead of the whole list fading away into the top
             // and bottom of the strip.
             lineContext: 2
+            // Only the corner box the badge sits in is off limits; rows below
+            // it use the whole column.
+            topRightBlockX: sourceBadge.known
+                ? sourceBadge.x - 6 - (root.pad + root.artSize + root.gap) : -1
+            topRightBlockHeight: root.badgeBottom > root.pad ? root.badgeBottom - root.pad : 0
             // The strip shows its words smaller than the sidebar does, and the
             // dots are not text, so they need asking for separately.
             dotScale: 0.75
@@ -230,7 +240,7 @@ Item {
         id: trackTitle
         x: root.textX
         y: root.lerp(root.pad, root.lyricsTitleY)
-        width: root.textWidth
+        width: root.textWidthFor(trackTitle.y)
         font.pixelSize: Appearance.font.pixelSize.large
         color: root.blendedColors.colOnLayer0
         elide: Text.ElideRight
@@ -244,7 +254,7 @@ Item {
         id: trackArtist
         x: root.textX
         y: trackTitle.y + trackTitle.implicitHeight + root.lerp(2, -2)
-        width: root.textWidth
+        width: root.textWidthFor(trackArtist.y)
         font.pixelSize: Appearance.font.pixelSize.smaller
         color: root.blendedColors.colSubtext
         elide: Text.ElideRight

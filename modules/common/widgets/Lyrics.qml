@@ -51,6 +51,13 @@ Item {
     // dead lines.
     property int lineContext: -1
 
+    // A box at the widget's top-right that the host has something floating in
+    // (the media source badge). X is in this widget's coordinates; a negative
+    // value means nothing is blocked. Only rows reaching into the box narrow
+    // themselves, so the rest of the column keeps its full width.
+    property real topRightBlockX: -1
+    property real topRightBlockHeight: 0
+
     // Draw the latin reading a source supplies under each line (NetEase calls
     // it romaji, and only fills it for the tracks someone annotated — mostly
     // Japanese). Off simply leaves the layout exactly as it was.
@@ -706,6 +713,13 @@ Item {
             // the song is in, however much room the host has for it.
             readonly property bool within: root.lineContext < 0
                 || lineRow.dist <= root.lineContext
+            readonly property bool inTopBand: root.topRightBlockHeight > 0
+                && root.topRightBlockX >= 0
+                && lineRow.y < root.topRightBlockHeight
+            readonly property real rowTextWidth: Math.max(1, root.textWidth
+                - (lineRow.inTopBand
+                    ? Math.max(0, root.width - root.contentInset - root.topRightBlockX)
+                    : 0))
             readonly property bool useKaraoke: root.karaoke
                 && lineRow.isHot
                 && !lineRow.isNote
@@ -736,7 +750,7 @@ Item {
             Column {
                 id: hotColumn
                 x: root.contentInset
-                width: root.textWidth
+                width: lineRow.rowTextWidth
                 spacing: root.rowSpacing
                 visible: lineRow.useKaraoke
                 // The line recedes while a break is being counted: it keeps its
@@ -813,7 +827,7 @@ Item {
             Column {
                 id: plainColumn
                 x: root.contentInset
-                width: root.textWidth
+                width: lineRow.rowTextWidth
                 anchors.verticalCenter: lineRow.verticalCenter
                 spacing: root.rowSpacing
                 visible: !lineRow.isNote && !lineRow.isInterlude && !lineRow.useKaraoke
