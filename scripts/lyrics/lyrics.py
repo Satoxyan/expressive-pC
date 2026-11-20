@@ -2318,6 +2318,29 @@ def _fold_echo_lines(lines):
     return kept
 
 
+# A source writes the echo wrapped in parentheses, e.g. "(can I?)". The
+# widget draws the echo on its own line already, so the brackets are noise.
+_ECHO_PARENS = re.compile(r"[（(]\s*([^()（）]*?)\s*[）)]")
+
+
+def _echo_text(text):
+    """The background vocal without the brackets that mark it as one."""
+    return _ECHO_PARENS.sub(r"\1", text).strip()
+
+
+def _echo_words(words):
+    """Echo words without the bracket the first/last span carries.
+
+    Word-level sources split the pair across the first and last span ("(Back",
+    ..., "know)"), so a per-word regex alone would leave both halves.
+    """
+    out = [[t, w] for t, w in words]
+    if out:
+        out[0][1] = out[0][1].lstrip("(（")
+        out[-1][1] = out[-1][1].rstrip(")）")
+    return [w for w in out if w[1]]
+
+
 def _payload_line(line):
     """One line as the widget reads it: t, x, w (words), a (voice edge).
 
@@ -2338,8 +2361,8 @@ def _payload_line(line):
         out["r"] = reading
     bg = line.get("bg") or {}
     if bg.get("text"):
-        out["b"] = bg["text"].replace("§", "")
-        out["bw"] = [[w["t"], w["w"]] for w in bg.get("words") or []]
+        out["b"] = _echo_text(bg["text"].replace("§", ""))
+        out["bw"] = _echo_words([[w["t"], w["w"]] for w in bg.get("words") or []])
     return out
 
 
