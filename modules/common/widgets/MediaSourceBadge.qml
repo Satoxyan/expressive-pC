@@ -60,15 +60,15 @@ RippleButton {
     visible: root.known
     implicitWidth: 28
     implicitHeight: 28
-    // Flat at rest; on hover it takes the same surface as the lyric button
-    // beside it, and the glyph uses the same on-secondary-container colour.
-    // Transparent *of the hover colour*, not plain transparent: animating from
-    // #00000000 makes Qt interpolate through black and flash dark on hover.
-    colBackground: ColorUtils.transparentize(root.blendedColors.colSecondaryContainer, 1)
-    colBackgroundHover: root.blendedColors.colSecondaryContainerHover
+    // Flat at rest; on hover it takes the play button's accent, and the glyph
+    // uses the same colour as its fill. Transparent *of that colour*, not plain
+    // transparent: animating from #00000000 makes Qt interpolate through black
+    // and flash dark on hover.
+    colBackground: ColorUtils.transparentize(root.blendedColors.colPrimary, 1)
+    colBackgroundHover: root.blendedColors.colPrimaryHover
     colBackgroundToggled: "transparent"
-    colRipple: root.blendedColors.colSecondaryContainerActive
-    colRippleToggled: root.blendedColors.colSecondaryContainerActive
+    colRipple: root.blendedColors.colPrimaryActive
+    colRippleToggled: root.blendedColors.colPrimaryActive
     onClicked: root.activateSource()
 
     contentItem: Item {
@@ -81,7 +81,7 @@ RippleButton {
         ColorOverlay {
             anchors.fill: iconImage
             source: iconImage
-            color: root.blendedColors.colOnSecondaryContainer
+            color: root.blendedColors.colPrimary
         }
     }
 }

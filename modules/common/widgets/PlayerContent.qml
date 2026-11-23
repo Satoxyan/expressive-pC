@@ -73,14 +73,16 @@ Item {
         implicitWidth: 24
         implicitHeight: 24
         property var iconName
-        colBackground: ColorUtils.transparentize(root.blendedColors.colSecondaryContainer, 1)
-        colBackgroundHover: root.blendedColors.colSecondaryContainerHover
-        colRipple: root.blendedColors.colSecondaryContainerActive
+        // Same accent as the play button beside them, so the whole control row
+        // follows the media the card is showing instead of the wallpaper.
+        colBackground: ColorUtils.transparentize(root.blendedColors.colPrimary, 1)
+        colBackgroundHover: root.blendedColors.colPrimaryHover
+        colRipple: root.blendedColors.colPrimaryActive
         contentItem: MaterialSymbol {
             iconSize: Appearance.font.pixelSize.huge
             fill: 1
             horizontalAlignment: Text.AlignHCenter
-            color: root.blendedColors.colOnSecondaryContainer
+            color: root.blendedColors.colPrimary
             text: iconName
             Behavior on color {
                 animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
