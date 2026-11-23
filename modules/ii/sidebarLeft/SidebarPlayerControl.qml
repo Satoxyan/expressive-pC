@@ -339,27 +339,6 @@ Item {
                     Layout.fillWidth: true
                     spacing: 12
                     RippleButton {
-                        property real baseSize: Math.max(60, parent.parent.height * 0.06)
-                        implicitWidth: baseSize
-                        implicitHeight: baseSize 
-                        buttonRadius: Appearance.rounding.verylarge
-                        colBackground: "transparent"
-                        colBackgroundHover: "transparent"
-                        colRipple: "transparent"
-                        padding: -10
-                        downAction: () => root.player?.previous()
-                        contentItem: MaterialShapeWrappedMaterialSymbol {
-                            wrappedShape: MaterialShape.Shape.Cookie12Sided
-                            padding: 0
-                            iconSize: 32
-                            fill: 1
-                            text: "skip_previous"
-                            color: ColorUtils.transparentize(blendedColors.colSecondaryContainer, 0.7)
-                            colSymbol: blendedColors.colOnSecondaryContainer
-                        }
-                    }
-
-                    RippleButton {
                         property real baseSize: Math.max(70, parent.parent.height * 0.1)
                         Layout.fillWidth: true
                         implicitHeight: baseSize
@@ -405,6 +384,30 @@ Item {
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 24
+
+                    // Previous sits below the play button, beside the seekbar,
+                    // so play can run the full width of the row above.
+                    RippleButton {
+                        Layout.alignment: Qt.AlignVCenter
+                        property real baseSize: Math.max(60, parent.parent.height * 0.06)
+                        implicitWidth: baseSize
+                        implicitHeight: baseSize
+                        buttonRadius: Appearance.rounding.verylarge
+                        colBackground: "transparent"
+                        colBackgroundHover: "transparent"
+                        colRipple: "transparent"
+                        padding: -10
+                        downAction: () => root.player?.previous()
+                        contentItem: MaterialShapeWrappedMaterialSymbol {
+                            wrappedShape: MaterialShape.Shape.Cookie12Sided
+                            padding: 0
+                            iconSize: 32
+                            fill: 1
+                            text: "skip_previous"
+                            color: ColorUtils.transparentize(blendedColors.colSecondaryContainer, 0.7)
+                            colSymbol: blendedColors.colOnSecondaryContainer
+                        }
+                    }
 
                     ColumnLayout {
                         Layout.fillWidth: true
