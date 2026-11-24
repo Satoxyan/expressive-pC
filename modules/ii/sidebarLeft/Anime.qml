@@ -21,7 +21,6 @@ Item {
     property string downloadPath: Directories.booruDownloads
     property string nsfwPath: Directories.booruDownloadsNsfw
     property string commandPrefix: "/"
-    property real scrollOnNewResponse: 100
     property int tagSuggestionDelay: 210
     property var suggestionQuery: ""
     property var suggestionList: []
@@ -320,8 +319,6 @@ Item {
                     target: root
                     function onResponsesChanged() {
                         if (root.responses.length > booruResponseListView.lastResponseLength) {
-                            if (booruResponseListView.lastResponseLength > 0 && root.responses[booruResponseListView.lastResponseLength].provider != "system")
-                                booruResponseListView.contentY = booruResponseListView.contentY + root.scrollOnNewResponse
                             booruResponseListView.lastResponseLength = root.responses.length
                             // Response baru = kembali lihat halaman terbaru.
                             root.viewedResponseIndex = -1
@@ -344,6 +341,9 @@ Item {
                     property bool isLoading: !root.pullLoading && Booru.runningRequests > 0 && root.responses.length > 0
                     width: booruResponseListView.width
                     implicitHeight: isLoading ? footerIndicator.implicitHeight + 20 : 0
+                    // Loading muncul = turun ke paling bawah supaya indikatornya
+                    // kelihatan, bukan tertinggal di halaman lama.
+                    onIsLoadingChanged: if (isLoading) Qt.callLater(() => booruResponseListView.positionViewAtEnd())
                     MaterialLoadingIndicator {
                         id: footerIndicator
                         anchors.centerIn: parent
