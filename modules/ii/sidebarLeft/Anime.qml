@@ -101,6 +101,23 @@ Item {
         root.resetPaging()
     }
 
+    // Halaman paling atas yang sedang terlihat: angka pagination mengikuti isi
+    // yang tampil, bukan halaman terakhir yang diminta.
+    function syncPageToView() {
+        if (!root.pagingVisible || Booru.runningRequests > 0) return
+        const list = booruResponseListView
+        let index = (list.contentY + list.height >= list.contentHeight - 2)
+            ? root.responses.length - 1
+            : list.indexAt(list.width / 2, list.contentY + 20)
+        if (index < 0 || index >= root.responses.length) return
+        while (index > 0 && root.responses[index].provider === "system") --index
+        const response = root.responses[index]
+        if (!response || response.provider === "system") return
+        root.viewedResponseIndex = index
+        const page = Number(response.page)
+        if (Number.isFinite(page) && page !== root.currentPage) root.setPage(page)
+    }
+
     // Riwayat gambar dibiarkan utuh; hanya halaman yang dipatahkan, karena
     // ruang halaman sebuah endpoint tidak berlaku di endpoint lain.
     function resetPaging() {
@@ -319,12 +336,20 @@ Item {
                     target: root
                     function onResponsesChanged() {
                         if (root.responses.length > booruResponseListView.lastResponseLength) {
+                            const newIndex = root.responses.length - 1
                             booruResponseListView.lastResponseLength = root.responses.length
                             // Response baru = kembali lihat halaman terbaru.
                             root.viewedResponseIndex = -1
+                            // Taruh kartu baru di atas layar. Tanpa ini ListView
+                            // sempat clamp ke tinggi kartu yang masih kosong lalu
+                            // melompat balik ke ekor halaman sebelumnya.
+                            Qt.callLater(() => booruResponseListView.positionViewAtIndex(newIndex, ListView.Beginning))
                         }
                     }
                 }
+
+                // Angka halaman ikut bergeser saat kamu scroll antar halaman.
+                onContentYChanged: root.syncPageToView()
 
                 model: ScriptModel {
                     values: root.responses
