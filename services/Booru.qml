@@ -102,7 +102,7 @@ Singleton {
             // The JSON list endpoint answers 500 with a JSON object glued to an
             // HTML page, so JSON.parse never sees a whole document. The RSS
             // variant still serves the same entries with a 200.
-            "api": "https://www.zerochan.net/?xml",
+            "api": "https://www.zerochan.net/",
             "defaultLimit": 20,
             "description": Translation.tr("Clean stuff | Excellent quality, no NSFW"),
             "manualParseFunc": (responseText) => BooruZerochan.parse(responseText)
@@ -448,7 +448,11 @@ Singleton {
 
         // Tags & limit
         if (currentProvider === "zerochan") {
-            params.push("c=" + tagString) // zerochan doesn't have search in api, so we use color
+            // Zerochan has no tags parameter: the tag goes in the path and the
+            // feed format in the query string.
+            if (tagString.length > 0)
+                url += encodeURIComponent(tagString).replace(/%20/g, "+")
+            params.push("xml")
             params.push("l=" + effectiveLimit)
             params.push("s=" + "fav")
             params.push("t=" + 1)
