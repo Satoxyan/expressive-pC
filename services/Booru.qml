@@ -5,6 +5,7 @@ import qs.modules.common
 import qs.services
 import Quickshell;
 import QtQuick;
+import "BooruPageCache.js" as BooruPageCache
 import "BooruZerochan.js" as BooruZerochan;
 
 /**
@@ -409,6 +410,12 @@ Singleton {
 
     // Accurate when the endpoint reports a count; otherwise a batch that comes
     // back short of the limit proves nothing follows it, so that page is last.
+    // Posisi response yang sudah ada untuk provider + tag + halaman ini, atau
+    // -1 kalau belum pernah diambil (dipakai untuk loncat tanpa query ulang).
+    function responseIndexFor(responses, provider, tags, page) {
+        return BooruPageCache.indexOf(responses, provider, tags, page)
+    }
+
     function totalPagesFrom(provider, raw, fetched, limit, page) {
         const reported = raw === null || provider.totalCountFunc === undefined
             ? NaN : Number(provider.totalCountFunc(raw))

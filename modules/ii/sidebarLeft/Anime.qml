@@ -37,8 +37,14 @@ Item {
 
     readonly property bool pagingVisible: Booru.providerSupportsPaging(Booru.currentProvider)
 
-    // Response terakhir yang bukan pesan system = pencarian yang sedang berlaku.
+    // Halaman yang sedang dilihat, kalau viewer loncat ke response lama.
+    property int viewedResponseIndex: -1
+
+    // Response terakhir yang bukan pesan system = pencarian yang sedang berlaku,
+    // kecuali viewer sedang loncat ke halaman lama yang sudah ada di daftar.
     readonly property var currentResponse: {
+        if (root.viewedResponseIndex >= 0 && root.viewedResponseIndex < root.responses.length)
+            return root.responses[root.viewedResponseIndex]
         for (let i = root.responses.length - 1; i >= 0; --i) {
             const r = root.responses[i]
             if (r.provider !== "system") return r
@@ -53,14 +59,34 @@ Item {
     // kalau angkanya memang tidak kamu sentuh.
     readonly property bool pageEdited: root.currentPage !== (root.currentResponse ? root.currentResponse.page : 1)
 
-    // Satu-satunya jalur pengubah halaman: clamp dan sinkronkan field. Angka ini
-    // baru diambil oleh submit (tombol kirim/Enter), tidak oleh perubahan halaman.
+    // Satu-satunya jalur pengubah halaman: clamp dan sinkronkan field. Tidak
+    // mengambil data sendiri; goToPage yang memutuskan fetch atau loncat cache.
     function setPage(page) {
         const clamped = Number.isFinite(page)
             ? Math.min(root.maxPage, Math.max(1, Math.round(page)))
             : 1
         root.currentPage = clamped
         pageField.text = clamped.toString()
+    }
+
+    // Ganti halaman: kalau provider + tag + halaman itu sudah ada di daftar,
+    // loncat ke response lama; kalau belum, baru query.
+    function goToPage(page) {
+        const clamped = Number.isFinite(page)
+            ? Math.min(root.maxPage, Math.max(1, Math.round(page)))
+            : root.currentPage
+        root.setPage(clamped)
+        if (!root.hasLastSearch) return
+
+        const index = Booru.responseIndexFor(root.responses, Booru.currentProvider,
+            root.lastTagList, clamped)
+        if (index >= 0) {
+            root.viewedResponseIndex = index
+            booruResponseListView.positionViewAtIndex(index, ListView.Beginning)
+            return
+        }
+        Booru.makeRequest(root.lastTagList, Persistent.states.booru.allowNsfw,
+            Config.options.sidebar.booru.limit, clamped)
     }
 
     function refetchCurrentPage() {
@@ -72,6 +98,7 @@ Item {
 
     function clearSearch() {
         Booru.clearResponses()
+        root.viewedResponseIndex = -1
         root.resetPaging()
     }
 
@@ -81,6 +108,7 @@ Item {
         root.hasLastSearch = false
         root.lastTagKey = ""
         root.lastTagList = []
+        root.viewedResponseIndex = -1
         root.setPage(1)
     }
 
@@ -295,6 +323,8 @@ Item {
                             if (booruResponseListView.lastResponseLength > 0 && root.responses[booruResponseListView.lastResponseLength].provider != "system")
                                 booruResponseListView.contentY = booruResponseListView.contentY + root.scrollOnNewResponse
                             booruResponseListView.lastResponseLength = root.responses.length
+                            // Response baru = kembali lihat halaman terbaru.
+                            root.viewedResponseIndex = -1
                         }
                     }
                 }
@@ -586,7 +616,7 @@ Item {
                         buttonSize: 28
                         buttonIcon: "chevron_left"
                         enabled: root.currentPage > 1
-                        onClicked: root.setPage(root.currentPage - 1)
+                        onClicked: root.goToPage(root.currentPage - 1)
                     }
 
                     StyledTextInput {
@@ -600,17 +630,32 @@ Item {
                         text: root.currentPage.toString()
                         inputMethodHints: Qt.ImhDigitsOnly
                         validator: IntValidator { bottom: 1; top: root.maxPage }
+                        // Ngetik angka langsung lompat; timer menahan supaya
+                        // "1" lalu "12" tidak query dua kali.
+                        onTextEdited: pageJumpTimer.restart()
                         onAccepted: {
                             const p = parseInt(text)
                             if (!Number.isFinite(p) || p < 1) {
                                 pageField.text = root.currentPage.toString()
                                 return
                             }
-                            root.setPage(p)
-                            // Enter di sini = submit: tag yang sedang ditulis, atau
-                            // pencarian terakhir kalau field tag masih kosong.
-                            if (tagInputField.text.length > 0) tagInputField.accept()
-                            else if (root.hasLastSearch) root.handleInput("")
+                            if (tagInputField.text.length > 0) {
+                                // Tag baru yang belum disubmit: halaman ikut request itu.
+                                root.setPage(p)
+                                tagInputField.accept()
+                            } else {
+                                root.goToPage(p)
+                            }
+                        }
+                    }
+
+                    Timer {
+                        id: pageJumpTimer
+                        interval: 450
+                        onTriggered: {
+                            const p = parseInt(pageField.text)
+                            if (!Number.isFinite(p) || p < 1) return
+                            if (p !== root.currentPage) root.goToPage(p)
                         }
                     }
 
@@ -625,7 +670,7 @@ Item {
                         buttonSize: 28
                         buttonIcon: "chevron_right"
                         enabled: root.totalPages < 0 || root.currentPage < root.totalPages
-                        onClicked: root.setPage(root.currentPage + 1)
+                        onClicked: root.goToPage(root.currentPage + 1)
                     }
                 }
 
