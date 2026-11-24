@@ -22,8 +22,7 @@ function field(block, pattern) {
     return match ? decodeEntities(match[1]).trim() : ""
 }
 
-function parse(text) {
-    return String(text ?? "").split("<item>").slice(1).map(block => {
+function parse(text) {    return String(text ?? "").split("<item>").slice(1).map(block => {
         const thumbTag = (block.match(/<media:thumbnail[^>]*>/) || [""])[0]
         const contentTag = (block.match(/<media:content[^>]*>/) || [""])[0]
         const link = field(block, /<link>([^<]*)<\/link>/)
@@ -56,4 +55,12 @@ function parse(text) {
             "character": title,
         }
     }).filter(item => item !== null)
+}
+
+// /suggest?q= answers one tag per line as "Name|Type|Parent".
+function parseTags(text) {
+    return String(text ?? "").split("\n")
+        .map(line => line.split("|")[0].trim())
+        .filter(name => name.length > 0)
+        .map(name => ({ "name": name }))
 }

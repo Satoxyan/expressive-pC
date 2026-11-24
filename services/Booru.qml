@@ -23,6 +23,11 @@ Singleton {
     property var defaultUserAgent: Config.options?.networking?.userAgent || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
     // e621 rejects requests without a User-Agent (403) and bans browser-impersonating ones.
     property string e621UserAgent: "expressive-pC/1.0 (quickshell sidebar booru viewer)"
+    // Zerochan wants "<project> - <username>"; anonymous projects can be banned.
+    property string zerochanUserAgent: {
+        const username = Config.options?.sidebar?.booru?.zerochan?.username
+        return username ? `Desktop sidebar booru viewer - username: ${username}` : defaultUserAgent
+    }
     property var providerList: Object.keys(providers).filter(provider => provider !== "system" && providers[provider].api)
     property var providers: {
         "system": { "name": Translation.tr("System") },
@@ -105,7 +110,10 @@ Singleton {
             "api": "https://www.zerochan.net/",
             "defaultLimit": 20,
             "description": Translation.tr("Clean stuff | Excellent quality, no NSFW"),
-            "manualParseFunc": (responseText) => BooruZerochan.parse(responseText)
+            "manualParseFunc": (responseText) => BooruZerochan.parse(responseText),
+            // /suggest answers one tag per line: "Name|Type|Parent".
+            "tagSearchTemplate": "https://www.zerochan.net/suggest?q={{query}}",
+            "tagParseFunc": (responseText) => BooruZerochan.parseTags(responseText)
         },
         "danbooru": {
             "name": "Danbooru",
@@ -359,7 +367,7 @@ Singleton {
             Persistent.states.booru.provider = provider
             var providerMessage = Translation.tr("Provider set to ") + providers[provider].name
             if (provider == "zerochan") {
-                providerMessage += Translation.tr(". Notes for Zerochan:\n- You must enter a color\n- Set your zerochan username in Settings -> Services option. You [might be banned for not doing so](https://www.zerochan.net/api#:~:text=The%20request%20may%20still%20be%20completed%20successfully%20without%20this%20custom%20header%2C%20but%20your%20project%20may%20be%20banned%20for%20being%20anonymous.)!")
+                providerMessage += Translation.tr(". Notes for Zerochan:\n- Enter the tag exactly as zerochan spells it\n- Set your zerochan username in Settings -> Services option. You [might be banned for not doing so](https://www.zerochan.net/api#:~:text=The%20request%20may%20still%20be%20completed%20successfully%20without%20this%20custom%20header%2C%20but%20your%20project%20may%20be%20banned%20for%20being%20anonymous.)!")
             } else if (provider == "gelbooru") {
                 providerMessage += Translation.tr(". Notes for Gelbooru:\n- You must enter API credentials in Settings -> Services options. You can get these from your [account settings](https://gelbooru.com/index.php?page=account&s=options) on Gelbooru.")
             } else if (provider == "rule34") {
@@ -553,8 +561,7 @@ Singleton {
                 xhr.setRequestHeader("User-Agent", defaultUserAgent)
             }
             else if (currentProvider == "zerochan") {
-                const userAgent = Config.options?.sidebar?.booru?.zerochan?.username ? `Desktop sidebar booru viewer - username: ${Config.options.sidebar.booru.zerochan.username}` : defaultUserAgent
-                xhr.setRequestHeader("User-Agent", userAgent)
+                xhr.setRequestHeader("User-Agent", root.zerochanUserAgent)
             }
             else if (currentProvider === "e621") {
                 xhr.setRequestHeader("User-Agent", e621UserAgent)
@@ -610,8 +617,13 @@ Singleton {
                 currentTagRequest = null
                 try {
                     // console.log("[Booru] Raw response: " + xhr.responseText)
-                    var response = JSON.parse(xhr.responseText)
-                    response = provider.tagMapFunc(response)
+                    let response
+                    if (provider.tagParseFunc) {
+                        response = provider.tagParseFunc(xhr.responseText)
+                    } else {
+                        response = JSON.parse(xhr.responseText)
+                        response = provider.tagMapFunc(response)
+                    }
                     // console.log("[Booru] Mapped response: " + JSON.stringify(response))
                     root.tagSuggestion(query, response)
                 } catch (e) {
@@ -629,6 +641,8 @@ Singleton {
                 xhr.setRequestHeader("User-Agent", "Qt/6.0")
             } else if (["konachan", "gelbooru", "rule34"].includes(currentProvider)) {
                 xhr.setRequestHeader("User-Agent", defaultUserAgent)
+            } else if (currentProvider === "zerochan") {
+                xhr.setRequestHeader("User-Agent", root.zerochanUserAgent)
             } else if (currentProvider === "e621") {
                 xhr.setRequestHeader("User-Agent", e621UserAgent)
             }

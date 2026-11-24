@@ -75,4 +75,23 @@ TestCase {
         compare(Zerochan.parse("").length, 0)
         compare(Zerochan.parse(undefined).length, 0)
     }
+
+    readonly property string suggestions: `Genshin Impact|Game|-
+Genshin Impact (Cosplay)|Theme|Genshin Impact
+Skirk|Character|Genshin Impact
+`
+
+    function test_suggestionsUseTheNameColumn() {
+        const tags = Zerochan.parseTags(suggestions)
+        compare(tags.length, 3)
+        compare(tags[0].name, "Genshin Impact")
+        compare(tags[1].name, "Genshin Impact (Cosplay)")
+        compare(tags[2].name, "Skirk")
+        verify(tags[0].count === undefined)
+    }
+
+    function test_suggestionsIgnoreEmptyLines() {
+        compare(Zerochan.parseTags("Skirk|Character|Genshin Impact\n\n").length, 1)
+        compare(Zerochan.parseTags(undefined).length, 0)
+    }
 }
