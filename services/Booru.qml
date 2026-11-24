@@ -5,6 +5,7 @@ import qs.modules.common
 import qs.services
 import Quickshell;
 import QtQuick;
+import "BooruZerochan.js" as BooruZerochan;
 
 /**
  * A service for interacting with various booru APIs.
@@ -98,31 +99,13 @@ Singleton {
         "zerochan": {
             "name": "Zerochan",
             "url": "https://www.zerochan.net",
-            "api": "https://www.zerochan.net/?json",
+            // The JSON list endpoint answers 500 with a JSON object glued to an
+            // HTML page, so JSON.parse never sees a whole document. The RSS
+            // variant still serves the same entries with a 200.
+            "api": "https://www.zerochan.net/?xml",
             "defaultLimit": 20,
             "description": Translation.tr("Clean stuff | Excellent quality, no NSFW"),
-            "totalCountFunc": (response) => response.pages?.count,
-            "mapFunc": (response) => {
-                response = response.items
-                return response.map(item => {
-                    return {
-                        "id": item.id,
-                        "width": item.width,
-                        "height": item.height,
-                        "aspect_ratio": item.width / item.height,
-                        "tags": item.tags.join(" "),
-                        "rating": "safe", // Zerochan doesn't have nsfw
-                        "is_nsfw": false,
-                        "md5": item.md5,
-                        "preview_url": item.thumbnail,
-                        "sample_url": item.thumbnail,
-                        "file_url": item.thumbnail,
-                        "file_ext": "avif",
-                        "source": getWorkingImageSource(item.source) ?? item.thumbnail,
-                        "character": item.tag
-                    }
-                })
-            }
+            "manualParseFunc": (responseText) => BooruZerochan.parse(responseText)
         },
         "danbooru": {
             "name": "Danbooru",
