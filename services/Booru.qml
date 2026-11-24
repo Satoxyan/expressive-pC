@@ -463,7 +463,8 @@ Singleton {
             params.push("xml")
             params.push("l=" + effectiveLimit)
             params.push("s=" + "fav")
-            params.push("t=" + 1)
+            // No t=: it's a popularity *window* measured in recent entries
+            // (last 7000/15000), so it empties older characters like Kuda Izuna.
             params.push("p=" + page)
         }
         else if (currentProvider === "waifu.im") {
