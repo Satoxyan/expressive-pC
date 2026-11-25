@@ -35,28 +35,61 @@ Button {
     readonly property var imageExtensions: ["jpg", "jpeg", "png", "webp", "bmp", "tiff", "tif", "svg", "avif"]
     readonly property bool isAnimated: (root.imageData.tags || "").split(" ").includes("animated")
 
+    property bool openAfterDownload: false
+
     onImageDataChanged: {
         root.sampleDownloaded = false
         root.playOverlayVisible = false
+        root.openAfterDownload = false
         animatedDownloader.running = false
         if (root.isAnimated) {
             cacheChecker.running = true
         }
     }
 
-    onClicked: {
-        if (root.sampleDownloaded) {
-            root.checkingForPlay = true
-            cacheChecker.running = true
-        } else if (root.isAnimated && !animatedDownloader.running) {
-            animatedDownloader.running = true
-        } else {
-            var src = String(imageObject.source)
-            if (src.startsWith("/"))
-                src = "file://" + src
-            if (src.length > 0)
-                Quickshell.execDetached(["xdg-open", src])
+    function isLocalFile(path) {
+        const value = String(path)
+        return value.startsWith("/") || value.startsWith("file://")
+    }
+
+    // Open the clicked post in the user's default app. A remote URL must never
+    // reach xdg-open: it opens the browser instead (that is how the AVIF
+    // preview thumbnails ended up there). Wait for the local file instead.
+    function maybeOpenRequested() {
+        if (!root.openAfterDownload) return
+        const src = String(imageObject.source)
+        if (root.isAnimated) {
+            if (!root.sampleDownloaded) return
+            root.openAfterDownload = false
+            Quickshell.execDetached(["xdg-open", "file://" + root.filePath])
+        } else if (root.isLocalFile(src)) {
+            root.openAfterDownload = false
+            Quickshell.execDetached(["xdg-open", src])
         }
+    }
+
+    onSampleDownloadedChanged: root.maybeOpenRequested()
+
+    Connections {
+        target: imageObject
+        function onSourceChanged() {
+            root.maybeOpenRequested()
+        }
+    }
+
+    onClicked: {
+        const src = String(imageObject.source)
+        if (!root.isAnimated && root.isLocalFile(src)) {
+            Quickshell.execDetached(["xdg-open", src])
+            return
+        }
+        root.openAfterDownload = true
+        // A download is already running; its completion opens the file.
+        if (imageDownloader.running || refererPreviewDownloader.running
+                || refererSampleUpgrader.running || animatedDownloader.running)
+            return
+        root.checkingForPlay = true
+        cacheChecker.running = true
     }
 
     // Standard downloader — used for all providers WITHOUT hotlink protection
@@ -176,6 +209,7 @@ Button {
                 if (trimmed === "CACHED") {
                     if (root.checkingForPlay) {
                         root.checkingForPlay = false
+                        root.openAfterDownload = false
                         Quickshell.execDetached(["xdg-open", "file://" + root.filePath])
                     } else {
                         root.sampleDownloaded = true
