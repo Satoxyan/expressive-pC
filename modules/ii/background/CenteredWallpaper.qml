@@ -50,13 +50,13 @@ Item {
     property real centeredShapeMax: Math.max(1, Math.ceil(
         Math.hypot(root.screen.width / 2, root.screen.height / 2)
         / CF.ShapeUtils.centeredShapeMinBoundaryRadius(root.centeredWallpaperShape) * 1.02))
-    // Pixel size the shape item/layer is rendered at. Kept at roughly the
-    // screen diagonal instead of centeredShapeMax (which can be 2.5x that)
-    // so the layer + OpacityMask + 2D canvases are ~6x cheaper per frame;
-    // the scale below compensates, so the silhouette and the picture inside
-    // stay identical (edges soften only while the shape outgrows the layer).
-    property real centeredShapeRenderSize: Math.max(1, Math.ceil(
-        Math.hypot(root.screen.width, root.screen.height)))
+    // Pixel size the shape item/layer is rendered at. Sama dengan
+    // centeredShapeMax supaya sepanjang animasi skalanya tidak pernah > 1:
+    // wallpaper di dalam shape tetap resolusi asli, tidak di-upscale.
+    // ponytail: layer-nya jadi 1.2-3.7x area diagonal tergantung bentuk; kalau
+    // bentuk ekstrem (Triangle/Arrow) terasa berat, balikkan ke diagonal layar
+    // dan terima sedikit pelembutan di akhir animasi.
+    property real centeredShapeRenderSize: root.centeredShapeMax
 
     // 0 = locked (wallpaper rests centered inside the shape), 1 = unlocked
     // (wallpaper fills the screen). This is the only animated driver: the
