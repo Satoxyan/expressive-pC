@@ -89,7 +89,9 @@ Item {
             root.finishPendingDisable()
             return
         }
-        centeredAnim.duration = value > root.centeredProgress ? 800 : 650
+        // M3 "emphasized": mulai pelan, cepat di tengah, mendarat pelan. Kurva
+        // spatial default (overshoot di awal) bikin shape-nya terasa nyentak.
+        centeredAnim.duration = value > root.centeredProgress ? 1000 : 1000
         centeredAnim.to = value
         centeredAnim.start()
     }
