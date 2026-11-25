@@ -34,12 +34,15 @@ Item {
     // Firefox asymptotes at composition length; viewport is the closest QML analogue.
     readonly property real maxOverscroll: Math.max(1, horizontal ? flickable.width : flickable.height)
     readonly property real touchpadScrollFactor: Config?.options.interactions.scrolling.touchpadScrollFactor ?? 1.0
+    // Per-view multiplier on top of the shared sensitivity (list overrides).
+    property real touchpadFactor: 1
     // Same knob semantics as TouchpadScrollArea: legacy absolute factors normalize to 1.0.
     property real touchpadSensitivity: {
         const sc = Config?.options?.interactions?.scrolling
         if (sc?.fasterTouchpadScroll === false) return 1
         return (sc?.touchpadSensitivity ?? 3.5)
             * (touchpadScrollFactor > 10 ? touchpadScrollFactor / 450 : Math.max(0, touchpadScrollFactor))
+            * root.touchpadFactor
     }
 
     // === Mouse wheel physics ===

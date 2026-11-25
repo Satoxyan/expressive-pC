@@ -2,3 +2,6 @@ module qs.modules.common.widgets
 ContentPage 1.0 ContentPage.qml
 Circle 1.0 Circle.qml
 MaterialDial 1.0 MaterialDial.qml
+StyledFlickable 1.0 StyledFlickable.qml
+StyledListView 1.0 StyledListView.qml
+StyledScrollBar 1.0 StyledScrollBar.qml

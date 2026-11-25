@@ -17,8 +17,8 @@ ListView {
     property bool animateAppearance: true
     property bool animateMovement: false
 
-    // Keep per-list overrides used by Anime.qml and AiChat.qml.
-    property real touchpadScrollFactor: Config?.options.interactions.scrolling.touchpadScrollFactor ?? 1.0
+    // Per-view multiplier on the shared touchpad sensitivity.
+    property real touchpadScrollFactor: 1
 
     function resetDrag() {
         root.dragIndex = -1
@@ -30,9 +30,30 @@ ListView {
 
     ScrollBar.vertical: StyledScrollBar {}
 
-    TouchpadScrollArea {
+    InertialScrollEngine {
+        id: scrollEngine
         flickable: root
-        touchpadScrollFactor: root.touchpadScrollFactor
+        touchpadFactor: root.touchpadScrollFactor
+    }
+
+    // Runs before the ListView's own C++ wheel handling in Qt 6. Disabled when
+    // there is nothing to scroll vertically, so short lists keep native input.
+    WheelHandler {
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        enabled: root.contentHeight > root.height
+        onWheel: event => {
+            event.accepted = false
+            scrollEngine.handleWheel(event)
+        }
+    }
+
+    onDraggingChanged: if (dragging) scrollEngine.stop()
+
+    // Keyboard and programmatic scroll steps animate; wheel, drag and fling
+    // stay instant.
+    Behavior on contentY {
+        enabled: !root.moving && !root.dragging && !scrollEngine.active
+        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
     }
 
     add: Transition {
