@@ -143,14 +143,17 @@ Item {
         return root.centeredWallpaperSize
             + root.centeredProgress * (root.centeredShapeMax - root.centeredWallpaperSize)
     }
+    // Scale of the picture on screen. The picture is composited at screen
+    // resolution, so this is its true desktop scale: it stays at 1:1 once the
+    // shape is bigger than the screen's short side, and starts slightly zoomed
+    // out while the shape is a small blob.
     function centeredImageScale() {
         if (!root.centeredWallpaperEnabled) return 1
         const minDim = Math.min(root.screen.width, root.screen.height)
         const size = root.centeredShapeSize()
         const overscan = size >= minDim ? 1
             : 1.08 - 0.08 * (size - root.centeredWallpaperSize) / (minDim - root.centeredWallpaperSize)
-        return overscan * root.centeredShapeRenderSize
-            / Math.max(size, minDim)
+        return overscan * size / Math.max(size, minDim)
     }
     function centeredFullWallpaperOpacity() {
         if (!root.centeredWallpaperEnabled) return 1
@@ -175,7 +178,6 @@ Item {
         if (Config.ready)
             root.centeredAnimationReady = true
     }
-
     Connections {
         target: Config
         function onReadyChanged() {
@@ -200,102 +202,114 @@ Item {
         visible: opacity > 0
     }
 
-    MaterialShape {
-        id: centeredWallpaperShapeItem
-        anchors.centerIn: parent
-        width: root.centeredShapeRenderSize
-        height: root.centeredShapeRenderSize
-        // Transparent while the shape is not the subject (desktop end): the layer
-        // must keep rendering so its FBO stays allocated, but everything stacked
-        // below in Background.qml (wallpaper, the transition shader) must show.
-        // The fill is thinned with the blurred background rather than by lowering
-        // the item's opacity, which would also fade the picture inside the shape.
-        color: root.centeredShapeActive && !root.wallpaperIsVideo && !root.collageMode
-            ? (root.centeredBlurActive && !root.centeredColorHasAlpha
-                ? CF.ColorUtils.transparentize(root.centeredWallpaperColor, 1 - root.centeredBlurBgOpacity)
-                : root.centeredWallpaperColor)
-            : "transparent"
-        shape: root.centeredWallpaperShape
-        transformOrigin: Item.Center
-        property real shapeZoom: 1
-        scale: (root.centeredShapeSize() / root.centeredShapeRenderSize) * shapeZoom
-        // Always rendered while enabled so the layer FBO (screen-diagonal sized)
-        // is already allocated before the lock animation starts; allocating it on
-        // frame 1 is what made desktop->lock stutter while lock->desktop was smooth.
+    // The picture is composited at screen resolution and only the mask grows,
+    // so the wallpaper keeps its 1:1 desktop mapping for the whole transition
+    // instead of being upscaled inside a scaled layer and softened.
+    Item {
+        id: centeredShapeHost
+        anchors.fill: parent
+        // Always rendered while enabled so the layer FBO is already allocated
+        // before the lock animation starts; allocating it on frame 1 is what
+        // made desktop->lock stutter while lock->desktop was smooth.
         visible: root.centeredWallpaperEnabled
 
-        SequentialAnimation {
-            id: shapeZoomAnim
-            NumberAnimation { target: centeredWallpaperShapeItem; property: "shapeZoom"; to: 1.06; duration: 300; easing.type: Easing.OutQuad }
-            NumberAnimation { target: centeredWallpaperShapeItem; property: "shapeZoom"; to: 1.0;  duration: 500; easing.type: Easing.InOutQuad }
-        }
-        SequentialAnimation {
-            id: imageFollowAnim
-            PauseAnimation { duration: 200 }
-            NumberAnimation { target: centeredWallpaperImage; property: "imageZoom"; to: 1.08; duration: 250; easing.type: Easing.OutQuad }
-            NumberAnimation { target: centeredWallpaperImage; property: "imageZoom"; to: 1.0;  duration: 350; easing.type: Easing.InOutQuad }
-        }
-        function thump() {
-            if (shapeZoomAnim.running || imageFollowAnim.running) return
-            shapeZoomAnim.restart()
-            imageFollowAnim.restart()
+        // Picture and shape fill, masked at screen resolution.
+        Item {
+            id: centeredShapeContent
+            anchors.fill: parent
+            layer.enabled: true
+            // The mask is a fixed-size shape rasterized once and then scaled;
+            // it lives in a screen-sized item so its alpha maps 1:1 onto the
+            // layer and only the silhouette grows.
+            layer.effect: OpacityMask {
+                maskSource: Item {
+                    width: root.width
+                    height: root.height
+                    MaterialShape {
+                        id: centeredShapeMaskShape
+                        anchors.centerIn: parent
+                        width: root.centeredShapeRenderSize
+                        height: root.centeredShapeRenderSize
+                        shape: root.centeredWallpaperShape
+                        color: "white"
+                        transformOrigin: Item.Center
+                        property real shapeZoom: 1
+                        scale: (root.centeredShapeSize() / root.centeredShapeRenderSize) * shapeZoom
+
+                        SequentialAnimation {
+                            id: shapeZoomAnim
+                            NumberAnimation { target: centeredShapeMaskShape; property: "shapeZoom"; to: 1.06; duration: 300; easing.type: Easing.OutQuad }
+                            NumberAnimation { target: centeredShapeMaskShape; property: "shapeZoom"; to: 1.0;  duration: 500; easing.type: Easing.InOutQuad }
+                        }
+                        SequentialAnimation {
+                            id: imageFollowAnim
+                            PauseAnimation { duration: 200 }
+                            NumberAnimation { target: centeredWallpaperImage; property: "imageZoom"; to: 1.08; duration: 250; easing.type: Easing.OutQuad }
+                            NumberAnimation { target: centeredWallpaperImage; property: "imageZoom"; to: 1.0;  duration: 350; easing.type: Easing.InOutQuad }
+                        }
+                        function thump() {
+                            if (shapeZoomAnim.running || imageFollowAnim.running) return
+                            shapeZoomAnim.restart()
+                            imageFollowAnim.restart()
+                        }
+                    }
+                }
+            }
+
+            // The fill is thinned with the blurred background rather than by
+            // lowering the item's opacity, which would also fade the picture.
+            Rectangle {
+                anchors.fill: parent
+                color: root.centeredShapeActive && !root.wallpaperIsVideo && !root.collageMode
+                    ? (root.centeredBlurActive && !root.centeredColorHasAlpha
+                        ? CF.ColorUtils.transparentize(root.centeredWallpaperColor, 1 - root.centeredBlurBgOpacity)
+                        : root.centeredWallpaperColor)
+                    : "transparent"
+            }
+
+            StyledImage {
+                id: centeredWallpaperImage
+                anchors.fill: parent
+                visible: !root.wallpaperIsVideo && root.centeredShapeActive
+                source: root.shapeImagePath
+                fillMode: Image.PreserveAspectCrop
+                mipmap: true
+                antialiasing: true
+                // Same request as the background wallpaper, so both share a single decode
+                sourceSize: Qt.size(Math.ceil(root.screen.width * root.screen.devicePixelRatio),
+                    Math.ceil(root.screen.height * root.screen.devicePixelRatio))
+                property real imageZoom: 1
+                scale: root.centeredImageScale() * imageZoom
+            }
+
+            LiveWallpaperPreview {
+                id: centeredLiveWallpaper
+                anchors.fill: parent
+                visible: root.wallpaperIsVideo && root.centeredShapeActive
+                source: root.effectiveWallpaperPath
+                thumbnail: root.wallpaperPath
+                radius: 0
+                active: visible
+                property real imageZoom: 1
+                scale: root.centeredImageScale() * imageZoom
+            }
         }
 
         Connections {
             target: GlobalStates
             function onCenteredWallpaperThumpRequested() {
-                centeredWallpaperShapeItem.thump()
+                centeredShapeMaskShape.thump()
             }
-        }
-
-        layer.enabled: true
-        layer.effect: OpacityMask {
-            maskSource: MaterialShape {
-                width: centeredWallpaperShapeItem.width
-                height: centeredWallpaperShapeItem.height
-                shape: root.centeredWallpaperShape
-            }
-        }
-
-        StyledImage {
-            id: centeredWallpaperImage
-            width: root.width
-            height: root.height
-            anchors.centerIn: parent
-            visible: !root.wallpaperIsVideo && root.centeredShapeActive
-            source: root.shapeImagePath
-            fillMode: Image.PreserveAspectCrop
-            mipmap: true
-            antialiasing: true
-            // Same request as the background wallpaper, so both share a single decode
-            sourceSize: Qt.size(Math.ceil(root.screen.width * root.screen.devicePixelRatio),
-                Math.ceil(root.screen.height * root.screen.devicePixelRatio))
-            property real imageZoom: 1
-            scale: root.centeredImageScale() * (1 / centeredWallpaperShapeItem.shapeZoom) * imageZoom
-        }
-
-        LiveWallpaperPreview {
-            id: centeredLiveWallpaper
-            width: root.width
-            height: root.height
-            anchors.centerIn: parent
-            visible: root.wallpaperIsVideo && root.centeredShapeActive
-            source: root.effectiveWallpaperPath
-            thumbnail: root.wallpaperPath
-            radius: 0
-            active: visible
-            property real imageZoom: 1
-            scale: root.centeredImageScale() * (1 / centeredWallpaperShapeItem.shapeZoom) * imageZoom
         }
 
         MouseArea {
             anchors.fill: parent
             z: 1
-            // Input only when the shape is actually the visible subject; the layer
-            // itself stays rendered at desktop end so it must not swallow clicks.
+            // Input only when the shape is actually the visible subject; the
+            // layer stays rendered at desktop end so it must not swallow clicks.
             enabled: root.centeredShapeActive
             acceptedButtons: Qt.LeftButton
-                onClicked: centeredWallpaperShapeItem.thump()
+            onClicked: centeredShapeMaskShape.thump()
             onWheel: (wheel) => {
                 if (!Config.options.background.centeredWallpaperShapeCycle) return
                 if (shapeCycleCooldown.running) return
