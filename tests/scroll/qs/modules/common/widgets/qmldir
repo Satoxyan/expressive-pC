@@ -5,3 +5,4 @@ MaterialDial 1.0 MaterialDial.qml
 StyledFlickable 1.0 StyledFlickable.qml
 StyledListView 1.0 StyledListView.qml
 StyledScrollBar 1.0 StyledScrollBar.qml
+StyledGridView 1.0 StyledGridView.qml

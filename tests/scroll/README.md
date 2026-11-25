@@ -12,6 +12,7 @@ QT_QPA_PLATFORM=offscreen qml6 -I tests/scroll tests/scroll/wheelflag.qml
 Use `/usr/lib/qt6/bin/qmltestrunner`; `/usr/bin/qmltestrunner` is a different build.
 
 `qs/modules/common` is a test-only module: the real `InertialScrollEngine.qml`,
-`ContentPage.qml`, `StyledListView.qml` and `StyledFlickable.qml`, plus a stub `Config.qml` with only the scrolling knobs
+`ContentPage.qml`, `StyledListView.qml`, `StyledFlickable.qml` and
+`StyledGridView.qml`, plus a stub `Config.qml` with only the scrolling knobs
 the engine reads and a stub `Appearance.qml` with only the properties the
 widgets read. `tst_dial.qml` reuses it for MaterialDial's wheel parsing.

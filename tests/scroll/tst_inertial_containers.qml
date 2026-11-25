@@ -2,10 +2,10 @@ import QtQuick
 import QtTest
 import qs.modules.common.widgets
 
-// StyledListView must scroll through the shared inertial engine, i.e. the same
-// feel as the settings pages. (Wheel routing itself needs a real compositor.)
+// The shared scroll containers must run through the same inertial engine as the
+// settings pages. (Wheel routing itself needs a real compositor.)
 TestCase {
-    name: "StyledListViewInertia"
+    name: "InertialContainers"
     when: windowShown
     width: 400
     height: 300
@@ -19,23 +19,30 @@ TestCase {
         popin: false
     }
 
-    function childOf(item, predicate) {
+    // Grids don't populate while hidden under the offscreen harness, so only the
+    // engine's presence is checked here; behaviour is covered by the list above.
+    StyledGridView {
+        id: grid
+        anchors.fill: parent
+        visible: false
+        cellWidth: 100
+        cellHeight: 100
+        model: 40
+    }
+
+    function engineOf(item) {
         for (let i = 0; i < item.data.length; i++) {
             const child = item.data[i]
-            if (predicate(child)) return child
+            if (typeof child.handleWheel === "function") return child
         }
         return null
     }
 
-    function engineOf(item) {
-        return childOf(item, child => typeof child.handleWheel === "function")
-    }
-
-    function test_engineInstalled() {
+    function test_listEngineInstalled() {
         verify(engineOf(view) !== null, "inertial engine present inside the list")
     }
 
-    function test_mouseWheelAnimates() {
+    function test_listMouseWheelAnimates() {
         wait(50)
         verify(view.contentHeight > view.height, "list overflows")
         const engine = engineOf(view)
@@ -52,7 +59,7 @@ TestCase {
         verify(view.contentY > 90, "wheel animation completed (y=" + view.contentY.toFixed(1) + ")")
     }
 
-    function test_touchpadFlingContinues() {
+    function test_listTouchpadFlingContinues() {
         const engine = engineOf(view)
         engine.stop()
         view.contentY = 0
@@ -72,4 +79,9 @@ TestCase {
         wait(250)
         verify(view.contentY > atRelease, "movement continued after the gesture (inertia)")
     }
+
+    function test_gridEngineInstalled() {
+        verify(engineOf(grid) !== null, "inertial engine present inside the grid")
+    }
+
 }
