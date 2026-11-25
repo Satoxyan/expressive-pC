@@ -29,6 +29,8 @@ Button {
     property real imageRadius: Appearance.rounding.small
 
     property bool showActions: false
+    // Tags are noisy on hover; they only show on demand (right-click).
+    property bool tagsVisible: false
     property bool sampleDownloaded: false
     property bool playOverlayVisible: false
     property bool checkingForPlay: false
@@ -38,6 +40,7 @@ Button {
     property bool openAfterDownload: false
 
     onImageDataChanged: {
+        root.tagsVisible = false
         root.sampleDownloaded = false
         root.playOverlayVisible = false
         root.openAfterDownload = false
@@ -77,7 +80,10 @@ Button {
         }
     }
 
+    onHoveredChanged: if (!root.hovered) root.tagsVisible = false
+
     onClicked: {
+        root.tagsVisible = false
         const src = String(imageObject.source)
         if (!root.isAnimated && root.isLocalFile(src)) {
             Quickshell.execDetached(["xdg-open", src])
@@ -225,7 +231,14 @@ Button {
         }
     }
 
+    TapHandler {
+        acceptedButtons: Qt.RightButton
+        onTapped: root.tagsVisible = !root.tagsVisible
+    }
+
     StyledToolTip {
+        extraVisibleCondition: false
+        alternativeVisibleCondition: root.tagsVisible
         text: `${StringUtils.wordWrap(root.imageData.tags, root.maxTagStringLineLength)}`
     }
 
