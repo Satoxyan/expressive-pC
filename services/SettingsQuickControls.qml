@@ -120,6 +120,8 @@ Singleton {
         "desktop:Wallpaper/Centered wallpaper/Show only when locked": root.optionSwitch("background.centeredWallpaperOnlyWhenLocked"),
         "desktop:Wallpaper/Centered wallpaper/Blur background": root.optionSwitch("background.centeredWallpaperBlur"),
         "desktop:Wallpaper/Centered wallpaper/Size": root.optionSlider("background.centeredWallpaperSize", 400, 800, [400], false),
+        "desktop:Wallpaper/Centered wallpaper/Enter duration (ms)": root.optionSpin("background.centeredWallpaperEnterDuration", 0, 5000, 50),
+        "desktop:Wallpaper/Centered wallpaper/Exit duration (ms)": root.optionSpin("background.centeredWallpaperExitDuration", 0, 5000, 50),
         "desktop:Clock/Enable": root.optionSwitch("background.widgets.clock.enable"),
         "desktop:Clock/Show only when locked": root.optionSwitch("background.widgets.clock.showOnlyWhenLocked"),
         "desktop:Placement strategy": root.optionSelect("background.widgets.clock.placementStrategy", [

@@ -91,7 +91,9 @@ Item {
         }
         // M3 "emphasized": mulai pelan, cepat di tengah, mendarat pelan. Kurva
         // spatial default (overshoot di awal) bikin shape-nya terasa nyentak.
-        centeredAnim.duration = value > root.centeredProgress ? 1000 : 1000
+        centeredAnim.duration = value < root.centeredProgress
+            ? Config.options.background.centeredWallpaperEnterDuration
+            : Config.options.background.centeredWallpaperExitDuration
         centeredAnim.to = value
         centeredAnim.start()
     }

@@ -412,6 +412,30 @@ ContentPage {
                             Config.options.background.centeredWallpaperSize = value;
                         }
                     }
+                    ConfigSpinBox {
+                        visible: Config.options.background.centeredWallpaper
+                        icon: "login"
+                        text: Translation.tr("Enter duration (ms)")
+                        value: Config.options.background.centeredWallpaperEnterDuration
+                        from: 0
+                        to: 5000
+                        stepSize: 50
+                        onValueChanged: {
+                            Config.options.background.centeredWallpaperEnterDuration = value;
+                        }
+                    }
+                    ConfigSpinBox {
+                        visible: Config.options.background.centeredWallpaper
+                        icon: "logout"
+                        text: Translation.tr("Exit duration (ms)")
+                        value: Config.options.background.centeredWallpaperExitDuration
+                        from: 0
+                        to: 5000
+                        stepSize: 50
+                        onValueChanged: {
+                            Config.options.background.centeredWallpaperExitDuration = value;
+                        }
+                    }
                 }
             }
         }

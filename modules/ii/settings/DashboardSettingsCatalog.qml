@@ -615,6 +615,8 @@ QtObject {
                 { type: "toggle", key: "desktop:Wallpaper/Centered wallpaper/Blur background", title: Translation.tr("Blur background"), icon: "blur_on" },
                 { type: "toggle", key: "desktop:Scroll to cycle shape", title: Translation.tr("Scroll to cycle shape"), icon: "swipe_vertical" },
                 { type: "slider", key: "desktop:Wallpaper/Centered wallpaper/Size", title: Translation.tr("Size"), icon: "aspect_ratio", percent: false },
+                { type: "spin", key: "desktop:Wallpaper/Centered wallpaper/Enter duration (ms)", title: Translation.tr("Enter duration (ms)"), icon: "login" },
+                { type: "spin", key: "desktop:Wallpaper/Centered wallpaper/Exit duration (ms)", title: Translation.tr("Exit duration (ms)"), icon: "logout" },
                 { type: "swatch", key: "desktop:Centered color", title: Translation.tr("Background color"), icon: "palette", w: 2 },
                 { type: "shape", key: "desktop:Centered shape", title: Translation.tr("Shape"), icon: "shapes" }
             ]
