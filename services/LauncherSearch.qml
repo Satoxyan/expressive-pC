@@ -172,6 +172,7 @@ Singleton {
 
     property string mathResult: ""
     property string helperScriptPath: FileUtils.trimFileProtocol(Quickshell.shellPath("scripts/super_menu_helper.py"))
+    readonly property var helperCommand: ["env", "QS_OMNI_HISTORY=" + (Config.options.search.omni.enableBrowserHistory ? "1" : "0"), "python3", helperScriptPath]
     property var fileSearchResults: []
     property string lastFileQuery: ""
     property var spotifySearchResults: []
@@ -213,7 +214,7 @@ Singleton {
         function search(isPlay, q) {
             spotifyHistoryProc.running = false;
             spotifyHistoryProc.targetQuery = q.toLowerCase();
-            spotifyHistoryProc.command = ["python3", root.helperScriptPath, "spotify-history", isPlay ? "play" : "queue", q];
+            spotifyHistoryProc.command = [...root.helperCommand, "spotify-history", isPlay ? "play" : "queue", q];
             spotifyHistoryProc.running = true;
         }
         stdout: SplitParser {
@@ -230,7 +231,7 @@ Singleton {
 
     Timer {
         id: suggestionTimer
-        interval: 35
+        interval: 180
         onTriggered: {
             const q = root.query.trim();
             if (Config.options.search.omni.enableBrowserHistory && q.length > 0 && !q.startsWith("/")) {
@@ -246,8 +247,7 @@ Singleton {
             suggestionProc.running = false;
             suggestionProc.targetQuery = q.toLowerCase();
             suggestionProc.command = [
-                "python3",
-                root.helperScriptPath,
+                ...root.helperCommand,
                 "suggestions",
                 q,
                 Config.options.search.omni.enableBrowserHistory ? "1" : "0",
@@ -269,7 +269,7 @@ Singleton {
 
     Timer {
         id: fileSearchTimer
-        interval: 40
+        interval: 120
         onTriggered: {
             if (Config.options.search.omni.enableFileSearch && root.query.startsWith("/")) {
                 fileSearchProc.search(root.query);
@@ -283,7 +283,7 @@ Singleton {
         function search(q) {
             fileSearchProc.running = false;
             fileSearchProc.targetQuery = q;
-            fileSearchProc.command = ["python3", root.helperScriptPath, "file-search", q];
+            fileSearchProc.command = [...root.helperCommand, "file-search", q];
             fileSearchProc.running = true;
         }
         stdout: SplitParser {
@@ -317,7 +317,7 @@ Singleton {
         function search(sq) {
             spotifySearchProc.running = false;
             spotifySearchProc.targetSongQuery = sq.toLowerCase();
-            spotifySearchProc.command = ["python3", root.helperScriptPath, "spotify-search", sq];
+            spotifySearchProc.command = [...root.helperCommand, "spotify-search", sq];
             spotifySearchProc.running = true;
         }
         stdout: SplitParser {
@@ -524,7 +524,7 @@ Singleton {
                     execute: () => {
                         GlobalStates.overviewOpen = false;
                         if (prompt) Quickshell.clipboardText = prompt;
-                        Quickshell.execDetached(["python3", root.helperScriptPath, "open-claude", prompt]);
+                        Quickshell.execDetached([...root.helperCommand, "open-claude", prompt]);
                     }
                 })];
             } else if (prefix === "gpt" || prefix === "chatgpt") {
@@ -538,7 +538,7 @@ Singleton {
                     execute: () => {
                         GlobalStates.overviewOpen = false;
                         if (prompt) Quickshell.clipboardText = prompt;
-                        Quickshell.execDetached(["python3", root.helperScriptPath, "open-chatgpt", prompt]);
+                        Quickshell.execDetached([...root.helperCommand, "open-chatgpt", prompt]);
                     }
                 })];
             }
@@ -576,9 +576,9 @@ Singleton {
                         iconType: LauncherSearchResult.IconType.Material,
                         execute: () => {
                             if (h.uri) {
-                                Quickshell.execDetached(["python3", root.helperScriptPath, isPlay ? "spotify-play" : "spotify-queue", h.uri, h.text]);
+                                Quickshell.execDetached([...root.helperCommand, isPlay ? "spotify-play" : "spotify-queue", h.uri, h.text]);
                             } else {
-                                Quickshell.execDetached(["python3", root.helperScriptPath, isPlay ? "spotify-play-query" : "spotify-queue-query", h.text]);
+                                Quickshell.execDetached([...root.helperCommand, isPlay ? "spotify-play-query" : "spotify-queue-query", h.text]);
                             }
                         }
                     });
@@ -606,7 +606,7 @@ Singleton {
                 iconName: isPlay ? "play_circle" : "queue_music",
                 iconType: LauncherSearchResult.IconType.Material,
                 execute: () => {
-                    Quickshell.execDetached(["python3", root.helperScriptPath, isPlay ? "spotify-play-query" : "spotify-queue-query", songQuery]);
+                    Quickshell.execDetached([...root.helperCommand, isPlay ? "spotify-play-query" : "spotify-queue-query", songQuery]);
                 }
             });
 
@@ -620,7 +620,7 @@ Singleton {
                         iconName: isPlay ? "play_circle" : "queue_music",
                         iconType: LauncherSearchResult.IconType.Material,
                         execute: () => {
-                            Quickshell.execDetached(["python3", root.helperScriptPath, isPlay ? "spotify-play" : "spotify-queue", track.uri, track.display]);
+                            Quickshell.execDetached([...root.helperCommand, isPlay ? "spotify-play" : "spotify-queue", track.uri, track.display]);
                         },
                         actions: [
                             resultComp.createObject(null, {
@@ -628,7 +628,7 @@ Singleton {
                                 iconName: isPlay ? "queue_music" : "play_arrow",
                                 iconType: LauncherSearchResult.IconType.Material,
                                 execute: () => {
-                                    Quickshell.execDetached(["python3", root.helperScriptPath, isPlay ? "spotify-queue" : "spotify-play", track.uri, track.display]);
+                                    Quickshell.execDetached([...root.helperCommand, isPlay ? "spotify-queue" : "spotify-play", track.uri, track.display]);
                                 }
                             })
                         ]
@@ -768,7 +768,7 @@ Singleton {
                         iconName: item.is_dir ? "folder" : "description",
                         iconType: LauncherSearchResult.IconType.Material,
                         execute: () => {
-                            Quickshell.execDetached(["python3", root.helperScriptPath, "file-open", item.path]);
+                            Quickshell.execDetached([...root.helperCommand, "file-open", item.path]);
                         }
                     });
                 });
@@ -781,7 +781,7 @@ Singleton {
                     iconName: "folder_open",
                     iconType: LauncherSearchResult.IconType.Material,
                     execute: () => {
-                        Quickshell.execDetached(["python3", root.helperScriptPath, "file-open", root.query]);
+                        Quickshell.execDetached([...root.helperCommand, "file-open", root.query]);
                     }
                 })];
             }
@@ -812,7 +812,7 @@ Singleton {
                     iconName: 'language',
                     iconType: LauncherSearchResult.IconType.Material,
                     execute: () => {
-                        Quickshell.execDetached(["python3", root.helperScriptPath, "open-url", targetUrl]);
+                        Quickshell.execDetached([...root.helperCommand, "open-url", targetUrl]);
                     }
                 });
             }
@@ -823,82 +823,6 @@ Singleton {
         if (domainResultObject)
             result.push(domainResultObject);
 
-        //////// Smart Suggestions (Browser History + Launcher History) /////////
-        if (Config.options.search.omni.enableBrowserHistory && root.lastSuggestionQuery === trimmedQuery.toLowerCase() && root.smartSuggestions.length > 0) {
-            for (let i = 0; i < root.smartSuggestions.length; i++) {
-                const s = root.smartSuggestions[i];
-                if (s.type === "browser_url" || s.type === "url") {
-                    result.push(resultComp.createObject(null, {
-                        name: s.text,
-                        comment: (s.data ? `${s.data} • ` : "") + `${Translation.tr("Browser history")} (${s.count || 1})`,
-                        verb: Translation.tr("Open"),
-                        type: Translation.tr("Website"),
-                        iconName: "history",
-                        iconType: LauncherSearchResult.IconType.Material,
-                        execute: () => {
-                            Quickshell.execDetached(["python3", root.helperScriptPath, "open-url", s.text]);
-                        }
-                    }));
-                } else if (Config.options.search.omni.enableSpotify && s.type === "spotify_play") {
-                    result.push(resultComp.createObject(null, {
-                        name: `p ${s.text}`,
-                        comment: `${Translation.tr("Recent track")}: ${s.text} (${s.count || 1})`,
-                        verb: Translation.tr("Play"),
-                        type: "Spotify",
-                        iconName: "play_circle",
-                        iconType: LauncherSearchResult.IconType.Material,
-                        execute: () => {
-                            if (s.data) {
-                                Quickshell.execDetached(["python3", root.helperScriptPath, "spotify-play", s.data, s.text]);
-                            } else {
-                                Quickshell.execDetached(["python3", root.helperScriptPath, "spotify-play-query", s.text]);
-                            }
-                        }
-                    }));
-                } else if (Config.options.search.omni.enableSpotify && s.type === "spotify_queue") {
-                    result.push(resultComp.createObject(null, {
-                        name: `q ${s.text}`,
-                        comment: `${Translation.tr("Recent queued track")}: ${s.text} (${s.count || 1})`,
-                        verb: Translation.tr("Queue"),
-                        type: "Spotify",
-                        iconName: "queue_music",
-                        iconType: LauncherSearchResult.IconType.Material,
-                        execute: () => {
-                            if (s.data) {
-                                Quickshell.execDetached(["python3", root.helperScriptPath, "spotify-queue", s.data, s.text]);
-                            } else {
-                                Quickshell.execDetached(["python3", root.helperScriptPath, "spotify-queue-query", s.text]);
-                            }
-                        }
-                    }));
-                } else if (s.type === "search") {
-                    result.push(resultComp.createObject(null, {
-                        name: s.text,
-                        comment: `${Translation.tr("Recent search")}: "${s.text}" (${s.count || 1})`,
-                        verb: Translation.tr("Search"),
-                        type: Translation.tr("Web search"),
-                        iconName: "search",
-                        iconType: LauncherSearchResult.IconType.Material,
-                        execute: () => {
-                            Quickshell.execDetached(["python3", root.helperScriptPath, "open-search", s.text, Config.options.search.engineBaseUrl]);
-                        }
-                    }));
-                } else if (s.type === "command") {
-                    result.push(resultComp.createObject(null, {
-                        name: s.text,
-                        comment: `${Translation.tr("Recent command")}: ${s.text} (${s.count || 1})`,
-                        verb: Translation.tr("Run"),
-                        type: Translation.tr("Command"),
-                        fontType: LauncherSearchResult.FontType.Monospace,
-                        iconName: "terminal",
-                        iconType: LauncherSearchResult.IconType.Material,
-                        execute: () => {
-                            Quickshell.execDetached(["python3", root.helperScriptPath, "run-shell", s.text]);
-                        }
-                    }));
-                }
-            }
-        }
         const startsWithNumber = /^\d/.test(root.query);
         const startsWithMathPrefix = root.query.startsWith(Config.options.search.prefix.math);
         const startsWithShellCommandPrefix = root.query.startsWith(Config.options.search.prefix.shellCommand);
@@ -917,6 +841,83 @@ Singleton {
         result = result.concat(settingsResults);
         ////////// Launcher actions ////////////
         result = result.concat(launcherActionObjects);
+
+        //////// Smart Suggestions (Browser History + Launcher History) /////////
+        if (Config.options.search.omni.enableBrowserHistory && root.lastSuggestionQuery === trimmedQuery.toLowerCase() && root.smartSuggestions.length > 0) {
+            for (let i = 0; i < root.smartSuggestions.length; i++) {
+                const s = root.smartSuggestions[i];
+                if (s.type === "browser_url" || s.type === "url") {
+                    result.push(resultComp.createObject(null, {
+                        name: s.text,
+                        comment: (s.data ? `${s.data} • ` : "") + `${Translation.tr("Browser history")} (${s.count || 1})`,
+                        verb: Translation.tr("Open"),
+                        type: Translation.tr("Website"),
+                        iconName: "history",
+                        iconType: LauncherSearchResult.IconType.Material,
+                        execute: () => {
+                            Quickshell.execDetached([...root.helperCommand, "open-url", s.text]);
+                        }
+                    }));
+                } else if (Config.options.search.omni.enableSpotify && s.type === "spotify_play") {
+                    result.push(resultComp.createObject(null, {
+                        name: `p ${s.text}`,
+                        comment: `${Translation.tr("Recent track")}: ${s.text} (${s.count || 1})`,
+                        verb: Translation.tr("Play"),
+                        type: "Spotify",
+                        iconName: "play_circle",
+                        iconType: LauncherSearchResult.IconType.Material,
+                        execute: () => {
+                            if (s.data) {
+                                Quickshell.execDetached([...root.helperCommand, "spotify-play", s.data, s.text]);
+                            } else {
+                                Quickshell.execDetached([...root.helperCommand, "spotify-play-query", s.text]);
+                            }
+                        }
+                    }));
+                } else if (Config.options.search.omni.enableSpotify && s.type === "spotify_queue") {
+                    result.push(resultComp.createObject(null, {
+                        name: `q ${s.text}`,
+                        comment: `${Translation.tr("Recent queued track")}: ${s.text} (${s.count || 1})`,
+                        verb: Translation.tr("Queue"),
+                        type: "Spotify",
+                        iconName: "queue_music",
+                        iconType: LauncherSearchResult.IconType.Material,
+                        execute: () => {
+                            if (s.data) {
+                                Quickshell.execDetached([...root.helperCommand, "spotify-queue", s.data, s.text]);
+                            } else {
+                                Quickshell.execDetached([...root.helperCommand, "spotify-queue-query", s.text]);
+                            }
+                        }
+                    }));
+                } else if (s.type === "search") {
+                    result.push(resultComp.createObject(null, {
+                        name: s.text,
+                        comment: `${Translation.tr("Recent search")}: "${s.text}" (${s.count || 1})`,
+                        verb: Translation.tr("Search"),
+                        type: Translation.tr("Web search"),
+                        iconName: "search",
+                        iconType: LauncherSearchResult.IconType.Material,
+                        execute: () => {
+                            Quickshell.execDetached([...root.helperCommand, "open-search", s.text, Config.options.search.engineBaseUrl]);
+                        }
+                    }));
+                } else if (s.type === "command") {
+                    result.push(resultComp.createObject(null, {
+                        name: s.text,
+                        comment: `${Translation.tr("Recent command")}: ${s.text} (${s.count || 1})`,
+                        verb: Translation.tr("Run"),
+                        type: Translation.tr("Command"),
+                        fontType: LauncherSearchResult.FontType.Monospace,
+                        iconName: "terminal",
+                        iconType: LauncherSearchResult.IconType.Material,
+                        execute: () => {
+                            Quickshell.execDetached([...root.helperCommand, "run-shell", s.text]);
+                        }
+                    }));
+                }
+            }
+        }
 
         /// Math result, command, web search ///
         if (Config.options.search.prefix.showDefaultActionsWithoutPrefix) {

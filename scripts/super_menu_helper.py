@@ -45,12 +45,37 @@ def notify(title: str, body: str, icon: str = "system-search", app_name: str = "
 # 1. LAUNCHER HISTORY & BROWSER HISTORY (SMART SUGGESTIONS)
 # ============================================================================
 
+def _write_private_json(path: Path, payload: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(path.parent, 0o700)
+    except OSError:
+        pass
+    fd, tmp_path = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.")
+    try:
+        os.chmod(tmp_path, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False)
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+def history_enabled() -> bool:
+    return os.environ.get("QS_OMNI_HISTORY", "1") != "0"
+
+
 def record_history(item_type: str, text: str, data: str = "") -> None:
+    if not history_enabled():
+        return
     text = text.strip()
     if not text:
         return
     try:
-        HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
         history = []
         if HISTORY_FILE.exists():
             try:
@@ -78,7 +103,7 @@ def record_history(item_type: str, text: str, data: str = "") -> None:
 
         history.sort(key=lambda x: x.get("ts", 0), reverse=True)
         history = history[:200]
-        HISTORY_FILE.write_text(json.dumps(history, ensure_ascii=False), encoding="utf-8")
+        _write_private_json(HISTORY_FILE, history)
     except Exception:
         pass
 
