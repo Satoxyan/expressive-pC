@@ -807,8 +807,6 @@ Singleton {
         mediaDownloadProc.running = true
     }
 
-    Process {
-        id: mediaDownloadProc
     // Link downloads land in a folder the user can find again; the drawer only points at the file
     readonly property string linkDownloadDir: {
         const custom = (root.cfg.linkDownloadDir ?? "").trim().replace(/\/+$/, "")
@@ -843,6 +841,9 @@ Singleton {
         { kind: "audio", re: /^((on\.)?soundcloud\.com\/[^\/?#]+|open\.spotify\.com\/(intl-[a-z-]+\/)?(track|album|playlist)\/|deezer\.com\/([a-z]{2}\/)?track\/\d)/ },
         { kind: "audio", re: /^([^\/]+\.bandcamp\.com\/(track|album)\/|mixcloud\.com\/[^\/]+\/[^\/]|audiomack\.com\/[^\/]+\/(song|album)\/|newgrounds\.com\/audio\/listen)/ }
     ]
+
+    Process {
+        id: mediaDownloadProc
         property string activityId: ""
         property var saved: []
         property string failure: ""
@@ -865,6 +866,7 @@ Singleton {
             } else {
                 root.upsertActivity(mediaDownloadProc.activityId, "", root.linkDownloadErrors[mediaDownloadProc.failure] ?? Translation.tr("Download failed"), "", -1, "error")
             }
+            root.startNextMediaDownload()
         }
     }
 
@@ -882,10 +884,13 @@ Singleton {
         return foreignCount >= 2 && foreignCount > portugueseCount
     }
 
-            if (root.mediaDownloadQueue.length === 0) return
-            const next = root.mediaDownloadQueue[0]
-            root.mediaDownloadQueue = root.mediaDownloadQueue.slice(1)
-            root.startMediaDownload(next)
+    function startNextMediaDownload() {
+        if (root.mediaDownloadQueue.length === 0) return
+        const next = root.mediaDownloadQueue[0]
+        root.mediaDownloadQueue = root.mediaDownloadQueue.slice(1)
+        root.startMediaDownload(next)
+    }
+
     function translateText(text) {
         root.translation = { source: text, result: "", busy: true }
         translateProc.command = ["trans", "-b", "-no-autocorrect", ":pt-BR", text]
@@ -2045,10 +2050,10 @@ Singleton {
         }
         function remove(id: string): void {
             root.removeActivity(id)
+        }
         // mode: video | audio | file
         function download(url: string, mode: string): void {
             root.downloadMedia(url, ["audio", "file"].includes(mode) ? mode : "video")
-        }
         }
         function dev(id: string, title: string, subtitle: string, state: string, url: string): void {
             if (state === "error") { root.upsertActivity(id, title, subtitle, "web", -1, "error", { url: url, kind: "dev" }); return }
