@@ -101,18 +101,23 @@ Scope {
             readonly property real barMargin: Config.options.bar.cornerStyle === 3 ? 5 : 0
             readonly property real barWindowHeight: Appearance.sizes.barHeight + Appearance.rounding.screenRounding
             readonly property Item surface: scope.di.surfaceItem
-            readonly property rect surfaceRect: {
-                win.surface.width
-                win.surface.height
-                scope.pillItem.width
-                scope.di.implicitWidth
+            // mapFromItem() results aren't tracked by QML, so a binding goes stale whenever the bar
+            // moves or is restyled. Refresh when the island opens or closes instead.
+            property rect surfaceRect: Qt.rect(0, 0, 0, 0)
+            function refreshSurfaceRect() {
+                if (!win.surface || !scope.pillItem) return
                 const s = scope.di.QsWindow.mapFromItem(win.surface, 0, 0)
                 const q = scope.di.QsWindow.mapFromItem(scope.pillItem, 0, 0)
                 const left = Math.min(s.x, q.x)
                 const top = Math.min(s.y, q.y)
                 const right = Math.max(s.x + win.surface.width, q.x + scope.pillItem.width)
                 const bottom = Math.max(s.y + win.surface.height, q.y + scope.pillItem.height)
-                return Qt.rect(left, top, right - left, bottom - top)
+                win.surfaceRect = Qt.rect(left, top, right - left, bottom - top)
+            }
+            Component.onCompleted: Qt.callLater(win.refreshSurfaceRect)
+            Connections {
+                target: scope.di
+                function onExpandedChanged() { win.refreshSurfaceRect() }
             }
 
             screen: scope.di.QsWindow.window?.screen ?? null

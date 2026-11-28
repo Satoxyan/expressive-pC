@@ -18,7 +18,7 @@ Item {
     readonly property var cfg: Config.options.bar.dynamicIsland
     readonly property real pillHeight: 32
     readonly property real capsuleGap: 11
-    readonly property bool isMaterial: Config.options.bar.cornerStyle === 3
+    readonly property bool isMaterial: Config.options.bar.cornerStyle === 3 || Config.options.bar.cornerStyle === 4
     property bool vertical: Config.options.bar.vertical
 
     readonly property color surfaceColor: Config.options.bar.followFrameColor
