@@ -643,8 +643,7 @@ ColumnLayout {
             label: Translation.tr("Tweaks")
             onTap: () => {
                 xi.di.collapse()
-                GlobalStates.settingsPage = "Bar"
-                GlobalStates.settingsOpen = true
+                GlobalStates.openSettingsAt("Bar")
             }
         }
     }
